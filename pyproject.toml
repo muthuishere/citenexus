@@ -10,9 +10,17 @@ license = { text = "Apache-2.0" }
 authors = [{ name = "Muthukumaran Navaneethakrishnan", email = "muthuishere@gmail.com" }]
 keywords = ["rag", "retrieval", "evidence", "multilingual", "s3", "lancedb"]
 dependencies = [
+    "beautifulsoup4>=4.15.0",
     "boto3>=1.43.36",
+    "fasttext-wheel>=0.9.2",
     "lancedb>=0.33.0",
+    "lxml>=6.1.1",
+    "markdown-it-py>=4.2.0",
+    "pdfplumber>=0.11.10",
+    "pillow>=12.2.0",
     "pydantic>=2.7",
+    "python-docx>=1.2.0",
+    "python-pptx>=1.0.2",
     "pyyaml>=6.0.3",
 ]
 
@@ -51,7 +59,15 @@ files = ["src", "tests"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["lancedb", "lancedb.*"]
+module = [
+    "lancedb", "lancedb.*",
+    "fasttext", "fasttext.*",
+    "pdfplumber", "pdfplumber.*",
+    "docx", "docx.*",
+    "pptx", "pptx.*",
+    "bs4", "bs4.*",
+    "markdown_it", "markdown_it.*",
+]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

@@ -1,0 +1,64 @@
+## ADDED Requirements
+
+### Requirement: Universal intake dispatches to the right extractor
+
+`IngestPipeline.ingest` SHALL accept a file path, raw bytes, or raw text, dispatch
+to the matching extractor (unknown type → plain), and produce Evidence Units with
+the detected document language stamped on each (§8).
+
+#### Scenario: Raw text ingests as evidence
+
+- **WHEN** raw text is ingested with a document id
+- **THEN** at least one Evidence Unit is produced, each carrying the document's
+  detected language.
+
+#### Scenario: Unknown source falls back to plain
+
+- **WHEN** a source with no recognized type is ingested
+- **THEN** it is handled by the plain extractor rather than failing.
+
+### Requirement: Ingest is idempotent by content hash
+
+The pipeline SHALL record each document's content checksum in the etag manifest and
+skip re-processing an unchanged document (§4c/§5).
+
+#### Scenario: Re-ingesting unchanged content is skipped
+
+- **WHEN** the same content is ingested twice
+- **THEN** the second call reports status `unchanged` and does not re-embed.
+
+### Requirement: Ingest is gated by the declared signals
+
+The pipeline SHALL consult the client's declared signals: `embedding`/`text`
+enables embedding + upsert into the leaf vector store; `structure` enables building
+and persisting the structure index; any slow-path signal
+(`graph`/`community`/`wiki`) enqueues the content hash on the worker (§8, §15).
+
+#### Scenario: Lexical/semantic-only client skips graph and structure work
+
+- **WHEN** a pipeline declared with signals `["embedding","text"]` ingests a document
+- **THEN** its Evidence Units are embedded and upserted, no structure index is
+  persisted, and nothing is enqueued on the slow-path queue.
+
+#### Scenario: Structure signal persists a structure index
+
+- **WHEN** a pipeline that includes the `structure` signal ingests a document with
+  headings
+- **THEN** a structure index for that document is persisted under the knowledge layer.
+
+#### Scenario: Slow-path signal enqueues the document
+
+- **WHEN** a pipeline that includes the `graph` signal (with a worker queue) ingests
+  a document
+- **THEN** the document's content hash is enqueued for slow-path processing.
+
+### Requirement: Ingest persists the raw blob and returns a result
+
+The pipeline SHALL store the raw bytes content-addressed under the raw layer and
+return an `IngestResult` with the document id, status, the produced `eu_ids`, and
+the unit count.
+
+#### Scenario: Result reports the produced units
+
+- **WHEN** a document yielding two blocks is ingested
+- **THEN** the result lists two `eu_ids`, `n_units == 2`, and status `ingested`.
