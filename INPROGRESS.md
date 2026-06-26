@@ -4,7 +4,7 @@ Working state for picking the build back up. The durable plan + conventions live
 in [`CLAUDE.md`](CLAUDE.md); the living spec is under `openspec/specs/`; this file
 is just "where we are right now."
 
-_Last updated: 2026-06-26 · branch `main` · last green commit `7f86858`._
+_Last updated: 2026-06-26 · branch `main` (latest)._
 
 ## Snapshot
 
@@ -14,27 +14,29 @@ _Last updated: 2026-06-26 · branch `main` · last green commit `7f86858`._
 | **L1** domain (core-types, config/signals, plugins, provenance) | ✅ done, on main |
 | **L2** substrate (storage/MinIO, worker, telemetry, access, smoke-e2e) | ✅ done, on main |
 | **L3** ingest (extractors, language-detect, evidence+structure, vision, ingest-pipeline) | ✅ done, on main |
-| **L4** retrieval | 🔶 **partial** — embedding client + `Candidate` seam + `scan()` on main; **retrieve-engine in progress** |
-| **L5** answer / verify / eval (+ judge) → ship 0.1.0 | ⏳ not started |
+| **L4** retrieval (embedding-openai, vector/lexical/structure retrievers, RRF fusion, rerank, engine) | ✅ done, on main |
+| **L5** answer / verify / eval (+ judge) → ship 0.1.0 | ⏳ **next** |
 | **L6** graph · wiki · streaming · memory · MCP · auth-enforcement | ⏳ not started |
 
-**Living spec:** 16 capabilities archived in `openspec/specs/` (L1–L3 + embedding-openai).
-
-## In progress — `retrieve-engine` (L4)
-
-The `retrieve-engine` OpenSpec change is being implemented:
-`src/trustrag/retrieve/{vector,lexical,structure,fusion,rerank,engine}.py` +
-`tests/retrieve/`. These files may be **uncommitted in the working tree** (kept off
-`main` until green so `main` always builds). The shared `Candidate`/`RetrievalSignal`
-types (`retrieve/types.py`) and `LeafVectorStore.scan()` are already committed.
-
-**To finish L4:** run the full gate; if green, `openspec archive embedding-openai retrieve-engine`, then commit + push. Then wire `RetrievalEngine` into a public `retrieve()` (and later `ask()` at L5).
+**Living spec:** 17 capabilities archived in `openspec/specs/`. No active OpenSpec changes.
 
 ## Next steps (in order)
 
-1. **Land retrieve-engine** (above) → L4 done.
-2. **L5 answer/verify/eval**: grounded generation over an injected LLM (OpenAI-compatible / Ollama), always-on faithfulness gate, cite-or-abstain, answer-language invariant, `evaluate(csv)` + groundedness/citation metrics, offline judge. Upgrade `SmokePipeline.ask` → real `ask()` using `RetrievalEngine`. **Ship `0.1.0` to PyPI.**
-3. **L6**: graph (Leiden) · wiki (distill/index/lint) · streaming · conversation memory · MCP server · external-store auth enforcement.
+1. **L5 answer/verify/eval** — grounded generation over an injected LLM
+   (OpenAI-compatible / Ollama), always-on faithfulness gate, cite-or-abstain,
+   answer-language invariant, `evaluate(csv)` + groundedness/citation metrics,
+   offline judge. Wire `RetrievalEngine` (L4) into a public `retrieve()` and a real
+   `ask()` (replacing the smoke pipeline's fake-only path). **Ship `0.1.0` to PyPI.**
+2. **L6** — graph (Leiden) · wiki (distill/index/lint) · streaming · conversation
+   memory · MCP server · external-store auth enforcement.
+
+### What L4 gives the next session
+- `trustrag.retrieve.RetrievalEngine` — run retrievers → RRF (k=60) → rerank top-N.
+- `VectorRetriever` (dense, over `LeafVectorStore`), `LexicalRetriever` (BM25-lite
+  over `scan()`), `StructureRetriever` (structure-index walk). `rrf_fuse`.
+- `OpenAICompatibleEmbedding` (dense, `/v1/embeddings`) + `OpenAICompatibleReranker`
+  — injected transport; real endpoints are integration-only.
+- L5 should compose these into `retrieve()`/`ask()` and add the LLM generation step.
 
 ## Resume / verify
 
@@ -45,10 +47,10 @@ task local:minio:up              # start MinIO (S3) — needed for integration t
 uv run pytest -m integration -q  # MinIO + fastText integration suite
 ```
 
-- **Tests (last full run):** 269 unit + 4 integration green (before retrieve-engine).
+- **Tests (last full run):** 302 unit + 4 integration green (1 skipped: embed endpoint, Ollama down).
 - **MinIO**: `compose.yaml`, S3 `:19000` / console `:19001` (`minioadmin`), bucket `trustrag-local`.
-- **Ollama**: currently **down** — real embedding/LLM integration tests skip until it's up (`task local:ollama:up` to pull models). All unit tests use deterministic fakes.
-- **fastText `lid.176`** model caches under `assets/models/` (gitignored), downloaded on first real detect.
+- **Ollama**: currently **down** — real embedding/LLM/rerank integration tests skip until it's up (`task local:ollama:up`). All unit tests use deterministic fakes.
+- **fastText `lid.176`** caches under `assets/models/` (gitignored), downloaded on first real detect.
 
 ## Open decisions
 
