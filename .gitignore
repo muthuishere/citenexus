@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# uv
+# (uv.lock IS committed)
+
+# Vendored assets (downloaded on first use)
+assets/models/
+
+# Env / secrets — never commit (but keep the committed template)
+*.env
+.env
+.env.*
+!.env.example
+
+# Local data / scratch
+*.lance/
+example/.data/

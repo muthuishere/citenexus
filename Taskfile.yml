@@ -1,0 +1,68 @@
+version: '3'
+
+# Taskfile target-first: every ritual is a target; tools are never hand-run.
+# Library repo. Local-only infra (MinIO S3, Ollama, the example) lives in
+# Taskfile.local.yml, included under the `local:` namespace (kernel convention).
+# e.g. `task local:minio:up`, `task local:example`.
+
+includes:
+  local: Taskfile.local.yml
+
+tasks:
+  setup:
+    desc: Create the venv and install all deps (incl. dev group)
+    cmds:
+      - uv sync
+
+  test:
+    desc: Run the default (unit) test suite — fakes only, hermetic
+    cmds:
+      - uv run pytest -m "not integration"
+
+  test:unit:
+    desc: Alias for the hermetic unit suite
+    cmds:
+      - uv run pytest -m "not integration"
+
+  test:integration:
+    desc: Run opt-in integration tests (needs local Ollama / S3)
+    cmds:
+      - uv run pytest -m integration
+
+  cov:
+    desc: Unit suite with coverage report
+    cmds:
+      - uv run pytest -m "not integration" --cov --cov-report=term-missing
+
+  lint:
+    desc: Lint with ruff
+    cmds:
+      - uv run ruff check src tests
+
+  format:
+    desc: Auto-format with ruff
+    cmds:
+      - uv run ruff format src tests
+      - uv run ruff check --fix src tests
+
+  typecheck:
+    desc: Static type-check with mypy --strict
+    cmds:
+      - uv run mypy
+
+  check:
+    desc: The full gate — lint + types + unit tests (what CI runs)
+    cmds:
+      - task: lint
+      - task: typecheck
+      - task: test
+
+  build:
+    desc: Build the wheel + sdist
+    cmds:
+      - uv build
+
+  publish:
+    desc: Publish to PyPI (CI does this via OIDC on a tag; manual is a fallback)
+    cmds:
+      - uv publish

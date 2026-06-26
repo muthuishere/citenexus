@@ -1,0 +1,43 @@
+version: '3'
+
+# Local-only env: a local S3 (MinIO, via compose.yaml) plus an OpenAI-compatible
+# model server (Ollama) for the runnable example and the opt-in integration tests.
+
+tasks:
+  minio:up:
+    desc: Start local MinIO (S3) and auto-create the bucket
+    cmds:
+      - docker compose up -d
+      - 'echo "MinIO S3 API : http://localhost:${MINIO_API_PORT:-19000}"'
+      - 'echo "MinIO console: http://localhost:${MINIO_CONSOLE_PORT:-19001}  (minioadmin / minioadmin)"'
+      - 'echo "Bucket       : ${TRUSTRAG_BUCKET:-trustrag-local}"'
+
+  minio:down:
+    desc: Stop local MinIO (keeps the data volume)
+    cmds:
+      - docker compose down
+
+  minio:reset:
+    desc: Stop local MinIO and DELETE its data volume
+    cmds:
+      - docker compose down -v
+
+  minio:logs:
+    desc: Tail MinIO logs
+    cmds:
+      - docker compose logs -f minio
+
+  example:
+    desc: Run the end-to-end example — ingest -> ask -> evaluate (needs MinIO + Ollama)
+    dir: example
+    dotenv: ['.env']
+    deps: [minio:up]
+    cmds:
+      - uv run python run.py
+
+  ollama:up:
+    desc: Pull the models the example expects (bge-m3, qwen2.5, bge-reranker)
+    cmds:
+      - ollama pull bge-m3
+      - ollama pull qwen2.5
+      - ollama pull xitao/bge-reranker-v2-m3

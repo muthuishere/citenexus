@@ -1,0 +1,42 @@
+name: ci
+
+# PR-triggered from day one (kernel lesson: don't ship a workflow_dispatch-only
+# test workflow). Also runs on pushes to main as a backstop.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call: # so release.yml can gate publish on this same gate
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      # Third-party actions pinned to commit SHAs (never floating tags).
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install uv (+ project Python)
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: true
+
+      - name: Install Task
+        uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sync deps
+        run: task setup
+
+      # The canonical gate — same `task check` developers run locally.
+      - name: Lint + typecheck + unit tests
+        run: task check
