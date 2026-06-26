@@ -62,6 +62,15 @@ class LeafVectorStore:
         hits: list[dict[str, Any]] = tbl.search(list(vector)).limit(limit).to_list()
         return hits
 
+    def scan(self, limit: int | None = None) -> list[dict[str, Any]]:
+        """All rows in this leaf (no query) — the corpus for lexical/structure
+        retrievers. Empty if the leaf has no table yet."""
+        if self.TABLE not in self._tables():
+            return []
+        tbl = self._db.open_table(self.TABLE)
+        rows: list[dict[str, Any]] = tbl.to_arrow().to_pylist()
+        return rows if limit is None else rows[:limit]
+
     def drop(self) -> None:
         """Drop this leaf's table (the leaf becomes empty)."""
         if self.TABLE in self._tables():
