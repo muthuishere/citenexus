@@ -31,6 +31,62 @@ class Generator(Protocol):
     def answer(self, question: str, passage: str) -> str: ...
 
 
+# Trivial words carry no evidential signal; overlap on them must not "ground" an
+# answer (otherwise every question matches every document via "the"/"of"/...).
+_STOPWORDS = frozenset(
+    {
+        "a",
+        "an",
+        "and",
+        "are",
+        "as",
+        "at",
+        "be",
+        "by",
+        "can",
+        "could",
+        "do",
+        "does",
+        "for",
+        "from",
+        "how",
+        "i",
+        "in",
+        "is",
+        "it",
+        "its",
+        "may",
+        "much",
+        "no",
+        "not",
+        "of",
+        "on",
+        "or",
+        "shall",
+        "should",
+        "that",
+        "the",
+        "this",
+        "to",
+        "was",
+        "what",
+        "when",
+        "where",
+        "which",
+        "who",
+        "why",
+        "will",
+        "with",
+        "you",
+        "your",
+    }
+)
+
+
+def _content_tokens(text: str) -> set[str]:
+    return set(tokenize(text)) - _STOPWORDS
+
+
 def _supported(answer: str, passage: str) -> bool:
     """Faithfulness gate: every answer token must appear in the cited passage."""
     a = set(tokenize(answer))
@@ -59,9 +115,7 @@ class SmokePipeline:
         self._embedder = embedder
         self._generator = generator
         self._top_k = top_k
-        self._store = LeafVectorStore(
-            leaf_vector_uri(base_uri, partition), storage_options
-        )
+        self._store = LeafVectorStore(leaf_vector_uri(base_uri, partition), storage_options)
 
     def ingest(self, text: str, document_id: str) -> str:
         """Store a document as one Evidence Unit and index it. Returns its eu_id."""
@@ -91,8 +145,8 @@ class SmokePipeline:
         """Answer grounded in retrieved evidence, or refuse if there is none."""
         qvec = self._embedder.embed(question)
         hits = self._store.search(qvec, limit=self._top_k)
-        q_tokens = set(tokenize(question))
-        grounded = [h for h in hits if q_tokens & set(tokenize(str(h["text"])))]
+        q_terms = _content_tokens(question)
+        grounded = [h for h in hits if q_terms & _content_tokens(str(h["text"]))]
         if not grounded:
             return self._refuse(mode)
 

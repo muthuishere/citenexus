@@ -52,6 +52,14 @@ def test_abstains_on_empty_corpus(tmp_path: Path) -> None:
     assert r.answer  # a localized refusal, not a fabricated answer
 
 
+def test_abstains_on_irrelevant_question_with_nonempty_corpus(tmp_path: Path) -> None:
+    p = _local_pipeline(tmp_path)
+    p.ingest(NDA, "nda")
+    r = p.ask("What is the capital of France?")
+    assert r.evidence.decision is Decision.refused
+    assert r.claims == ()
+
+
 def test_retrieves_the_relevant_document(tmp_path: Path) -> None:
     p = _local_pipeline(tmp_path)
     p.ingest("Cats are small domestic animals.", "cats")
