@@ -14,8 +14,10 @@ from __future__ import annotations
 import hashlib
 import math
 import re
+from typing import TypeVar
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
+T = TypeVar("T")
 
 
 def tokenize(text: str) -> list[str]:
@@ -40,12 +42,14 @@ class FakeEmbedding:
 class FakeLLM:
     """An extractive generator — answers with evidence text, never invents."""
 
-    def answer(self, question: str, passage: str) -> str:
+    def answer(
+        self, question: str, passage: str, answer_language: str = "en"
+    ) -> str:
         return passage
 
 
 class FakeReranker:
     """Identity reranker — keeps the fused order."""
 
-    def rerank(self, query: str, candidates: list[str]) -> list[str]:
+    def rerank(self, query: str, candidates: list[T]) -> list[T]:
         return list(candidates)

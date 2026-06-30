@@ -16,8 +16,12 @@ grounding, and evaluation.
 ```python
 from trustrag import TrustRAG
 
-rag = TrustRAG("s3://my-bucket")                 # sensible defaults, all signals on
-rag.ingest()                                     # any input type; sync or async
+rag = TrustRAG(
+    "s3://my-bucket",
+    embedder=my_embedding_endpoint,
+    generator=my_llm_endpoint,
+)
+rag.ingest("policy.pdf")                         # any supported input type
 answer = rag.ask("Can the employee disclose this information?")
 print(answer)                                    # grounded answer; .sources are bbox-cited
 ```
@@ -25,8 +29,12 @@ print(answer)                                    # grounded answer; .sources are
 ## Status
 
 Early development, built layer-by-layer (foundation-first) and spec-driven via
-**OpenSpec**. See [`CLAUDE.md`](CLAUDE.md) for the build plan and conventions,
-and [`docs/SPEC-v6.md`](docs/SPEC-v6.md) for the full specification.
+**OpenSpec**. L0-L6 core retrieval/answering is implemented: the public client
+exposes `ingest()`, `retrieve()`, `ask()`, `stream()`, memory recall, and
+`evaluate(csv)`, with graph and wiki navigation resolving back to citable EUs.
+MCP and external auth enforcement are still later work. See [`CLAUDE.md`](CLAUDE.md)
+for the build plan and conventions, and [`docs/SPEC-v6.md`](docs/SPEC-v6.md) for
+the full specification.
 
 ## Develop
 

@@ -97,6 +97,8 @@ class LexicalRetriever(RetrieverPlugin):
                     text=row.get("text"),
                     page=_page(row.get("page")),
                     language=row.get("language"),
+                    checksum=row.get("checksum"),
+                    raw_uri=row.get("raw_uri"),
                 )
             )
         return candidates

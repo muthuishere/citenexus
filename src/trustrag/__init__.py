@@ -5,6 +5,8 @@ client, ``ingest``, ``ask``, and ``evaluate``. The heavy machinery lives behind
 typed plugin protocols so nothing in the pipeline is hardwired.
 """
 
-__version__ = "0.0.0"
+from trustrag.client import TrustRAG
 
-__all__ = ["__version__"]
+__version__ = "0.2.0"
+
+__all__ = ["TrustRAG", "__version__"]

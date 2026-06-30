@@ -2,7 +2,7 @@
 # NOTE: the PyPI name "trustrag" is taken; the publish dist-name will get a
 # suffix at L5 (import package stays `trustrag`). Local build is unaffected.
 name = "trustrag"
-version = "0.0.0"
+version = "0.2.0"
 description = "Evidence-first, multilingual, S3-native RAG for domains where a wrong answer is worse than no answer."
 readme = "README.md"
 requires-python = ">=3.11"

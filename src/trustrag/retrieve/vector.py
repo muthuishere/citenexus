@@ -60,6 +60,8 @@ class VectorRetriever(RetrieverPlugin):
                     text=hit.get("text"),
                     page=_page(hit.get("page")),
                     language=hit.get("language"),
+                    checksum=hit.get("checksum"),
+                    raw_uri=hit.get("raw_uri"),
                 )
             )
         return candidates

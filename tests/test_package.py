@@ -4,4 +4,4 @@ import trustrag
 
 
 def test_version_exposed() -> None:
-    assert trustrag.__version__ == "0.0.0"
+    assert trustrag.__version__ == "0.2.0"

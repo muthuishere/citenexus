@@ -26,7 +26,10 @@ assets/models/
 .env
 .env.*
 !.env.example
+vault/
+infra/vault/
 
 # Local data / scratch
+.DS_Store
 *.lance/
 example/.data/

@@ -37,3 +37,5 @@ class Candidate(BaseModel):
     text: str | None = None
     page: int | None = None
     language: str | None = None
+    checksum: str | None = None
+    raw_uri: str | None = None

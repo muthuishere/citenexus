@@ -107,6 +107,8 @@ class StructureRetriever(RetrieverPlugin):
                     text=row.get("text"),
                     page=_page(row.get("page")),
                     language=row.get("language"),
+                    checksum=row.get("checksum"),
+                    raw_uri=row.get("raw_uri"),
                 )
             )
         candidates.sort(key=lambda c: (-c.score, c.eu_id))
