@@ -59,7 +59,40 @@ provably work end-to-end over cheap hosted endpoints:
   `stock-core-vault`), pushed encrypted to S3. `.vsync` pin added (commit it).
   Tests: 323 unit green; live integration 4 passed (Jina embed + generator smoke).
 
-**Not yet committed** — review the diff, then commit + `git add .vsync`.
+**Committed** on branch `feat/real-endpoints-and-example` (2 commits: real
+endpoints/example, then telemetry). Not pushed. `git add .vsync` done.
+
+### Telemetry / observability (committed)
+- `OpenAICompatibleGenerator.last_usage` — parses the OpenAI `usage` block into
+  `TokenUsage` (input/output tokens) after each call.
+- `TrustRAG(sink=...)` / `from_config(sink=...)` — `ask()` emits a `generate`
+  `StageEvent` with real token usage + answer/refuse `Outcome`, partition-attributed.
+  No sink = silent no-op. The cost view + quality counters already read this stream.
+
+### Open threads (asked for by user, NOT yet built — sequence for next session)
+Priority order by "retrieval must be right for legal/medical":
+1. **Chunker / splitting (HIGHEST leverage)** — today `build_evidence_units` is
+   *one EU per block*, and the PDF extractor emits *one block per page*. So a legal
+   citation points at a whole page, not a clause, and the faithfulness gate over-
+   abstains. Need a real sentence/token-window chunker with overlap. ⚠️ Changes
+   `eu_id`/provenance semantics — do with the user present, not unsupervised.
+2. **Karpathy LLM-wiki (§10b)** — replace the deterministic wiki stand-in with an
+   injected `WikiDistiller` plugin (LLM), cross-referenced concept + entity pages
+   as a browsable **Markdown tree in S3** + `pages.json` manifest, a `lint` pass.
+   Reuse graph entity resolution. Navigate-not-cite invariant already enforced —
+   this is why the wiki can't hurt correctness (it only adds recall; every hit
+   resolves down to bbox-cited EUs; the faithfulness gate still runs).
+3. **Emit telemetry from ingest + retrieve + rerank + embedding** — only the
+   `generate` stage emits so far; extend to the other stages for full cost/latency.
+4. **Audio ingestion** — no audio path exists. Add an audio extractor + injected
+   transcription (Whisper-style) plugin feeding the same EU pipeline. (Image is
+   already handled: extractors emit `ImageRef`, vision describe + conditional
+   prefilter exist; needs a vision endpoint.)
+
+Design decisions locked with user: wiki depth = full (concept+entity pages, cross-
+refs, index); storage = browsable Markdown tree + JSON manifest; **tool surface =
+the library API itself** (no CLI/MCP — users import, give URLs, call ingest/ask;
+everything config-driven + plugin-swappable, toolnexus "right-sized" style).
 
 ### What L5 gives the next session
 - `trustrag.retrieve.RetrievalEngine` — run retrievers → RRF (k=60) → rerank top-N.
