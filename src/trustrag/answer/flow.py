@@ -26,9 +26,7 @@ class Generator(Protocol):
     language. It may call any endpoint, but the verifier decides what is usable.
     """
 
-    def answer(
-        self, question: str, passage: str, answer_language: str = "en"
-    ) -> str: ...
+    def answer(self, question: str, passage: str, answer_language: str = "en") -> str: ...
 
 
 def refusal(
@@ -69,9 +67,7 @@ class AnswerFlow:
         evidence_query: str | None = None,
     ) -> Result:
         relevance_query = evidence_query or question
-        languages = tuple(
-            dict.fromkeys(c.language for c in candidates if c.language is not None)
-        )
+        languages = tuple(dict.fromkeys(c.language for c in candidates if c.language is not None))
         language = resolve_answer_language(
             detection=None,
             answer_language=answer_language,

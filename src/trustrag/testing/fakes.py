@@ -42,9 +42,7 @@ class FakeEmbedding:
 class FakeLLM:
     """An extractive generator — answers with evidence text, never invents."""
 
-    def answer(
-        self, question: str, passage: str, answer_language: str = "en"
-    ) -> str:
+    def answer(self, question: str, passage: str, answer_language: str = "en") -> str:
         return passage
 
 

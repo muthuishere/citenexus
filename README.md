@@ -26,6 +26,23 @@ answer = rag.ask("Can the employee disclose this information?")
 print(answer)                                    # grounded answer; .sources are bbox-cited
 ```
 
+Or wire real OpenAI-compatible endpoints from typed config — one call builds the
+embedding / answering-LLM / reranker plugins (answers stay temperature-0):
+
+```python
+from trustrag import TrustRAG
+from trustrag.config.schema import EmbeddingConfig, LLMConfig, StorageConfig, TrustRAGConfig
+
+config = TrustRAGConfig(
+    storage=StorageConfig(bucket="./data"),                       # or "s3://bucket"
+    embedding=EmbeddingConfig(endpoint="https://api.jina.ai/v1", model="jina-embeddings-v3",
+                              api_key_env="TRUSTRAG_EMBED_API_KEY"),
+    llm=LLMConfig(endpoint="https://generativelanguage.googleapis.com/v1beta/openai",
+                  model="gemini-2.5-flash", api_key_env="TRUSTRAG_LLM_API_KEY"),
+)
+rag = TrustRAG.from_config(config)                                # keys read from env, by name
+```
+
 ## Status
 
 Early development, built layer-by-layer (foundation-first) and spec-driven via
@@ -43,16 +60,29 @@ task setup            # uv sync
 task check            # lint + typecheck + unit tests (the CI gate)
 task test             # hermetic unit suite (fakes only)
 
-task local:minio:up   # start local S3 (MinIO) + auto-create the bucket
-task local:minio:down # stop it (keep data);  local:minio:reset wipes the volume
-task local:example    # end-to-end demo over MinIO + local Ollama
+task local:example    # end-to-end demo: ingest → ask → evaluate (hosted stack, no infra)
 ```
 
-Unit tests are hermetic (fakes only) and need nothing running. The S3-native
-storage layer, the opt-in integration tests, and the example talk to a local
-**MinIO** (`compose.yaml`) — S3 API on `:19000`, console on `:19001`
-(`minioadmin`/`minioadmin`), bucket `trustrag-local`. Copy `.env.example` to
-`.env` to override defaults.
+Unit tests are hermetic (fakes only) and need nothing running.
+
+### The example ([`example/`](example/))
+
+`task local:example` runs ingest → ask → evaluate over a tiny multilingual
+corpus using a **cheap, hosted, no-infra** stack:
+
+- **Storage** — LocalFs (a folder). Point `TRUSTRAG_S3_ENDPOINT_URL` at MinIO
+  or Cloudflare R2 to exercise the real S3 path.
+- **Embedding + reranker** — [Jina](https://jina.ai) (`/v1/embeddings` + `/rerank`, one key).
+- **Answering LLM** — Gemini's OpenAI-compatible endpoint (temperature 0).
+
+Secrets live in a [vsync](https://muthuishere.github.io/vsync/) vault
+(`infra/vault/dev/.env.dev`, encrypted on S3), referenced in code by env-var
+*name* only. `task local:example` loads it via `dotenv`. Copy
+[`example/.env.example`](example/.env.example) if you'd rather use a plain file.
+
+Heavier all-local paths stay opt-in: `task local:minio:up` (real S3 backend),
+`task local:models:up` (infinity — bge-m3 embed + bge-reranker on one port), and
+`task local:ollama:up` (a local answering LLM). See [`compose.yaml`](compose.yaml).
 
 ## License
 

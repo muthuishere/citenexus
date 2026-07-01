@@ -1,5 +1,6 @@
-"""The grounded answer Result and its parts."""
+"""The grounded answer Result, its parts, and the answering-model client."""
 
+from trustrag.answer.generator import OpenAICompatibleGenerator
 from trustrag.answer.result import (
     Claim,
     Decision,
@@ -13,6 +14,7 @@ __all__ = [
     "Claim",
     "Decision",
     "EvidenceSignals",
+    "OpenAICompatibleGenerator",
     "ProvenanceEntry",
     "Result",
     "SourceRef",

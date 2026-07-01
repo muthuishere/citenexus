@@ -74,9 +74,7 @@ class IngestPipeline:
         self._embedder = embedder
         self._detector: LanguageDetectorPlugin = detector or HeuristicDetector()
         self._signals = resolve_signals(signals)
-        self._store = LeafVectorStore(
-            leaf_vector_uri(base_uri, partition), storage_options
-        )
+        self._store = LeafVectorStore(leaf_vector_uri(base_uri, partition), storage_options)
         self._queue = queue
         self._default_language = default_answer_language
 
@@ -105,9 +103,7 @@ class IngestPipeline:
             doc = extract(source, source_type=source_type, document_id=doc_id)
 
         language = self._detect_language(doc)
-        units = build_evidence_units(
-            doc, partition=self._partition, language=language, acl=acl
-        )
+        units = build_evidence_units(doc, partition=self._partition, language=language, acl=acl)
 
         # Persist the raw blob (content-addressed).
         raw_prefix = layer_prefix(Layer.raw, self._partition)

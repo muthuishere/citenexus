@@ -14,9 +14,7 @@ from trustrag.answer.result import (
 from trustrag.domain.trust import TrustMode
 
 
-def _result(
-    answer_language: str = "en", evidence_langs: tuple[str, ...] = ("en",)
-) -> Result:
+def _result(answer_language: str = "en", evidence_langs: tuple[str, ...] = ("en",)) -> Result:
     return Result(
         answer="No. The employee cannot disclose confidential information.",
         answer_language=answer_language,

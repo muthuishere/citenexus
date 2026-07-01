@@ -4,7 +4,7 @@ Working state for picking the build back up. The durable plan + conventions live
 in [`CLAUDE.md`](CLAUDE.md); the living spec is under `openspec/specs/`; this file
 is just "where we are right now."
 
-_Last updated: 2026-06-30 · branch `main`._
+_Last updated: 2026-07-02 · branch `main`._
 
 ## Snapshot
 
@@ -15,8 +15,9 @@ _Last updated: 2026-06-30 · branch `main`._
 | **L2** substrate (storage/MinIO, worker, telemetry, access, smoke-e2e) | ✅ done, on main |
 | **L3** ingest (extractors, language-detect, evidence+structure, vision, ingest-pipeline) | ✅ done, on main |
 | **L4** retrieval (embedding-openai, vector/lexical/structure retrievers, RRF fusion, rerank, engine) | ✅ done, on main |
-| **L5** answer / verify / eval → 0.1.0-ready | ✅ done, local |
-| **L6a** graph · wiki · streaming · memory | ✅ done, local |
+| **L5** answer / verify / eval → 0.1.0-ready | ✅ done, on main |
+| **L6a** graph · wiki · streaming · memory | ✅ done, on main |
+| **L5+** real answering-LLM client · `from_config` · runnable example · hosted stack | ✅ done, local |
 | **L6b** MCP · external auth enforcement · richer graph/wiki | ⏳ **next** |
 
 **Living spec:** 22 capabilities archived in `openspec/specs/`. No active OpenSpec changes.
@@ -28,6 +29,37 @@ _Last updated: 2026-06-30 · branch `main`._
    is `0.2.0` because graph/wiki/streaming/memory are included.
 2. **L6b** — MCP server · external-store auth enforcement · richer graph entity
    extraction/community clustering · richer wiki distillation/lint.
+
+## Session 2026-07-02 — real endpoints + runnable example (local, uncommitted)
+
+Closed the last L5 gap (a real answering-LLM client) and made the library
+provably work end-to-end over cheap hosted endpoints:
+
+- **`OpenAICompatibleGenerator`** (`answer/generator.py`) — the real chat client
+  behind `ask()`. Always sends `temperature` (default 0.0) → "temp-0 grounded"
+  is now enforced, not just a config default. Mirrors the embed/rerank seam
+  (injected `transport`, stdlib urllib default, key only via `api_key_env`).
+- **`TrustRAG.from_config(...)`** (`client.py`) — one call builds embedding +
+  generator + reranker plugins from a typed `TrustRAGConfig`; transports are
+  injectable so it's unit-tested hermetically.
+- **Config**: added `api_key_env` to `EmbeddingConfig` + `RerankerConfig` (keyed
+  hosted embed/rerank endpoints like Jina need it).
+- **User-Agent fix**: all three default urllib transports now send
+  `User-Agent: trustrag` — Jina (behind Cloudflare) 403s the default urllib UA.
+- **`example/`** — multilingual corpus (en/de/fr) + `golden.csv` + `run.py`.
+  `task local:example` runs ingest → ask → evaluate. Verified live: German Q
+  answered in German, groundedness + citation 100%, correct abstention on the
+  rest (extractive verifier is conservative — Gemini rephrases, gate abstains).
+- **Cheap hosted stack** (default): Jina embed+rerank, Gemini `gemini-2.5-flash`
+  LLM, LocalFs storage. No GPU, no containers.
+- **compose.yaml** — added opt-in `infinity` service (`models` profile) for
+  all-local bge-m3 embed + bge-reranker-v2-m3 on one port. (Downloaded fine but
+  its reranker weights stalled on a HF hang twice — hence hosted is the default.)
+- **Secrets**: vsync vault `infra/vault/dev/.env.dev` (env `dev`, profile
+  `stock-core-vault`), pushed encrypted to S3. `.vsync` pin added (commit it).
+  Tests: 323 unit green; live integration 4 passed (Jina embed + generator smoke).
+
+**Not yet committed** — review the diff, then commit + `git add .vsync`.
 
 ### What L5 gives the next session
 - `trustrag.retrieve.RetrievalEngine` — run retrievers → RRF (k=60) → rerank top-N.

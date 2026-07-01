@@ -11,9 +11,7 @@ from trustrag.testing import FakeEmbedding, FakeLLM
 
 
 class HallucinatingLLM:
-    def answer(
-        self, question: str, passage: str, answer_language: str = "en"
-    ) -> str:
+    def answer(self, question: str, passage: str, answer_language: str = "en") -> str:
         return "Paris is the capital of France"
 
 

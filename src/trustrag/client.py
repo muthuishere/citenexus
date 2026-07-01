@@ -7,10 +7,15 @@ from pathlib import Path
 from typing import Any
 
 from trustrag.answer.flow import AnswerFlow, Generator
+from trustrag.answer.generator import OpenAICompatibleGenerator
+from trustrag.answer.generator import Transport as ChatTransport
 from trustrag.answer.result import Result
+from trustrag.config.schema import TrustRAGConfig
 from trustrag.config.signals import Signal, resolve_signals
 from trustrag.domain.partition import PartitionPath
 from trustrag.domain.trust import TrustMode
+from trustrag.embed import OpenAICompatibleEmbedding
+from trustrag.embed import Transport as EmbedTransport
 from trustrag.evaluate import EvaluationReport, Evaluator
 from trustrag.graph import GraphRetriever, GraphStore
 from trustrag.ingest.pipeline import IngestPipeline
@@ -19,6 +24,7 @@ from trustrag.memory import MemoryStore, MemoryTurn
 from trustrag.plugins.base import LanguageDetectorPlugin, RerankerPlugin, RetrieverPlugin
 from trustrag.retrieve.engine import RetrievalEngine
 from trustrag.retrieve.lexical import LexicalRetriever
+from trustrag.retrieve.rerank import OpenAICompatibleReranker
 from trustrag.retrieve.structure import StructureRetriever
 from trustrag.retrieve.types import Candidate
 from trustrag.retrieve.vector import QueryEmbedder, VectorRetriever
@@ -32,10 +38,23 @@ from trustrag.wiki import WikiRetriever, WikiStore
 class _IdentityReranker(RerankerPlugin):
     plugin_version = "identity-rerank-v1"
 
-    def rerank(
-        self, query: str, candidates: Sequence[Candidate]
-    ) -> list[Candidate]:
+    def rerank(self, query: str, candidates: Sequence[Candidate]) -> list[Candidate]:
         return list(candidates)
+
+
+class _SingleTextEmbedder:
+    """Adapt a batch ``OpenAICompatibleEmbedding`` to the single-text seam.
+
+    Ingest and the vector retriever call ``embed(text) -> list[float]``; the
+    OpenAI-compatible plugin's ``embed`` takes a sequence. This wraps its
+    ``embed_query`` convenience so the batch plugin drops into the client.
+    """
+
+    def __init__(self, plugin: OpenAICompatibleEmbedding) -> None:
+        self._plugin = plugin
+
+    def embed(self, text: str) -> list[float]:
+        return self._plugin.embed_query(text)
 
 
 class TrustRAG:
@@ -70,9 +89,7 @@ class TrustRAG:
         )
         self._graph_store = GraphStore(self._backend, self.partition)
         self._wiki_store = WikiStore(self._backend, self.partition)
-        self._memory = MemoryStore(
-            self._backend, self.partition, max_turns=memory_max_turns
-        )
+        self._memory = MemoryStore(self._backend, self.partition, max_turns=memory_max_turns)
         self._ingest = IngestPipeline(
             backend=self._backend,
             base_uri=self.base_uri,
@@ -89,9 +106,7 @@ class TrustRAG:
         if Signal.text in self.signals:
             retrievers.append(LexicalRetriever(self._store))
         if Signal.structure in self.signals:
-            retrievers.append(
-                StructureRetriever(self._backend, self.partition, self._store)
-            )
+            retrievers.append(StructureRetriever(self._backend, self.partition, self._store))
         if Signal.graph in self.signals or Signal.community in self.signals:
             retrievers.append(GraphRetriever(self._graph_store, self._store))
         if Signal.wiki in self.signals:
@@ -105,6 +120,68 @@ class TrustRAG:
             default_answer_language=default_answer_language,
         )
         self._top_k = top_k
+
+    @classmethod
+    def from_config(
+        cls,
+        config: TrustRAGConfig,
+        *,
+        partition: PartitionPath | None = None,
+        backend: StorageBackend | None = None,
+        storage_options: StorageOptions | None = None,
+        detector: LanguageDetectorPlugin | None = None,
+        embed_transport: EmbedTransport | None = None,
+        llm_transport: ChatTransport | None = None,
+        rerank_transport: EmbedTransport | None = None,
+    ) -> TrustRAG:
+        """Build a client with real OpenAI-compatible plugins from ``config``.
+
+        Endpoints, models, and ``llm.temperature`` come from the typed config;
+        API keys are referenced only by env-var name (``*.api_key_env``) and
+        never read here. Transports are injectable so this stays unit-testable.
+        """
+        if config.llm.endpoint is None:
+            raise ValueError("config.llm.endpoint is required to build a generator")
+        if config.embedding.endpoint is None:
+            raise ValueError("config.embedding.endpoint is required to build an embedder")
+
+        embedding_plugin = OpenAICompatibleEmbedding(
+            base_url=config.embedding.endpoint,
+            model=config.embedding.model,
+            api_key_env=config.embedding.api_key_env,
+            transport=embed_transport,
+        )
+        generator = OpenAICompatibleGenerator(
+            base_url=config.llm.endpoint,
+            model=config.llm.model,
+            api_key_env=config.llm.api_key_env,
+            temperature=config.llm.temperature,
+            max_tokens=config.llm.max_tokens,
+            transport=llm_transport,
+        )
+        reranker: RerankerPlugin | None = None
+        if config.reranker.enabled and config.reranker.endpoint is not None:
+            reranker = OpenAICompatibleReranker(
+                base_url=config.reranker.endpoint,
+                model=config.reranker.model,
+                api_key_env=config.reranker.api_key_env,
+                transport=rerank_transport,
+            )
+
+        return cls(
+            config.storage.bucket,
+            partition=partition,
+            signals=config.signals,
+            embedder=_SingleTextEmbedder(embedding_plugin),
+            generator=generator,
+            reranker=reranker,
+            detector=detector,
+            backend=backend,
+            storage_options=storage_options,
+            default_answer_language=config.multilingual.fallback_language,
+            top_k=config.retrieval.top_k,
+            memory_max_turns=config.memory.max_turns,
+        )
 
     def ingest(
         self,
@@ -154,9 +231,7 @@ class TrustRAG:
         answer_language: str | None = None,
         conversation_id: str | None = None,
     ) -> Result:
-        retrieval_query = self._retrieval_query(
-            question, conversation_id=conversation_id
-        )
+        retrieval_query = self._retrieval_query(question, conversation_id=conversation_id)
         result = self._answer.ask(
             question,
             self._retrieve.retrieve(retrieval_query, k or self._top_k),
@@ -189,14 +264,10 @@ class TrustRAG:
     def evaluate(self, csv_path: str | Path) -> EvaluationReport:
         return Evaluator(self.ask).evaluate(csv_path)
 
-    def recall(
-        self, conversation_id: str, query: str, *, limit: int = 3
-    ) -> tuple[MemoryTurn, ...]:
+    def recall(self, conversation_id: str, query: str, *, limit: int = 3) -> tuple[MemoryTurn, ...]:
         return self._memory.recall(conversation_id, query, limit=limit)
 
-    def _retrieval_query(
-        self, question: str, *, conversation_id: str | None
-    ) -> str:
+    def _retrieval_query(self, question: str, *, conversation_id: str | None) -> str:
         if conversation_id is None:
             return question
         turns = self._memory.recall(conversation_id, question)

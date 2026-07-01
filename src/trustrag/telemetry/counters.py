@@ -35,9 +35,7 @@ def count_refusals(events: Iterable[StageEvent]) -> int:
 
 def count_citation_failures(events: Iterable[StageEvent]) -> int:
     """Number of verify-stage claims that failed the citation/faithfulness gate."""
-    return sum(
-        1 for e in events if e.stage is Stage.verify and e.outcome is Outcome.verify_failed
-    )
+    return sum(1 for e in events if e.stage is Stage.verify and e.outcome is Outcome.verify_failed)
 
 
 def groundedness_rate(events: Iterable[StageEvent]) -> float:

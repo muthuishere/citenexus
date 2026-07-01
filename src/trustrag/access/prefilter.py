@@ -28,9 +28,7 @@ from trustrag.domain.partition import PartitionPath
 T = TypeVar("T")
 
 
-def allowed_partition(
-    candidate: PartitionPath, allowed_set: Collection[PartitionPath]
-) -> bool:
+def allowed_partition(candidate: PartitionPath, allowed_set: Collection[PartitionPath]) -> bool:
     """True iff some path in ``allowed_set`` is a prefix of ``candidate``.
 
     An empty ``allowed_set`` always returns ``False`` (nothing is visible).

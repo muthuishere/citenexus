@@ -31,9 +31,7 @@ class Signal(StrEnum):
 # The slow-path signals: graph, graph-community, and wiki-navigation are the
 # layers an ingest never pays for unless declared, and the only ones that make
 # ``ask`` take the slow path.
-SLOW_PATH_SIGNALS: frozenset[Signal] = frozenset(
-    {Signal.graph, Signal.community, Signal.wiki}
-)
+SLOW_PATH_SIGNALS: frozenset[Signal] = frozenset({Signal.graph, Signal.community, Signal.wiki})
 
 
 def all_signals() -> frozenset[Signal]:

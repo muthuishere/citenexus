@@ -66,18 +66,14 @@ class PluginRegistry:
         """Register a single-slot plugin (last-wins). Retrievers are rejected."""
         protocol = self._classify(plugin)
         if protocol is RetrieverPlugin:
-            raise TypeError(
-                "RetrieverPlugin forms a fusion set; use register_retriever() or use()"
-            )
+            raise TypeError("RetrieverPlugin forms a fusion set; use register_retriever() or use()")
         self._validate_version(plugin)
         self._slots[protocol] = plugin
 
     def register_retriever(self, plugin: RetrieverPlugin) -> None:
         """Add a retriever to the fusion set; multiple retrievers coexist."""
         if not isinstance(plugin, RetrieverPlugin):
-            raise TypeError(
-                f"expected a RetrieverPlugin, got {type(plugin).__name__!r}"
-            )
+            raise TypeError(f"expected a RetrieverPlugin, got {type(plugin).__name__!r}")
         self._validate_version(plugin)
         self._retrievers.append(plugin)
 
@@ -97,9 +93,7 @@ class PluginRegistry:
         """Return the single protocol ``plugin`` implements, or reject it."""
         matches = [p for p in _ALL_PROTOCOLS if isinstance(plugin, p)]
         if not matches:
-            raise TypeError(
-                f"{type(plugin).__name__!r} is not an instance of any plugin protocol"
-            )
+            raise TypeError(f"{type(plugin).__name__!r} is not an instance of any plugin protocol")
         if len(matches) > 1:
             names = ", ".join(p.__name__ for p in matches)
             raise TypeError(

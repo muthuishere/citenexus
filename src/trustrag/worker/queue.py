@@ -128,9 +128,7 @@ class DurableQueue:
 
     def mark_done(self, content_hash: str, partition: str) -> Job:
         """Commit a job as ``done`` (terminal, idempotent), clearing failure info."""
-        return self._set(
-            content_hash, partition, status=JobStatus.done, stage=None, reason=None
-        )
+        return self._set(content_hash, partition, status=JobStatus.done, stage=None, reason=None)
 
     def mark_failed(self, content_hash: str, partition: str, stage: str, reason: str) -> Job:
         """Record a transient failure: ``failed`` + 1 attempt + failing stage/reason."""
@@ -145,9 +143,7 @@ class DurableQueue:
 
     def mark_dead(self, content_hash: str, partition: str, stage: str, reason: str) -> Job:
         """Dead-letter a job, recording the failing stage + reason (never dropped)."""
-        return self._set(
-            content_hash, partition, status=JobStatus.dead, stage=stage, reason=reason
-        )
+        return self._set(content_hash, partition, status=JobStatus.dead, stage=stage, reason=reason)
 
     def requeue(self, content_hash: str, partition: str) -> Job:
         """Reset a job to ``queued`` with attempts and failure info cleared.

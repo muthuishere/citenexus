@@ -96,9 +96,7 @@ def test_dict_override_wins_over_yaml() -> None:
 
 def test_precedence_env_beats_dict_beats_yaml(tmp_path: Path) -> None:
     path = tmp_path / "trustrag.yaml"
-    path.write_text(
-        "storage:\n  bucket: s3://b\nretrieval:\n  top_k: 5\n", encoding="utf-8"
-    )
+    path.write_text("storage:\n  bucket: s3://b\nretrieval:\n  top_k: 5\n", encoding="utf-8")
     # yaml says 5, dict override says 7, env says 9 -> env wins
     config = from_config(
         path,

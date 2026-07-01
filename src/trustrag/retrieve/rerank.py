@@ -23,7 +23,11 @@ Transport = Callable[[str, bytes, dict[str, str]], bytes]
 
 
 def _urllib_transport(url: str, body: bytes, headers: dict[str, str]) -> bytes:
-    request = urllib.request.Request(url, data=body, headers=headers, method="POST")
+    # Explicit User-Agent: some hosted endpoints (Jina behind Cloudflare) 403
+    # the default ``Python-urllib`` agent.
+    request = urllib.request.Request(
+        url, data=body, headers={"User-Agent": "trustrag", **headers}, method="POST"
+    )
     with urllib.request.urlopen(request) as response:
         data: bytes = response.read()
     return data
@@ -71,9 +75,7 @@ class OpenAICompatibleReranker(RerankerPlugin):
         results = json.loads(raw).get("results", [])
 
         # Order by descending relevance; each result points back by `index`.
-        ordered = sorted(
-            results, key=lambda r: r.get("relevance_score", 0.0), reverse=True
-        )
+        ordered = sorted(results, key=lambda r: r.get("relevance_score", 0.0), reverse=True)
         reranked = [items[r["index"]] for r in ordered if 0 <= r["index"] < len(items)]
         # Append any candidate the endpoint omitted, preserving input order.
         seen = {id(c) for c in reranked}

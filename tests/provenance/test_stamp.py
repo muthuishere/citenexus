@@ -18,9 +18,7 @@ def _full_stamp() -> ProducedBy:
         artifact_version=3,
         extractor=StageStamp(plugin="pdfplumber", plugin_version="1.2.0"),
         chunker=StageStamp(plugin="recursive", plugin_version="0.4.1"),
-        vision=StageStamp(
-            plugin="qwen-vl", plugin_version="1.0.0", endpoint_model="qwen2-vl-7b"
-        ),
+        vision=StageStamp(plugin="qwen-vl", plugin_version="1.0.0", endpoint_model="qwen2-vl-7b"),
         embedding=StageStamp(
             plugin="bge-m3", plugin_version="2.0.0", endpoint_model="bge-m3", dim=1024
         ),

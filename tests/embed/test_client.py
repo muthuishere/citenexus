@@ -28,9 +28,7 @@ class RecordingTransport:
         payload = json.loads(body)
         inputs = payload["input"]
         # one distinct, deterministic dense vector per input, in order
-        data = [
-            {"embedding": [float(i)] * self.dim} for i, _ in enumerate(inputs)
-        ]
+        data = [{"embedding": [float(i)] * self.dim} for i, _ in enumerate(inputs)]
         return json.dumps({"data": data}).encode("utf-8")
 
     @property

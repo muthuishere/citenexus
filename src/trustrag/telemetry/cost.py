@@ -79,9 +79,7 @@ def rollup_by_stage(events: Iterable[StageEvent], rates: CostRates) -> CostRollu
     return CostRollup(by_stage=by_stage, total=total, currency=rates.currency)
 
 
-def rollup_by_document(
-    events: Iterable[StageEvent], rates: CostRates
-) -> dict[str, CostRollup]:
+def rollup_by_document(events: Iterable[StageEvent], rates: CostRates) -> dict[str, CostRollup]:
     """Per-document cost rollups, keyed by `document_id` (events without one are skipped)."""
     grouped: dict[str, list[StageEvent]] = {}
     for event in events:

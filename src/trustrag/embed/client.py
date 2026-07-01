@@ -30,8 +30,14 @@ Transport = Callable[[str, bytes, dict[str, str]], bytes]
 
 
 def _urllib_transport(url: str, body: bytes, headers: dict[str, str]) -> bytes:
-    """The default transport: a stdlib ``urllib.request`` POST (no new deps)."""
-    request = urllib.request.Request(url, data=body, headers=headers, method="POST")
+    """The default transport: a stdlib ``urllib.request`` POST (no new deps).
+
+    Sends an explicit ``User-Agent`` — some hosted endpoints (e.g. Jina behind
+    Cloudflare) reject the default ``Python-urllib`` agent with a 403.
+    """
+    request = urllib.request.Request(
+        url, data=body, headers={"User-Agent": "trustrag", **headers}, method="POST"
+    )
     with urllib.request.urlopen(request) as response:
         data: bytes = response.read()
     return data

@@ -33,3 +33,7 @@ infra/vault/
 .DS_Store
 *.lance/
 example/.data/
+
+# Example runtime data (LocalFs store created by `task local:example`)
+example/.trustrag-data/
+.trustrag-data/

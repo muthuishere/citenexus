@@ -92,9 +92,7 @@ def test_smoke_on_minio() -> None:
     from trustrag.storage.backend import S3Backend
 
     part = PartitionPath.of(("workspace", f"it-{uuid.uuid4().hex}"))
-    backend = S3Backend(
-        BUCKET, endpoint_url=ENDPOINT, access_key_id=KEY, secret_access_key=SECRET
-    )
+    backend = S3Backend(BUCKET, endpoint_url=ENDPOINT, access_key_id=KEY, secret_access_key=SECRET)
     pipeline = SmokePipeline(
         backend=backend,
         base_uri=f"s3://{BUCKET}",

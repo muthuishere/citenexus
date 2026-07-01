@@ -64,9 +64,7 @@ class WikiStore:
         return tuple(pages)
 
     def save(self, pages: tuple[WikiPage, ...]) -> None:
-        self._backend.put_json(
-            self.key, [page.model_dump(mode="json") for page in pages]
-        )
+        self._backend.put_json(self.key, [page.model_dump(mode="json") for page in pages])
 
     def load(self) -> tuple[WikiPage, ...]:
         if not self._backend.exists(self.key):

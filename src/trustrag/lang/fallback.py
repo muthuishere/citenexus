@@ -46,9 +46,7 @@ def resolve_answer_language(
     return default_answer_language
 
 
-def flag_code_mixing(
-    candidates: Sequence[tuple[str, float]], *, strong: float = 0.40
-) -> bool:
+def flag_code_mixing(candidates: Sequence[tuple[str, float]], *, strong: float = 0.40) -> bool:
     """True when the top-2 language candidates are both strong (code-mixed).
 
     When two languages both clear ``strong`` there is no single reliable label, so

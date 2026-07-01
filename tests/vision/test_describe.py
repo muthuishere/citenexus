@@ -34,8 +34,6 @@ def test_describe_image_is_deterministic() -> None:
 
 
 def test_vision_record_is_frozen_and_forbids_extra() -> None:
-    record = describe_image(
-        ImageRef(image_id="fig-1", width=10, height=10), FakeVision()
-    )
+    record = describe_image(ImageRef(image_id="fig-1", width=10, height=10), FakeVision())
     assert record.model_config["frozen"] is True
     assert record.model_config["extra"] == "forbid"

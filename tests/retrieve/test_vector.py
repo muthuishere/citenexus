@@ -31,9 +31,7 @@ def test_candidate_carries_payload_and_page_none(
     assert top.page is None  # the -1 ingest sentinel maps back to None
 
 
-def test_empty_leaf_returns_empty(
-    empty_store: LeafVectorStore, embedder: FakeEmbedding
-) -> None:
+def test_empty_leaf_returns_empty(empty_store: LeafVectorStore, embedder: FakeEmbedding) -> None:
     assert VectorRetriever(empty_store, embedder).retrieve("x", k=5) == []
 
 

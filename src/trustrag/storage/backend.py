@@ -78,9 +78,7 @@ class LocalFsBackend(StorageBackend):
             return []
         if base.is_file():
             return [prefix]
-        return sorted(
-            str(p.relative_to(self.root)) for p in base.rglob("*") if p.is_file()
-        )
+        return sorted(str(p.relative_to(self.root)) for p in base.rglob("*") if p.is_file())
 
     def delete_prefix(self, prefix: str) -> None:
         path = self._path(prefix)
@@ -143,6 +141,4 @@ class S3Backend(StorageBackend):
         if not keys:
             return
         batch: Iterable[dict[str, str]] = [{"Key": k} for k in keys]
-        self._client.delete_objects(
-            Bucket=self.bucket, Delete={"Objects": list(batch)}
-        )
+        self._client.delete_objects(Bucket=self.bucket, Delete={"Objects": list(batch)})

@@ -70,8 +70,11 @@ def test_embedding_signal_upserts_into_leaf(tmp_path: Path) -> None:
 def test_structure_signal_persists_index(tmp_path: Path) -> None:
     backend = LocalFsBackend(tmp_path)
     p = IngestPipeline(
-        backend=backend, base_uri=str(tmp_path), partition=PART,
-        embedder=FakeEmbedding(), signals=["structure"],
+        backend=backend,
+        base_uri=str(tmp_path),
+        partition=PART,
+        embedder=FakeEmbedding(),
+        signals=["structure"],
     )
     p.ingest(text="some content", document_id="d")
     key = f"{layer_prefix(Layer.knowledge, PART)}/structure/d.json"
@@ -81,8 +84,11 @@ def test_structure_signal_persists_index(tmp_path: Path) -> None:
 def test_no_structure_signal_skips_index(tmp_path: Path) -> None:
     backend = LocalFsBackend(tmp_path)
     p = IngestPipeline(
-        backend=backend, base_uri=str(tmp_path), partition=PART,
-        embedder=FakeEmbedding(), signals=["embedding", "text"],
+        backend=backend,
+        base_uri=str(tmp_path),
+        partition=PART,
+        embedder=FakeEmbedding(),
+        signals=["embedding", "text"],
     )
     p.ingest(text="some content", document_id="d")
     key = f"{layer_prefix(Layer.knowledge, PART)}/structure/d.json"

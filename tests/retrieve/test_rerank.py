@@ -43,9 +43,7 @@ def test_empty_candidates_short_circuit() -> None:
     def boom(url: str, body: bytes, headers: dict[str, str]) -> bytes:  # pragma: no cover
         raise AssertionError("transport must not be called for empty input")
 
-    reranker = OpenAICompatibleReranker(
-        base_url="http://x/v1", model="m", transport=boom
-    )
+    reranker = OpenAICompatibleReranker(base_url="http://x/v1", model="m", transport=boom)
     assert reranker.rerank("q", []) == []
 
 

@@ -74,9 +74,7 @@ def test_identity_reranker_preserves_fused_order(
     lists = [
         VectorRetriever(seeded_store, embedder).retrieve(query, 10),
         LexicalRetriever(seeded_store).retrieve(query, 10),
-        StructureRetriever(backend_with_structure, PARTITION, seeded_store).retrieve(
-            query, 10
-        ),
+        StructureRetriever(backend_with_structure, PARTITION, seeded_store).retrieve(query, 10),
     ]
     expected = [c.eu_id for c in rrf_fuse(lists)]
     assert got == expected

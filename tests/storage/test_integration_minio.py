@@ -39,9 +39,7 @@ def _require_minio() -> None:
 
 
 def test_s3_backend_round_trip_and_delete() -> None:
-    backend = S3Backend(
-        BUCKET, endpoint_url=ENDPOINT, access_key_id=KEY, secret_access_key=SECRET
-    )
+    backend = S3Backend(BUCKET, endpoint_url=ENDPOINT, access_key_id=KEY, secret_access_key=SECRET)
     prefix = f"raw/it-{uuid.uuid4().hex}"
     digest = backend.put_blob(prefix, b"evidence-bytes")
     assert backend.exists(f"{prefix}/{digest}")

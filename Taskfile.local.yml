@@ -1,9 +1,27 @@
 version: '3'
 
-# Local-only env: a local S3 (MinIO, via compose.yaml) plus an OpenAI-compatible
-# model server (Ollama) for the runnable example and the opt-in integration tests.
+# Local + example env. The DEFAULT example stack is cheap + hosted (Jina embed/
+# rerank + Gemini LLM + LocalFs storage), so `task local:example` needs no
+# containers and no GPU — it just reads secrets from the vsync vault.
+#
+# Heavier all-local options stay opt-in:
+#   - MinIO (compose default profile)     the real S3 backend
+#   - infinity (compose `models` profile) bge-m3 embed + bge-reranker on one port
+#   - Ollama (host)                       a local answering LLM
+#
+# Secrets: `infra/vault/dev/.env.dev`, managed by vsync (encrypted on S3).
+#   vsync pull dev    # fetch + decrypt the vault before running
+#   vsync push dev    # after editing secrets
 
 tasks:
+  example:
+    desc: Run the end-to-end example — ingest -> ask -> evaluate (hosted stack, no infra)
+    dir: example
+    dotenv: ['../infra/vault/dev/.env.dev']
+    cmds:
+      - uv run python run.py
+
+  # --- MinIO (local S3) --------------------------------------------------------
   minio:up:
     desc: Start local MinIO (S3) and auto-create the bucket
     cmds:
@@ -27,16 +45,34 @@ tasks:
     cmds:
       - docker compose logs -f minio
 
-  example:
-    desc: Run the end-to-end example — ingest -> ask -> evaluate (needs MinIO + Ollama)
-    dir: example
-    dotenv: ['.env']
-    deps: [minio:up]
+  # --- infinity (local embed + rerank on one OpenAI-compatible port) -----------
+  models:up:
+    desc: Start infinity (bge-m3 embeddings + bge-reranker-v2-m3) on one OpenAI-compatible port
     cmds:
-      - uv run python run.py
+      - docker compose --profile models up -d infinity
+      - 'echo "infinity API : http://localhost:${INFINITY_PORT:-17997}  (/v1/embeddings + /rerank)"'
+      - 'echo "first boot downloads model weights — watch: task local:models:logs"'
+
+  models:down:
+    desc: Stop the infinity model server (keeps the weights cache)
+    cmds:
+      - docker compose --profile models down
+
+  models:logs:
+    desc: Tail infinity logs (watch the first-boot model download)
+    cmds:
+      - docker compose --profile models logs -f infinity
+
+  up:
+    desc: Start the full local stack — MinIO (S3) + infinity (embed/rerank)
+    cmds:
+      - docker compose --profile models up -d
+      - 'echo "MinIO S3 API : http://localhost:${MINIO_API_PORT:-19000}"'
+      - 'echo "infinity API : http://localhost:${INFINITY_PORT:-17997}"'
+      - 'echo "LLM          : start host Ollama separately (task local:ollama:up)"'
 
   ollama:up:
-    desc: Pull the models the example expects (bge-m3, qwen2.5, bge-reranker)
+    desc: Pull the models the all-local example expects (bge-m3, qwen2.5, bge-reranker)
     cmds:
       - ollama pull bge-m3
       - ollama pull qwen2.5

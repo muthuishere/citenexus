@@ -30,9 +30,7 @@ def test_unknown_signal_is_rejected_with_validation_error() -> None:
 
 
 def test_partition_hierarchy_accepts_any_depth() -> None:
-    flat = TrustRAGConfig(
-        storage={"bucket": "s3://b", "partition_hierarchy": ["workspace"]}
-    )
+    flat = TrustRAGConfig(storage={"bucket": "s3://b", "partition_hierarchy": ["workspace"]})
     three = TrustRAGConfig(
         storage={
             "bucket": "s3://b",

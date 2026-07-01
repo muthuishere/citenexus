@@ -77,9 +77,7 @@ _MATRIX: list[tuple[str, ModelManifest, set[Layer], set[Layer]]] = [
         "vision-swap",
         _manifest(
             _STAMP,
-            vision=StageStamp(
-                plugin="florence", plugin_version="1.0", endpoint_model="florence-2"
-            ),
+            vision=StageStamp(plugin="florence", plugin_version="1.0", endpoint_model="florence-2"),
         ),
         {Layer.vision, Layer.eu_chunk, Layer.embedding},
         {Layer.extract, Layer.ocr},
@@ -92,9 +90,7 @@ _MATRIX: list[tuple[str, ModelManifest, set[Layer], set[Layer]]] = [
     ),
     (
         "graph-extractor-swap",
-        _manifest(
-            _STAMP, graph_extractor=StageStamp(plugin="graphrag", plugin_version="1.0")
-        ),
+        _manifest(_STAMP, graph_extractor=StageStamp(plugin="graphrag", plugin_version="1.0")),
         {Layer.graph, Layer.community_summary},
         {Layer.extract, Layer.ocr, Layer.vision, Layer.eu_chunk, Layer.embedding, Layer.structure},
     ),
@@ -125,9 +121,7 @@ _MATRIX: list[tuple[str, ModelManifest, set[Layer], set[Layer]]] = [
     ("current", "rebuilt", "untouched"),
     [pytest.param(c, r, u, id=name) for name, c, r, u in _MATRIX],
 )
-def test_rebuild_matrix(
-    current: ModelManifest, rebuilt: set[Layer], untouched: set[Layer]
-) -> None:
+def test_rebuild_matrix(current: ModelManifest, rebuilt: set[Layer], untouched: set[Layer]) -> None:
     result = plan(current, _STAMP)
     assert rebuilt <= result, f"missing expected rebuild layers: {rebuilt - result}"
     assert result & untouched == set(), f"unexpectedly rebuilt: {result & untouched}"

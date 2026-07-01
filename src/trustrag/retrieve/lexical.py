@@ -60,9 +60,7 @@ class LexicalRetriever(RetrieverPlugin):
 
         # Document frequency per query term.
         query_terms = set(terms)
-        doc_freq = {
-            term: sum(1 for toks in tokenized if term in toks) for term in query_terms
-        }
+        doc_freq = {term: sum(1 for toks in tokenized if term in toks) for term in query_terms}
 
         scored: list[tuple[float, int]] = []
         for idx, toks in enumerate(tokenized):
@@ -75,9 +73,7 @@ class LexicalRetriever(RetrieverPlugin):
                     continue
                 n_t = doc_freq[term]
                 idf = math.log(1.0 + (n_docs - n_t + 0.5) / (n_t + 0.5))
-                norm = tf * (_K1 + 1.0) / (
-                    tf + _K1 * (1.0 - _B + _B * doc_len / avg_len)
-                )
+                norm = tf * (_K1 + 1.0) / (tf + _K1 * (1.0 - _B + _B * doc_len / avg_len))
                 score += idf * norm
             if score > 0.0:
                 scored.append((score, idx))

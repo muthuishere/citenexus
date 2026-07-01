@@ -18,9 +18,7 @@ def _config(signals: list[str], doc_types: list[str] | None = None) -> TrustRAGC
 
 def test_disallowed_signal_warns_but_proceeds(tmp_path: Path) -> None:
     validate_path = tmp_path / "trustrag.validate.yaml"
-    validate_path.write_text(
-        "allowed_signals: [embedding, text]\n", encoding="utf-8"
-    )
+    validate_path.write_text("allowed_signals: [embedding, text]\n", encoding="utf-8")
     config = _config(["embedding", "text", "graph"])
     with pytest.warns(UserWarning, match="graph"):
         result = validate_client(config, validate_path)
@@ -31,9 +29,7 @@ def test_disallowed_signal_warns_but_proceeds(tmp_path: Path) -> None:
 
 def test_disallowed_doc_type_warns(tmp_path: Path) -> None:
     validate_path = tmp_path / "trustrag.validate.yaml"
-    validate_path.write_text(
-        "allowed_doc_types: [pdf, txt]\n", encoding="utf-8"
-    )
+    validate_path.write_text("allowed_doc_types: [pdf, txt]\n", encoding="utf-8")
     config = _config(["embedding"], doc_types=["pdf", "docx"])
     with pytest.warns(UserWarning, match="docx"):
         validate_client(config, validate_path)
@@ -41,9 +37,7 @@ def test_disallowed_doc_type_warns(tmp_path: Path) -> None:
 
 def test_within_allowlist_emits_no_warning(tmp_path: Path) -> None:
     validate_path = tmp_path / "trustrag.validate.yaml"
-    validate_path.write_text(
-        "allowed_signals: [embedding, text]\n", encoding="utf-8"
-    )
+    validate_path.write_text("allowed_signals: [embedding, text]\n", encoding="utf-8")
     config = _config(["embedding", "text"])
     with warnings.catch_warnings():
         warnings.simplefilter("error")

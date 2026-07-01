@@ -5,6 +5,13 @@ name: trustrag-local
 # Ports use a high range (19000/19001) to isolate this stack from any other
 # MinIO running on the default 9000 (kernel: test stacks get their own ports).
 # Images pinned by digest (latest as of 2026-06-26).
+#
+# Two profiles:
+#   (default)  minio + createbuckets  — the S3 backend, always started.
+#   models     infinity               — bge-m3 embeddings + bge-reranker-v2-m3
+#              behind ONE OpenAI-compatible port :17997, so the "real reranker"
+#              path needs no host GPU. Started only with `--profile models`
+#              (task local:models:up). The answering LLM stays on host Ollama.
 
 services:
   minio:
@@ -38,5 +45,25 @@ services:
       echo \"bucket $$TRUSTRAG_BUCKET ready\";
       "
 
+  # Embedding + reranker behind one OpenAI-compatible port (opt-in profile).
+  # infinity serves bge-m3 (/v1/embeddings) and bge-reranker-v2-m3 (/rerank);
+  # first boot downloads the model weights into the cache volume.
+  infinity:
+    profiles: ["models"]
+    image: michaelf34/infinity:0.0.76
+    command: >
+      v2
+      --model-id BAAI/bge-m3
+      --model-id BAAI/bge-reranker-v2-m3
+      --port 7997
+    environment:
+      HF_HOME: /cache
+    ports:
+      - "${INFINITY_PORT:-17997}:7997"
+    volumes:
+      - infinity-cache:/cache
+    restart: unless-stopped
+
 volumes:
   minio-data:
+  infinity-cache:

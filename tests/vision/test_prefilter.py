@@ -75,6 +75,5 @@ def test_skip_if_ocr_dense_false_routes_meaningful_to_vision() -> None:
     cfg = VisionPrefilterConfig(skip_if_ocr_dense=False)
     img = _image("img-scan", width=900, height=900)
     assert (
-        decide(img, page_area=1_000_000.0, ocr_text_dense=True, config=cfg)
-        is VisionDecision.vision
+        decide(img, page_area=1_000_000.0, ocr_text_dense=True, config=cfg) is VisionDecision.vision
     )

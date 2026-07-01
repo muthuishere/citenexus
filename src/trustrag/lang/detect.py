@@ -133,9 +133,7 @@ class FastTextDetector(LanguageDetectorPlugin):
         cleaned = text.replace("\n", " ").strip()
         label, confidence = _predict_top(model, cleaned)
         language = label.removeprefix("__label__")
-        return LanguageResult.from_prediction(
-            language, confidence, threshold=self.threshold
-        )
+        return LanguageResult.from_prediction(language, confidence, threshold=self.threshold)
 
 
 # Dominant-script → ISO code. Order matters only for documentation; lookup is by
@@ -215,9 +213,7 @@ class HeuristicDetector(LanguageDetectorPlugin):
         language = _SCRIPT_TO_ISO.get(dominant, self.default_language)
         if dominant == "LATIN":
             language = self._latin_language(text, language)
-        return LanguageResult.from_prediction(
-            language, confidence, threshold=self.threshold
-        )
+        return LanguageResult.from_prediction(language, confidence, threshold=self.threshold)
 
     @staticmethod
     def _latin_language(text: str, default: str) -> str:

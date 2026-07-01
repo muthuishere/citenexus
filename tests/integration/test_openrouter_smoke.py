@@ -39,9 +39,7 @@ def _openrouter_key() -> str | None:
 def test_openrouter_chat_completion_smoke() -> None:
     key = _openrouter_key()
     if key is None:
-        pytest.skip(
-            "OPENROUTER_API_KEY not set and infra/vault/dev/openrouter.env absent"
-        )
+        pytest.skip("OPENROUTER_API_KEY not set and infra/vault/dev/openrouter.env absent")
 
     body = json.dumps(
         {

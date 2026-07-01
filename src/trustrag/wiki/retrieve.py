@@ -33,9 +33,7 @@ class WikiRetriever(RetrieverPlugin):
         eu_scores: dict[str, float] = {}
         for page in self._wiki_store.load():
             haystack = (
-                set(page.keywords)
-                | content_tokens(page.title)
-                | content_tokens(page.summary)
+                set(page.keywords) | content_tokens(page.title) | content_tokens(page.summary)
             )
             hits = len(terms & haystack)
             if hits == 0:

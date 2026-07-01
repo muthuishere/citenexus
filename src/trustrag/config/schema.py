@@ -64,6 +64,7 @@ class EmbeddingConfig(_Section):
 
     model: str = "bge-m3"
     endpoint: str | None = None
+    api_key_env: str | None = None
     dense: bool = True
     sparse: bool = True
     batch_size: int = 32
@@ -76,6 +77,7 @@ class RerankerConfig(_Section):
     enabled: bool = True
     model: str = "bge-reranker-v2-m3"
     endpoint: str | None = None
+    api_key_env: str | None = None
     top_n: int = 20
 
 

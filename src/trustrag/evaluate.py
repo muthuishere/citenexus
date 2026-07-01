@@ -59,7 +59,8 @@ class Evaluator:
             grounded=sum(1 for r in answered if r.evidence.all_claims_verified),
             cited=sum(1 for r in answered if r.sources),
             expected_supported=sum(
-                1 for row, result in zip(rows, results, strict=True)
+                1
+                for row, result in zip(rows, results, strict=True)
                 if _expected_supported(row.get("expected", ""), result)
             ),
         )
