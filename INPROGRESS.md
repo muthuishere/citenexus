@@ -85,6 +85,24 @@ endpoints/example, then telemetry). Not pushed. `git add .vsync` done.
   model until pdf/docx/pptx extractors capture+persist the raster to a blob_key.
   Wiring + degradation are proven with FakeVision + a persisted blob.
 
+### Contextual chunking + web crawl (committed this session)
+- **Recursive chunker** (`evidence/chunker.py`): boundary-aware (para→line→
+  sentence→word), ~450 tok / ~60 overlap, no tokenizer dep.
+- **Contextual retrieval** (`evidence/contextualize.py`): a SMALL injected model
+  writes a 50-100 tok situating prefix per chunk (Anthropic technique; ~35/49/67%
+  failure cuts). Enhancement-only — any failure degrades to the bare chunk.
+- **Parent-child builder** (`evidence/chunked_builder.py`): oversized blocks →
+  child EUs (`{doc}::{order}::{i}`). Context prefix goes in indexed `text`; the
+  citation `passage` stays VERBATIM (safety invariant for legal/medical).
+- **Web crawl** (`ingest/web.py`): `rag.ingest("https://…")` fetches+indexes;
+  `rag.crawl(seed)` BFS same-domain (page/depth capped). No new dep.
+
+⚠️ **NOT yet the default**: `build_chunked_units` is opt-in; `build_evidence_units`
+(one-EU-per-block) is still what ingest uses. Switching the default changes
+eu_id/provenance for ALL docs — deliberate change, do with user. Also needs a
+`context_model` config section (small model) + `from_config` wiring so the
+contextualizer is built from config.
+
 ### Open threads (asked for by user, NOT yet built — sequence for next session)
 Priority order by "retrieval must be right for legal/medical":
 1. **Chunker / splitting (HIGHEST leverage)** — today `build_evidence_units` is
