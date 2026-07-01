@@ -6,11 +6,13 @@ injected `VisionPlugin`'s output into an EU-ready `VisionRecord` only for the
 images that earn a vision call.
 """
 
+from trustrag.vision.client import OpenAICompatibleVision
 from trustrag.vision.describe import FakeVision, VisionRecord, describe_image
 from trustrag.vision.prefilter import VisionDecision, VisionPrefilterConfig, decide
 
 __all__ = [
     "FakeVision",
+    "OpenAICompatibleVision",
     "VisionDecision",
     "VisionPrefilterConfig",
     "VisionRecord",
