@@ -9,7 +9,7 @@ from typing import Any
 from trustrag.answer.flow import AnswerFlow, Generator
 from trustrag.answer.generator import OpenAICompatibleGenerator
 from trustrag.answer.generator import Transport as ChatTransport
-from trustrag.answer.result import Result
+from trustrag.answer.result import Decision, Result
 from trustrag.config.schema import TrustRAGConfig
 from trustrag.config.signals import Signal, resolve_signals
 from trustrag.domain.partition import PartitionPath
@@ -32,6 +32,8 @@ from trustrag.storage.backend import LocalFsBackend, S3Backend, StorageBackend
 from trustrag.storage.lance_store import LeafVectorStore, StorageOptions
 from trustrag.storage.paths import leaf_vector_uri
 from trustrag.stream import stream_result
+from trustrag.telemetry.events import Outcome, Stage, StageEvent
+from trustrag.telemetry.sinks import TelemetrySink
 from trustrag.wiki import WikiRetriever, WikiStore
 
 
@@ -79,6 +81,7 @@ class TrustRAG:
         default_answer_language: str = "en",
         top_k: int = 5,
         memory_max_turns: int = 20,
+        sink: TelemetrySink | None = None,
     ) -> None:
         self.base_uri = str(base_uri)
         self.partition = partition or PartitionPath.of(("workspace", "default"))
@@ -119,6 +122,8 @@ class TrustRAG:
             generator=generator,
             default_answer_language=default_answer_language,
         )
+        self._generator = generator
+        self._sink = sink
         self._top_k = top_k
 
     @classmethod
@@ -133,6 +138,7 @@ class TrustRAG:
         embed_transport: EmbedTransport | None = None,
         llm_transport: ChatTransport | None = None,
         rerank_transport: EmbedTransport | None = None,
+        sink: TelemetrySink | None = None,
     ) -> TrustRAG:
         """Build a client with real OpenAI-compatible plugins from ``config``.
 
@@ -181,6 +187,7 @@ class TrustRAG:
             default_answer_language=config.multilingual.fallback_language,
             top_k=config.retrieval.top_k,
             memory_max_turns=config.memory.max_turns,
+            sink=sink,
         )
 
     def ingest(
@@ -239,9 +246,29 @@ class TrustRAG:
             answer_language=answer_language,
             evidence_query=retrieval_query,
         )
+        self._emit_generate(result)
         if conversation_id is not None:
             self._memory.append(conversation_id, question, result.answer)
         return result
+
+    def _emit_generate(self, result: Result) -> None:
+        """Emit the answering-model telemetry event (§6c). No-op without a sink.
+
+        Carries the generator's real token usage (when the plugin surfaces it via
+        ``last_usage``) and the answer/refuse outcome, attributed to the partition
+        — the single stream the cost view and quality counters read.
+        """
+        if self._sink is None:
+            return
+        outcome = Outcome.ok if result.evidence.decision is Decision.answered else Outcome.refused
+        self._sink.emit(
+            StageEvent(
+                stage=Stage.generate,
+                partition=self.partition,
+                tokens=getattr(self._generator, "last_usage", None),
+                outcome=outcome,
+            )
+        )
 
     def stream(
         self,

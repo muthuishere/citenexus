@@ -26,7 +26,10 @@ class RecordingTransport:
 
     def __call__(self, url: str, body: bytes, headers: dict[str, str]) -> bytes:
         self.calls.append((url, body, dict(headers)))
-        payload = {"choices": [{"message": {"content": self.content}}]}
+        payload = {
+            "choices": [{"message": {"content": self.content}}],
+            "usage": {"prompt_tokens": 11, "completion_tokens": 7},
+        }
         return json.dumps(payload).encode("utf-8")
 
     @property
@@ -84,6 +87,15 @@ def test_temperature_is_configurable_but_still_sent() -> None:
     t = RecordingTransport()
     _generator(t, temperature=0.3).answer("q", "passage")
     assert t.last_body["temperature"] == 0.3
+
+
+def test_last_usage_exposes_token_counts() -> None:
+    g = _generator(RecordingTransport())
+    assert g.last_usage is None
+    g.answer("q", "passage")
+    assert g.last_usage is not None
+    assert g.last_usage.input == 11
+    assert g.last_usage.output == 7
 
 
 def test_max_tokens_sent_only_when_configured() -> None:

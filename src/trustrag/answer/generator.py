@@ -26,6 +26,8 @@ import os
 import urllib.request
 from collections.abc import Callable
 
+from trustrag.telemetry.events import TokenUsage
+
 # (url, json body, headers) -> response bytes. The single seam that lets unit
 # tests run hermetically while the default wires stdlib urllib.
 Transport = Callable[[str, bytes, dict[str, str]], bytes]
@@ -78,6 +80,9 @@ class OpenAICompatibleGenerator:
         self._temperature = temperature
         self._max_tokens = max_tokens
         self._transport: Transport = transport or _urllib_transport
+        # Token usage from the most recent call, for telemetry. ``None`` until
+        # the first ``answer()``; the client reads it to emit a generate event.
+        self.last_usage: TokenUsage | None = None
 
     @property
     def _endpoint(self) -> str:
@@ -114,5 +119,17 @@ class OpenAICompatibleGenerator:
         body = json.dumps(request).encode("utf-8")
         raw = self._transport(self._endpoint, body, self._headers())
         payload = json.loads(raw)
+        self.last_usage = _usage_of(payload)
         content: str = payload["choices"][0]["message"]["content"]
         return content
+
+
+def _usage_of(payload: dict[str, object]) -> TokenUsage | None:
+    """Parse the OpenAI ``usage`` block into a ``TokenUsage`` (None if absent)."""
+    usage = payload.get("usage")
+    if not isinstance(usage, dict):
+        return None
+    return TokenUsage(
+        input=int(usage.get("prompt_tokens", 0)),
+        output=int(usage.get("completion_tokens", 0)),
+    )
