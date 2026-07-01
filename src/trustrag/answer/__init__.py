@@ -1,5 +1,6 @@
-"""The grounded answer Result, its parts, and the answering-model client."""
+"""The grounded answer Result, its parts, and the answering-model clients."""
 
+from trustrag.answer.anthropic import AnthropicGenerator
 from trustrag.answer.generator import OpenAICompatibleGenerator
 from trustrag.answer.result import (
     Claim,
@@ -11,6 +12,7 @@ from trustrag.answer.result import (
 )
 
 __all__ = [
+    "AnthropicGenerator",
     "Claim",
     "Decision",
     "EvidenceSignals",

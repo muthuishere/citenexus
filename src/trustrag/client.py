@@ -6,11 +6,12 @@ from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Any
 
+from trustrag.answer.anthropic import AnthropicGenerator
 from trustrag.answer.flow import AnswerFlow, Generator
 from trustrag.answer.generator import OpenAICompatibleGenerator
 from trustrag.answer.generator import Transport as ChatTransport
 from trustrag.answer.result import Decision, Result
-from trustrag.config.schema import TrustRAGConfig
+from trustrag.config.schema import LLMProvider, TrustRAGConfig
 from trustrag.config.signals import Signal, resolve_signals
 from trustrag.domain.partition import PartitionPath
 from trustrag.domain.trust import TrustMode
@@ -157,14 +158,25 @@ class TrustRAG:
             api_key_env=config.embedding.api_key_env,
             transport=embed_transport,
         )
-        generator = OpenAICompatibleGenerator(
-            base_url=config.llm.endpoint,
-            model=config.llm.model,
-            api_key_env=config.llm.api_key_env,
-            temperature=config.llm.temperature,
-            max_tokens=config.llm.max_tokens,
-            transport=llm_transport,
-        )
+        generator: Generator
+        if config.llm.provider is LLMProvider.anthropic:
+            generator = AnthropicGenerator(
+                base_url=config.llm.endpoint,
+                model=config.llm.model,
+                api_key_env=config.llm.api_key_env,
+                temperature=config.llm.temperature,
+                max_tokens=config.llm.max_tokens or 1024,
+                transport=llm_transport,
+            )
+        else:
+            generator = OpenAICompatibleGenerator(
+                base_url=config.llm.endpoint,
+                model=config.llm.model,
+                api_key_env=config.llm.api_key_env,
+                temperature=config.llm.temperature,
+                max_tokens=config.llm.max_tokens,
+                transport=llm_transport,
+            )
         reranker: RerankerPlugin | None = None
         if config.reranker.enabled and config.reranker.endpoint is not None:
             reranker = OpenAICompatibleReranker(

@@ -34,6 +34,18 @@ class LexicalSignal(StrEnum):
     bm25 = "bm25"
 
 
+class LLMProvider(StrEnum):
+    """The answering-model wire protocol (§4b).
+
+    ``openai`` covers any OpenAI-compatible ``/chat/completions`` endpoint —
+    OpenAI, Gemini's OpenAI-compat endpoint, Ollama, vLLM, OpenRouter, …
+    ``anthropic`` is the native Messages API (different shape, own client).
+    """
+
+    openai = "openai"
+    anthropic = "anthropic"
+
+
 class StorageConfig(_Section):
     """S3-native storage + the variable-depth partition hierarchy (§6b)."""
 
@@ -49,8 +61,13 @@ class StorageConfig(_Section):
 
 
 class LLMConfig(_Section):
-    """The injected, OpenAI-compatible answering model (§4b)."""
+    """The injected answering model (§4b).
 
+    ``provider`` selects the wire protocol — OpenAI-compatible (default; also
+    Gemini/Ollama/OpenRouter) or Anthropic's native Messages API.
+    """
+
+    provider: LLMProvider = LLMProvider.openai
     model: str = "qwen2.5"
     endpoint: str | None = None
     api_key_env: str | None = None

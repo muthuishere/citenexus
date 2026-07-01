@@ -16,6 +16,7 @@ from trustrag.client import TrustRAG
 from trustrag.config.schema import (
     EmbeddingConfig,
     LLMConfig,
+    LLMProvider,
     RerankerConfig,
     StorageConfig,
     TrustRAGConfig,
@@ -97,3 +98,33 @@ def test_from_config_honours_temperature(tmp_path: Path) -> None:
     rag.ask("Can the employee disclose secrets?")
     assert captured
     assert captured[-1]["temperature"] == 0.0
+
+
+def _anthropic_transport(url: str, body: bytes, headers: dict[str, str]) -> bytes:
+    """Extractive Anthropic-shaped fake: echo the passage from the user turn."""
+    payload = json.loads(body)
+    user = payload["messages"][-1]["content"]
+    passage = user.split("Passage:\n", 1)[1].split("\n\nQuestion:", 1)[0]
+    return json.dumps({"content": [{"type": "text", "text": passage}]}).encode("utf-8")
+
+
+def test_from_config_anthropic_provider(tmp_path: Path) -> None:
+    cfg = _config(tmp_path).model_copy(
+        update={
+            "llm": LLMConfig(
+                provider=LLMProvider.anthropic,
+                endpoint="https://api.anthropic.test",
+                model="claude-opus-4-8",
+            )
+        }
+    )
+    rag = TrustRAG.from_config(
+        cfg, embed_transport=_embed_transport, llm_transport=_anthropic_transport
+    )
+    rag.ingest(
+        text="The employee shall not disclose confidential information.",
+        document_id="nda",
+    )
+    result = rag.ask("Can the employee disclose confidential information?")
+    assert result.evidence.decision is Decision.answered
+    assert result.claims[0].supported
