@@ -21,6 +21,7 @@ from trustrag.evaluate import EvaluationReport, Evaluator
 from trustrag.graph import GraphRetriever, GraphStore
 from trustrag.ingest.pipeline import IngestPipeline, VisionDescriber
 from trustrag.ingest.result import IngestResult
+from trustrag.ingest.web import FetchTransport, crawl, fetch_url, is_url
 from trustrag.memory import MemoryStore, MemoryTurn
 from trustrag.plugins.base import LanguageDetectorPlugin, RerankerPlugin, RetrieverPlugin
 from trustrag.retrieve.engine import RetrievalEngine
@@ -85,6 +86,7 @@ class TrustRAG:
         memory_max_turns: int = 20,
         sink: TelemetrySink | None = None,
         vision: VisionDescriber | None = None,
+        fetch_transport: FetchTransport | None = None,
     ) -> None:
         self.base_uri = str(base_uri)
         self.partition = partition or PartitionPath.of(("workspace", "default"))
@@ -128,6 +130,7 @@ class TrustRAG:
         )
         self._generator = generator
         self._sink = sink
+        self._fetch_transport = fetch_transport
         self._top_k = top_k
 
     @classmethod
@@ -227,6 +230,9 @@ class TrustRAG:
         source_type: Any = None,
         acl: Any = None,
     ) -> IngestResult:
+        # A URL is just another source: fetch it, then ingest as HTML.
+        if text is None and is_url(source):
+            return self._ingest_url(source, document_id=document_id, acl=acl)
         result = self._ingest.ingest(
             source,
             text=text,
@@ -237,6 +243,51 @@ class TrustRAG:
         if result.status == "ingested":
             self.refresh_slow_path()
         return result
+
+    def _ingest_url(self, url: str, *, document_id: str | None, acl: Any) -> IngestResult:
+        """Fetch a URL and ingest its body via the content-appropriate extractor."""
+        from trustrag.extract.types import SourceType
+
+        data, content_type = fetch_url(url, transport=self._fetch_transport)
+        source_type = SourceType.html if "html" in content_type else None
+        result = self._ingest.ingest(
+            data,
+            document_id=document_id or url,
+            source_type=source_type,
+            acl=acl,
+        )
+        if result.status == "ingested":
+            self.refresh_slow_path()
+        return result
+
+    def crawl(
+        self,
+        seed_url: str,
+        *,
+        max_pages: int = 50,
+        max_depth: int = 3,
+        acl: Any = None,
+    ) -> list[IngestResult]:
+        """Crawl a website (same-domain, capped) and ingest each page as HTML."""
+        from trustrag.extract.types import SourceType
+
+        results: list[IngestResult] = []
+        for page in crawl(
+            seed_url,
+            transport=self._fetch_transport,
+            max_pages=max_pages,
+            max_depth=max_depth,
+        ):
+            result = self._ingest.ingest(
+                page.html.encode("utf-8"),
+                document_id=page.url,
+                source_type=SourceType.html,
+                acl=acl,
+            )
+            results.append(result)
+        if any(r.status == "ingested" for r in results):
+            self.refresh_slow_path()
+        return results
 
     def refresh_slow_path(self) -> None:
         """Rebuild deterministic slow-path graph/wiki artifacts for this leaf."""
