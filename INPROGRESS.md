@@ -69,6 +69,22 @@ endpoints/example, then telemetry). Not pushed. `git add .vsync` done.
   `StageEvent` with real token usage + answer/refuse `Outcome`, partition-attributed.
   No sink = silent no-op. The cost view + quality counters already read this stream.
 
+### Multi-provider LLM + vision-into-evidence (committed this session)
+- **3 LLM providers**: `LLMConfig.provider` (openai | anthropic). OpenAI-compat
+  covers OpenAI + Gemini(OpenAI endpoint) + Ollama + OpenRouter; `AnthropicGenerator`
+  is the native Messages API. `from_config` picks the client.
+- **Vision client**: `OpenAICompatibleVision` (VL endpoint, base64 image → data URI,
+  JSON description, prose fallback). Built from `VisionConfig` when enabled.
+- **Vision-into-evidence**: `build_vision_units` + `IngestPipeline(vision=...)`.
+  Doc images (any type) → prefilter → describe → figure EU (text=description,
+  cite=image page/bbox, eu_id `{doc}::img::{id}`). GUARDED: no client / no bytes /
+  per-image error → text-level only, never fails. `TrustRAG(vision=...)` +
+  `from_config(vision_transport=...)`.
+- ⚠️ **ONE STEP LEFT for real PDFs**: the built-in extractors don't PERSIST image
+  bytes yet (`ImageRef.blob_key` is None). So real PDFs feed no bytes to the VL
+  model until pdf/docx/pptx extractors capture+persist the raster to a blob_key.
+  Wiring + degradation are proven with FakeVision + a persisted blob.
+
 ### Open threads (asked for by user, NOT yet built — sequence for next session)
 Priority order by "retrieval must be right for legal/medical":
 1. **Chunker / splitting (HIGHEST leverage)** — today `build_evidence_units` is
@@ -84,10 +100,10 @@ Priority order by "retrieval must be right for legal/medical":
    resolves down to bbox-cited EUs; the faithfulness gate still runs).
 3. **Emit telemetry from ingest + retrieve + rerank + embedding** — only the
    `generate` stage emits so far; extend to the other stages for full cost/latency.
-4. **Audio ingestion** — no audio path exists. Add an audio extractor + injected
-   transcription (Whisper-style) plugin feeding the same EU pipeline. (Image is
-   already handled: extractors emit `ImageRef`, vision describe + conditional
-   prefilter exist; needs a vision endpoint.)
+4. **Extractor image-byte capture** — make pdf/docx/pptx/html extractors persist
+   the actual image raster to a `blob_key` so the (now-wired) vision path feeds
+   real bytes to the VL model. This is the last step for real-PDF vision.
+5. **Audio** — dropped for now per user (was: Whisper-style transcribe plugin).
 
 Design decisions locked with user: wiki depth = full (concept+entity pages, cross-
 refs, index); storage = browsable Markdown tree + JSON manifest; **tool surface =
