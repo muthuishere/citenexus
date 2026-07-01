@@ -113,6 +113,7 @@ class VisionConfig(_Section):
     enabled: bool = False
     model: str | None = None
     endpoint: str | None = None
+    api_key_env: str | None = None
     prefilter: VisionPrefilterConfig = Field(default_factory=VisionPrefilterConfig)
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from trustrag.config.signals import Signal, requires_slow_path, resolve_signals
 from trustrag.evidence.builder import build_evidence_units
@@ -17,18 +17,48 @@ from trustrag.lang.fallback import resolve_answer_language
 from trustrag.storage.lance_store import LeafVectorStore, StorageOptions
 from trustrag.storage.manifest import EtagManifest, load_manifest, save_manifest
 from trustrag.storage.paths import Layer, layer_prefix, leaf_vector_uri, partition_segment
+from trustrag.vision.describe import describe_image
+from trustrag.vision.units import build_vision_units
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from trustrag.domain.partition import PartitionPath
-    from trustrag.plugins.base import LanguageDetectorPlugin
+    from trustrag.evidence.unit import EvidenceUnit
+    from trustrag.extract.types import ImageRef
+    from trustrag.plugins.base import LanguageDetectorPlugin, VisionPlugin
     from trustrag.storage.backend import StorageBackend
+    from trustrag.vision.describe import VisionRecord
     from trustrag.worker.queue import DurableQueue
 
 
 class Embedder(Protocol):
     def embed(self, text: str) -> list[float]: ...
+
+
+class VisionDescriber(Protocol):
+    """The injected vision seam — describe an image's bytes (§9).
+
+    Optional: with no describer configured, ingest is text-level only. Satisfied
+    by ``OpenAICompatibleVision`` and ``FakeVision``.
+    """
+
+    def describe(self, image_region: Any) -> Any: ...
+
+
+class _BytesImage:
+    """Carries an ``ImageRef``'s metadata plus its loaded bytes for the VL plugin.
+
+    ``describe_image`` reads ``.image_id``; a real vision client reads ``.data``.
+    This adapter satisfies both so the same call works for ``FakeVision`` (ignores
+    bytes) and ``OpenAICompatibleVision`` (needs them).
+    """
+
+    def __init__(self, image: Any, data: bytes) -> None:
+        self.image_id = getattr(image, "image_id", "img")
+        self.page = getattr(image, "page", None)
+        self.bbox = getattr(image, "bbox", None)
+        self.data = data
 
 
 def _raw_bytes(source: Any, text: str | None) -> bytes:
@@ -68,6 +98,7 @@ class IngestPipeline:
         storage_options: StorageOptions | None = None,
         queue: DurableQueue | None = None,
         default_answer_language: str = "en",
+        vision: VisionDescriber | None = None,
     ) -> None:
         self._backend = backend
         self._partition = partition
@@ -77,6 +108,7 @@ class IngestPipeline:
         self._store = LeafVectorStore(leaf_vector_uri(base_uri, partition), storage_options)
         self._queue = queue
         self._default_language = default_answer_language
+        self._vision = vision
 
     def ingest(
         self,
@@ -104,6 +136,7 @@ class IngestPipeline:
 
         language = self._detect_language(doc)
         units = build_evidence_units(doc, partition=self._partition, language=language, acl=acl)
+        units.extend(self._vision_units(doc, doc_id=doc_id, language=language, acl=acl))
 
         # Persist the raw blob (content-addressed).
         raw_prefix = layer_prefix(Layer.raw, self._partition)
@@ -151,6 +184,52 @@ class IngestPipeline:
             n_units=len(units),
             enqueued_slow_path=enqueued,
         )
+
+    def _vision_units(
+        self, doc: Any, *, doc_id: str, language: str, acl: Any
+    ) -> list[EvidenceUnit]:
+        """Describe the doc's images into figure EUs — text-level only if unable.
+
+        Guarded degradation (per design): with no vision plugin, or images that
+        carry no retrievable bytes, this returns ``[]`` and ingest proceeds at
+        text level. A per-image failure never fails the whole ingest.
+        """
+        vision = self._vision
+        if vision is None or not getattr(doc, "images", ()):
+            return []
+        described: list[tuple[ImageRef, VisionRecord]] = []
+        for image in doc.images:
+            data = self._image_bytes(image)
+            if data is None:
+                continue
+            try:
+                record = describe_image(
+                    cast("ImageRef", _BytesImage(image, data)),
+                    cast("VisionPlugin", vision),
+                )
+            except Exception:
+                continue
+            described.append((image, record))
+        if not described:
+            return []
+        return build_vision_units(
+            described,
+            document_id=doc_id,
+            partition=self._partition,
+            language=language,
+            acl=acl,
+            source_uri=getattr(doc, "source_uri", None),
+        )
+
+    def _image_bytes(self, image: Any) -> bytes | None:
+        """Fetch an image's bytes from its ``blob_key`` (None if not persisted)."""
+        blob_key = getattr(image, "blob_key", None)
+        if not blob_key:
+            return None
+        try:
+            return self._backend.get_bytes(blob_key)
+        except Exception:
+            return None
 
     def _detect_language(self, doc: Any) -> str:
         text = " ".join(block.text for block in doc.blocks)[:2000]

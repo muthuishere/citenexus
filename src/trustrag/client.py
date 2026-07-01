@@ -19,7 +19,7 @@ from trustrag.embed import OpenAICompatibleEmbedding
 from trustrag.embed import Transport as EmbedTransport
 from trustrag.evaluate import EvaluationReport, Evaluator
 from trustrag.graph import GraphRetriever, GraphStore
-from trustrag.ingest.pipeline import IngestPipeline
+from trustrag.ingest.pipeline import IngestPipeline, VisionDescriber
 from trustrag.ingest.result import IngestResult
 from trustrag.memory import MemoryStore, MemoryTurn
 from trustrag.plugins.base import LanguageDetectorPlugin, RerankerPlugin, RetrieverPlugin
@@ -35,6 +35,7 @@ from trustrag.storage.paths import leaf_vector_uri
 from trustrag.stream import stream_result
 from trustrag.telemetry.events import Outcome, Stage, StageEvent
 from trustrag.telemetry.sinks import TelemetrySink
+from trustrag.vision import OpenAICompatibleVision
 from trustrag.wiki import WikiRetriever, WikiStore
 
 
@@ -83,6 +84,7 @@ class TrustRAG:
         top_k: int = 5,
         memory_max_turns: int = 20,
         sink: TelemetrySink | None = None,
+        vision: VisionDescriber | None = None,
     ) -> None:
         self.base_uri = str(base_uri)
         self.partition = partition or PartitionPath.of(("workspace", "default"))
@@ -103,6 +105,7 @@ class TrustRAG:
             signals=self.signals,
             storage_options=storage_options,
             default_answer_language=default_answer_language,
+            vision=vision,
         )
         retrievers: list[RetrieverPlugin] = []
         if Signal.embedding in self.signals:
@@ -139,6 +142,7 @@ class TrustRAG:
         embed_transport: EmbedTransport | None = None,
         llm_transport: ChatTransport | None = None,
         rerank_transport: EmbedTransport | None = None,
+        vision_transport: ChatTransport | None = None,
         sink: TelemetrySink | None = None,
     ) -> TrustRAG:
         """Build a client with real OpenAI-compatible plugins from ``config``.
@@ -186,6 +190,17 @@ class TrustRAG:
                 transport=rerank_transport,
             )
 
+        # Vision is optional: build a client only when enabled + configured.
+        # Without one, ingest stays text-level (images are skipped, never an error).
+        vision: VisionDescriber | None = None
+        if config.vision.enabled and config.vision.endpoint and config.vision.model:
+            vision = OpenAICompatibleVision(
+                base_url=config.vision.endpoint,
+                model=config.vision.model,
+                api_key_env=config.vision.api_key_env,
+                transport=vision_transport,
+            )
+
         return cls(
             config.storage.bucket,
             partition=partition,
@@ -200,6 +215,7 @@ class TrustRAG:
             top_k=config.retrieval.top_k,
             memory_max_turns=config.memory.max_turns,
             sink=sink,
+            vision=vision,
         )
 
     def ingest(

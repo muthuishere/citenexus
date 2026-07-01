@@ -108,6 +108,28 @@ def _anthropic_transport(url: str, body: bytes, headers: dict[str, str]) -> byte
     return json.dumps({"content": [{"type": "text", "text": passage}]}).encode("utf-8")
 
 
+def test_from_config_builds_vision_client_when_enabled(tmp_path: Path) -> None:
+    from trustrag.config.schema import VisionConfig
+
+    cfg = _config(tmp_path).model_copy(
+        update={
+            "vision": VisionConfig(
+                enabled=True, endpoint="http://vl.test/v1", model="gemini-2.5-flash"
+            )
+        }
+    )
+    rag = TrustRAG.from_config(cfg, embed_transport=_embed_transport, llm_transport=_llm_transport)
+    # A vision plugin was wired into the ingest pipeline.
+    assert rag._ingest._vision is not None
+
+
+def test_from_config_no_vision_when_disabled(tmp_path: Path) -> None:
+    rag = TrustRAG.from_config(
+        _config(tmp_path), embed_transport=_embed_transport, llm_transport=_llm_transport
+    )
+    assert rag._ingest._vision is None
+
+
 def test_from_config_anthropic_provider(tmp_path: Path) -> None:
     cfg = _config(tmp_path).model_copy(
         update={
