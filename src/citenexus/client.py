@@ -589,6 +589,18 @@ class CiteNexus:
             self._hooks.fire("on_chunk", chunk)
         return chunks
 
+    def tools(self) -> list[dict[str, Any]]:
+        """Agentic navigation tools over this client's corpus (toolnexus-style).
+
+        Framework-neutral specs — {name, description, parameters, handler} —
+        for any tool-calling LLM: hybrid search, wiki index/page navigation,
+        graph neighbors, and verbatim evidence fetch. Navigate-not-cite holds:
+        only search_evidence/get_evidence return quotable (verbatim) text.
+        """
+        from citenexus.tools import build_tools
+
+        return build_tools(self)
+
     def evaluate(self, csv_path: str | Path) -> EvaluationReport:
         self._require_answer()
         return Evaluator(self.ask).evaluate(csv_path)
