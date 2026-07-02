@@ -15,6 +15,12 @@ from citenexus.answer.verify import content_tokens
 from citenexus.domain.partition import PartitionPath
 from citenexus.storage.backend import StorageBackend
 from citenexus.storage.paths import Layer, layer_prefix
+
+if True:  # TYPE_CHECKING-safe forward ref for the distiller protocol
+    from typing import TYPE_CHECKING
+
+    if TYPE_CHECKING:
+        from citenexus.graph.distill import GraphDistiller
 from citenexus.storage.protocols import VectorStore
 
 _GRAPH_FILE = "graph.json"
@@ -32,13 +38,16 @@ class GraphNode(BaseModel):
 
 
 class GraphEdge(BaseModel):
-    """A co-mention edge between graph nodes."""
+    """An edge between graph nodes — co-mention, or LLM-typed when distilled."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     source: str
     target: str
     weight: int
+    # The typed relation an LLM distiller extracted ("bound_by", "owns", ...).
+    # None for deterministic co-mention edges; default keeps old graph.json loading.
+    relation: str | None = None
 
 
 class GraphIndex(BaseModel):
@@ -53,9 +62,16 @@ class GraphIndex(BaseModel):
 class GraphStore:
     """Persist and load a partition graph artifact."""
 
-    def __init__(self, backend: StorageBackend, partition: PartitionPath) -> None:
+    def __init__(
+        self,
+        backend: StorageBackend,
+        partition: PartitionPath,
+        *,
+        distiller: GraphDistiller | None = None,
+    ) -> None:
         self._backend = backend
         self._partition = partition
+        self._distiller = distiller
 
     @property
     def key(self) -> str:
@@ -63,6 +79,17 @@ class GraphStore:
 
     def build_from_store(self, store: VectorStore) -> GraphIndex:
         rows = store.scan()
+        # LLM distillation first (when injected) — enhancement-only; None
+        # degrades to the deterministic co-mention graph below.
+        if self._distiller is not None:
+            by_doc: dict[str, list[tuple[str, str]]] = {}
+            for row in rows:
+                doc = str(row.get("document_id", row["eu_id"]))
+                by_doc.setdefault(doc, []).append((str(row["eu_id"]), str(row.get("text", ""))))
+            distilled = self._distiller.distill({d: tuple(u) for d, u in sorted(by_doc.items())})
+            if distilled is not None:
+                self.save(distilled)
+                return distilled
         mentions: dict[str, set[str]] = {}
         co_mentions: Counter[tuple[str, str]] = Counter()
         for row in rows:

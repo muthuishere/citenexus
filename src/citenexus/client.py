@@ -20,7 +20,7 @@ from citenexus.embed import Transport as EmbedTransport
 from citenexus.evaluate import EvaluationReport, Evaluator
 from citenexus.evidence.chunked_builder import Contextualizer as ContextualizerSeam
 from citenexus.evidence.contextualize import Contextualizer
-from citenexus.graph import GraphRetriever, GraphStore
+from citenexus.graph import GraphDistiller, GraphRetriever, GraphStore, LLMGraphDistiller
 from citenexus.hooks import Hooks
 from citenexus.ingest.pipeline import IngestPipeline, VisionDescriber
 from citenexus.ingest.result import IngestResult
@@ -108,6 +108,7 @@ class CiteNexus:
         fetch_transport: FetchTransport | None = None,
         reformulator: Reformulator | None = None,
         wiki_distiller: WikiDistiller | None = None,
+        graph_distiller: GraphDistiller | None = None,
         vector_store: VectorStore | None = None,
         text_search: TextSearch | None = None,
         hooks: Hooks | None = None,
@@ -133,7 +134,7 @@ class CiteNexus:
         self._store: VectorStore = vector_store or LanceVectorStore(
             leaf_vector_uri(self.base_uri, self.partition), storage_options
         )
-        self._graph_store = GraphStore(self._backend, self.partition)
+        self._graph_store = GraphStore(self._backend, self.partition, distiller=graph_distiller)
         self._wiki_store = WikiStore(self._backend, self.partition, distiller=wiki_distiller)
         self._memory = MemoryStore(self._backend, self.partition, max_turns=memory_max_turns)
         # Without an embedder the client is still a working lexical search
@@ -204,6 +205,7 @@ class CiteNexus:
         vision_transport: ChatTransport | None = None,
         reformulate_transport: ChatTransport | None = None,
         wiki_distill_transport: ChatTransport | None = None,
+        graph_distill_transport: ChatTransport | None = None,
         context_transport: ChatTransport | None = None,
         sink: TelemetrySink | None = None,
     ) -> CiteNexus:
@@ -295,6 +297,17 @@ class CiteNexus:
                 transport=wiki_distill_transport,
             )
 
+        # LLM graph distillation is optional: a small model extracts grounded
+        # entities + typed relations. Without one, deterministic co-mention.
+        graph_distiller: GraphDistiller | None = None
+        if config.graph_distill.enabled and config.graph_distill.endpoint:
+            graph_distiller = LLMGraphDistiller(
+                base_url=config.graph_distill.endpoint,
+                model=config.graph_distill.model,
+                api_key_env=config.graph_distill.api_key_env,
+                transport=graph_distill_transport,
+            )
+
         # VectorStore backend (spec §6b): LanceDB-per-leaf is the S3-native
         # default; "postgres" brings pgvector + native tsvector text search.
         # Construction is lazy (no connection until first use).
@@ -366,6 +379,7 @@ class CiteNexus:
             vision=vision,
             reformulator=reformulator,
             wiki_distiller=wiki_distiller,
+            graph_distiller=graph_distiller,
             vector_store=vector_store,
             chunking_enabled=config.chunking.enabled,
             chunk_max_tokens=config.chunking.max_tokens,
@@ -393,9 +407,21 @@ class CiteNexus:
             acl=acl,
         )
         if result.status == "ingested":
-            self.refresh_slow_path()
+            self._refresh_incremental(result.document_id)
         self._hooks.fire("on_ingest", result)
         return result
+
+    def _refresh_incremental(self, document_id: str) -> None:
+        """Per-document slow-path refresh — scales to very large corpora.
+
+        The wiki upserts ONE page (Karpathy-style compounding); the graph still
+        rebuilds (co-mention edges are corpus-wide). A full wiki rebuild —
+        including LLM distillation — happens via refresh_slow_path().
+        """
+        if Signal.graph in self.signals or Signal.community in self.signals:
+            self._graph_store.build_from_store(self._store)
+        if Signal.wiki in self.signals:
+            self._wiki_store.integrate_document(document_id, self._store)
 
     def _ingest_url(self, url: str, *, document_id: str | None, acl: Any) -> IngestResult:
         """Fetch a URL and ingest its body via the content-appropriate extractor."""

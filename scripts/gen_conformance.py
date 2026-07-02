@@ -16,7 +16,6 @@ from pathlib import Path
 from typing import Any
 
 from citenexus.answer.generator import _SYSTEM_PROMPT
-from citenexus.wiki.distill import _PROMPT as _WIKI_DISTILL_PROMPT
 from citenexus.answer.verify import _STOPWORDS, has_relevance_overlap, is_supported
 from citenexus.domain.partition import PartitionPath
 from citenexus.evidence.builder import build_evidence_units
@@ -24,6 +23,7 @@ from citenexus.evidence.chunked_builder import build_chunked_units
 from citenexus.evidence.chunker import chunk_text
 from citenexus.evidence.contextualize import _PROMPT as _CONTEXTUALIZE_PROMPT
 from citenexus.extract.types import BlockKind, ExtractedBlock, ExtractedDoc, SourceType
+from citenexus.graph.distill import _PROMPT as _GRAPH_DISTILL_PROMPT
 from citenexus.lang.detect import LanguageResult
 from citenexus.lang.fallback import resolve_answer_language
 from citenexus.retrieve.fusion import rrf_fuse
@@ -32,6 +32,7 @@ from citenexus.retrieve.types import Candidate, RetrievalSignal
 from citenexus.storage.bm25 import Bm25TextSearch
 from citenexus.testing.fakes import tokenize
 from citenexus.vision.client import _VISION_PROMPT
+from citenexus.wiki.distill import _PROMPT as _WIKI_DISTILL_PROMPT
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _PARTITION = PartitionPath.of(("workspace", "default"))
@@ -56,6 +57,7 @@ def _prompts() -> dict[str, str]:
         "contextualize": _CONTEXTUALIZE_PROMPT,
         "reformulate": _REFORMULATE_PROMPT,
         "wiki_distill": _WIKI_DISTILL_PROMPT,
+        "graph_distill": _GRAPH_DISTILL_PROMPT,
     }
 
 

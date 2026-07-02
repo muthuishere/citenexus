@@ -111,6 +111,20 @@ class ReformulationConfig(_Section):
     api_key_env: str | None = None
 
 
+class GraphDistillConfig(_Section):
+    """LLM graph distillation (§10) — grounded entities + typed relations.
+
+    A SMALL model extracts named entities (grounded in real eu_refs) and typed
+    relations. Disabled by default; without it the graph layer builds its
+    deterministic co-mention graph.
+    """
+
+    enabled: bool = False
+    model: str = "gemini-2.5-flash-lite"
+    endpoint: str | None = None
+    api_key_env: str | None = None
+
+
 class WikiDistillConfig(_Section):
     """LLM wiki distillation (§10b) — Karpathy-style cross-referenced pages.
 
@@ -290,6 +304,7 @@ class CiteNexusConfig(BaseModel):
     reranker: RerankerConfig = Field(default_factory=RerankerConfig)
     reformulation: ReformulationConfig = Field(default_factory=ReformulationConfig)
     wiki_distill: WikiDistillConfig = Field(default_factory=WikiDistillConfig)
+    graph_distill: GraphDistillConfig = Field(default_factory=GraphDistillConfig)
     vision: VisionConfig = Field(default_factory=VisionConfig)
     chunking: ChunkingConfig = Field(default_factory=ChunkingConfig)
     context_model: ContextModelConfig = Field(default_factory=ContextModelConfig)

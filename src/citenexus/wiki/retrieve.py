@@ -20,7 +20,7 @@ def _page(value: object) -> int | None:
 class WikiRetriever(RetrieverPlugin):
     """Navigate wiki pages, then return the citable EUs under matched pages."""
 
-    plugin_version = "wiki-retriever-v1"
+    plugin_version = "wiki-retriever-v2"
 
     def __init__(self, wiki_store: WikiStore, leaf_store: VectorStore) -> None:
         self._wiki_store = wiki_store
@@ -30,27 +30,38 @@ class WikiRetriever(RetrieverPlugin):
         terms = content_tokens(query)
         if not terms:
             return []
-        pages = self._wiki_store.load()
-        pages_by_id = {page.page_id: page for page in pages}
-        eu_scores: dict[str, float] = {}
-        for page in pages:
+
+        # 1) Match against the LIGHT index only (one small S3 object) — the
+        #    wiki is never loaded wholesale, so query cost stays flat at scale.
+        page_scores: dict[str, float] = {}
+        for entry in self._wiki_store.load_index():
             haystack = (
-                set(page.keywords) | content_tokens(page.title) | content_tokens(page.summary)
+                {str(keyword) for keyword in entry.get("keywords", ())}
+                | content_tokens(str(entry.get("title", "")))
+                | content_tokens(str(entry.get("summary", "")))
             )
             hits = len(terms & haystack)
             if hits == 0:
                 continue
-            for eu_ref in page.eu_refs:
-                eu_scores[eu_ref] = max(eu_scores.get(eu_ref, 0.0), float(hits))
+            page_id = str(entry["page_id"])
+            page_scores[page_id] = max(page_scores.get(page_id, 0.0), float(hits))
             # Navigate one hop: a matched page also vouches for the pages it
             # [[links]] to, at half its own hit score. Still resolves to EUs —
             # the linked page itself is never a candidate, let alone a citation.
-            for link in page.links:
-                target = pages_by_id.get(link)
-                if target is None:
-                    continue
-                for eu_ref in target.eu_refs:
-                    eu_scores[eu_ref] = max(eu_scores.get(eu_ref, 0.0), hits / 2.0)
+            for link in entry.get("links", ()):
+                link_id = str(link)
+                page_scores[link_id] = max(page_scores.get(link_id, 0.0), hits / 2.0)
+        if not page_scores:
+            return []
+
+        # 2) Fetch ONLY the matched pages to collect their EU refs.
+        eu_scores: dict[str, float] = {}
+        for page_id, score in page_scores.items():
+            page = self._wiki_store.load_page(page_id)
+            if page is None:
+                continue
+            for eu_ref in page.eu_refs:
+                eu_scores[eu_ref] = max(eu_scores.get(eu_ref, 0.0), score)
         if not eu_scores:
             return []
 

@@ -119,7 +119,7 @@ def test_rebuild_clears_stale_markdown_pages(tmp_path: Path) -> None:
     smaller = WikiStore(backend, _PARTITION, distiller=FakeDistiller(_DISTILLED[:1]))
     smaller.build_from_store(FakeLeafStore(_rows()))
     assert not backend.exists(store.page_key("doc-nda"))
-    assert backend.exists(store.key)  # pages.json survives the page sweep
+    assert backend.exists(store.index_json_key)  # the light index survives the sweep
 
 
 def test_old_pages_json_without_links_still_loads(tmp_path: Path) -> None:
