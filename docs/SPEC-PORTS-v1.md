@@ -153,9 +153,13 @@ All model IO is injected endpoints; nothing bundled.
   `anthropic-version: 2023-06-01`, top-level `system`, required `max_tokens`
   (default 1024), reply = concatenated `content[].text` blocks.
 - **Temperature is ALWAYS sent** (default 0.0) on every generation call.
-- API keys: referenced by **environment-variable name** in config
-  (`api_key_env`); the value is read at call time and travels only in the auth
-  header. Never logged, never stored on the client object.
+- **Typed endpoint objects, app-resolved keys**: connections are declared as
+  typed endpoints (OpenAI-style, Gemini, Anthropic, OpenRouter, Ollama, custom
+  auth shapes) carrying base_url + key + headers + timeout + pre/post hooks.
+  THE LIBRARY READS NO ENVIRONMENT — the application passes the key value,
+  held in a redaction-safe wrapper (Python SecretStr; Go/TS equivalents must
+  redact in String()/toString()/JSON). The endpoint type selects the wire
+  protocol. Wire clients receive only base_url + model + transport.
 - Every default HTTP transport sends `User-Agent: citenexus` (Cloudflare-fronted
   APIs 403 default library agents).
 - Transports are injectable — unit tests are hermetic in all languages.
@@ -175,8 +179,7 @@ All model IO is injected endpoints; nothing bundled.
 
 The §17 config is a language-neutral document (YAML/JSON), key-for-key the
 Python schema: `storage` (bucket, partition_hierarchy, endpoint_url) · `llm`
-(provider: `openai|anthropic`, model, endpoint, api_key_env, temperature=0,
-max_tokens) · `embedding` · `reranker` · `reformulation` · `vision` ·
+(model, endpoint: typed-endpoint object, temperature=0, max_tokens) · `embedding` · `reranker` · `reformulation` · `vision` ·
 `vector_store` (backend: `lancedb|postgres`, uri, table_prefix) · `retrieval`
 (rrf_k=60, top_k) · `trust` · `multilingual` · `memory` · `signals`.
 Unknown keys are an error (strict parsing) in every language.

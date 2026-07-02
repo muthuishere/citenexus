@@ -90,18 +90,28 @@ Or wire real OpenAI-compatible endpoints from typed config — one call builds t
 embedding / answering-LLM / reranker plugins (answers stay temperature-0):
 
 ```python
-from citenexus import CiteNexus
+import os
+from citenexus import CiteNexus, GeminiHttpEndpoint, OpenAIHttpEndpoint
 from citenexus.config.schema import EmbeddingConfig, LLMConfig, StorageConfig, CiteNexusConfig
 
+# YOUR app reads its environment — the library never touches env vars.
+jina   = OpenAIHttpEndpoint(base_url="https://api.jina.ai/v1",
+                            api_key=os.environ["JINA_API_KEY"])
+gemini = GeminiHttpEndpoint(api_key=os.environ["GEMINI_API_KEY"])   # SecretStr — repr/log-safe
+
 config = CiteNexusConfig(
-    storage=StorageConfig(bucket="./data"),                       # or "s3://bucket"
-    embedding=EmbeddingConfig(endpoint="https://api.jina.ai/v1", model="jina-embeddings-v3",
-                              api_key_env="CITENEXUS_EMBED_API_KEY"),
-    llm=LLMConfig(endpoint="https://generativelanguage.googleapis.com/v1beta/openai",
-                  model="gemini-2.5-flash", api_key_env="CITENEXUS_LLM_API_KEY"),
+    storage=StorageConfig(bucket="./data"),                  # or "s3://bucket"
+    embedding=EmbeddingConfig(endpoint=jina, model="jina-embeddings-v3"),
+    llm=LLMConfig(endpoint=gemini, model="gemini-2.5-flash"),
+    # the SAME endpoint objects can serve context_model / reformulation /
+    # wiki_distill / graph_distill — declare a connection once, reuse it.
 )
-rag = CiteNexus.from_config(config)                                # keys read from env, by name
+rag = CiteNexus.from_config(config)
 ```
+
+Endpoints carry everything connection-shaped: key, custom headers, timeout,
+pre/post hooks, auth style (`AnthropicHttpEndpoint` → Messages API automatically;
+`HttpEndpoint(auth_header="api-key", auth_scheme=None)` for Azure-style).
 
 ## Status
 
