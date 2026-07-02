@@ -39,18 +39,48 @@ answer = rag.ask("Can the employee disclose this information?")
 print(answer)                                    # grounded answer; .sources are bbox-cited
 ```
 
-**The client scales down to what you give it** — every model is optional:
+**The client scales to exactly what you give it** — every model is optional,
+and every rung below is additive (nothing above it changes):
 
 ```python
-rag = CiteNexus("./data")                  # ZERO models: ingest + BM25 text search
-rag.ingest("handbook.pdf"); rag.retrieve("termination notice")
+rag = CiteNexus("./data")
+# ZERO models — already FOUR retrieval signals, fused with RRF:
+#   text (BM25) · structure (heading tree) · graph (co-mention) · wiki (page nav)
+rag.ingest("handbook.pdf")
+rag.retrieve("termination notice")            # works immediately, cited rows
 
-rag = CiteNexus("./data", embedder=e)      # + vector search (hybrid RRF)
-rag = CiteNexus("./data", embedder=e, generator=g)   # + ask()/stream()/evaluate()
+rag = CiteNexus("./data", embedder=e)         # + vector signal (5-way hybrid RRF)
+rag = CiteNexus("./data", ..., generator=g)   # + ask()/stream()/evaluate() — cite-or-abstain
+rag = CiteNexus("./data", ..., reranker=r)    # + cross-encoder ordering of the fused pool
+rag = CiteNexus("./data", ..., wiki_distiller=w)   # wiki pages become LLM-distilled,
+                                                   #   cross-linked concept pages (+ Markdown tree in S3)
+rag = CiteNexus("./data", ..., contextualizer=c)   # + Anthropic-style contextual chunk prefixes
+rag = CiteNexus("./data", ..., reformulator=q)     # + EN dual-query RRF (cross-lingual recall)
+rag = CiteNexus("./data", ..., vision=v)           # + images in PDFs/docs become described, cited evidence
+rag = CiteNexus("./data", ..., detector=d)         # + real lid.176 language detection
+rag = CiteNexus("./data", ..., sink=s, hooks=h)    # + telemetry (tokens/cost) + lifecycle hooks
+rag = CiteNexus("./data", ..., vector_store=pg, text_search=es)  # + bring your own stores
+
+rag.ask("...", conversation_id="c1")          # conversation memory — built in, no param
 ```
 
-`ask()` without a generator raises a clear error pointing at `retrieve()` —
-search-only deployments are first-class, not a crash.
+Or declare it all in one typed config: `CiteNexus.from_config(cfg)` builds only
+what the config enables. `ask()` without a generator raises a clear error
+pointing at `retrieve()` — search-only deployments are first-class, not a crash.
+
+**Capability status (honest):**
+
+| Capability | Status |
+|---|---|
+| text (BM25) · structure · graph · wiki · vector · RRF fusion | ✅ shipped, zero-model tier included |
+| ask/stream/evaluate with per-claim faithfulness gate | ✅ shipped (generator required) |
+| LLM wiki distillation (concept pages, `[[links]]`, S3 Markdown tree, lint) | ✅ shipped (`wiki_distiller=`) |
+| Contextual chunking · dual-query RRF · vision-into-evidence · hooks · telemetry · web crawl · Postgres backend | ✅ shipped |
+| **LLM graph extraction** (entity/relation model behind the graph signal) | ⏳ not yet — graph is deterministic co-mention; the `GraphExtractorPlugin` seam exists, no LLM impl |
+| Leiden community clustering | ⏳ not yet (community signal rides the graph retriever) |
+| True BGE-M3 sparse lexical | ⏳ BM25-lite stands in (needs a sparse-capable endpoint) |
+| Image bytes from real PDFs for vision | ⏳ extractors don't persist rasters yet (vision path proven with injected bytes) |
+| LLM-as-judge · MCP server | ⏳ later (config sections reserved) |
 
 Or wire real OpenAI-compatible endpoints from typed config — one call builds the
 embedding / answering-LLM / reranker plugins (answers stay temperature-0):
