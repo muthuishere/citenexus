@@ -114,16 +114,12 @@ def comparable(row: dict[str, Any]) -> dict[str, Any]:
 
 
 @pytest.fixture()
-def rust_written_store(
-    core: ctypes.CDLL, tmp_path: Path
-) -> tuple[ctypes.CDLL, int, str]:
+def rust_written_store(core: ctypes.CDLL, tmp_path: Path) -> tuple[ctypes.CDLL, int, str]:
     """A leaf database whose rows were written by RUST through the C ABI."""
     uri = str(tmp_path / "leaf")
     handle = core.trustrag_store_open(uri.encode(), b"{}")
     assert handle, "trustrag_store_open returned null"
-    ok = take_json(
-        core, core.trustrag_store_upsert(handle, json.dumps(ROWS).encode())
-    )
+    ok = take_json(core, core.trustrag_store_upsert(handle, json.dumps(ROWS).encode()))
     assert ok == {"ok": True}
     return core, handle, uri
 
@@ -171,9 +167,7 @@ def test_rust_upsert_is_idempotent_when_python_reads(
     try:
         updated = [dict(r) for r in ROWS]
         updated[1]["text"] = "Remote work is pre-approved."
-        ok = take_json(
-            core, core.trustrag_store_upsert(handle, json.dumps(updated).encode())
-        )
+        ok = take_json(core, core.trustrag_store_upsert(handle, json.dumps(updated).encode()))
         assert ok == {"ok": True}
 
         python_rows = LanceVectorStore(uri).scan()

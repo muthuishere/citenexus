@@ -39,6 +39,19 @@ answer = rag.ask("Can the employee disclose this information?")
 print(answer)                                    # grounded answer; .sources are bbox-cited
 ```
 
+**The client scales down to what you give it** — every model is optional:
+
+```python
+rag = TrustRAG("./data")                  # ZERO models: ingest + BM25 text search
+rag.ingest("handbook.pdf"); rag.retrieve("termination notice")
+
+rag = TrustRAG("./data", embedder=e)      # + vector search (hybrid RRF)
+rag = TrustRAG("./data", embedder=e, generator=g)   # + ask()/stream()/evaluate()
+```
+
+`ask()` without a generator raises a clear error pointing at `retrieve()` —
+search-only deployments are first-class, not a crash.
+
 Or wire real OpenAI-compatible endpoints from typed config — one call builds the
 embedding / answering-LLM / reranker plugins (answers stay temperature-0):
 

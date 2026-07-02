@@ -44,7 +44,5 @@ def test_committed_fixtures_match_regeneration() -> None:
 def test_no_orphan_fixture_files() -> None:
     """Every committed JSON fixture must be produced by the generator."""
     generated = set(_regenerate())
-    committed = {
-        str(p.relative_to(_CONFORMANCE)) for p in _CONFORMANCE.rglob("*.json")
-    }
+    committed = {str(p.relative_to(_CONFORMANCE)) for p in _CONFORMANCE.rglob("*.json")}
     assert committed == generated

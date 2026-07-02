@@ -69,6 +69,17 @@ class _SingleTextEmbedder:
         return self._plugin.embed_query(text)
 
 
+class _ZeroEmbedder:
+    """Placeholder embedder for model-less clients (lexical-only search).
+
+    Rows still need a vector column; this writes a constant 1-dim vector that
+    is never searched — without an embedder the vector retriever is not built.
+    """
+
+    def embed(self, text: str) -> list[float]:
+        return [0.0]
+
+
 class TrustRAG:
     """The v0.1 public surface.
 
@@ -82,8 +93,8 @@ class TrustRAG:
         *,
         partition: PartitionPath | None = None,
         signals: Iterable[str | Signal] | None = None,
-        embedder: QueryEmbedder,
-        generator: Generator,
+        embedder: QueryEmbedder | None = None,
+        generator: Generator | None = None,
         reranker: RerankerPlugin | None = None,
         detector: LanguageDetectorPlugin | None = None,
         backend: StorageBackend | None = None,
@@ -116,11 +127,14 @@ class TrustRAG:
         self._graph_store = GraphStore(self._backend, self.partition)
         self._wiki_store = WikiStore(self._backend, self.partition, distiller=wiki_distiller)
         self._memory = MemoryStore(self._backend, self.partition, max_turns=memory_max_turns)
+        # Without an embedder the client is still a working lexical search
+        # engine: ingest stores rows with a placeholder vector (never searched —
+        # the vector retriever is simply not constructed) and BM25 serves text.
         self._ingest = IngestPipeline(
             backend=self._backend,
             base_uri=self.base_uri,
             partition=self.partition,
-            embedder=embedder,
+            embedder=embedder or _ZeroEmbedder(),
             detector=detector,
             signals=self.signals,
             storage_options=storage_options,
@@ -134,7 +148,7 @@ class TrustRAG:
             sink=sink,
         )
         retrievers: list[RetrieverPlugin] = []
-        if Signal.embedding in self.signals:
+        if Signal.embedding in self.signals and embedder is not None:
             retrievers.append(VectorRetriever(self._store, embedder))
         if Signal.text in self.signals:
             # Text search is its own store seam: an injected TextSearch wins;
@@ -151,9 +165,13 @@ class TrustRAG:
             retrievers=retrievers,
             reranker=reranker or _IdentityReranker(),
         )
-        self._answer = AnswerFlow(
-            generator=generator,
-            default_answer_language=default_answer_language,
+        self._answer = (
+            AnswerFlow(
+                generator=generator,
+                default_answer_language=default_answer_language,
+            )
+            if generator is not None
+            else None
         )
         self._generator = generator
         self._sink = sink
@@ -186,25 +204,28 @@ class TrustRAG:
         API keys are referenced only by env-var name (``*.api_key_env``) and
         never read here. Transports are injectable so this stays unit-testable.
         """
-        if config.llm.endpoint is None:
-            raise ValueError("config.llm.endpoint is required to build a generator")
-        if config.embedding.endpoint is None:
-            raise ValueError("config.embedding.endpoint is required to build an embedder")
-
         # The real detector by default (§11a: fastText lid.176, lazy-downloaded).
         # The test-grade heuristic mislabels real languages (fr -> es), which
         # poisons the answer-language invariant; tests inject HeuristicDetector.
         if detector is None and config.multilingual.detector == "fasttext-lid176":
             detector = FastTextDetector(threshold=config.multilingual.detect_confidence_threshold)
 
-        embedding_plugin = OpenAICompatibleEmbedding(
-            base_url=config.embedding.endpoint,
-            model=config.embedding.model,
-            api_key_env=config.embedding.api_key_env,
-            transport=embed_transport,
-        )
-        generator: Generator
-        if config.llm.provider is LLMProvider.anthropic:
+        # Every model is optional: no embedding endpoint -> lexical-only
+        # search; no llm endpoint -> retrieve-only client (ask() explains).
+        embedder: QueryEmbedder | None = None
+        if config.embedding.endpoint:
+            embedder = _SingleTextEmbedder(
+                OpenAICompatibleEmbedding(
+                    base_url=config.embedding.endpoint,
+                    model=config.embedding.model,
+                    api_key_env=config.embedding.api_key_env,
+                    transport=embed_transport,
+                )
+            )
+        generator: Generator | None = None
+        if config.llm.endpoint is None:
+            pass
+        elif config.llm.provider is LLMProvider.anthropic:
             generator = AnthropicGenerator(
                 base_url=config.llm.endpoint,
                 model=config.llm.model,
@@ -300,7 +321,7 @@ class TrustRAG:
             config.storage.bucket,
             partition=partition,
             signals=config.signals,
-            embedder=_SingleTextEmbedder(embedding_plugin),
+            embedder=embedder,
             generator=generator,
             reranker=reranker,
             detector=detector,
@@ -431,7 +452,7 @@ class TrustRAG:
         )
         self._hooks.fire("on_retrieve", question, candidates)
         self._emit_fusion(len(candidates))
-        result = self._answer.ask(
+        result = self._require_answer().ask(
             question,
             candidates,
             mode=mode,
@@ -511,7 +532,18 @@ class TrustRAG:
         return chunks
 
     def evaluate(self, csv_path: str | Path) -> EvaluationReport:
+        self._require_answer()
         return Evaluator(self.ask).evaluate(csv_path)
+
+    def _require_answer(self) -> AnswerFlow:
+        """The answer flow, or a clear error for search-only clients."""
+        if self._answer is None:
+            raise ValueError(
+                "ask()/stream()/evaluate() need an answering model — construct "
+                "TrustRAG(generator=...) or set llm.endpoint in the config. "
+                "retrieve() works without one."
+            )
+        return self._answer
 
     def recall(self, conversation_id: str, query: str, *, limit: int = 3) -> tuple[MemoryTurn, ...]:
         return self._memory.recall(conversation_id, query, limit=limit)
