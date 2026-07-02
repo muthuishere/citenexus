@@ -130,6 +130,40 @@ def test_from_config_no_vision_when_disabled(tmp_path: Path) -> None:
     assert rag._ingest._vision is None
 
 
+def test_from_config_builds_contextualizer_when_enabled(tmp_path: Path) -> None:
+    from trustrag.config.schema import ContextModelConfig
+
+    cfg = _config(tmp_path).model_copy(
+        update={
+            "context_model": ContextModelConfig(
+                enabled=True, endpoint="http://ctx.test/v1", model="qwen2.5:0.5b"
+            )
+        }
+    )
+    rag = TrustRAG.from_config(cfg, embed_transport=_embed_transport, llm_transport=_llm_transport)
+    assert rag._ingest._contextualizer is not None
+
+
+def test_from_config_no_contextualizer_by_default(tmp_path: Path) -> None:
+    rag = _rag(tmp_path)
+    assert rag._ingest._contextualizer is None
+
+
+def test_from_config_chunking_disabled_restores_legacy_ids(tmp_path: Path) -> None:
+    from trustrag.config.schema import ChunkingConfig
+
+    cfg = _config(tmp_path).model_copy(update={"chunking": ChunkingConfig(enabled=False)})
+    rag = TrustRAG.from_config(cfg, embed_transport=_embed_transport, llm_transport=_llm_transport)
+    r = rag.ingest(text="The employee shall not disclose secrets.", document_id="nda")
+    assert r.eu_ids == ("nda::0",)
+
+
+def test_from_config_chunks_by_default(tmp_path: Path) -> None:
+    rag = _rag(tmp_path)
+    r = rag.ingest(text="The employee shall not disclose secrets.", document_id="nda")
+    assert r.eu_ids == ("nda::0::0",)
+
+
 def test_from_config_anthropic_provider(tmp_path: Path) -> None:
     cfg = _config(tmp_path).model_copy(
         update={

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from trustrag.config.signals import Signal, requires_slow_path, resolve_signals
 from trustrag.evidence.builder import build_evidence_units
+from trustrag.evidence.chunked_builder import Contextualizer, build_chunked_units
 from trustrag.evidence.structure import build_structure
 from trustrag.extract.dispatch import extract
 from trustrag.extract.types import SourceType
@@ -99,6 +100,10 @@ class IngestPipeline:
         queue: DurableQueue | None = None,
         default_answer_language: str = "en",
         vision: VisionDescriber | None = None,
+        chunking_enabled: bool = True,
+        chunk_max_tokens: int = 450,
+        chunk_overlap: int = 60,
+        contextualizer: Contextualizer | None = None,
     ) -> None:
         self._backend = backend
         self._partition = partition
@@ -109,6 +114,10 @@ class IngestPipeline:
         self._queue = queue
         self._default_language = default_answer_language
         self._vision = vision
+        self._chunking_enabled = chunking_enabled
+        self._chunk_max_tokens = chunk_max_tokens
+        self._chunk_overlap = chunk_overlap
+        self._contextualizer = contextualizer
 
     def ingest(
         self,
@@ -135,7 +144,23 @@ class IngestPipeline:
             doc = extract(source, source_type=source_type, document_id=doc_id)
 
         language = self._detect_language(doc)
-        units = build_evidence_units(doc, partition=self._partition, language=language, acl=acl)
+        if self._chunking_enabled:
+            # Default (§7): chunk oversized blocks into child EUs
+            # ({doc}::{order}::{i}) — clause-level citations, verbatim passages.
+            units = build_chunked_units(
+                doc,
+                partition=self._partition,
+                language=language,
+                acl=acl,
+                max_tokens=self._chunk_max_tokens,
+                overlap=self._chunk_overlap,
+                contextualizer=self._contextualizer,
+            )
+        else:
+            # Escape hatch: legacy one-block-one-EU ids ({doc}::{order}).
+            units = build_evidence_units(
+                doc, partition=self._partition, language=language, acl=acl
+            )
         units.extend(self._vision_units(doc, doc_id=doc_id, language=language, acl=acl))
 
         # Persist the raw blob (content-addressed).

@@ -35,10 +35,12 @@ def resolve_path(source: Any) -> Path | None:
     if isinstance(source, str):
         try:
             candidate = Path(source)
+            # exists() itself raises OSError for over-long raw content
+            # (ENAMETOOLONG) — that is content, not a path.
+            if candidate.exists() and candidate.is_file():
+                return candidate
         except (ValueError, OSError):
             return None
-        if candidate.exists() and candidate.is_file():
-            return candidate
     return None
 
 
