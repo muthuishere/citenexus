@@ -1,0 +1,80 @@
+{
+  "cases": [
+    {
+      "name": "block builder skips empty blocks; eu_id = doc::order",
+      "document_id": "policy-1",
+      "blocks": [
+        {
+          "order": 0,
+          "kind": "heading",
+          "text": "Confidentiality",
+          "page": 1
+        },
+        {
+          "order": 1,
+          "kind": "paragraph",
+          "text": "Employees may not disclose.",
+          "page": 1
+        },
+        {
+          "order": 2,
+          "kind": "paragraph",
+          "text": "   ",
+          "page": 1
+        },
+        {
+          "order": 3,
+          "kind": "table",
+          "text": "term | value",
+          "page": 2
+        }
+      ],
+      "chunk_max_tokens": 450,
+      "chunk_overlap": 60,
+      "block_builder_eu_ids": [
+        "policy-1::0",
+        "policy-1::1",
+        "policy-1::3"
+      ],
+      "chunked_builder_eu_ids": [
+        "policy-1::0::0",
+        "policy-1::1::0",
+        "policy-1::3::0"
+      ]
+    },
+    {
+      "name": "chunked builder splits an oversized block into doc::order::i children",
+      "document_id": "long-doc",
+      "blocks": [
+        {
+          "order": 0,
+          "kind": "heading",
+          "text": "Intro",
+          "page": 1
+        },
+        {
+          "order": 1,
+          "kind": "paragraph",
+          "text": "One two three four five six seven eight.\n\nNine ten eleven twelve thirteen fourteen fifteen sixteen.\n\nSeventeen eighteen nineteen twenty twenty-one twenty-two.",
+          "page": 2
+        }
+      ],
+      "chunk_max_tokens": 8,
+      "chunk_overlap": 2,
+      "block_builder_eu_ids": [
+        "long-doc::0",
+        "long-doc::1"
+      ],
+      "chunked_builder_eu_ids": [
+        "long-doc::0::0",
+        "long-doc::1::0",
+        "long-doc::1::1",
+        "long-doc::1::2"
+      ]
+    }
+  ],
+  "checksum_example": {
+    "raw_utf8": "hello trustrag\n",
+    "sha256": "52089ef9e6d7a0b521496a4185e76b96cb90d1cc5140213e6ed187f2faa139b7"
+  }
+}

@@ -1,0 +1,85 @@
+[
+  {
+    "name": "rung 1: reliable detection wins over everything",
+    "detection": {
+      "language": "ta",
+      "confidence": 0.95,
+      "is_reliable": true
+    },
+    "answer_language": "fr",
+    "conversation_language": "de",
+    "languages_in_evidence": [
+      "en",
+      "en"
+    ],
+    "default_answer_language": "en",
+    "expected": "ta"
+  },
+  {
+    "name": "rung 2: unreliable detection -> explicit override",
+    "detection": {
+      "language": "en",
+      "confidence": 0.3,
+      "is_reliable": false
+    },
+    "answer_language": "fr",
+    "conversation_language": "de",
+    "languages_in_evidence": [
+      "en"
+    ],
+    "default_answer_language": "en",
+    "expected": "fr"
+  },
+  {
+    "name": "rung 3: no detection, no override -> conversation language",
+    "detection": null,
+    "answer_language": null,
+    "conversation_language": "de",
+    "languages_in_evidence": [
+      "en",
+      "es"
+    ],
+    "default_answer_language": "en",
+    "expected": "de"
+  },
+  {
+    "name": "rung 4: dominant evidence language",
+    "detection": {
+      "language": "en",
+      "confidence": 0.2,
+      "is_reliable": false
+    },
+    "answer_language": null,
+    "conversation_language": null,
+    "languages_in_evidence": [
+      "en",
+      "es",
+      "es"
+    ],
+    "default_answer_language": "en",
+    "expected": "es"
+  },
+  {
+    "name": "rung 4 tie: first-seen evidence language wins (stable)",
+    "detection": null,
+    "answer_language": null,
+    "conversation_language": null,
+    "languages_in_evidence": [
+      "fr",
+      "en",
+      "fr",
+      "en"
+    ],
+    "default_answer_language": "en",
+    "expected": "fr"
+  },
+  {
+    "name": "rung 5: nothing else -> configured default",
+    "detection": null,
+    "answer_language": null,
+    "conversation_language": null,
+    "languages_in_evidence": [],
+    "default_answer_language": "hi",
+    "expected": "hi"
+  }
+]
