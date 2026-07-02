@@ -100,9 +100,7 @@ class WikiStore:
         # failure (None) falls through to the deterministic pages below.
         if self._distiller is not None:
             pages_input = {
-                document_id: tuple(
-                    (str(row["eu_id"]), str(row.get("text", ""))) for row in rows
-                )
+                document_id: tuple((str(row["eu_id"]), str(row.get("text", ""))) for row in rows)
                 for document_id, rows in sorted(rows_by_doc.items())
             }
             distilled = self._distiller.distill(pages_input)

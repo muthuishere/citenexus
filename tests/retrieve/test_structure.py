@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from trustrag.retrieve.structure import StructureRetriever
 from trustrag.retrieve.types import RetrievalSignal
 from trustrag.storage.backend import LocalFsBackend
@@ -22,6 +24,39 @@ def test_heading_match_returns_eus_under_node(
     top = next(c for c in out if c.eu_id == "doc1::0")
     assert top.text is not None
     assert top.document_id == "doc1"
+
+
+def test_block_ref_resolves_down_to_chunked_children(
+    backend_with_structure: LocalFsBackend, tmp_path: Path
+) -> None:
+    """A structure node's eu_ref ({doc}::{order}) resolves to the block's
+    chunked child EUs ({doc}::{order}::{i}) when only children are stored —
+    the default now that ingest chunks blocks."""
+    from trustrag.testing.fakes import FakeEmbedding
+
+    embedder = FakeEmbedding()
+    store = LanceVectorStore(str(tmp_path / "leaf-chunked"))
+    store.upsert(
+        [
+            {
+                "eu_id": eu_id,
+                "vector": embedder.embed(text),
+                "text": text,
+                "document_id": "doc1",
+                "language": "en",
+                "page": -1,
+            }
+            for eu_id, text in (
+                ("doc1::0::0", "Termination of employment by the employer"),
+                ("doc1::0::1", "Notice periods for termination"),
+                ("doc1::2::0", "Confidentiality and non disclosure obligations"),
+            )
+        ]
+    )
+    retriever = StructureRetriever(backend_with_structure, PARTITION, store)
+    out = retriever.retrieve("termination", k=5)
+    assert [c.eu_id for c in out] == ["doc1::0::0", "doc1::0::1"]
+    assert all(c.text is not None for c in out)
 
 
 def test_non_matching_query_returns_empty(

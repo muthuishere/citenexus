@@ -81,6 +81,34 @@ def test_ask_emits_fusion_event_with_candidate_count(tmp_path: Path) -> None:
     assert fusion_events[0].units.candidates >= 1
 
 
+def test_ingest_emits_extract_and_embedding_events(tmp_path: Path) -> None:
+    sink = InMemorySink()
+    rag = _rag(tmp_path, sink)
+    rag.ingest(
+        text="The employee shall not disclose confidential information.",
+        document_id="nda",
+    )
+
+    extract_events = [e for e in sink.events if e.stage is Stage.extract]
+    embedding_events = [e for e in sink.events if e.stage is Stage.embedding]
+    assert len(extract_events) == 1
+    assert len(embedding_events) == 1
+    for event in (*extract_events, *embedding_events):
+        assert event.document_id == "nda"
+        assert event.duration_ms > 0
+        assert event.outcome is Outcome.ok
+        assert event.partition == rag.partition
+
+
+def test_unchanged_reingest_emits_no_ingest_events(tmp_path: Path) -> None:
+    sink = InMemorySink()
+    rag = _rag(tmp_path, sink)
+    rag.ingest(text="hello world", document_id="d")
+    before = len(sink.events)
+    rag.ingest(text="hello world", document_id="d")  # idempotent skip
+    assert len(sink.events) == before
+
+
 def test_no_sink_is_a_silent_noop(tmp_path: Path) -> None:
     rag = TrustRAG(tmp_path, embedder=FakeEmbedding(), generator=UsageLLM())
     rag.ingest(text="Termination requires thirty days notice.", document_id="c")

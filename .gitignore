@@ -40,3 +40,6 @@ example/.trustrag-data/
 
 # Rust core build artifacts
 core/target/
+
+# agent worktrees
+.claude/worktrees/

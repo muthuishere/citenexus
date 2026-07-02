@@ -144,6 +144,33 @@ class VisionConfig(_Section):
     prefilter: VisionPrefilterConfig = Field(default_factory=VisionPrefilterConfig)
 
 
+class ChunkingConfig(_Section):
+    """Chunk-based evidence building (§7) — the ingest default.
+
+    Oversized blocks are split by the recursive chunker into child EUs
+    (``{doc}::{order}::{i}``) so citations land at clause/paragraph granularity.
+    Disable to reproduce the legacy one-block-one-EU ``{doc}::{order}`` ids.
+    """
+
+    enabled: bool = True
+    max_tokens: int = 450
+    overlap: int = 60
+
+
+class ContextModelConfig(_Section):
+    """The small contextual-retrieval model (§7, Anthropic technique).
+
+    When enabled, an injected OpenAI-compatible endpoint writes a short blurb
+    situating each chunk in its document; the blurb enriches only the *indexed*
+    text — the citation passage stays verbatim.
+    """
+
+    enabled: bool = False
+    model: str | None = None
+    endpoint: str | None = None
+    api_key_env: str | None = None
+
+
 class VectorStoreConfig(_Section):
     """The vector index backend (§4, default LanceDB)."""
 
@@ -264,6 +291,8 @@ class TrustRAGConfig(BaseModel):
     reformulation: ReformulationConfig = Field(default_factory=ReformulationConfig)
     wiki_distill: WikiDistillConfig = Field(default_factory=WikiDistillConfig)
     vision: VisionConfig = Field(default_factory=VisionConfig)
+    chunking: ChunkingConfig = Field(default_factory=ChunkingConfig)
+    context_model: ContextModelConfig = Field(default_factory=ContextModelConfig)
     vector_store: VectorStoreConfig = Field(default_factory=VectorStoreConfig)
     graph: GraphConfig = Field(default_factory=GraphConfig)
     retrieval: RetrievalConfig = Field(default_factory=RetrievalConfig)

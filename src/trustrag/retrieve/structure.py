@@ -39,6 +39,20 @@ def _descendant_eu_refs(node: StructureNode, by_parent: dict[str, list[Structure
     return refs
 
 
+def _resolve_refs(
+    ref: str, rows_by_id: dict[str, dict[str, Any]]
+) -> list[tuple[str, dict[str, Any]]]:
+    """Resolve a block-level ``eu_ref`` to its stored EU(s) — self or children."""
+    row = rows_by_id.get(ref)
+    if row is not None:
+        return [(ref, row)]
+    child_prefix = f"{ref}::"
+    return sorted(
+        ((eu_id, row) for eu_id, row in rows_by_id.items() if eu_id.startswith(child_prefix)),
+        key=lambda item: item[0],
+    )
+
+
 class StructureRetriever(RetrieverPlugin):
     """Match query terms to structure node labels → EUs under those nodes."""
 
@@ -95,21 +109,22 @@ class StructureRetriever(RetrieverPlugin):
 
         candidates: list[Candidate] = []
         for ref, hits in matched.items():
-            row = rows_by_id.get(ref)
-            if row is None:
-                continue
-            candidates.append(
-                Candidate(
-                    eu_id=ref,
-                    score=float(hits),
-                    signal=RetrievalSignal.structure,
-                    document_id=row.get("document_id"),
-                    text=row.get("text"),
-                    page=_page(row.get("page")),
-                    language=row.get("language"),
-                    checksum=row.get("checksum"),
-                    raw_uri=row.get("raw_uri"),
+            # A structure node anchors a whole block ({doc}::{order}); the store
+            # may hold that EU itself or the block's chunked children
+            # ({doc}::{order}::{i}) — resolve down to whichever EUs exist.
+            for eu_id, row in _resolve_refs(ref, rows_by_id):
+                candidates.append(
+                    Candidate(
+                        eu_id=eu_id,
+                        score=float(hits),
+                        signal=RetrievalSignal.structure,
+                        document_id=row.get("document_id"),
+                        text=row.get("text"),
+                        page=_page(row.get("page")),
+                        language=row.get("language"),
+                        checksum=row.get("checksum"),
+                        raw_uri=row.get("raw_uri"),
+                    )
                 )
-            )
         candidates.sort(key=lambda c: (-c.score, c.eu_id))
         return candidates[:k]

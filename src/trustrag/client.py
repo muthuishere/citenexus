@@ -18,6 +18,8 @@ from trustrag.domain.trust import TrustMode
 from trustrag.embed import OpenAICompatibleEmbedding
 from trustrag.embed import Transport as EmbedTransport
 from trustrag.evaluate import EvaluationReport, Evaluator
+from trustrag.evidence.chunked_builder import Contextualizer as ContextualizerSeam
+from trustrag.evidence.contextualize import Contextualizer
 from trustrag.graph import GraphRetriever, GraphStore
 from trustrag.hooks import Hooks
 from trustrag.ingest.pipeline import IngestPipeline, VisionDescriber
@@ -97,6 +99,10 @@ class TrustRAG:
         vector_store: VectorStore | None = None,
         text_search: TextSearch | None = None,
         hooks: Hooks | None = None,
+        chunking_enabled: bool = True,
+        chunk_max_tokens: int = 450,
+        chunk_overlap: int = 60,
+        contextualizer: ContextualizerSeam | None = None,
     ) -> None:
         self.base_uri = str(base_uri)
         self.partition = partition or PartitionPath.of(("workspace", "default"))
@@ -121,6 +127,11 @@ class TrustRAG:
             default_answer_language=default_answer_language,
             vision=vision,
             vector_store=self._store,
+            chunking_enabled=chunking_enabled,
+            chunk_max_tokens=chunk_max_tokens,
+            chunk_overlap=chunk_overlap,
+            contextualizer=contextualizer,
+            sink=sink,
         )
         retrievers: list[RetrieverPlugin] = []
         if Signal.embedding in self.signals:
@@ -166,6 +177,7 @@ class TrustRAG:
         vision_transport: ChatTransport | None = None,
         reformulate_transport: ChatTransport | None = None,
         wiki_distill_transport: ChatTransport | None = None,
+        context_transport: ChatTransport | None = None,
         sink: TelemetrySink | None = None,
     ) -> TrustRAG:
         """Build a client with real OpenAI-compatible plugins from ``config``.
@@ -269,6 +281,21 @@ class TrustRAG:
                 ),
             )
 
+        # Contextual retrieval is optional: build the small-model contextualizer
+        # only when enabled + configured. Without one, chunks index un-enriched.
+        contextualizer: Contextualizer | None = None
+        if (
+            config.context_model.enabled
+            and config.context_model.endpoint
+            and config.context_model.model
+        ):
+            contextualizer = Contextualizer(
+                base_url=config.context_model.endpoint,
+                model=config.context_model.model,
+                api_key_env=config.context_model.api_key_env,
+                transport=context_transport,
+            )
+
         return cls(
             config.storage.bucket,
             partition=partition,
@@ -287,6 +314,10 @@ class TrustRAG:
             reformulator=reformulator,
             wiki_distiller=wiki_distiller,
             vector_store=vector_store,
+            chunking_enabled=config.chunking.enabled,
+            chunk_max_tokens=config.chunking.max_tokens,
+            chunk_overlap=config.chunking.overlap,
+            contextualizer=contextualizer,
         )
 
     def ingest(
