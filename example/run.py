@@ -26,13 +26,14 @@ from pathlib import Path
 from citenexus import CiteNexus
 from citenexus.answer.result import Result
 from citenexus.config.schema import (
+    CiteNexusConfig,
+    ContextModelConfig,
     EmbeddingConfig,
     LLMConfig,
     MultilingualConfig,
     ReformulationConfig,
     RerankerConfig,
     StorageConfig,
-    CiteNexusConfig,
 )
 from citenexus.config.signals import Signal
 from citenexus.storage.lance_store import StorageOptions
@@ -75,10 +76,20 @@ def _config() -> CiteNexusConfig:
         reranker=RerankerConfig(
             enabled=_bool_env("CITENEXUS_RERANK_ENABLED", True),
             endpoint=os.environ.get("CITENEXUS_RERANK_BASE_URL", "https://api.jina.ai/v1"),
-            model=os.environ.get(
-                "CITENEXUS_RERANK_MODEL", "jina-reranker-v2-base-multilingual"
-            ),
+            model=os.environ.get("CITENEXUS_RERANK_MODEL", "jina-reranker-v2-base-multilingual"),
             api_key_env="CITENEXUS_RERANK_API_KEY",
+        ),
+        # Contextual retrieval (Anthropic technique): a small model prepends a
+        # situating blurb to each chunk BEFORE embedding/BM25 — the citation
+        # passage stays verbatim. ~35-49%% retrieval-failure reduction.
+        context_model=ContextModelConfig(
+            enabled=_bool_env("CITENEXUS_CONTEXT_ENABLED", True),
+            endpoint=os.environ.get(
+                "CITENEXUS_CONTEXT_BASE_URL",
+                "https://generativelanguage.googleapis.com/v1beta/openai",
+            ),
+            model=os.environ.get("CITENEXUS_CONTEXT_MODEL", "gemini-2.5-flash-lite"),
+            api_key_env="CITENEXUS_LLM_API_KEY",
         ),
         # EN dual-query RRF: a small model rewrites each query in English and
         # retrieval fuses both phrasings — the cross-lingual abstention fix.

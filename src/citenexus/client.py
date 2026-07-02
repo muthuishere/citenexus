@@ -15,7 +15,7 @@ from citenexus.config.schema import CiteNexusConfig, LLMProvider
 from citenexus.config.signals import Signal, resolve_signals
 from citenexus.domain.partition import PartitionPath
 from citenexus.domain.trust import TrustMode
-from citenexus.embed import OpenAICompatibleEmbedding
+from citenexus.embed import OpenAICompatibleEmbedding, embed_in_batches
 from citenexus.embed import Transport as EmbedTransport
 from citenexus.evaluate import EvaluationReport, Evaluator
 from citenexus.evidence.chunked_builder import Contextualizer as ContextualizerSeam
@@ -63,11 +63,16 @@ class _SingleTextEmbedder:
     ``embed_query`` convenience so the batch plugin drops into the client.
     """
 
-    def __init__(self, plugin: OpenAICompatibleEmbedding) -> None:
+    def __init__(self, plugin: OpenAICompatibleEmbedding, batch_size: int = 32) -> None:
         self._plugin = plugin
+        self._batch_size = batch_size
 
     def embed(self, text: str) -> list[float]:
         return self._plugin.embed_query(text)
+
+    def embed_many(self, texts: list[str]) -> list[list[float]]:
+        """Batched embedding — one request per ``batch_size`` texts (§10)."""
+        return embed_in_batches(self._plugin, texts, self._batch_size)
 
 
 class _ZeroEmbedder:
@@ -231,7 +236,8 @@ class CiteNexus:
                     model=config.embedding.model,
                     api_key_env=config.embedding.api_key_env,
                     transport=embed_transport,
-                )
+                ),
+                batch_size=config.embedding.batch_size,
             )
         generator: Generator | None = None
         if config.llm.endpoint is None:

@@ -187,10 +187,11 @@ class IngestPipeline:
         # embedding/text signal → embed + upsert into the leaf vector store.
         if Signal.embedding in self._signals or Signal.text in self._signals:
             started = time.perf_counter()
+            vectors = self._embed_texts([eu.text for eu in units])
             rows = [
                 {
                     "eu_id": eu.eu_id,
-                    "vector": self._embedder.embed(eu.text),
+                    "vector": vector,
                     "text": eu.text,
                     "document_id": eu.document_id,
                     "language": eu.language,
@@ -198,7 +199,7 @@ class IngestPipeline:
                     "checksum": checksum,
                     "raw_uri": raw_uri,
                 }
-                for eu in units
+                for eu, vector in zip(units, vectors, strict=True)
             ]
             self._store.upsert(rows)
             self._emit(Stage.embedding, doc_id, started)
@@ -280,6 +281,14 @@ class IngestPipeline:
             return self._backend.get_bytes(blob_key)
         except Exception:
             return None
+
+    def _embed_texts(self, texts: list[str]) -> list[list[float]]:
+        """All EU vectors — one batched call when the embedder supports it."""
+        embed_many = getattr(self._embedder, "embed_many", None)
+        if callable(embed_many) and texts:
+            result: list[list[float]] = embed_many(texts)
+            return result
+        return [self._embedder.embed(text) for text in texts]
 
     def _detect_language(self, doc: Any) -> str:
         text = " ".join(block.text for block in doc.blocks)[:2000]
