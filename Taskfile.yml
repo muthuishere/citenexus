@@ -62,6 +62,19 @@ tasks:
     cmds:
       - uv build
 
+  core:build:
+    desc: Build the Rust core (trustrag-core cdylib — enables the parity tests)
+    dir: core
+    cmds:
+      - cargo build
+
+  core:test:
+    desc: Rust core unit tests + the Python↔Rust extraction parity suite
+    cmds:
+      - cd core && cargo test
+      - task: core:build
+      - uv run pytest tests/core -q
+
   publish:
     desc: Publish to PyPI (CI does this via OIDC on a tag; manual is a fallback)
     cmds:

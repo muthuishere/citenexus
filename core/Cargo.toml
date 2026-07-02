@@ -1,0 +1,35 @@
+[package]
+name = "trustrag-core"
+version = "0.1.0"
+edition = "2021"
+description = "TrustRAG's Rust engine: extraction (pdf/docx/pptx/html/md/csv/txt), lance store access, lid.176 detection. One core, FFI for all languages (SPEC-PORTS-v1 §3.4)."
+license = "Apache-2.0"
+
+[lib]
+name = "trustrag_core"
+# cdylib: the C-ABI artifact every language binds (cgo / napi / pyo3 / ctypes).
+# rlib: normal Rust consumption + tests.
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# extract: html (browser-grade html5ever), markdown (CommonMark reference),
+# OOXML docx/pptx (zip + streaming xml), csv.
+scraper = "0.27"
+ego-tree = "0.11"
+pulldown-cmark = "0.13"
+quick-xml = "0.41"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+csv = "1"
+# pdf is feature-gated: pdfium-render binds libpdfium dynamically at runtime,
+# so the crate always compiles; enabling the feature adds the binding code.
+pdfium-render = { version = "0.9", optional = true }
+
+[features]
+default = []
+pdf = ["dep:pdfium-render"]
+
+[profile.release]
+lto = true
+strip = true
