@@ -26,6 +26,7 @@ from trustrag.memory import MemoryStore, MemoryTurn
 from trustrag.plugins.base import LanguageDetectorPlugin, RerankerPlugin, RetrieverPlugin
 from trustrag.retrieve.engine import RetrievalEngine
 from trustrag.retrieve.lexical import LexicalRetriever
+from trustrag.retrieve.reformulate import QueryReformulator, Reformulator
 from trustrag.retrieve.rerank import OpenAICompatibleReranker
 from trustrag.retrieve.structure import StructureRetriever
 from trustrag.retrieve.types import Candidate
@@ -87,6 +88,7 @@ class TrustRAG:
         sink: TelemetrySink | None = None,
         vision: VisionDescriber | None = None,
         fetch_transport: FetchTransport | None = None,
+        reformulator: Reformulator | None = None,
     ) -> None:
         self.base_uri = str(base_uri)
         self.partition = partition or PartitionPath.of(("workspace", "default"))
@@ -131,6 +133,7 @@ class TrustRAG:
         self._generator = generator
         self._sink = sink
         self._fetch_transport = fetch_transport
+        self._reformulator = reformulator
         self._top_k = top_k
 
     @classmethod
@@ -146,6 +149,7 @@ class TrustRAG:
         llm_transport: ChatTransport | None = None,
         rerank_transport: EmbedTransport | None = None,
         vision_transport: ChatTransport | None = None,
+        reformulate_transport: ChatTransport | None = None,
         sink: TelemetrySink | None = None,
     ) -> TrustRAG:
         """Build a client with real OpenAI-compatible plugins from ``config``.
@@ -204,6 +208,17 @@ class TrustRAG:
                 transport=vision_transport,
             )
 
+        # EN dual-query reformulation is optional: a small model, cached per
+        # query. Without one, retrieval is single-query exactly as before.
+        reformulator: Reformulator | None = None
+        if config.reformulation.enabled and config.reformulation.endpoint:
+            reformulator = QueryReformulator(
+                base_url=config.reformulation.endpoint,
+                model=config.reformulation.model,
+                api_key_env=config.reformulation.api_key_env,
+                transport=reformulate_transport,
+            )
+
         return cls(
             config.storage.bucket,
             partition=partition,
@@ -219,6 +234,7 @@ class TrustRAG:
             memory_max_turns=config.memory.max_turns,
             sink=sink,
             vision=vision,
+            reformulator=reformulator,
         )
 
     def ingest(
@@ -306,6 +322,7 @@ class TrustRAG:
         return self._retrieve.retrieve(
             self._retrieval_query(question, conversation_id=conversation_id),
             k or self._top_k,
+            extra_queries=self._extra_queries(question),
         )
 
     def ask(
@@ -318,17 +335,33 @@ class TrustRAG:
         conversation_id: str | None = None,
     ) -> Result:
         retrieval_query = self._retrieval_query(question, conversation_id=conversation_id)
+        extra_queries = self._extra_queries(question)
+        # The EN reformulation also counts for the relevance gate: it is the same
+        # question in the evidence's language. Citations and the faithfulness
+        # gate stay exactly as strict — this only widens *relevance* matching.
+        evidence_query = " ".join([retrieval_query, *extra_queries])
         result = self._answer.ask(
             question,
-            self._retrieve.retrieve(retrieval_query, k or self._top_k),
+            self._retrieve.retrieve(retrieval_query, k or self._top_k, extra_queries=extra_queries),
             mode=mode,
             answer_language=answer_language,
-            evidence_query=retrieval_query,
+            evidence_query=evidence_query,
         )
         self._emit_generate(result)
         if conversation_id is not None:
             self._memory.append(conversation_id, question, result.answer)
         return result
+
+    def _extra_queries(self, question: str) -> tuple[str, ...]:
+        """The EN dual-query reformulation, when configured and useful.
+
+        Cached inside the reformulator, so ask/retrieve/evaluate share one model
+        call per distinct question. No reformulator, or nothing gained → ().
+        """
+        if self._reformulator is None:
+            return ()
+        rewritten = self._reformulator.reformulate(question)
+        return (rewritten,) if rewritten else ()
 
     def _emit_generate(self, result: Result) -> None:
         """Emit the answering-model telemetry event (§6c). No-op without a sink.

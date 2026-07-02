@@ -98,6 +98,19 @@ class RerankerConfig(_Section):
     top_n: int = 20
 
 
+class ReformulationConfig(_Section):
+    """EN dual-query reformulation (§10, §11a) — the cross-lingual abstention fix.
+
+    A SMALL model rewrites each query in English; retrieval runs both the
+    original and the rewrite and RRF-fuses (RAG-Fusion). Cached per query.
+    """
+
+    enabled: bool = False
+    model: str = "gemini-2.5-flash-lite"
+    endpoint: str | None = None
+    api_key_env: str | None = None
+
+
 class VisionPrefilterConfig(_Section):
     """The cheap pre-filter that gates the conditional vision pass (§9)."""
 
@@ -234,6 +247,7 @@ class TrustRAGConfig(BaseModel):
     llm: LLMConfig = Field(default_factory=LLMConfig)
     embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
     reranker: RerankerConfig = Field(default_factory=RerankerConfig)
+    reformulation: ReformulationConfig = Field(default_factory=ReformulationConfig)
     vision: VisionConfig = Field(default_factory=VisionConfig)
     vector_store: VectorStoreConfig = Field(default_factory=VectorStoreConfig)
     graph: GraphConfig = Field(default_factory=GraphConfig)

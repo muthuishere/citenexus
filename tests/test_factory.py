@@ -130,6 +130,21 @@ def test_from_config_no_vision_when_disabled(tmp_path: Path) -> None:
     assert rag._ingest._vision is None
 
 
+def test_from_config_builds_reformulator_when_enabled(tmp_path: Path) -> None:
+    from trustrag.config.schema import ReformulationConfig
+
+    cfg = _config(tmp_path).model_copy(
+        update={"reformulation": ReformulationConfig(enabled=True, endpoint="http://small.test/v1")}
+    )
+    rag = TrustRAG.from_config(cfg, embed_transport=_embed_transport, llm_transport=_llm_transport)
+    assert rag._reformulator is not None
+
+
+def test_from_config_no_reformulator_by_default(tmp_path: Path) -> None:
+    rag = _rag(tmp_path)
+    assert rag._reformulator is None
+
+
 def test_from_config_anthropic_provider(tmp_path: Path) -> None:
     cfg = _config(tmp_path).model_copy(
         update={

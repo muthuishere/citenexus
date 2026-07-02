@@ -42,8 +42,22 @@ class RetrievalEngine:
         self._rrf_k = rrf_k
         self._rerank_top_n = rerank_top_n
 
-    def retrieve(self, query: str, k: int) -> list[Candidate]:
-        lists = [r.retrieve(query, k) for r in self._retrievers]
+    def retrieve(
+        self,
+        query: str,
+        k: int,
+        *,
+        extra_queries: Sequence[str] = (),
+    ) -> list[Candidate]:
+        """Retrieve for ``query`` (+ optional reformulations), fuse, rerank.
+
+        Dual-query RRF (RAG-Fusion): every (retriever x query) list feeds one
+        RRF fusion, so an EU found by either phrasing surfaces — the researched
+        fix for cross-lingual misses. The reranker always scores against the
+        ORIGINAL query (the user's true intent), never a reformulation.
+        """
+        queries = [query, *extra_queries]
+        lists = [r.retrieve(q, k) for q in queries for r in self._retrievers]
         fused = rrf_fuse(lists, k=self._rrf_k)
 
         head = fused[: self._rerank_top_n]
