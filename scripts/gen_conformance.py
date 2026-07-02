@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from citenexus.answer.generator import _SYSTEM_PROMPT
+from citenexus.wiki.distill import _PROMPT as _WIKI_DISTILL_PROMPT
 from citenexus.answer.verify import _STOPWORDS, has_relevance_overlap, is_supported
 from citenexus.domain.partition import PartitionPath
 from citenexus.evidence.builder import build_evidence_units
@@ -54,6 +55,7 @@ def _prompts() -> dict[str, str]:
         "vision_describe": _VISION_PROMPT,
         "contextualize": _CONTEXTUALIZE_PROMPT,
         "reformulate": _REFORMULATE_PROMPT,
+        "wiki_distill": _WIKI_DISTILL_PROMPT,
     }
 
 

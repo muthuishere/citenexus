@@ -159,10 +159,17 @@ All model IO is injected endpoints; nothing bundled.
 - Every default HTTP transport sends `User-Agent: citenexus` (Cloudflare-fronted
   APIs 403 default library agents).
 - Transports are injectable — unit tests are hermetic in all languages.
-- The four prompts (grounded-answer system prompt with the verbatim-quote rule,
-  vision JSON-description prompt, contextualizer prompt, EN-reformulation
-  prompt) are pinned **verbatim** in `conformance/prompts.json`; ports load or
-  embed them unchanged.
+- The five prompts (grounded-answer system prompt with the verbatim-quote
+  rule, vision JSON-description prompt, contextualizer prompt, EN-reformulation
+  prompt, wiki-distillation prompt) are pinned **verbatim** in
+  `conformance/prompts.json`; ports load or embed them unchanged.
+- **Every model-backed capability ports the same way** — generator (OpenAI +
+  Anthropic), reformulator, contextualizer, vision, and the wiki distiller are
+  all plain HTTP + pinned prompt + JSON parse; none needs a language-specific
+  SDK. Likewise Postgres is pinned SQL (§3.3), and the LLM wiki's artifacts
+  (`pages.json` + Markdown tree) are language-neutral S3 objects — a wiki
+  built by any implementation is navigable by every other (read-side is T1-
+  adjacent even though distillation itself is T2).
 
 ## 6. Config contract
 
