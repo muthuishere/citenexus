@@ -13,7 +13,7 @@ from trustrag.answer.result import (
     SourceRef,
 )
 from trustrag.domain.trust import TrustMode
-from trustrag.storage.lance_store import LeafVectorStore, StorageOptions
+from trustrag.storage.lance_store import LanceVectorStore, StorageOptions
 from trustrag.storage.manifest import EtagManifest, load_manifest, save_manifest
 from trustrag.storage.paths import Layer, layer_prefix, leaf_vector_uri
 from trustrag.testing.fakes import tokenize
@@ -115,7 +115,7 @@ class SmokePipeline:
         self._embedder = embedder
         self._generator = generator
         self._top_k = top_k
-        self._store = LeafVectorStore(leaf_vector_uri(base_uri, partition), storage_options)
+        self._store = LanceVectorStore(leaf_vector_uri(base_uri, partition), storage_options)
 
     def ingest(self, text: str, document_id: str) -> str:
         """Store a document as one Evidence Unit and index it. Returns its eu_id."""

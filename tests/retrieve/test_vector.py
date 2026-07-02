@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from trustrag.retrieve.types import RetrievalSignal
 from trustrag.retrieve.vector import VectorRetriever
-from trustrag.storage.lance_store import LeafVectorStore
+from trustrag.storage.lance_store import LanceVectorStore
 from trustrag.testing.fakes import FakeEmbedding
 
 
 def test_hits_are_vector_signal_ranked_by_similarity(
-    seeded_store: LeafVectorStore, embedder: FakeEmbedding
+    seeded_store: LanceVectorStore, embedder: FakeEmbedding
 ) -> None:
     retriever = VectorRetriever(seeded_store, embedder)
     out = retriever.retrieve("termination of employment", k=3)
@@ -21,7 +21,7 @@ def test_hits_are_vector_signal_ranked_by_similarity(
 
 
 def test_candidate_carries_payload_and_page_none(
-    seeded_store: LeafVectorStore, embedder: FakeEmbedding
+    seeded_store: LanceVectorStore, embedder: FakeEmbedding
 ) -> None:
     out = VectorRetriever(seeded_store, embedder).retrieve("salary", k=1)
     top = out[0]
@@ -31,11 +31,11 @@ def test_candidate_carries_payload_and_page_none(
     assert top.page is None  # the -1 ingest sentinel maps back to None
 
 
-def test_empty_leaf_returns_empty(empty_store: LeafVectorStore, embedder: FakeEmbedding) -> None:
+def test_empty_leaf_returns_empty(empty_store: LanceVectorStore, embedder: FakeEmbedding) -> None:
     assert VectorRetriever(empty_store, embedder).retrieve("x", k=5) == []
 
 
 def test_plugin_version_is_non_empty(
-    seeded_store: LeafVectorStore, embedder: FakeEmbedding
+    seeded_store: LanceVectorStore, embedder: FakeEmbedding
 ) -> None:
     assert VectorRetriever(seeded_store, embedder).plugin_version

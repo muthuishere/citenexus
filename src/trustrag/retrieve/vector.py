@@ -1,7 +1,7 @@
 """The dense vector retrieval signal (spec §10).
 
 ``VectorRetriever`` embeds the query with an injected embedder, asks the leaf
-``LeafVectorStore`` for its nearest rows, and maps each hit to a citable
+``LanceVectorStore`` for its nearest rows, and maps each hit to a citable
 ``Candidate`` carrying ``signal=vector``. LanceDB returns a ``_distance`` per hit
 (smaller = more similar); we turn that into a score that *descends* as distance
 grows, so the nearest EU ranks first.

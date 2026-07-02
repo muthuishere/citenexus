@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, Any
 
 import lancedb
 
+from trustrag.storage.bm25 import Bm25TextSearch
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -22,7 +24,7 @@ if TYPE_CHECKING:
 StorageOptions = dict[str, str]
 
 
-class LeafVectorStore:
+class LanceVectorStore:
     """The vector index for a single leaf partition."""
 
     TABLE = "evidence_units"
@@ -75,3 +77,22 @@ class LeafVectorStore:
         """Drop this leaf's table (the leaf becomes empty)."""
         if self.TABLE in self._tables():
             self._db.drop_table(self.TABLE)
+
+
+class LanceTextSearch(Bm25TextSearch):
+    """The text-search half of the Lance backend pairing.
+
+    LanceDB has no server-side text ranking, so its ``TextSearch`` is the
+    in-core BM25-lite over ``scan()`` — named here so each backend reads as a
+    (vector, text) pair: ``LanceVectorStore`` + ``LanceTextSearch``, mirroring
+    ``PostgresVectorStore`` (+ its native tsvector ``search_text``).
+    """
+
+    plugin_version = "lance-text-search-v1"
+
+    def __init__(self, store: LanceVectorStore) -> None:
+        super().__init__(store)
+
+
+# Backward-compat alias for the pre-rename name.
+LeafVectorStore = LanceVectorStore

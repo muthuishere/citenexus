@@ -167,3 +167,23 @@ class PostgresVectorStore:
             params = (limit,)
         rows = self._select(sql, params)
         return [dict(zip(_COLUMNS, row, strict=True)) for row in rows]
+
+
+class PostgresTextSearch:
+    """The text-search half of the Postgres backend pairing.
+
+    Postgres ranks text natively (``tsvector``), so this delegates to the
+    store's ``search_text`` — sharing its connection and leaf table. Named so
+    each backend reads as a (vector, text) pair: ``PostgresVectorStore`` +
+    ``PostgresTextSearch``, mirroring ``LanceVectorStore`` + ``LanceTextSearch``.
+    (The store itself already satisfies ``TextSearch``; use this name when you
+    wire the text seam explicitly, e.g. ``TrustRAG(text_search=...)``.)
+    """
+
+    plugin_version = "postgres-text-search-v1"
+
+    def __init__(self, store: PostgresVectorStore) -> None:
+        self._store = store
+
+    def search_text(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
+        return self._store.search_text(query, limit=limit)

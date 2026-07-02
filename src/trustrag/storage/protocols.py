@@ -5,7 +5,7 @@ live behind ``StorageBackend`` (S3-native, already an adapter), while the
 retrievable index lives behind these two protocols:
 
 - ``VectorStore`` — the per-leaf index every consumer already uses through
-  exactly three methods (``upsert`` / ``search`` / ``scan``). ``LeafVectorStore``
+  exactly three methods (``upsert`` / ``search`` / ``scan``). ``LanceVectorStore``
   (LanceDB) is the zero-infra, S3-native REFERENCE implementation and stays the
   default; ``PostgresVectorStore`` (pgvector) lets a team bring their existing
   Postgres instead.

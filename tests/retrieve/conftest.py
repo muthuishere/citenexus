@@ -1,6 +1,6 @@
 """Hermetic seeding for the retrieval tests (spec §10).
 
-Seeds a real local ``LeafVectorStore`` with a few EU rows (text + FakeEmbedding
+Seeds a real local ``LanceVectorStore`` with a few EU rows (text + FakeEmbedding
 vectors + document_id) and writes a structure index json into a
 ``LocalFsBackend`` — the same shapes the ingest pipeline persists.
 """
@@ -15,7 +15,7 @@ from trustrag.domain.partition import PartitionPath
 from trustrag.evidence.structure import StructureIndex, StructureNode
 from trustrag.extract.types import StructureType
 from trustrag.storage.backend import LocalFsBackend
-from trustrag.storage.lance_store import LeafVectorStore
+from trustrag.storage.lance_store import LanceVectorStore
 from trustrag.storage.paths import Layer, layer_prefix
 from trustrag.testing.fakes import FakeEmbedding
 
@@ -36,9 +36,9 @@ def embedder() -> FakeEmbedding:
 
 
 @pytest.fixture
-def seeded_store(tmp_path: Path, embedder: FakeEmbedding) -> LeafVectorStore:
+def seeded_store(tmp_path: Path, embedder: FakeEmbedding) -> LanceVectorStore:
     """A leaf store upserted with the corpus, ingest-pipeline row shape."""
-    store = LeafVectorStore(str(tmp_path / "leaf"))
+    store = LanceVectorStore(str(tmp_path / "leaf"))
     store.upsert(
         [
             {
@@ -56,9 +56,9 @@ def seeded_store(tmp_path: Path, embedder: FakeEmbedding) -> LeafVectorStore:
 
 
 @pytest.fixture
-def empty_store(tmp_path: Path) -> LeafVectorStore:
+def empty_store(tmp_path: Path) -> LanceVectorStore:
     """A leaf with no table yet — search/scan both return []."""
-    return LeafVectorStore(str(tmp_path / "leaf-empty"))
+    return LanceVectorStore(str(tmp_path / "leaf-empty"))
 
 
 @pytest.fixture

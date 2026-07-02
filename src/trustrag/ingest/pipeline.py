@@ -14,7 +14,7 @@ from trustrag.extract.types import SourceType
 from trustrag.ingest.result import IngestResult
 from trustrag.lang.detect import HeuristicDetector
 from trustrag.lang.fallback import resolve_answer_language
-from trustrag.storage.lance_store import LeafVectorStore, StorageOptions
+from trustrag.storage.lance_store import LanceVectorStore, StorageOptions
 from trustrag.storage.manifest import EtagManifest, load_manifest, save_manifest
 from trustrag.storage.paths import Layer, layer_prefix, leaf_vector_uri, partition_segment
 from trustrag.vision.describe import describe_image
@@ -108,7 +108,7 @@ class IngestPipeline:
         self._detector: LanguageDetectorPlugin = detector or HeuristicDetector()
         self._signals = resolve_signals(signals)
         # The injected VectorStore seam; LanceDB-per-leaf is the default.
-        self._store: VectorStore = vector_store or LeafVectorStore(
+        self._store: VectorStore = vector_store or LanceVectorStore(
             leaf_vector_uri(base_uri, partition), storage_options
         )
         self._queue = queue

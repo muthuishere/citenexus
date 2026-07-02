@@ -13,14 +13,18 @@ The library bundles **no models** — embedding, LLM, reranker, and vision are
 injected endpoints. TrustRAG owns orchestration, storage, retrieval, fusion,
 grounding, and evaluation.
 
-**TrustRAG supports pluggable vector databases.** The recommended default is
-**LanceDB** — embedded, S3-native, zero infrastructure: point at a bucket and
-go. Prefer your own database? Set `vector_store.backend: "postgres"` and bring
-Postgres/pgvector (`pip install 'trustrag[postgres]'` — it also serves the
-lexical signal natively via `tsvector`), or implement the 3-method
-`VectorStore` protocol for anything else (Qdrant, Weaviate, …). Text search is
-its own seam too: any `TextSearch` backend (Elasticsearch, Tantivy, …) can
-serve the lexical signal independently of the vector store.
+**TrustRAG supports pluggable vector databases.** Storage is two protocols —
+`VectorStore` (dense) and `TextSearch` (lexical) — and each backend is a named
+(vector, text) pair:
+
+| Backend | Vector | Text | When |
+|---|---|---|---|
+| **Lance** (recommended) | `LanceVectorStore` | `LanceTextSearch` (BM25-lite) | Zero infra, S3-native: point at a bucket and go |
+| **Postgres** | `PostgresVectorStore` (pgvector) | `PostgresTextSearch` (native `tsvector`) | You already run Postgres — `pip install 'trustrag[postgres]'`, set `vector_store.backend: "postgres"` |
+| **Yours** | implement `VectorStore` | implement `TextSearch` | Qdrant, Weaviate, Elasticsearch, Tantivy, … |
+
+The seams are independent: mix LanceDB vectors with an Elasticsearch
+`text_search=`, or let one Postgres serve both.
 
 ```python
 from trustrag import TrustRAG

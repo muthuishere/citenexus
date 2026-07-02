@@ -33,7 +33,7 @@ from trustrag.retrieve.structure import StructureRetriever
 from trustrag.retrieve.types import Candidate
 from trustrag.retrieve.vector import QueryEmbedder, VectorRetriever
 from trustrag.storage.backend import LocalFsBackend, S3Backend, StorageBackend
-from trustrag.storage.lance_store import LeafVectorStore, StorageOptions
+from trustrag.storage.lance_store import LanceVectorStore, StorageOptions
 from trustrag.storage.paths import leaf_vector_uri, partition_segment
 from trustrag.storage.postgres_store import PostgresVectorStore, table_name_for
 from trustrag.storage.protocols import TextSearch, VectorStore
@@ -101,7 +101,7 @@ class TrustRAG:
         self._backend = backend or _backend_for(self.base_uri)
         # The injected VectorStore seam (spec §6b): LanceDB-per-leaf (S3-native,
         # zero infra) is the reference default; Postgres/pgvector drops in here.
-        self._store: VectorStore = vector_store or LeafVectorStore(
+        self._store: VectorStore = vector_store or LanceVectorStore(
             leaf_vector_uri(self.base_uri, self.partition), storage_options
         )
         self._graph_store = GraphStore(self._backend, self.partition)

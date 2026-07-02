@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from trustrag.storage.lance_store import LeafVectorStore
+from trustrag.storage.lance_store import LanceVectorStore
 
 
 def _rows() -> list[dict[str, object]]:
@@ -13,7 +13,7 @@ def _rows() -> list[dict[str, object]]:
 
 
 def test_upsert_then_search(tmp_path: Path) -> None:
-    store = LeafVectorStore(str(tmp_path / "leafA"))
+    store = LanceVectorStore(str(tmp_path / "leafA"))
     store.upsert(_rows())
     hits = store.search([0.1, 0.2, 0.3], limit=1)
     assert len(hits) == 1
@@ -21,7 +21,7 @@ def test_upsert_then_search(tmp_path: Path) -> None:
 
 
 def test_upsert_is_idempotent(tmp_path: Path) -> None:
-    store = LeafVectorStore(str(tmp_path / "leafA"))
+    store = LanceVectorStore(str(tmp_path / "leafA"))
     store.upsert(_rows())
     store.upsert(_rows())  # same eu_ids — merge, not duplicate
     hits = store.search([0.9, 0.8, 0.7], limit=10)
@@ -29,8 +29,8 @@ def test_upsert_is_idempotent(tmp_path: Path) -> None:
 
 
 def test_leaves_are_isolated(tmp_path: Path) -> None:
-    a = LeafVectorStore(str(tmp_path / "leafA"))
-    b = LeafVectorStore(str(tmp_path / "leafB"))
+    a = LanceVectorStore(str(tmp_path / "leafA"))
+    b = LanceVectorStore(str(tmp_path / "leafB"))
     a.upsert(_rows())
     b.upsert(_rows())
     a.drop()
@@ -39,5 +39,5 @@ def test_leaves_are_isolated(tmp_path: Path) -> None:
 
 
 def test_search_empty_leaf_returns_empty(tmp_path: Path) -> None:
-    store = LeafVectorStore(str(tmp_path / "leafEmpty"))
+    store = LanceVectorStore(str(tmp_path / "leafEmpty"))
     assert store.search([0.0, 0.0, 0.0]) == []

@@ -7,7 +7,7 @@ from pathlib import Path
 from trustrag.domain.partition import PartitionPath
 from trustrag.retrieve.types import RetrievalSignal
 from trustrag.storage.backend import LocalFsBackend
-from trustrag.storage.lance_store import LeafVectorStore
+from trustrag.storage.lance_store import LanceVectorStore
 from trustrag.testing import FakeEmbedding
 from trustrag.wiki import WikiRetriever, WikiStore
 
@@ -15,7 +15,7 @@ from trustrag.wiki import WikiRetriever, WikiStore
 def test_wiki_retriever_returns_underlying_eu(tmp_path: Path) -> None:
     partition = PartitionPath.of(("org", "acme"))
     backend = LocalFsBackend(tmp_path / "objects")
-    store = LeafVectorStore(str(tmp_path / "leaf"))
+    store = LanceVectorStore(str(tmp_path / "leaf"))
     embedder = FakeEmbedding()
     store.upsert(
         [

@@ -11,7 +11,7 @@ from trustrag.retrieve.structure import StructureRetriever
 from trustrag.retrieve.types import Candidate
 from trustrag.retrieve.vector import VectorRetriever
 from trustrag.storage.backend import LocalFsBackend
-from trustrag.storage.lance_store import LeafVectorStore
+from trustrag.storage.lance_store import LanceVectorStore
 from trustrag.testing.fakes import FakeEmbedding
 
 from .conftest import PARTITION
@@ -31,7 +31,7 @@ class _SpyReranker:
 
 
 def _engine(
-    store: LeafVectorStore,
+    store: LanceVectorStore,
     backend: LocalFsBackend,
     embedder: FakeEmbedding,
     reranker: _SpyReranker,
@@ -47,7 +47,7 @@ def _engine(
 
 
 def test_end_to_end_fused_reranked_list(
-    seeded_store: LeafVectorStore,
+    seeded_store: LanceVectorStore,
     backend_with_structure: LocalFsBackend,
     embedder: FakeEmbedding,
 ) -> None:
@@ -61,7 +61,7 @@ def test_end_to_end_fused_reranked_list(
 
 
 def test_identity_reranker_preserves_fused_order(
-    seeded_store: LeafVectorStore,
+    seeded_store: LanceVectorStore,
     backend_with_structure: LocalFsBackend,
     embedder: FakeEmbedding,
 ) -> None:
@@ -81,7 +81,7 @@ def test_identity_reranker_preserves_fused_order(
 
 
 def test_k_caps_the_result(
-    seeded_store: LeafVectorStore,
+    seeded_store: LanceVectorStore,
     backend_with_structure: LocalFsBackend,
     embedder: FakeEmbedding,
 ) -> None:

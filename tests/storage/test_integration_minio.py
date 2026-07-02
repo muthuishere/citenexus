@@ -13,7 +13,7 @@ import pytest
 
 from trustrag.domain.partition import PartitionPath
 from trustrag.storage.backend import S3Backend
-from trustrag.storage.lance_store import LeafVectorStore
+from trustrag.storage.lance_store import LanceVectorStore
 from trustrag.storage.paths import leaf_vector_uri
 
 pytestmark = pytest.mark.integration
@@ -58,7 +58,7 @@ def test_lance_leaf_on_s3() -> None:
         "secret_access_key": SECRET,
         "region": "us-east-1",
     }
-    store = LeafVectorStore(uri, storage_options=so)
+    store = LanceVectorStore(uri, storage_options=so)
     try:
         store.upsert(
             [

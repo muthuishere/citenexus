@@ -8,7 +8,7 @@ from pathlib import Path
 from trustrag.domain.partition import PartitionPath
 from trustrag.ingest import IngestPipeline
 from trustrag.storage.backend import LocalFsBackend
-from trustrag.storage.lance_store import LeafVectorStore
+from trustrag.storage.lance_store import LanceVectorStore
 from trustrag.storage.paths import Layer, layer_prefix, leaf_vector_uri
 from trustrag.testing import FakeEmbedding
 from trustrag.worker.queue import DurableQueue
@@ -31,8 +31,8 @@ def _pipeline(
     )
 
 
-def _store(tmp_path: Path) -> LeafVectorStore:
-    return LeafVectorStore(leaf_vector_uri(str(tmp_path), PART))
+def _store(tmp_path: Path) -> LanceVectorStore:
+    return LanceVectorStore(leaf_vector_uri(str(tmp_path), PART))
 
 
 def test_raw_text_ingest_yields_units_with_language(tmp_path: Path) -> None:
