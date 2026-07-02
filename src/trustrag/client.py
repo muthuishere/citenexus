@@ -42,7 +42,7 @@ from trustrag.stream import stream_result
 from trustrag.telemetry.events import Outcome, Stage, StageEvent, UnitCount
 from trustrag.telemetry.sinks import TelemetrySink
 from trustrag.vision import OpenAICompatibleVision
-from trustrag.wiki import WikiRetriever, WikiStore
+from trustrag.wiki import LLMWikiDistiller, WikiDistiller, WikiRetriever, WikiStore
 
 
 class _IdentityReranker(RerankerPlugin):
@@ -93,6 +93,7 @@ class TrustRAG:
         vision: VisionDescriber | None = None,
         fetch_transport: FetchTransport | None = None,
         reformulator: Reformulator | None = None,
+        wiki_distiller: WikiDistiller | None = None,
         vector_store: VectorStore | None = None,
         text_search: TextSearch | None = None,
         hooks: Hooks | None = None,
@@ -107,7 +108,7 @@ class TrustRAG:
             leaf_vector_uri(self.base_uri, self.partition), storage_options
         )
         self._graph_store = GraphStore(self._backend, self.partition)
-        self._wiki_store = WikiStore(self._backend, self.partition)
+        self._wiki_store = WikiStore(self._backend, self.partition, distiller=wiki_distiller)
         self._memory = MemoryStore(self._backend, self.partition, max_turns=memory_max_turns)
         self._ingest = IngestPipeline(
             backend=self._backend,
@@ -164,6 +165,7 @@ class TrustRAG:
         rerank_transport: EmbedTransport | None = None,
         vision_transport: ChatTransport | None = None,
         reformulate_transport: ChatTransport | None = None,
+        wiki_distill_transport: ChatTransport | None = None,
         sink: TelemetrySink | None = None,
     ) -> TrustRAG:
         """Build a client with real OpenAI-compatible plugins from ``config``.
@@ -239,6 +241,18 @@ class TrustRAG:
                 transport=reformulate_transport,
             )
 
+        # LLM wiki distillation is optional: a small model compiles the corpus
+        # into cross-referenced pages. Without one, the deterministic
+        # per-document wiki is built exactly as before.
+        wiki_distiller: WikiDistiller | None = None
+        if config.wiki_distill.enabled and config.wiki_distill.endpoint:
+            wiki_distiller = LLMWikiDistiller(
+                base_url=config.wiki_distill.endpoint,
+                model=config.wiki_distill.model,
+                api_key_env=config.wiki_distill.api_key_env,
+                transport=wiki_distill_transport,
+            )
+
         # VectorStore backend (spec §6b): LanceDB-per-leaf is the S3-native
         # default; "postgres" brings pgvector + native tsvector text search.
         # Construction is lazy (no connection until first use).
@@ -271,6 +285,7 @@ class TrustRAG:
             sink=sink,
             vision=vision,
             reformulator=reformulator,
+            wiki_distiller=wiki_distiller,
             vector_store=vector_store,
         )
 

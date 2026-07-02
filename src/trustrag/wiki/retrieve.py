@@ -30,8 +30,10 @@ class WikiRetriever(RetrieverPlugin):
         terms = content_tokens(query)
         if not terms:
             return []
+        pages = self._wiki_store.load()
+        pages_by_id = {page.page_id: page for page in pages}
         eu_scores: dict[str, float] = {}
-        for page in self._wiki_store.load():
+        for page in pages:
             haystack = (
                 set(page.keywords) | content_tokens(page.title) | content_tokens(page.summary)
             )
@@ -40,6 +42,15 @@ class WikiRetriever(RetrieverPlugin):
                 continue
             for eu_ref in page.eu_refs:
                 eu_scores[eu_ref] = max(eu_scores.get(eu_ref, 0.0), float(hits))
+            # Navigate one hop: a matched page also vouches for the pages it
+            # [[links]] to, at half its own hit score. Still resolves to EUs —
+            # the linked page itself is never a candidate, let alone a citation.
+            for link in page.links:
+                target = pages_by_id.get(link)
+                if target is None:
+                    continue
+                for eu_ref in target.eu_refs:
+                    eu_scores[eu_ref] = max(eu_scores.get(eu_ref, 0.0), hits / 2.0)
         if not eu_scores:
             return []
 

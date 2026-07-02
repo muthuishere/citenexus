@@ -165,6 +165,58 @@ def test_from_config_no_reformulator_by_default(tmp_path: Path) -> None:
     assert rag._reformulator is None
 
 
+def test_from_config_builds_wiki_distiller_when_enabled(tmp_path: Path) -> None:
+    from trustrag.config.schema import WikiDistillConfig
+    from trustrag.wiki import LLMWikiDistiller
+
+    cfg = _config(tmp_path).model_copy(
+        update={"wiki_distill": WikiDistillConfig(enabled=True, endpoint="http://small.test/v1")}
+    )
+    rag = TrustRAG.from_config(
+        cfg,
+        detector=HeuristicDetector(),
+        embed_transport=_embed_transport,
+        llm_transport=_llm_transport,
+    )
+    assert isinstance(rag._wiki_store._distiller, LLMWikiDistiller)
+
+
+def test_from_config_no_wiki_distiller_by_default(tmp_path: Path) -> None:
+    rag = _rag(tmp_path)
+    assert rag._wiki_store._distiller is None
+
+
+def test_wiki_pipeline_survives_dead_distill_endpoint(tmp_path: Path) -> None:
+    """Distillation is enhancement-only: a dead endpoint degrades to the
+    deterministic wiki and ingest/ask keep working (refresh_slow_path intact)."""
+    from trustrag.config.schema import WikiDistillConfig
+
+    def dead(url: str, body: bytes, headers: dict[str, str]) -> bytes:
+        raise RuntimeError("endpoint down")
+
+    cfg = _config(tmp_path).model_copy(
+        update={
+            "wiki_distill": WikiDistillConfig(enabled=True, endpoint="http://dead.test/v1"),
+            "signals": (Signal.embedding, Signal.text, Signal.wiki),
+        }
+    )
+    rag = TrustRAG.from_config(
+        cfg,
+        detector=HeuristicDetector(),
+        embed_transport=_embed_transport,
+        llm_transport=_llm_transport,
+        wiki_distill_transport=dead,
+    )
+    rag.ingest(
+        text="The employee shall not disclose confidential information.",
+        document_id="nda",
+    )
+    pages = rag._wiki_store.load()
+    assert [page.page_id for page in pages] == ["wiki:nda"]  # deterministic fallback
+    result = rag.ask("Can the employee disclose confidential information?")
+    assert result.evidence.decision is Decision.answered
+
+
 def test_from_config_postgres_backend(tmp_path: Path) -> None:
     from trustrag.config.schema import VectorStoreConfig
     from trustrag.storage.postgres_store import PostgresVectorStore

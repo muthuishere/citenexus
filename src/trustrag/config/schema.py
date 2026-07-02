@@ -111,6 +111,20 @@ class ReformulationConfig(_Section):
     api_key_env: str | None = None
 
 
+class WikiDistillConfig(_Section):
+    """LLM wiki distillation (§10b) — Karpathy-style cross-referenced pages.
+
+    A SMALL model distills the corpus into concept pages + per-document
+    summaries with ``[[links]]``. Disabled by default; without it the wiki
+    layer builds its deterministic per-document pages.
+    """
+
+    enabled: bool = False
+    model: str = "gemini-2.5-flash-lite"
+    endpoint: str | None = None
+    api_key_env: str | None = None
+
+
 class VisionPrefilterConfig(_Section):
     """The cheap pre-filter that gates the conditional vision pass (§9)."""
 
@@ -248,6 +262,7 @@ class TrustRAGConfig(BaseModel):
     embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
     reranker: RerankerConfig = Field(default_factory=RerankerConfig)
     reformulation: ReformulationConfig = Field(default_factory=ReformulationConfig)
+    wiki_distill: WikiDistillConfig = Field(default_factory=WikiDistillConfig)
     vision: VisionConfig = Field(default_factory=VisionConfig)
     vector_store: VectorStoreConfig = Field(default_factory=VectorStoreConfig)
     graph: GraphConfig = Field(default_factory=GraphConfig)
