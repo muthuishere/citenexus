@@ -29,6 +29,7 @@ from trustrag.config.schema import (
     EmbeddingConfig,
     LLMConfig,
     MultilingualConfig,
+    ReformulationConfig,
     RerankerConfig,
     StorageConfig,
     TrustRAGConfig,
@@ -78,6 +79,17 @@ def _config() -> TrustRAGConfig:
                 "TRUSTRAG_RERANK_MODEL", "jina-reranker-v2-base-multilingual"
             ),
             api_key_env="TRUSTRAG_RERANK_API_KEY",
+        ),
+        # EN dual-query RRF: a small model rewrites each query in English and
+        # retrieval fuses both phrasings — the cross-lingual abstention fix.
+        reformulation=ReformulationConfig(
+            enabled=_bool_env("TRUSTRAG_REFORMULATE_ENABLED", True),
+            endpoint=os.environ.get(
+                "TRUSTRAG_REFORMULATE_BASE_URL",
+                "https://generativelanguage.googleapis.com/v1beta/openai",
+            ),
+            model=os.environ.get("TRUSTRAG_REFORMULATE_MODEL", "gemini-2.5-flash-lite"),
+            api_key_env="TRUSTRAG_LLM_API_KEY",
         ),
         multilingual=MultilingualConfig(fallback_language="en"),
         # Fast-path signals for the example: dense vectors + lexical.

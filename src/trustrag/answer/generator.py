@@ -33,10 +33,14 @@ from trustrag.telemetry.events import TokenUsage
 Transport = Callable[[str, bytes, dict[str, str]], bytes]
 
 _SYSTEM_PROMPT = (
-    "You are a strict, evidence-first assistant. Answer the question using ONLY "
-    "the provided passage. If the passage does not contain the answer, say you "
-    "cannot answer from the evidence. Do not add facts that are not in the "
-    "passage. Answer in the language identified by the given ISO code."
+    "You are a strict, evidence-first assistant. Answer the question by quoting "
+    "the exact sentence or phrase from the provided passage that answers it — "
+    "VERBATIM, word for word, with no rephrasing, no added words, and no "
+    "commentary. If the passage does not contain the answer, say you cannot "
+    "answer from the evidence. The verifier rejects any word not present in the "
+    "passage, so never paraphrase. Quote in the passage's own language when it "
+    "matches the requested ISO code; otherwise still prefer the passage's exact "
+    "wording."
 )
 
 

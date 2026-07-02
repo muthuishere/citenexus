@@ -22,6 +22,7 @@ from trustrag.graph import GraphRetriever, GraphStore
 from trustrag.ingest.pipeline import IngestPipeline, VisionDescriber
 from trustrag.ingest.result import IngestResult
 from trustrag.ingest.web import FetchTransport, crawl, fetch_url, is_url
+from trustrag.lang.detect import FastTextDetector
 from trustrag.memory import MemoryStore, MemoryTurn
 from trustrag.plugins.base import LanguageDetectorPlugin, RerankerPlugin, RetrieverPlugin
 from trustrag.retrieve.engine import RetrievalEngine
@@ -162,6 +163,12 @@ class TrustRAG:
             raise ValueError("config.llm.endpoint is required to build a generator")
         if config.embedding.endpoint is None:
             raise ValueError("config.embedding.endpoint is required to build an embedder")
+
+        # The real detector by default (§11a: fastText lid.176, lazy-downloaded).
+        # The test-grade heuristic mislabels real languages (fr -> es), which
+        # poisons the answer-language invariant; tests inject HeuristicDetector.
+        if detector is None and config.multilingual.detector == "fasttext-lid176":
+            detector = FastTextDetector(threshold=config.multilingual.detect_confidence_threshold)
 
         embedding_plugin = OpenAICompatibleEmbedding(
             base_url=config.embedding.endpoint,

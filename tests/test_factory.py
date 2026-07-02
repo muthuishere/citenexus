@@ -22,6 +22,7 @@ from trustrag.config.schema import (
     TrustRAGConfig,
 )
 from trustrag.config.signals import Signal
+from trustrag.lang.detect import HeuristicDetector
 
 
 def _embed_transport(url: str, body: bytes, headers: dict[str, str]) -> bytes:
@@ -59,6 +60,7 @@ def _config(bucket_path: Path) -> TrustRAGConfig:
 def _rag(tmp_path: Path) -> TrustRAG:
     return TrustRAG.from_config(
         _config(tmp_path),
+        detector=HeuristicDetector(),
         embed_transport=_embed_transport,
         llm_transport=_llm_transport,
     )
@@ -93,7 +95,12 @@ def test_from_config_honours_temperature(tmp_path: Path) -> None:
     cfg = _config(tmp_path).model_copy(
         update={"llm": LLMConfig(endpoint="http://llm.test/v1", temperature=0.0)}
     )
-    rag = TrustRAG.from_config(cfg, embed_transport=_embed_transport, llm_transport=capturing_llm)
+    rag = TrustRAG.from_config(
+        cfg,
+        detector=HeuristicDetector(),
+        embed_transport=_embed_transport,
+        llm_transport=capturing_llm,
+    )
     rag.ingest(text="The employee shall not disclose secrets.", document_id="nda")
     rag.ask("Can the employee disclose secrets?")
     assert captured
@@ -118,14 +125,22 @@ def test_from_config_builds_vision_client_when_enabled(tmp_path: Path) -> None:
             )
         }
     )
-    rag = TrustRAG.from_config(cfg, embed_transport=_embed_transport, llm_transport=_llm_transport)
+    rag = TrustRAG.from_config(
+        cfg,
+        detector=HeuristicDetector(),
+        embed_transport=_embed_transport,
+        llm_transport=_llm_transport,
+    )
     # A vision plugin was wired into the ingest pipeline.
     assert rag._ingest._vision is not None
 
 
 def test_from_config_no_vision_when_disabled(tmp_path: Path) -> None:
     rag = TrustRAG.from_config(
-        _config(tmp_path), embed_transport=_embed_transport, llm_transport=_llm_transport
+        _config(tmp_path),
+        detector=HeuristicDetector(),
+        embed_transport=_embed_transport,
+        llm_transport=_llm_transport,
     )
     assert rag._ingest._vision is None
 
@@ -136,7 +151,12 @@ def test_from_config_builds_reformulator_when_enabled(tmp_path: Path) -> None:
     cfg = _config(tmp_path).model_copy(
         update={"reformulation": ReformulationConfig(enabled=True, endpoint="http://small.test/v1")}
     )
-    rag = TrustRAG.from_config(cfg, embed_transport=_embed_transport, llm_transport=_llm_transport)
+    rag = TrustRAG.from_config(
+        cfg,
+        detector=HeuristicDetector(),
+        embed_transport=_embed_transport,
+        llm_transport=_llm_transport,
+    )
     assert rag._reformulator is not None
 
 
@@ -156,7 +176,10 @@ def test_from_config_anthropic_provider(tmp_path: Path) -> None:
         }
     )
     rag = TrustRAG.from_config(
-        cfg, embed_transport=_embed_transport, llm_transport=_anthropic_transport
+        cfg,
+        detector=HeuristicDetector(),
+        embed_transport=_embed_transport,
+        llm_transport=_anthropic_transport,
     )
     rag.ingest(
         text="The employee shall not disclose confidential information.",
