@@ -8,7 +8,7 @@ from trustrag.answer.verify import content_tokens
 from trustrag.graph.store import GraphStore
 from trustrag.plugins.base import RetrieverPlugin
 from trustrag.retrieve.types import Candidate, RetrievalSignal
-from trustrag.storage.lance_store import LeafVectorStore
+from trustrag.storage.protocols import VectorStore
 
 
 def _page(value: object) -> int | None:
@@ -22,7 +22,7 @@ class GraphRetriever(RetrieverPlugin):
 
     plugin_version = "graph-retriever-v1"
 
-    def __init__(self, graph_store: GraphStore, leaf_store: LeafVectorStore) -> None:
+    def __init__(self, graph_store: GraphStore, leaf_store: VectorStore) -> None:
         self._graph_store = graph_store
         self._leaf_store = leaf_store
 

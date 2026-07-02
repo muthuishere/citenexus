@@ -7,7 +7,7 @@ from typing import Any
 from trustrag.answer.verify import content_tokens
 from trustrag.plugins.base import RetrieverPlugin
 from trustrag.retrieve.types import Candidate, RetrievalSignal
-from trustrag.storage.lance_store import LeafVectorStore
+from trustrag.storage.protocols import VectorStore
 from trustrag.wiki.store import WikiStore
 
 
@@ -22,7 +22,7 @@ class WikiRetriever(RetrieverPlugin):
 
     plugin_version = "wiki-retriever-v1"
 
-    def __init__(self, wiki_store: WikiStore, leaf_store: LeafVectorStore) -> None:
+    def __init__(self, wiki_store: WikiStore, leaf_store: VectorStore) -> None:
         self._wiki_store = wiki_store
         self._leaf_store = leaf_store
 

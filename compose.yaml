@@ -45,6 +45,21 @@ services:
       echo \"bucket $$TRUSTRAG_BUCKET ready\";
       "
 
+  # Postgres + pgvector — the second VectorStore backend (opt-in profile).
+  # High port 15432 isolates it from any local Postgres on 5432.
+  postgres:
+    profiles: ["postgres"]
+    image: pgvector/pgvector@sha256:dd467f03ca5c5581222490e5217e48a262864ccb659be559f8491bbafdc97da0
+    environment:
+      POSTGRES_USER: ${TRUSTRAG_PG_USER:-trustrag}
+      POSTGRES_PASSWORD: ${TRUSTRAG_PG_PASSWORD:-trustrag}
+      POSTGRES_DB: ${TRUSTRAG_PG_DB:-trustrag}
+    ports:
+      - "${TRUSTRAG_PG_PORT:-15432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
   # Embedding + reranker behind one OpenAI-compatible port (opt-in profile).
   # infinity serves bge-m3 (/v1/embeddings) and bge-reranker-v2-m3 (/rerank);
   # first boot downloads the model weights into the cache volume.
@@ -67,3 +82,4 @@ services:
 volumes:
   minio-data:
   infinity-cache:
+  postgres-data:

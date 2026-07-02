@@ -15,7 +15,7 @@ from trustrag.plugins.base import RetrieverPlugin
 from trustrag.retrieve.types import Candidate, RetrievalSignal
 
 if TYPE_CHECKING:
-    from trustrag.storage.lance_store import LeafVectorStore
+    from trustrag.storage.protocols import VectorStore
 
 
 class QueryEmbedder(Protocol):
@@ -41,7 +41,7 @@ class VectorRetriever(RetrieverPlugin):
 
     plugin_version = "vector-retriever-v1"
 
-    def __init__(self, store: LeafVectorStore, embedder: QueryEmbedder) -> None:
+    def __init__(self, store: VectorStore, embedder: QueryEmbedder) -> None:
         self._store = store
         self._embedder = embedder
 

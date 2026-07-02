@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from trustrag.extract.types import ImageRef
     from trustrag.plugins.base import LanguageDetectorPlugin, VisionPlugin
     from trustrag.storage.backend import StorageBackend
+    from trustrag.storage.protocols import VectorStore
     from trustrag.vision.describe import VisionRecord
     from trustrag.worker.queue import DurableQueue
 
@@ -99,13 +100,17 @@ class IngestPipeline:
         queue: DurableQueue | None = None,
         default_answer_language: str = "en",
         vision: VisionDescriber | None = None,
+        vector_store: VectorStore | None = None,
     ) -> None:
         self._backend = backend
         self._partition = partition
         self._embedder = embedder
         self._detector: LanguageDetectorPlugin = detector or HeuristicDetector()
         self._signals = resolve_signals(signals)
-        self._store = LeafVectorStore(leaf_vector_uri(base_uri, partition), storage_options)
+        # The injected VectorStore seam; LanceDB-per-leaf is the default.
+        self._store: VectorStore = vector_store or LeafVectorStore(
+            leaf_vector_uri(base_uri, partition), storage_options
+        )
         self._queue = queue
         self._default_language = default_answer_language
         self._vision = vision

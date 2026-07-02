@@ -13,8 +13,8 @@ from pydantic import BaseModel, ConfigDict
 from trustrag.answer.verify import content_tokens
 from trustrag.domain.partition import PartitionPath
 from trustrag.storage.backend import StorageBackend
-from trustrag.storage.lance_store import LeafVectorStore
 from trustrag.storage.paths import Layer, layer_prefix
+from trustrag.storage.protocols import VectorStore
 
 _WIKI_FILE = "pages.json"
 
@@ -42,7 +42,7 @@ class WikiStore:
     def key(self) -> str:
         return f"{layer_prefix(Layer.knowledge, self._partition)}/wiki/{_WIKI_FILE}"
 
-    def build_from_store(self, store: LeafVectorStore) -> tuple[WikiPage, ...]:
+    def build_from_store(self, store: VectorStore) -> tuple[WikiPage, ...]:
         rows_by_doc: dict[str, list[dict[str, object]]] = {}
         for row in store.scan():
             rows_by_doc.setdefault(str(row.get("document_id", row["eu_id"])), []).append(row)

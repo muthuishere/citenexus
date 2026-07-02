@@ -34,7 +34,9 @@ from trustrag.retrieve.types import Candidate
 from trustrag.retrieve.vector import QueryEmbedder, VectorRetriever
 from trustrag.storage.backend import LocalFsBackend, S3Backend, StorageBackend
 from trustrag.storage.lance_store import LeafVectorStore, StorageOptions
-from trustrag.storage.paths import leaf_vector_uri
+from trustrag.storage.paths import leaf_vector_uri, partition_segment
+from trustrag.storage.postgres_store import PostgresVectorStore, table_name_for
+from trustrag.storage.protocols import VectorStore
 from trustrag.stream import stream_result
 from trustrag.telemetry.events import Outcome, Stage, StageEvent
 from trustrag.telemetry.sinks import TelemetrySink
@@ -90,12 +92,15 @@ class TrustRAG:
         vision: VisionDescriber | None = None,
         fetch_transport: FetchTransport | None = None,
         reformulator: Reformulator | None = None,
+        vector_store: VectorStore | None = None,
     ) -> None:
         self.base_uri = str(base_uri)
         self.partition = partition or PartitionPath.of(("workspace", "default"))
         self.signals = resolve_signals(signals)
         self._backend = backend or _backend_for(self.base_uri)
-        self._store = LeafVectorStore(
+        # The injected VectorStore seam (spec §6b): LanceDB-per-leaf (S3-native,
+        # zero infra) is the reference default; Postgres/pgvector drops in here.
+        self._store: VectorStore = vector_store or LeafVectorStore(
             leaf_vector_uri(self.base_uri, self.partition), storage_options
         )
         self._graph_store = GraphStore(self._backend, self.partition)
@@ -111,6 +116,7 @@ class TrustRAG:
             storage_options=storage_options,
             default_answer_language=default_answer_language,
             vision=vision,
+            vector_store=self._store,
         )
         retrievers: list[RetrieverPlugin] = []
         if Signal.embedding in self.signals:
@@ -226,6 +232,22 @@ class TrustRAG:
                 transport=reformulate_transport,
             )
 
+        # VectorStore backend (spec §6b): LanceDB-per-leaf is the S3-native
+        # default; "postgres" brings pgvector + native tsvector text search.
+        # Construction is lazy (no connection until first use).
+        vector_store: VectorStore | None = None
+        if config.vector_store.backend == "postgres":
+            if not config.vector_store.uri:
+                raise ValueError("vector_store.backend='postgres' needs vector_store.uri (a DSN)")
+            effective_partition = partition or PartitionPath.of(("workspace", "default"))
+            vector_store = PostgresVectorStore(
+                dsn=config.vector_store.uri,
+                table=table_name_for(
+                    config.vector_store.table_prefix,
+                    partition_segment(effective_partition),
+                ),
+            )
+
         return cls(
             config.storage.bucket,
             partition=partition,
@@ -242,6 +264,7 @@ class TrustRAG:
             sink=sink,
             vision=vision,
             reformulator=reformulator,
+            vector_store=vector_store,
         )
 
     def ingest(

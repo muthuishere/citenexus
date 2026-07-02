@@ -22,7 +22,7 @@ from trustrag.testing.fakes import tokenize
 if TYPE_CHECKING:
     from trustrag.domain.partition import PartitionPath
     from trustrag.storage.backend import StorageBackend
-    from trustrag.storage.lance_store import LeafVectorStore
+    from trustrag.storage.protocols import VectorStore
 
 
 def _page(value: object) -> int | None:
@@ -48,7 +48,7 @@ class StructureRetriever(RetrieverPlugin):
         self,
         backend: StorageBackend,
         partition: PartitionPath,
-        store: LeafVectorStore,
+        store: VectorStore,
     ) -> None:
         self._backend = backend
         self._partition = partition

@@ -165,6 +165,45 @@ def test_from_config_no_reformulator_by_default(tmp_path: Path) -> None:
     assert rag._reformulator is None
 
 
+def test_from_config_postgres_backend(tmp_path: Path) -> None:
+    from trustrag.config.schema import VectorStoreConfig
+    from trustrag.storage.postgres_store import PostgresVectorStore
+
+    cfg = _config(tmp_path).model_copy(
+        update={
+            "vector_store": VectorStoreConfig(
+                backend="postgres", uri="postgresql://localhost:15432/trustrag"
+            )
+        }
+    )
+    # Construction is lazy — no connection is opened here, so this stays hermetic.
+    rag = TrustRAG.from_config(
+        cfg,
+        detector=HeuristicDetector(),
+        embed_transport=_embed_transport,
+        llm_transport=_llm_transport,
+    )
+    assert isinstance(rag._store, PostgresVectorStore)
+    assert rag._ingest._store is rag._store  # one shared store, both paths
+
+
+def test_from_config_postgres_requires_uri(tmp_path: Path) -> None:
+    import pytest
+
+    from trustrag.config.schema import VectorStoreConfig
+
+    cfg = _config(tmp_path).model_copy(
+        update={"vector_store": VectorStoreConfig(backend="postgres")}
+    )
+    with pytest.raises(ValueError, match=r"vector_store\.uri"):
+        TrustRAG.from_config(
+            cfg,
+            detector=HeuristicDetector(),
+            embed_transport=_embed_transport,
+            llm_transport=_llm_transport,
+        )
+
+
 def test_from_config_anthropic_provider(tmp_path: Path) -> None:
     cfg = _config(tmp_path).model_copy(
         update={

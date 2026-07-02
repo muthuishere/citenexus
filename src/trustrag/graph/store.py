@@ -14,8 +14,8 @@ from pydantic import BaseModel, ConfigDict
 from trustrag.answer.verify import content_tokens
 from trustrag.domain.partition import PartitionPath
 from trustrag.storage.backend import StorageBackend
-from trustrag.storage.lance_store import LeafVectorStore
 from trustrag.storage.paths import Layer, layer_prefix
+from trustrag.storage.protocols import VectorStore
 
 _GRAPH_FILE = "graph.json"
 _MIN_TOKEN_LEN = 4
@@ -61,7 +61,7 @@ class GraphStore:
     def key(self) -> str:
         return f"{layer_prefix(Layer.graph, self._partition)}/{_GRAPH_FILE}"
 
-    def build_from_store(self, store: LeafVectorStore) -> GraphIndex:
+    def build_from_store(self, store: VectorStore) -> GraphIndex:
         rows = store.scan()
         mentions: dict[str, set[str]] = {}
         co_mentions: Counter[tuple[str, str]] = Counter()

@@ -45,6 +45,18 @@ tasks:
     cmds:
       - docker compose logs -f minio
 
+  # --- Postgres + pgvector (the second VectorStore backend) --------------------
+  postgres:up:
+    desc: Start Postgres+pgvector (the alternative VectorStore backend)
+    cmds:
+      - docker compose --profile postgres up -d postgres
+      - 'echo "Postgres DSN : postgresql://trustrag:trustrag@localhost:${TRUSTRAG_PG_PORT:-15432}/trustrag"'
+
+  postgres:down:
+    desc: Stop Postgres (keeps the data volume)
+    cmds:
+      - docker compose --profile postgres down
+
   # --- infinity (local embed + rerank on one OpenAI-compatible port) -----------
   models:up:
     desc: Start infinity (bge-m3 embeddings + bge-reranker-v2-m3) on one OpenAI-compatible port

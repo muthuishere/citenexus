@@ -1,14 +1,16 @@
-"""The sparse / lexical retrieval signal — BM25-lite (spec §10).
+"""The sparse / lexical retrieval signal (spec §10).
 
-``LexicalRetriever`` scans every EU text in the leaf and scores it with classic
-BM25 over a language-agnostic tokenizer: lowercase ``[a-z0-9]+`` with **no**
-stemming and **no** stopword list, so non-English text is never penalized
-(multilingual-safe, §11a). A document containing a query term outranks one that
-does not.
+Two paths, one retriever:
 
-> Honest scope: this is a lexical bag-of-terms signal, not BGE-M3's learned
-> sparse weights. Real sparse retrieval needs a sparse-capable embedding endpoint
-> and is a future upgrade; BM25-lite is the deterministic v0.1 stand-in.
+- **Native** — when the store also implements the ``TextSearch`` protocol
+  (Postgres ``tsvector``), the backend ranks text itself: indexed, scalable,
+  language-agnostic (``'simple'`` config, no stemming).
+- **BM25-lite fallback** — for stores that can't (LanceDB): scan every EU text
+  and score with classic BM25 over a language-agnostic tokenizer (lowercase
+  ``[a-z0-9]+``, no stemming, no stopword list, §11a-safe).
+
+> Honest scope: neither path is BGE-M3's learned sparse weights. Real sparse
+> retrieval needs a sparse-capable embedding endpoint and is a future upgrade.
 """
 
 from __future__ import annotations
@@ -19,12 +21,13 @@ from typing import TYPE_CHECKING
 
 from trustrag.plugins.base import RetrieverPlugin
 from trustrag.retrieve.types import Candidate, RetrievalSignal
+from trustrag.storage.protocols import TextSearch
 from trustrag.testing.fakes import tokenize
 
 if TYPE_CHECKING:
     from typing import Any
 
-    from trustrag.storage.lance_store import LeafVectorStore
+    from trustrag.storage.protocols import VectorStore
 
 # Standard BM25 saturation / length-normalization constants.
 _K1 = 1.5
@@ -38,14 +41,16 @@ def _page(value: object) -> int | None:
 
 
 class LexicalRetriever(RetrieverPlugin):
-    """BM25-lite lexical retrieval over the leaf's scanned texts."""
+    """Lexical retrieval: native backend text search, else BM25-lite over scan."""
 
     plugin_version = "lexical-bm25-lite-v1"
 
-    def __init__(self, store: LeafVectorStore) -> None:
+    def __init__(self, store: VectorStore) -> None:
         self._store = store
 
     def retrieve(self, query: str, k: int) -> list[Candidate]:
+        if isinstance(self._store, TextSearch):
+            return self._native(query, k)
         rows = self._store.scan()
         if not rows:
             return []
@@ -88,6 +93,26 @@ class LexicalRetriever(RetrieverPlugin):
                 Candidate(
                     eu_id=str(row["eu_id"]),
                     score=score,
+                    signal=RetrievalSignal.lexical,
+                    document_id=row.get("document_id"),
+                    text=row.get("text"),
+                    page=_page(row.get("page")),
+                    language=row.get("language"),
+                    checksum=row.get("checksum"),
+                    raw_uri=row.get("raw_uri"),
+                )
+            )
+        return candidates
+
+    def _native(self, query: str, k: int) -> list[Candidate]:
+        """Delegate ranking to the backend's own text search (``TextSearch``)."""
+        assert isinstance(self._store, TextSearch)
+        candidates: list[Candidate] = []
+        for row in self._store.search_text(query, limit=k):
+            candidates.append(
+                Candidate(
+                    eu_id=str(row["eu_id"]),
+                    score=float(row.get("_text_score", 0.0)),
                     signal=RetrievalSignal.lexical,
                     document_id=row.get("document_id"),
                     text=row.get("text"),
