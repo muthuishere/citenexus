@@ -2,8 +2,9 @@ name: release
 
 # Tag-triggered publish to PyPI via OIDC trusted publishing (no API token).
 # Gated on the test job — publish only happens if the gate is green.
-# NOTE: the PyPI dist-name "trustrag" is taken; resolve the publish name and
-# register the trusted publisher before the first real tag (see CLAUDE.md / ADR-0001).
+# Dist-name is "trustrag-ai" (import stays `trustrag`; see ADR-0003). Register
+# the PyPI trusted publisher for project "trustrag-ai" (this repo, this
+# workflow file, environment "pypi") before pushing the first real tag.
 on:
   push:
     tags: ['v*']

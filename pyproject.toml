@@ -1,7 +1,7 @@
 [project]
-# NOTE: the PyPI name "trustrag" is taken; the publish dist-name will get a
-# suffix at L5 (import package stays `trustrag`). Local build is unaffected.
-name = "trustrag"
+# PyPI dist name. "trustrag" is taken on PyPI, so we publish as "trustrag-ai";
+# the import package stays `trustrag` (see docs/adr/0003-pypi-dist-name.md).
+name = "trustrag-ai"
 version = "0.2.0"
 description = "Evidence-first, multilingual, S3-native RAG for domains where a wrong answer is worse than no answer."
 readme = "README.md"
@@ -27,9 +27,6 @@ dependencies = [
 [project.optional-dependencies]
 # Postgres/pgvector VectorStore backend (LanceDB is the zero-infra default).
 postgres = ["psycopg[binary]>=3.2"]
-
-[project.scripts]
-trustrag = "trustrag.cli.main:main"
 
 [dependency-groups]
 dev = [
