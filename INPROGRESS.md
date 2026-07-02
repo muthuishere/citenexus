@@ -120,6 +120,21 @@ contextualizer is built from config.
   languages (en/de/fr), 100% grounded+cited, remaining refusal is the correct
   out-of-corpus one. Expected support 40% → 80%.
 
+### VectorStore/TextSearch protocols + Postgres backend (committed, LIVE-verified)
+- `storage/protocols.py`: **VectorStore** (upsert/search/scan) + **TextSearch**
+  (optional native lexical) — runtime-checkable. LanceDB-per-leaf stays the
+  S3-native zero-infra REFERENCE default.
+- `storage/postgres_store.py`: **PostgresVectorStore** implements both — pgvector
+  cosine + native tsvector ('simple' config, no stemming). One table per leaf;
+  empty leaf == [] (42P01 parity); lazy connect; optional extra
+  `trustrag[postgres]` (psycopg).
+- `LexicalRetriever` delegates to native TextSearch when available, else BM25-lite.
+- `TrustRAG(vector_store=…)`; `from_config` resolves `vector_store.backend`
+  ("lancedb" | "postgres", uri = DSN). Client + ingest share ONE store instance.
+- compose `postgres` profile (pgvector, :15432) + `task local:postgres:{up,down}`.
+- Verified live on a real pgvector container: store round-trip AND full client
+  ingest→ask with correct citation; lexical served by tsvector.
+
 ### Open threads (asked for by user, NOT yet built — sequence for next session)
 Priority order by "retrieval must be right for legal/medical":
 1. **Chunker / splitting (HIGHEST leverage)** — today `build_evidence_units` is
