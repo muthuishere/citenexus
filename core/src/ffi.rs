@@ -5,9 +5,12 @@
 //! distinguishes by the `error` key. Every returned string MUST be released
 //! with `trustrag_free_string`.
 
+use std::collections::BTreeMap;
 use std::ffi::{c_char, CStr, CString};
 
+use crate::detect::Detector;
 use crate::extract;
+use crate::store::LanceStore;
 use crate::types::SourceType;
 
 fn to_c_string(payload: String) -> *mut c_char {
@@ -76,4 +79,223 @@ pub unsafe extern "C" fn trustrag_free_string(s: *mut c_char) {
 #[no_mangle]
 pub extern "C" fn trustrag_core_version() -> *const c_char {
     concat!(env!("CARGO_PKG_VERSION"), "\0").as_ptr() as *const c_char
+}
+
+// ---------------------------------------------------------------------------
+// store — Lance over an opaque handle. Handles come from `trustrag_store_open`
+// (Box::into_raw) and MUST be released with `trustrag_store_close`. Every
+// returned string is JSON (`{"error": ...}` on failure) and MUST be released
+// with `trustrag_free_string`.
+// ---------------------------------------------------------------------------
+
+unsafe fn utf8_arg<'a>(ptr: *const c_char, name: &str) -> Result<&'a str, String> {
+    if ptr.is_null() {
+        return Err(format!("{name} is null"));
+    }
+    CStr::from_ptr(ptr)
+        .to_str()
+        .map_err(|_| format!("{name} is not UTF-8"))
+}
+
+/// Open (or create) the Lance database at `uri`. `storage_options_json` is a
+/// JSON object of string pairs (endpoint, access_key_id, …) or null/`{}` for
+/// none. Returns an opaque handle, or null on failure.
+///
+/// # Safety
+/// `uri` must be a valid NUL-terminated UTF-8 C string;
+/// `storage_options_json` must be one too, or null. The returned handle must
+/// be released with `trustrag_store_close` exactly once.
+#[no_mangle]
+pub unsafe extern "C" fn trustrag_store_open(
+    uri: *const c_char,
+    storage_options_json: *const c_char,
+) -> *mut LanceStore {
+    let Ok(uri) = utf8_arg(uri, "uri") else {
+        return std::ptr::null_mut();
+    };
+    let options: BTreeMap<String, String> = if storage_options_json.is_null() {
+        BTreeMap::new()
+    } else {
+        let Ok(raw) = utf8_arg(storage_options_json, "storage_options_json") else {
+            return std::ptr::null_mut();
+        };
+        match serde_json::from_str(raw) {
+            Ok(map) => map,
+            Err(_) => return std::ptr::null_mut(),
+        }
+    };
+    match LanceStore::open(uri, &options) {
+        Ok(store) => Box::into_raw(Box::new(store)),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Upsert `rows_json` (a JSON array of row objects, keyed by `eu_id`).
+/// Returns `{"ok":true}` or `{"error": ...}`.
+///
+/// # Safety
+/// `handle` must be a live pointer from `trustrag_store_open`; `rows_json`
+/// must be a valid NUL-terminated UTF-8 C string.
+#[no_mangle]
+pub unsafe extern "C" fn trustrag_store_upsert(
+    handle: *mut LanceStore,
+    rows_json: *const c_char,
+) -> *mut c_char {
+    if handle.is_null() {
+        return to_c_string(error_json("null store handle"));
+    }
+    let rows = match utf8_arg(rows_json, "rows_json") {
+        Ok(raw) => match serde_json::from_str::<serde_json::Value>(raw) {
+            Ok(v) => v,
+            Err(e) => return to_c_string(error_json(&format!("rows_json: {e}"))),
+        },
+        Err(msg) => return to_c_string(error_json(&msg)),
+    };
+    let payload = match (*handle).upsert(&rows) {
+        Ok(()) => r#"{"ok":true}"#.to_string(),
+        Err(message) => error_json(&message),
+    };
+    to_c_string(payload)
+}
+
+/// Vector search: `vector_json` is a JSON array of numbers; returns the
+/// nearest `limit` rows as a JSON array (each row carries `_distance`), or
+/// `{"error": ...}`.
+///
+/// # Safety
+/// `handle` must be a live pointer from `trustrag_store_open`; `vector_json`
+/// must be a valid NUL-terminated UTF-8 C string.
+#[no_mangle]
+pub unsafe extern "C" fn trustrag_store_search(
+    handle: *mut LanceStore,
+    vector_json: *const c_char,
+    limit: usize,
+) -> *mut c_char {
+    if handle.is_null() {
+        return to_c_string(error_json("null store handle"));
+    }
+    let vector: Vec<f32> = match utf8_arg(vector_json, "vector_json") {
+        Ok(raw) => match serde_json::from_str(raw) {
+            Ok(v) => v,
+            Err(e) => return to_c_string(error_json(&format!("vector_json: {e}"))),
+        },
+        Err(msg) => return to_c_string(error_json(&msg)),
+    };
+    let payload = match (*handle).search(&vector, limit) {
+        Ok(rows) => rows.to_string(),
+        Err(message) => error_json(&message),
+    };
+    to_c_string(payload)
+}
+
+/// Scan all rows (`limit` < 0 means no limit). Returns a JSON array, or
+/// `{"error": ...}`.
+///
+/// # Safety
+/// `handle` must be a live pointer from `trustrag_store_open`.
+#[no_mangle]
+pub unsafe extern "C" fn trustrag_store_scan(
+    handle: *mut LanceStore,
+    limit: i64,
+) -> *mut c_char {
+    if handle.is_null() {
+        return to_c_string(error_json("null store handle"));
+    }
+    let limit = usize::try_from(limit).ok();
+    let payload = match (*handle).scan(limit) {
+        Ok(rows) => rows.to_string(),
+        Err(message) => error_json(&message),
+    };
+    to_c_string(payload)
+}
+
+/// Drop the `evidence_units` table (no-op when absent). Returns `{"ok":true}`
+/// or `{"error": ...}`.
+///
+/// # Safety
+/// `handle` must be a live pointer from `trustrag_store_open`.
+#[no_mangle]
+pub unsafe extern "C" fn trustrag_store_drop(handle: *mut LanceStore) -> *mut c_char {
+    if handle.is_null() {
+        return to_c_string(error_json("null store handle"));
+    }
+    let payload = match (*handle).drop_table() {
+        Ok(()) => r#"{"ok":true}"#.to_string(),
+        Err(message) => error_json(&message),
+    };
+    to_c_string(payload)
+}
+
+/// Release a store handle. Safe to call with null.
+///
+/// # Safety
+/// `handle` must be a pointer from `trustrag_store_open` (or null) and must
+/// not be used after this call.
+#[no_mangle]
+pub unsafe extern "C" fn trustrag_store_close(handle: *mut LanceStore) {
+    if !handle.is_null() {
+        drop(Box::from_raw(handle));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// detect — fastText lid.176 over an opaque handle. Handles come from
+// `trustrag_detector_open` and MUST be released with `trustrag_detector_close`.
+// ---------------------------------------------------------------------------
+
+/// Load the lid.176 model at `model_path`. Returns an opaque handle, or null
+/// when the file is missing or unloadable. The model is caller-supplied — the
+/// core never downloads it.
+///
+/// # Safety
+/// `model_path` must be a valid NUL-terminated UTF-8 C string. The returned
+/// handle must be released with `trustrag_detector_close` exactly once.
+#[no_mangle]
+pub unsafe extern "C" fn trustrag_detector_open(model_path: *const c_char) -> *mut Detector {
+    let Ok(path) = utf8_arg(model_path, "model_path") else {
+        return std::ptr::null_mut();
+    };
+    match Detector::open(path) {
+        Ok(detector) => Box::into_raw(Box::new(detector)),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Detect the language of `text`. Returns
+/// `{"language":"fr","confidence":0.98}` or `{"error": ...}`.
+///
+/// # Safety
+/// `handle` must be a live pointer from `trustrag_detector_open`; `text`
+/// must be a valid NUL-terminated UTF-8 C string.
+#[no_mangle]
+pub unsafe extern "C" fn trustrag_detect(
+    handle: *mut Detector,
+    text: *const c_char,
+) -> *mut c_char {
+    if handle.is_null() {
+        return to_c_string(error_json("null detector handle"));
+    }
+    let text = match utf8_arg(text, "text") {
+        Ok(t) => t,
+        Err(msg) => return to_c_string(error_json(&msg)),
+    };
+    let payload = match (*handle).detect(text) {
+        Ok(detection) => {
+            serde_json::to_string(&detection).unwrap_or_else(|e| error_json(&e.to_string()))
+        }
+        Err(message) => error_json(&message),
+    };
+    to_c_string(payload)
+}
+
+/// Release a detector handle. Safe to call with null.
+///
+/// # Safety
+/// `handle` must be a pointer from `trustrag_detector_open` (or null) and
+/// must not be used after this call.
+#[no_mangle]
+pub unsafe extern "C" fn trustrag_detector_close(handle: *mut Detector) {
+    if !handle.is_null() {
+        drop(Box::from_raw(handle));
+    }
 }
