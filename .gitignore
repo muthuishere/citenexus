@@ -43,3 +43,5 @@ core/target/
 
 # agent worktrees
 .claude/worktrees/
+example/.trustrag-data/
+.trustrag-data/
