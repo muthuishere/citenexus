@@ -21,7 +21,7 @@ from citenexus.evidence.chunked_builder import Contextualizer as ContextualizerS
 from citenexus.evidence.contextualize import Contextualizer
 from citenexus.graph import GraphDistiller, GraphRetriever, GraphStore, LLMGraphDistiller
 from citenexus.hooks import Hooks
-from citenexus.http import HttpClient
+from citenexus.http import HttpClient, HttpEndpoint
 from citenexus.http import Transport as ChatTransport
 from citenexus.ingest.pipeline import IngestPipeline, VisionDescriber
 from citenexus.ingest.result import IngestResult
@@ -229,98 +229,146 @@ class CiteNexus:
 
         # Every model is optional: no embedding endpoint -> lexical-only
         # search; no llm endpoint -> retrieve-only client (ask() explains).
+        emb_base, emb_key, emb_hdrs, emb_tp = _endpoint_parts(
+            config.embedding.endpoint,
+            config.embedding.api_key_env,
+            config.embedding.headers,
+            embed_transport,
+        )
         embedder: QueryEmbedder | None = None
-        if config.embedding.endpoint:
+        if emb_base:
             embedder = _SingleTextEmbedder(
                 OpenAICompatibleEmbedding(
-                    extra_headers=config.embedding.headers,
-                    base_url=config.embedding.endpoint,
+                    extra_headers=emb_hdrs,
+                    base_url=emb_base,
                     model=config.embedding.model,
-                    api_key_env=config.embedding.api_key_env,
-                    transport=embed_transport,
+                    api_key_env=emb_key,
+                    transport=emb_tp,
                 ),
                 batch_size=config.embedding.batch_size,
             )
+        llm_base, llm_key, llm_headers, llm_tp = _endpoint_parts(
+            config.llm.endpoint,
+            config.llm.api_key_env,
+            config.llm.headers,
+            llm_transport,
+            timeout_s=config.llm.timeout_s,
+        )
+        llm_protocol = (
+            config.llm.endpoint.protocol
+            if isinstance(config.llm.endpoint, HttpEndpoint)
+            else ("anthropic" if config.llm.provider is LLMProvider.anthropic else "openai")
+        )
         generator: Generator | None = None
-        if config.llm.endpoint is None:
+        if llm_base is None:
             pass
-        elif config.llm.provider is LLMProvider.anthropic:
+        elif llm_protocol == "anthropic":
             generator = AnthropicGenerator(
-                extra_headers=config.llm.headers,
-                base_url=config.llm.endpoint,
+                extra_headers=llm_headers,
+                base_url=llm_base,
                 model=config.llm.model,
-                api_key_env=config.llm.api_key_env,
+                api_key_env=llm_key,
                 temperature=config.llm.temperature,
                 max_tokens=config.llm.max_tokens or 1024,
-                transport=llm_transport or HttpClient(timeout_s=config.llm.timeout_s),
+                transport=llm_tp,
             )
         else:
             generator = OpenAICompatibleGenerator(
-                extra_headers=config.llm.headers,
-                base_url=config.llm.endpoint,
+                extra_headers=llm_headers,
+                base_url=llm_base,
                 model=config.llm.model,
-                api_key_env=config.llm.api_key_env,
+                api_key_env=llm_key,
                 temperature=config.llm.temperature,
                 max_tokens=config.llm.max_tokens,
-                transport=llm_transport or HttpClient(timeout_s=config.llm.timeout_s),
+                transport=llm_tp,
             )
+        rr_base, rr_key, rr_hdrs, rr_tp = _endpoint_parts(
+            config.reranker.endpoint,
+            config.reranker.api_key_env,
+            config.reranker.headers,
+            rerank_transport,
+        )
         reranker: RerankerPlugin | None = None
-        if config.reranker.enabled and config.reranker.endpoint is not None:
+        if config.reranker.enabled and rr_base is not None:
             reranker = OpenAICompatibleReranker(
-                extra_headers=config.reranker.headers,
-                base_url=config.reranker.endpoint,
+                extra_headers=rr_hdrs,
+                base_url=rr_base,
                 model=config.reranker.model,
-                api_key_env=config.reranker.api_key_env,
-                transport=rerank_transport,
+                api_key_env=rr_key,
+                transport=rr_tp,
             )
 
         # Vision is optional: build a client only when enabled + configured.
         # Without one, ingest stays text-level (images are skipped, never an error).
+        vis_base, vis_key, vis_hdrs, vis_tp = _endpoint_parts(
+            config.vision.endpoint,
+            config.vision.api_key_env,
+            config.vision.headers,
+            vision_transport,
+        )
         vision: VisionDescriber | None = None
-        if config.vision.enabled and config.vision.endpoint and config.vision.model:
+        if config.vision.enabled and vis_base and config.vision.model:
             vision = OpenAICompatibleVision(
-                extra_headers=config.vision.headers,
-                base_url=config.vision.endpoint,
+                extra_headers=vis_hdrs,
+                base_url=vis_base,
                 model=config.vision.model,
-                api_key_env=config.vision.api_key_env,
-                transport=vision_transport,
+                api_key_env=vis_key,
+                transport=vis_tp,
             )
 
         # EN dual-query reformulation is optional: a small model, cached per
         # query. Without one, retrieval is single-query exactly as before.
+        ref_base, ref_key, ref_hdrs, ref_tp = _endpoint_parts(
+            config.reformulation.endpoint,
+            config.reformulation.api_key_env,
+            config.reformulation.headers,
+            reformulate_transport,
+        )
         reformulator: Reformulator | None = None
-        if config.reformulation.enabled and config.reformulation.endpoint:
+        if config.reformulation.enabled and ref_base:
             reformulator = QueryReformulator(
-                extra_headers=config.reformulation.headers,
-                base_url=config.reformulation.endpoint,
+                extra_headers=ref_hdrs,
+                base_url=ref_base,
                 model=config.reformulation.model,
-                api_key_env=config.reformulation.api_key_env,
-                transport=reformulate_transport,
+                api_key_env=ref_key,
+                transport=ref_tp,
             )
 
         # LLM wiki distillation is optional: a small model compiles the corpus
         # into cross-referenced pages. Without one, the deterministic
         # per-document wiki is built exactly as before.
+        wd_base, wd_key, wd_hdrs, wd_tp = _endpoint_parts(
+            config.wiki_distill.endpoint,
+            config.wiki_distill.api_key_env,
+            config.wiki_distill.headers,
+            wiki_distill_transport,
+        )
         wiki_distiller: WikiDistiller | None = None
-        if config.wiki_distill.enabled and config.wiki_distill.endpoint:
+        if config.wiki_distill.enabled and wd_base:
             wiki_distiller = LLMWikiDistiller(
-                extra_headers=config.wiki_distill.headers,
-                base_url=config.wiki_distill.endpoint,
+                extra_headers=wd_hdrs,
+                base_url=wd_base,
                 model=config.wiki_distill.model,
-                api_key_env=config.wiki_distill.api_key_env,
-                transport=wiki_distill_transport,
+                api_key_env=wd_key,
+                transport=wd_tp,
             )
 
         # LLM graph distillation is optional: a small model extracts grounded
         # entities + typed relations. Without one, deterministic co-mention.
+        gd_base, gd_key, gd_hdrs, gd_tp = _endpoint_parts(
+            config.graph_distill.endpoint,
+            config.graph_distill.api_key_env,
+            config.graph_distill.headers,
+            graph_distill_transport,
+        )
         graph_distiller: GraphDistiller | None = None
-        if config.graph_distill.enabled and config.graph_distill.endpoint:
+        if config.graph_distill.enabled and gd_base:
             graph_distiller = LLMGraphDistiller(
-                extra_headers=config.graph_distill.headers,
-                base_url=config.graph_distill.endpoint,
+                extra_headers=gd_hdrs,
+                base_url=gd_base,
                 model=config.graph_distill.model,
-                api_key_env=config.graph_distill.api_key_env,
-                transport=graph_distill_transport,
+                api_key_env=gd_key,
+                transport=gd_tp,
             )
 
         # VectorStore backend (spec §6b): LanceDB-per-leaf is the S3-native
@@ -341,18 +389,20 @@ class CiteNexus:
 
         # Contextual retrieval is optional: build the small-model contextualizer
         # only when enabled + configured. Without one, chunks index un-enriched.
+        ctx_base, ctx_key, ctx_hdrs, ctx_tp = _endpoint_parts(
+            config.context_model.endpoint,
+            config.context_model.api_key_env,
+            config.context_model.headers,
+            context_transport,
+        )
         contextualizer: Contextualizer | None = None
-        if (
-            config.context_model.enabled
-            and config.context_model.endpoint
-            and config.context_model.model
-        ):
+        if config.context_model.enabled and ctx_base and config.context_model.model:
             contextualizer = Contextualizer(
-                extra_headers=config.context_model.headers,
-                base_url=config.context_model.endpoint,
+                extra_headers=ctx_hdrs,
+                base_url=ctx_base,
                 model=config.context_model.model,
-                api_key_env=config.context_model.api_key_env,
-                transport=context_transport,
+                api_key_env=ctx_key,
+                transport=ctx_tp,
             )
 
         # S3-compatible endpoints (MinIO / Cloudflare R2): storage.endpoint_url
@@ -642,6 +692,30 @@ class CiteNexus:
             return question
         context = " ".join(f"{turn.question} {turn.answer}" for turn in turns)
         return f"{context} {question}"
+
+
+def _endpoint_parts(
+    endpoint: str | HttpEndpoint | None,
+    api_key_env: str | None,
+    headers: dict[str, str],
+    injected: ChatTransport | None,
+    *,
+    timeout_s: float | None = None,
+) -> tuple[str | None, str | None, dict[str, str], ChatTransport | None]:
+    """Resolve a section's connection: flat fields or a typed HttpEndpoint.
+
+    A typed endpoint carries its own key VALUE (SecretStr — the application
+    read its environment, not the library) plus headers/hooks/timeout; its
+    build_transport injects auth per call, so the wire client gets NO
+    api_key_env and can never add a conflicting Authorization header.
+    """
+    if endpoint is None:
+        return None, api_key_env, dict(headers), injected
+    if isinstance(endpoint, str):
+        if injected is None and timeout_s is not None:
+            return endpoint, api_key_env, dict(headers), HttpClient(timeout_s=timeout_s)
+        return endpoint, api_key_env, dict(headers), injected
+    return endpoint.base_url, None, dict(headers), endpoint.build_transport(injected)
 
 
 def _backend_for(base_uri: str) -> StorageBackend:

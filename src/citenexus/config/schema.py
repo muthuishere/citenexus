@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from citenexus.config.signals import Signal
 from citenexus.domain.trust import TrustMode
+from citenexus.http import HttpEndpoint
 
 
 class _Section(BaseModel):
@@ -69,7 +70,7 @@ class LLMConfig(_Section):
 
     provider: LLMProvider = LLMProvider.openai
     model: str = "qwen2.5"
-    endpoint: str | None = None
+    endpoint: str | HttpEndpoint | None = None
     api_key_env: str | None = None
     # Extra HTTP headers merged under auth (gateway/Referer/api-version...).
     headers: dict[str, str] = Field(default_factory=dict)
@@ -82,7 +83,7 @@ class EmbeddingConfig(_Section):
     """The dense+sparse embedding endpoint (§10, default bge-m3)."""
 
     model: str = "bge-m3"
-    endpoint: str | None = None
+    endpoint: str | HttpEndpoint | None = None
     api_key_env: str | None = None
     # Extra HTTP headers merged under auth (gateway/Referer/api-version...).
     headers: dict[str, str] = Field(default_factory=dict)
@@ -97,7 +98,7 @@ class RerankerConfig(_Section):
 
     enabled: bool = True
     model: str = "bge-reranker-v2-m3"
-    endpoint: str | None = None
+    endpoint: str | HttpEndpoint | None = None
     api_key_env: str | None = None
     # Extra HTTP headers merged under auth (gateway/Referer/api-version...).
     headers: dict[str, str] = Field(default_factory=dict)
@@ -113,7 +114,7 @@ class ReformulationConfig(_Section):
 
     enabled: bool = False
     model: str = "gemini-2.5-flash-lite"
-    endpoint: str | None = None
+    endpoint: str | HttpEndpoint | None = None
     api_key_env: str | None = None
     headers: dict[str, str] = Field(default_factory=dict)
 
@@ -128,7 +129,7 @@ class GraphDistillConfig(_Section):
 
     enabled: bool = False
     model: str = "gemini-2.5-flash-lite"
-    endpoint: str | None = None
+    endpoint: str | HttpEndpoint | None = None
     api_key_env: str | None = None
     headers: dict[str, str] = Field(default_factory=dict)
 
@@ -143,7 +144,7 @@ class WikiDistillConfig(_Section):
 
     enabled: bool = False
     model: str = "gemini-2.5-flash-lite"
-    endpoint: str | None = None
+    endpoint: str | HttpEndpoint | None = None
     api_key_env: str | None = None
     headers: dict[str, str] = Field(default_factory=dict)
 
@@ -162,7 +163,7 @@ class VisionConfig(_Section):
 
     enabled: bool = False
     model: str | None = None
-    endpoint: str | None = None
+    endpoint: str | HttpEndpoint | None = None
     api_key_env: str | None = None
     headers: dict[str, str] = Field(default_factory=dict)
     prefilter: VisionPrefilterConfig = Field(default_factory=VisionPrefilterConfig)
@@ -191,7 +192,7 @@ class ContextModelConfig(_Section):
 
     enabled: bool = False
     model: str | None = None
-    endpoint: str | None = None
+    endpoint: str | HttpEndpoint | None = None
     api_key_env: str | None = None
     headers: dict[str, str] = Field(default_factory=dict)
 
