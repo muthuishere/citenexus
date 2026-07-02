@@ -11,8 +11,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from citenexus.answer.anthropic import AnthropicGenerator
 
 
@@ -49,7 +47,6 @@ def _gen(
     return AnthropicGenerator(
         base_url="https://api.anthropic.test",
         model="claude-opus-4-8",
-        api_key_env=api_key_env,
         temperature=temperature,
         max_tokens=max_tokens,
         transport=transport,
@@ -91,22 +88,6 @@ def test_system_is_top_level_and_passage_in_user_turn() -> None:
     assert "Can they disclose?" in blob
     assert "The NDA forbids disclosure." in blob
     assert "de" in blob
-
-
-def test_api_key_flows_only_through_x_api_key_header(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    secret = "sk-ant-not-a-real-key"
-    monkeypatch.setenv("CITENEXUS_ANTHROPIC_KEY", secret)
-    t = RecordingTransport()
-    _gen(t, api_key_env="CITENEXUS_ANTHROPIC_KEY").answer("q", "passage")
-    headers = t.last_headers
-    assert headers["x-api-key"] == secret
-    assert headers["anthropic-version"]
-    assert "Authorization" not in headers
-    url, body, _ = t.calls[-1]
-    assert secret not in url
-    assert secret not in body.decode("utf-8")
 
 
 def test_last_usage_exposes_tokens() -> None:

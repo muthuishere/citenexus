@@ -11,7 +11,6 @@ plugin is integration-only — hermetic tests use ``FakeReranker`` (identity).
 from __future__ import annotations
 
 import json
-import os
 from collections.abc import Sequence
 
 from citenexus.http import DEFAULT_TRANSPORT, Transport
@@ -30,22 +29,15 @@ class OpenAICompatibleReranker(RerankerPlugin):
         base_url: str,
         model: str,
         transport: Transport | None = None,
-        api_key_env: str | None = None,
-        extra_headers: dict[str, str] | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._model = model
-        self._extra_headers = dict(extra_headers or {})
         self._transport = transport or DEFAULT_TRANSPORT
-        self._api_key_env = api_key_env
 
     def _headers(self) -> dict[str, str]:
-        headers = {**self._extra_headers, "Content-Type": "application/json"}
-        if self._api_key_env:
-            key = os.environ.get(self._api_key_env)
-            if key:
-                headers["Authorization"] = f"Bearer {key}"
-        return headers
+        # Auth + provider headers are the ENDPOINT layer's job (HttpEndpoint
+        # transport); wire clients only speak JSON.
+        return {"Content-Type": "application/json"}
 
     def rerank(self, query: str, candidates: Sequence[Candidate]) -> list[Candidate]:
         items = list(candidates)

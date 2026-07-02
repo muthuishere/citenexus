@@ -47,7 +47,6 @@ def _plugin(
     return OpenAICompatibleEmbedding(
         base_url="http://embed.test/v1",
         model="bge-m3",
-        api_key_env=api_key_env,
         transport=transport,
     )
 
@@ -80,27 +79,6 @@ def test_embed_query_returns_one_vector() -> None:
     assert t.last_body == {"model": "bge-m3", "input": ["x"]}
 
 
-def test_api_key_flows_only_through_authorization_header(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    secret = "sk-not-a-real-key-xyz"
-    monkeypatch.setenv("CITENEXUS_EMBED_API_KEY", secret)
-    t = RecordingTransport()
-    _plugin(t, api_key_env="CITENEXUS_EMBED_API_KEY").embed(["a"])
-    headers = t.last_headers
-    assert headers["Authorization"] == f"Bearer {secret}"
-    # the value must not leak into the URL or the request body
-    url, body, _ = t.calls[-1]
-    assert secret not in url
-    assert secret not in body.decode("utf-8")
-
-
-def test_no_api_key_sends_no_authorization_header() -> None:
-    t = RecordingTransport()
-    _plugin(t).embed(["a"])
-    assert "Authorization" not in t.last_headers
-
-
 def _real_endpoint_reachable(base_url: str) -> bool:
     parsed = urlparse(base_url)
     host = parsed.hostname or "localhost"
@@ -120,7 +98,6 @@ def test_real_embeddings_endpoint() -> None:
     plugin = OpenAICompatibleEmbedding(
         base_url=base_url,
         model=os.environ.get("CITENEXUS_EMBED_MODEL", "bge-m3"),
-        api_key_env="CITENEXUS_EMBED_API_KEY",
     )
     vecs = plugin.embed(["hello", "world"])
     assert len(vecs) == 2

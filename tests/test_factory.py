@@ -11,13 +11,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from citenexus import AnthropicHttpEndpoint, OpenAIHttpEndpoint
 from citenexus.answer.result import Decision
 from citenexus.client import CiteNexus
 from citenexus.config.schema import (
     CiteNexusConfig,
     EmbeddingConfig,
     LLMConfig,
-    LLMProvider,
     RerankerConfig,
     StorageConfig,
 )
@@ -50,8 +50,10 @@ def _llm_transport(url: str, body: bytes, headers: dict[str, str]) -> bytes:
 def _config(bucket_path: Path) -> CiteNexusConfig:
     return CiteNexusConfig(
         storage=StorageConfig(bucket=str(bucket_path)),
-        llm=LLMConfig(endpoint="http://llm.test/v1", model="qwen2.5"),
-        embedding=EmbeddingConfig(endpoint="http://embed.test/v1", model="bge-m3"),
+        llm=LLMConfig(endpoint=OpenAIHttpEndpoint(base_url="http://llm.test/v1"), model="qwen2.5"),
+        embedding=EmbeddingConfig(
+            endpoint=OpenAIHttpEndpoint(base_url="http://embed.test/v1"), model="bge-m3"
+        ),
         reranker=RerankerConfig(enabled=False),
         signals=(Signal.embedding, Signal.text),
     )
@@ -93,7 +95,11 @@ def test_from_config_honours_temperature(tmp_path: Path) -> None:
         return _llm_transport(url, body, headers)
 
     cfg = _config(tmp_path).model_copy(
-        update={"llm": LLMConfig(endpoint="http://llm.test/v1", temperature=0.0)}
+        update={
+            "llm": LLMConfig(
+                endpoint=OpenAIHttpEndpoint(base_url="http://llm.test/v1"), temperature=0.0
+            )
+        }
     )
     rag = CiteNexus.from_config(
         cfg,
@@ -121,7 +127,9 @@ def test_from_config_builds_vision_client_when_enabled(tmp_path: Path) -> None:
     cfg = _config(tmp_path).model_copy(
         update={
             "vision": VisionConfig(
-                enabled=True, endpoint="http://vl.test/v1", model="gemini-2.5-flash"
+                enabled=True,
+                endpoint=OpenAIHttpEndpoint(base_url="http://vl.test/v1"),
+                model="gemini-2.5-flash",
             )
         }
     )
@@ -149,7 +157,11 @@ def test_from_config_builds_reformulator_when_enabled(tmp_path: Path) -> None:
     from citenexus.config.schema import ReformulationConfig
 
     cfg = _config(tmp_path).model_copy(
-        update={"reformulation": ReformulationConfig(enabled=True, endpoint="http://small.test/v1")}
+        update={
+            "reformulation": ReformulationConfig(
+                enabled=True, endpoint=OpenAIHttpEndpoint(base_url="http://small.test/v1")
+            )
+        }
     )
     rag = CiteNexus.from_config(
         cfg,
@@ -170,7 +182,11 @@ def test_from_config_builds_wiki_distiller_when_enabled(tmp_path: Path) -> None:
     from citenexus.wiki import LLMWikiDistiller
 
     cfg = _config(tmp_path).model_copy(
-        update={"wiki_distill": WikiDistillConfig(enabled=True, endpoint="http://small.test/v1")}
+        update={
+            "wiki_distill": WikiDistillConfig(
+                enabled=True, endpoint=OpenAIHttpEndpoint(base_url="http://small.test/v1")
+            )
+        }
     )
     rag = CiteNexus.from_config(
         cfg,
@@ -196,7 +212,9 @@ def test_wiki_pipeline_survives_dead_distill_endpoint(tmp_path: Path) -> None:
 
     cfg = _config(tmp_path).model_copy(
         update={
-            "wiki_distill": WikiDistillConfig(enabled=True, endpoint="http://dead.test/v1"),
+            "wiki_distill": WikiDistillConfig(
+                enabled=True, endpoint=OpenAIHttpEndpoint(base_url="http://dead.test/v1")
+            ),
             "signals": (Signal.embedding, Signal.text, Signal.wiki),
         }
     )
@@ -262,7 +280,9 @@ def test_from_config_builds_contextualizer_when_enabled(tmp_path: Path) -> None:
     cfg = _config(tmp_path).model_copy(
         update={
             "context_model": ContextModelConfig(
-                enabled=True, endpoint="http://ctx.test/v1", model="qwen2.5:0.5b"
+                enabled=True,
+                endpoint=OpenAIHttpEndpoint(base_url="http://ctx.test/v1"),
+                model="qwen2.5:0.5b",
             )
         }
     )
@@ -304,8 +324,7 @@ def test_from_config_anthropic_provider(tmp_path: Path) -> None:
     cfg = _config(tmp_path).model_copy(
         update={
             "llm": LLMConfig(
-                provider=LLMProvider.anthropic,
-                endpoint="https://api.anthropic.test",
+                endpoint=AnthropicHttpEndpoint(base_url="https://api.anthropic.test"),
                 model="claude-opus-4-8",
             )
         }

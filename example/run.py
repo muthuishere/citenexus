@@ -1,20 +1,10 @@
 """CiteNexus runnable example — ingest → ask → evaluate over real endpoints.
 
-Wires the real OpenAI-compatible plugins (embedding, answering LLM, reranker)
-from environment variables. The default stack is cheap + hosted, so it runs with
-no local GPU and no containers:
-
-- **Storage**  LocalFs (a folder). Point ``CITENEXUS_S3_ENDPOINT_URL`` at MinIO
-  or Cloudflare R2 to exercise the real S3 path instead.
-- **Embedding + reranker**  Jina (``/v1/embeddings`` + ``/rerank``, one key).
-- **Answering LLM**  Gemini's OpenAI-compatible endpoint (temperature 0).
-
-This is the README quickstart and the single opt-in integration proof:
-everything the library promises, end to end, on a tiny multilingual corpus.
-
-Config + secrets come from the vsync vault (``infra/vault/dev/.env.dev``), which
-``task local:example`` loads. Secrets are referenced by env-var *name* only and
-never read or printed here.
+THE APPLICATION OWNS ITS ENVIRONMENT: this file reads os.environ and builds
+typed endpoints; the library never touches env vars. Default stack is cheap +
+hosted (Jina embeddings/rerank + Gemini LLMs + LocalFs storage) — no GPU, no
+containers. Secrets come from the vsync vault (infra/vault/dev/.env.dev),
+loaded by `task local:example`.
 """
 
 from __future__ import annotations
@@ -23,7 +13,7 @@ import csv
 import os
 from pathlib import Path
 
-from citenexus import CiteNexus
+from citenexus import CiteNexus, GeminiHttpEndpoint, OpenAIHttpEndpoint
 from citenexus.answer.result import Result
 from citenexus.config.schema import (
     CiteNexusConfig,
@@ -48,11 +38,13 @@ def _bool_env(name: str, default: bool) -> bool:
 
 
 def _config() -> CiteNexusConfig:
-    """Build the typed config from the vault's env values.
+    """Typed endpoints, declared once and reused — keys read HERE, by the app."""
+    jina = OpenAIHttpEndpoint(
+        base_url=os.environ.get("CITENEXUS_EMBED_BASE_URL", "https://api.jina.ai/v1"),
+        api_key=os.environ.get("CITENEXUS_EMBED_API_KEY"),
+    )
+    gemini = GeminiHttpEndpoint(api_key=os.environ.get("CITENEXUS_LLM_API_KEY"))
 
-    ``storage.bucket`` doubles as the base URI: a plain path selects LocalFs; an
-    ``s3://bucket`` value (with ``CITENEXUS_S3_ENDPOINT_URL``) selects S3/MinIO/R2.
-    """
     base_uri = os.environ.get("CITENEXUS_BASE_URI", "./.citenexus-data")
     return CiteNexusConfig(
         storage=StorageConfig(
@@ -60,59 +52,38 @@ def _config() -> CiteNexusConfig:
             endpoint_url=os.environ.get("CITENEXUS_S3_ENDPOINT_URL"),
         ),
         embedding=EmbeddingConfig(
-            endpoint=os.environ.get("CITENEXUS_EMBED_BASE_URL", "https://api.jina.ai/v1"),
+            endpoint=jina,
             model=os.environ.get("CITENEXUS_EMBED_MODEL", "jina-embeddings-v3"),
-            api_key_env="CITENEXUS_EMBED_API_KEY",
         ),
         llm=LLMConfig(
-            endpoint=os.environ.get(
-                "CITENEXUS_LLM_BASE_URL",
-                "https://generativelanguage.googleapis.com/v1beta/openai",
-            ),
+            endpoint=gemini,
             model=os.environ.get("CITENEXUS_LLM_MODEL", "gemini-2.5-flash"),
-            api_key_env="CITENEXUS_LLM_API_KEY",
             temperature=0.0,  # grounded answers are deterministic (§4b)
         ),
         reranker=RerankerConfig(
             enabled=_bool_env("CITENEXUS_RERANK_ENABLED", True),
-            endpoint=os.environ.get("CITENEXUS_RERANK_BASE_URL", "https://api.jina.ai/v1"),
+            endpoint=jina,  # same Jina connection serves embeddings AND rerank
             model=os.environ.get("CITENEXUS_RERANK_MODEL", "jina-reranker-v2-base-multilingual"),
-            api_key_env="CITENEXUS_RERANK_API_KEY",
         ),
-        # Contextual retrieval (Anthropic technique): a small model prepends a
-        # situating blurb to each chunk BEFORE embedding/BM25 — the citation
-        # passage stays verbatim. ~35-49%% retrieval-failure reduction.
+        # Contextual retrieval: a small model situates each chunk before
+        # embedding/BM25; the citation passage stays verbatim.
         context_model=ContextModelConfig(
             enabled=_bool_env("CITENEXUS_CONTEXT_ENABLED", True),
-            endpoint=os.environ.get(
-                "CITENEXUS_CONTEXT_BASE_URL",
-                "https://generativelanguage.googleapis.com/v1beta/openai",
-            ),
+            endpoint=gemini,  # the SAME gemini connection, smaller model
             model=os.environ.get("CITENEXUS_CONTEXT_MODEL", "gemini-2.5-flash-lite"),
-            api_key_env="CITENEXUS_LLM_API_KEY",
         ),
-        # EN dual-query RRF: a small model rewrites each query in English and
-        # retrieval fuses both phrasings — the cross-lingual abstention fix.
+        # EN dual-query RRF — the cross-lingual abstention fix.
         reformulation=ReformulationConfig(
             enabled=_bool_env("CITENEXUS_REFORMULATE_ENABLED", True),
-            endpoint=os.environ.get(
-                "CITENEXUS_REFORMULATE_BASE_URL",
-                "https://generativelanguage.googleapis.com/v1beta/openai",
-            ),
+            endpoint=gemini,
             model=os.environ.get("CITENEXUS_REFORMULATE_MODEL", "gemini-2.5-flash-lite"),
-            api_key_env="CITENEXUS_LLM_API_KEY",
         ),
         multilingual=MultilingualConfig(fallback_language="en"),
-        # Fast-path signals for the example: dense vectors + lexical.
         signals=(Signal.embedding, Signal.text),
     )
 
 
 def _storage_options() -> StorageOptions | None:
-    """LanceDB-over-S3 options so the vector store talks to MinIO/R2 too.
-
-    ``None`` when no S3 endpoint is set — LocalFs needs no options.
-    """
     endpoint = os.environ.get("CITENEXUS_S3_ENDPOINT_URL")
     if not endpoint:
         return None
@@ -135,8 +106,7 @@ def _print_answer(question: str, result: Result) -> None:
 
 
 def main() -> None:
-    config = _config()
-    rag = CiteNexus.from_config(config, storage_options=_storage_options())
+    rag = CiteNexus.from_config(_config(), storage_options=_storage_options())
 
     print("== Ingest ==")
     for path in sorted(_CORPUS.glob("*.txt")):

@@ -12,8 +12,6 @@ from __future__ import annotations
 import base64
 import json
 
-import pytest
-
 from citenexus.vision.client import OpenAICompatibleVision
 
 _PNG = b"\x89PNG\r\n\x1a\n fake image bytes"
@@ -45,7 +43,6 @@ def _vision(t: RecordingTransport, *, api_key_env: str | None = None) -> OpenAIC
     return OpenAICompatibleVision(
         base_url="http://vl.test/v1",
         model="gemini-2.5-flash",
-        api_key_env=api_key_env,
         transport=t,
     )
 
@@ -89,13 +86,3 @@ def test_non_json_content_falls_back_to_caption() -> None:
     ).describe(_PNG)
     # A model that ignores the JSON instruction still yields a usable caption.
     assert out["short_caption"] == "Just a plain sentence."
-
-
-def test_api_key_only_in_authorization_header(monkeypatch: pytest.MonkeyPatch) -> None:
-    secret = "sk-not-real"
-    monkeypatch.setenv("CITENEXUS_VISION_KEY", secret)
-    t = RecordingTransport()
-    _vision(t, api_key_env="CITENEXUS_VISION_KEY").describe(_PNG)
-    _, body, headers = t.calls[-1]
-    assert headers["Authorization"] == f"Bearer {secret}"
-    assert secret not in body.decode("utf-8")

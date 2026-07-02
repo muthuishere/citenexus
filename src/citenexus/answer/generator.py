@@ -22,7 +22,6 @@ dependency), matching the embedding/rerank clients.
 from __future__ import annotations
 
 import json
-import os
 
 from citenexus.http import DEFAULT_TRANSPORT, Transport
 from citenexus.telemetry.events import TokenUsage
@@ -53,19 +52,14 @@ class OpenAICompatibleGenerator:
         *,
         base_url: str,
         model: str,
-        api_key_env: str | None = None,
         temperature: float = 0.0,
         max_tokens: int | None = None,
-        extra_headers: dict[str, str] | None = None,
         transport: Transport | None = None,
     ) -> None:
-        # Store only the env-var *name*, never the secret value.
         self._base_url = base_url.rstrip("/")
         self._model = model
-        self._api_key_env = api_key_env
         self._temperature = temperature
         self._max_tokens = max_tokens
-        self._extra_headers = dict(extra_headers or {})
         self._transport: Transport = transport or DEFAULT_TRANSPORT
         # Token usage from the most recent call, for telemetry. ``None`` until
         # the first ``answer()``; the client reads it to emit a generate event.
@@ -76,14 +70,9 @@ class OpenAICompatibleGenerator:
         return f"{self._base_url}/chat/completions"
 
     def _headers(self) -> dict[str, str]:
-        headers = {**self._extra_headers, "Content-Type": "application/json"}
-        if self._api_key_env:
-            # Read the key at call time; carry it ONLY in the Authorization
-            # header. The value never lands on ``self`` and is never logged.
-            key = os.environ.get(self._api_key_env)
-            if key:
-                headers["Authorization"] = f"Bearer {key}"
-        return headers
+        # Auth + provider headers are the ENDPOINT layer's job (HttpEndpoint
+        # transport); wire clients only speak JSON.
+        return {"Content-Type": "application/json"}
 
     def answer(self, question: str, passage: str, answer_language: str = "en") -> str:
         """Generate a grounded answer from ``passage`` in ``answer_language``."""

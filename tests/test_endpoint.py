@@ -126,13 +126,3 @@ def test_pre_and_post_hooks_run(tmp_path: Path) -> None:
     rag.ask("What does termination require?")
     assert events[:2] == ["pre", "post"]
     assert seen[0]["X-Signed"] == "yes"
-
-
-def test_plain_string_endpoint_still_works(tmp_path: Path) -> None:
-    cfg = CiteNexusConfig(
-        storage=StorageConfig(bucket=str(tmp_path)),
-        llm=LLMConfig(endpoint="http://llm.test/v1"),
-    )
-    rag = CiteNexus.from_config(cfg, detector=HeuristicDetector(), llm_transport=_echo_llm)
-    rag.ingest(text="Termination requires thirty days notice.", document_id="c")
-    assert rag.ask("What does termination require?").answer

@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import base64
 import json
-import os
 from typing import Any
 
 from citenexus.http import DEFAULT_TRANSPORT, Transport
@@ -60,20 +59,16 @@ class OpenAICompatibleVision:
         *,
         base_url: str,
         model: str,
-        api_key_env: str | None = None,
         temperature: float = 0.0,
         max_tokens: int | None = 512,
         mime_type: str = "image/png",
-        extra_headers: dict[str, str] | None = None,
         transport: Transport | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._model = model
-        self._api_key_env = api_key_env
         self._temperature = temperature
         self._max_tokens = max_tokens
         self._mime_type = mime_type
-        self._extra_headers = dict(extra_headers or {})
         self._transport: Transport = transport or DEFAULT_TRANSPORT
 
     @property
@@ -81,12 +76,9 @@ class OpenAICompatibleVision:
         return f"{self._base_url}/chat/completions"
 
     def _headers(self) -> dict[str, str]:
-        headers = {**self._extra_headers, "Content-Type": "application/json"}
-        if self._api_key_env:
-            key = os.environ.get(self._api_key_env)
-            if key:
-                headers["Authorization"] = f"Bearer {key}"
-        return headers
+        # Auth + provider headers are the ENDPOINT layer's job (HttpEndpoint
+        # transport); wire clients only speak JSON.
+        return {"Content-Type": "application/json"}
 
     def describe(self, image_region: Any) -> dict[str, Any]:
         """Describe an image; returns the record mapping ``describe_image`` shapes."""

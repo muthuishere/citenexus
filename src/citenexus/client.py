@@ -10,7 +10,7 @@ from citenexus.answer.anthropic import AnthropicGenerator
 from citenexus.answer.flow import AnswerFlow, Generator
 from citenexus.answer.generator import OpenAICompatibleGenerator
 from citenexus.answer.result import Decision, Result
-from citenexus.config.schema import CiteNexusConfig, LLMProvider
+from citenexus.config.schema import CiteNexusConfig
 from citenexus.config.signals import Signal, resolve_signals
 from citenexus.domain.partition import PartitionPath
 from citenexus.domain.trust import TrustMode
@@ -21,7 +21,7 @@ from citenexus.evidence.chunked_builder import Contextualizer as ContextualizerS
 from citenexus.evidence.contextualize import Contextualizer
 from citenexus.graph import GraphDistiller, GraphRetriever, GraphStore, LLMGraphDistiller
 from citenexus.hooks import Hooks
-from citenexus.http import HttpClient, HttpEndpoint
+from citenexus.http import HttpEndpoint
 from citenexus.http import Transport as ChatTransport
 from citenexus.ingest.pipeline import IngestPipeline, VisionDescriber
 from citenexus.ingest.result import IngestResult
@@ -215,165 +215,115 @@ class CiteNexus:
         context_transport: ChatTransport | None = None,
         sink: TelemetrySink | None = None,
     ) -> CiteNexus:
-        """Build a client with real OpenAI-compatible plugins from ``config``.
+        """Build a client from typed config: every model rides an HttpEndpoint.
 
-        Endpoints, models, and ``llm.temperature`` come from the typed config;
-        API keys are referenced only by env-var name (``*.api_key_env``) and
-        never read here. Transports are injectable so this stays unit-testable.
+        The application resolves its own secrets and puts the key VALUE on the
+        endpoint (SecretStr) — the library reads no environment. The endpoint
+        TYPE selects the wire protocol (AnthropicHttpEndpoint -> Messages API).
+        Transports are injectable so tests stay hermetic.
         """
-        # The real detector by default (§11a: fastText lid.176, lazy-downloaded).
-        # The test-grade heuristic mislabels real languages (fr -> es), which
-        # poisons the answer-language invariant; tests inject HeuristicDetector.
-        if detector is None and config.multilingual.detector == "fasttext-lid176":
-            detector = FastTextDetector(threshold=config.multilingual.detect_confidence_threshold)
+
+        def styled(
+            endpoint: HttpEndpoint | None, injected: ChatTransport | None
+        ) -> ChatTransport | None:
+            return endpoint.build_transport(injected) if endpoint is not None else injected
 
         # Every model is optional: no embedding endpoint -> lexical-only
         # search; no llm endpoint -> retrieve-only client (ask() explains).
-        emb_base, emb_key, emb_hdrs, emb_tp = _endpoint_parts(
-            config.embedding.endpoint,
-            config.embedding.api_key_env,
-            config.embedding.headers,
-            embed_transport,
-        )
         embedder: QueryEmbedder | None = None
-        if emb_base:
+        if config.embedding.endpoint is not None:
             embedder = _SingleTextEmbedder(
                 OpenAICompatibleEmbedding(
-                    extra_headers=emb_hdrs,
-                    base_url=emb_base,
+                    base_url=config.embedding.endpoint.base_url,
                     model=config.embedding.model,
-                    api_key_env=emb_key,
-                    transport=emb_tp,
+                    transport=styled(config.embedding.endpoint, embed_transport),
                 ),
                 batch_size=config.embedding.batch_size,
             )
-        llm_base, llm_key, llm_headers, llm_tp = _endpoint_parts(
-            config.llm.endpoint,
-            config.llm.api_key_env,
-            config.llm.headers,
-            llm_transport,
-            timeout_s=config.llm.timeout_s,
-        )
-        llm_protocol = (
-            config.llm.endpoint.protocol
-            if isinstance(config.llm.endpoint, HttpEndpoint)
-            else ("anthropic" if config.llm.provider is LLMProvider.anthropic else "openai")
-        )
+
         generator: Generator | None = None
-        if llm_base is None:
-            pass
-        elif llm_protocol == "anthropic":
-            generator = AnthropicGenerator(
-                extra_headers=llm_headers,
-                base_url=llm_base,
-                model=config.llm.model,
-                api_key_env=llm_key,
-                temperature=config.llm.temperature,
-                max_tokens=config.llm.max_tokens or 1024,
-                transport=llm_tp,
-            )
-        else:
-            generator = OpenAICompatibleGenerator(
-                extra_headers=llm_headers,
-                base_url=llm_base,
-                model=config.llm.model,
-                api_key_env=llm_key,
-                temperature=config.llm.temperature,
-                max_tokens=config.llm.max_tokens,
-                transport=llm_tp,
-            )
-        rr_base, rr_key, rr_hdrs, rr_tp = _endpoint_parts(
-            config.reranker.endpoint,
-            config.reranker.api_key_env,
-            config.reranker.headers,
-            rerank_transport,
-        )
+        if config.llm.endpoint is not None:
+            llm_transport_final = styled(config.llm.endpoint, llm_transport)
+            if config.llm.endpoint.protocol == "anthropic":
+                generator = AnthropicGenerator(
+                    base_url=config.llm.endpoint.base_url,
+                    model=config.llm.model,
+                    temperature=config.llm.temperature,
+                    max_tokens=config.llm.max_tokens or 1024,
+                    transport=llm_transport_final,
+                )
+            else:
+                generator = OpenAICompatibleGenerator(
+                    base_url=config.llm.endpoint.base_url,
+                    model=config.llm.model,
+                    temperature=config.llm.temperature,
+                    max_tokens=config.llm.max_tokens,
+                    transport=llm_transport_final,
+                )
+
         reranker: RerankerPlugin | None = None
-        if config.reranker.enabled and rr_base is not None:
+        if config.reranker.enabled and config.reranker.endpoint is not None:
             reranker = OpenAICompatibleReranker(
-                extra_headers=rr_hdrs,
-                base_url=rr_base,
+                base_url=config.reranker.endpoint.base_url,
                 model=config.reranker.model,
-                api_key_env=rr_key,
-                transport=rr_tp,
+                transport=styled(config.reranker.endpoint, rerank_transport),
             )
 
-        # Vision is optional: build a client only when enabled + configured.
-        # Without one, ingest stays text-level (images are skipped, never an error).
-        vis_base, vis_key, vis_hdrs, vis_tp = _endpoint_parts(
-            config.vision.endpoint,
-            config.vision.api_key_env,
-            config.vision.headers,
-            vision_transport,
-        )
+        # Vision is optional: without a client, ingest stays text-level.
         vision: VisionDescriber | None = None
-        if config.vision.enabled and vis_base and config.vision.model:
+        if config.vision.enabled and config.vision.endpoint is not None and config.vision.model:
             vision = OpenAICompatibleVision(
-                extra_headers=vis_hdrs,
-                base_url=vis_base,
+                base_url=config.vision.endpoint.base_url,
                 model=config.vision.model,
-                api_key_env=vis_key,
-                transport=vis_tp,
+                transport=styled(config.vision.endpoint, vision_transport),
             )
 
-        # EN dual-query reformulation is optional: a small model, cached per
-        # query. Without one, retrieval is single-query exactly as before.
-        ref_base, ref_key, ref_hdrs, ref_tp = _endpoint_parts(
-            config.reformulation.endpoint,
-            config.reformulation.api_key_env,
-            config.reformulation.headers,
-            reformulate_transport,
-        )
+        # EN dual-query reformulation: small model, cached per query.
         reformulator: Reformulator | None = None
-        if config.reformulation.enabled and ref_base:
+        if config.reformulation.enabled and config.reformulation.endpoint is not None:
             reformulator = QueryReformulator(
-                extra_headers=ref_hdrs,
-                base_url=ref_base,
+                base_url=config.reformulation.endpoint.base_url,
                 model=config.reformulation.model,
-                api_key_env=ref_key,
-                transport=ref_tp,
+                transport=styled(config.reformulation.endpoint, reformulate_transport),
             )
 
-        # LLM wiki distillation is optional: a small model compiles the corpus
-        # into cross-referenced pages. Without one, the deterministic
-        # per-document wiki is built exactly as before.
-        wd_base, wd_key, wd_hdrs, wd_tp = _endpoint_parts(
-            config.wiki_distill.endpoint,
-            config.wiki_distill.api_key_env,
-            config.wiki_distill.headers,
-            wiki_distill_transport,
-        )
+        # LLM wiki distillation: degrades to the deterministic wiki.
         wiki_distiller: WikiDistiller | None = None
-        if config.wiki_distill.enabled and wd_base:
+        if config.wiki_distill.enabled and config.wiki_distill.endpoint is not None:
             wiki_distiller = LLMWikiDistiller(
-                extra_headers=wd_hdrs,
-                base_url=wd_base,
+                base_url=config.wiki_distill.endpoint.base_url,
                 model=config.wiki_distill.model,
-                api_key_env=wd_key,
-                transport=wd_tp,
+                transport=styled(config.wiki_distill.endpoint, wiki_distill_transport),
             )
 
-        # LLM graph distillation is optional: a small model extracts grounded
-        # entities + typed relations. Without one, deterministic co-mention.
-        gd_base, gd_key, gd_hdrs, gd_tp = _endpoint_parts(
-            config.graph_distill.endpoint,
-            config.graph_distill.api_key_env,
-            config.graph_distill.headers,
-            graph_distill_transport,
-        )
+        # LLM graph distillation: degrades to deterministic co-mention.
         graph_distiller: GraphDistiller | None = None
-        if config.graph_distill.enabled and gd_base:
+        if config.graph_distill.enabled and config.graph_distill.endpoint is not None:
             graph_distiller = LLMGraphDistiller(
-                extra_headers=gd_hdrs,
-                base_url=gd_base,
+                base_url=config.graph_distill.endpoint.base_url,
                 model=config.graph_distill.model,
-                api_key_env=gd_key,
-                transport=gd_tp,
+                transport=styled(config.graph_distill.endpoint, graph_distill_transport),
             )
+
+        # Contextual retrieval: small-model chunk blurbs (indexed text only).
+        contextualizer: Contextualizer | None = None
+        if (
+            config.context_model.enabled
+            and config.context_model.endpoint is not None
+            and config.context_model.model
+        ):
+            contextualizer = Contextualizer(
+                base_url=config.context_model.endpoint.base_url,
+                model=config.context_model.model,
+                transport=styled(config.context_model.endpoint, context_transport),
+            )
+
+        # The real detector by default (§11a: fastText lid.176, lazy-downloaded).
+        if detector is None and config.multilingual.detector == "fasttext-lid176":
+            detector = FastTextDetector(threshold=config.multilingual.detect_confidence_threshold)
 
         # VectorStore backend (spec §6b): LanceDB-per-leaf is the S3-native
         # default; "postgres" brings pgvector + native tsvector text search.
-        # Construction is lazy (no connection until first use).
         vector_store: VectorStore | None = None
         if config.vector_store.backend == "postgres":
             if not config.vector_store.uri:
@@ -387,28 +337,8 @@ class CiteNexus:
                 ),
             )
 
-        # Contextual retrieval is optional: build the small-model contextualizer
-        # only when enabled + configured. Without one, chunks index un-enriched.
-        ctx_base, ctx_key, ctx_hdrs, ctx_tp = _endpoint_parts(
-            config.context_model.endpoint,
-            config.context_model.api_key_env,
-            config.context_model.headers,
-            context_transport,
-        )
-        contextualizer: Contextualizer | None = None
-        if config.context_model.enabled and ctx_base and config.context_model.model:
-            contextualizer = Contextualizer(
-                extra_headers=ctx_hdrs,
-                base_url=ctx_base,
-                model=config.context_model.model,
-                api_key_env=ctx_key,
-                transport=ctx_tp,
-            )
-
-        # S3-compatible endpoints (MinIO / Cloudflare R2): storage.endpoint_url
-        # wires BOTH halves — the object backend (boto3) and the Lance store's
-        # object-store options — so "point at a bucket" works from config alone.
-        # Credentials come from the standard AWS_* environment variables.
+        # S3-compatible endpoints (MinIO / R2): storage.endpoint_url wires both
+        # the object backend and the Lance store options from config alone.
         if (
             backend is None
             and config.storage.bucket.startswith("s3://")
@@ -692,30 +622,6 @@ class CiteNexus:
             return question
         context = " ".join(f"{turn.question} {turn.answer}" for turn in turns)
         return f"{context} {question}"
-
-
-def _endpoint_parts(
-    endpoint: str | HttpEndpoint | None,
-    api_key_env: str | None,
-    headers: dict[str, str],
-    injected: ChatTransport | None,
-    *,
-    timeout_s: float | None = None,
-) -> tuple[str | None, str | None, dict[str, str], ChatTransport | None]:
-    """Resolve a section's connection: flat fields or a typed HttpEndpoint.
-
-    A typed endpoint carries its own key VALUE (SecretStr — the application
-    read its environment, not the library) plus headers/hooks/timeout; its
-    build_transport injects auth per call, so the wire client gets NO
-    api_key_env and can never add a conflicting Authorization header.
-    """
-    if endpoint is None:
-        return None, api_key_env, dict(headers), injected
-    if isinstance(endpoint, str):
-        if injected is None and timeout_s is not None:
-            return endpoint, api_key_env, dict(headers), HttpClient(timeout_s=timeout_s)
-        return endpoint, api_key_env, dict(headers), injected
-    return endpoint.base_url, None, dict(headers), endpoint.build_transport(injected)
 
 
 def _backend_for(base_uri: str) -> StorageBackend:

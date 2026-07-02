@@ -60,7 +60,7 @@ def test_full_section17_surface_validates() -> None:
                 "bucket": "s3://my-bucket",
                 "partition_hierarchy": ["org", "product_line", "product"],
             },
-            "llm": {"model": "qwen2.5", "endpoint": "http://localhost:11434/v1"},
+            "llm": {"model": "qwen2.5", "endpoint": {"base_url": "http://localhost:11434/v1"}},
             "embedding": {"model": "bge-m3"},
             "reranker": {"model": "bge-reranker-v2-m3"},
             "vision": {"enabled": True, "prefilter": {"enabled": True}},

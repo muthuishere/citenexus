@@ -18,7 +18,6 @@ over stored EU text) — this plugin never fakes a sparse vector.
 from __future__ import annotations
 
 import json
-import os
 from collections.abc import Sequence
 
 from citenexus.http import DEFAULT_TRANSPORT, Transport
@@ -38,15 +37,10 @@ class OpenAICompatibleEmbedding(EmbeddingPlugin):
         *,
         base_url: str,
         model: str,
-        api_key_env: str | None = None,
-        extra_headers: dict[str, str] | None = None,
         transport: Transport | None = None,
     ) -> None:
-        # Store only the env-var *name*, never the secret value.
         self._base_url = base_url.rstrip("/")
         self._model = model
-        self._api_key_env = api_key_env
-        self._extra_headers = dict(extra_headers or {})
         self._transport: Transport = transport or DEFAULT_TRANSPORT
 
     @property
@@ -54,14 +48,9 @@ class OpenAICompatibleEmbedding(EmbeddingPlugin):
         return f"{self._base_url}/embeddings"
 
     def _headers(self) -> dict[str, str]:
-        headers = {**self._extra_headers, "Content-Type": "application/json"}
-        if self._api_key_env:
-            # Read the key at call time; carry it ONLY in the Authorization
-            # header. The value never lands on ``self`` and is never logged.
-            key = os.environ.get(self._api_key_env)
-            if key:
-                headers["Authorization"] = f"Bearer {key}"
-        return headers
+        # Auth + provider headers are the ENDPOINT layer's job (HttpEndpoint
+        # transport); wire clients only speak JSON.
+        return {"Content-Type": "application/json"}
 
     def embed(self, texts: Sequence[str]) -> list[list[float]]:
         """Embed ``texts`` into dense vectors, preserving input order."""

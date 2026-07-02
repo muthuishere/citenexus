@@ -44,25 +44,16 @@ class Contextualizer:
         *,
         base_url: str,
         model: str,
-        api_key_env: str | None = None,
-        extra_headers: dict[str, str] | None = None,
         transport: Transport | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._model = model
-        self._api_key_env = api_key_env
-        self._extra_headers = dict(extra_headers or {})
         self._transport: Transport = transport or DEFAULT_TRANSPORT
 
     def _headers(self) -> dict[str, str]:
-        import os
-
-        headers = {**self._extra_headers, "Content-Type": "application/json"}
-        if self._api_key_env:
-            key = os.environ.get(self._api_key_env)
-            if key:
-                headers["Authorization"] = f"Bearer {key}"
-        return headers
+        # Auth + provider headers are the ENDPOINT layer's job (HttpEndpoint
+        # transport); wire clients only speak JSON.
+        return {"Content-Type": "application/json"}
 
     def contextualize(self, *, chunk: str, document: str) -> str:
         """Return ``context + "\\n" + chunk`` — or the bare chunk on any failure."""

@@ -16,7 +16,6 @@ lands on ``self``, and the HTTP call goes through an injected ``transport``.
 from __future__ import annotations
 
 import json
-import os
 
 from citenexus.answer.generator import _SYSTEM_PROMPT
 from citenexus.http import DEFAULT_TRANSPORT, Transport
@@ -38,18 +37,14 @@ class AnthropicGenerator:
         *,
         base_url: str = "https://api.anthropic.com",
         model: str,
-        api_key_env: str | None = None,
         temperature: float = 0.0,
         max_tokens: int = _DEFAULT_MAX_TOKENS,
-        extra_headers: dict[str, str] | None = None,
         transport: Transport | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._model = model
-        self._api_key_env = api_key_env
         self._temperature = temperature
         self._max_tokens = max_tokens
-        self._extra_headers = dict(extra_headers or {})
         self._transport: Transport = transport or DEFAULT_TRANSPORT
         self.last_usage: TokenUsage | None = None
 
@@ -58,16 +53,9 @@ class AnthropicGenerator:
         return f"{self._base_url}/v1/messages"
 
     def _headers(self) -> dict[str, str]:
-        headers = {
-            **self._extra_headers,
-            "Content-Type": "application/json",
-            "anthropic-version": _ANTHROPIC_VERSION,
-        }
-        if self._api_key_env:
-            key = os.environ.get(self._api_key_env)
-            if key:
-                headers["x-api-key"] = key
-        return headers
+        # Auth + provider headers are the ENDPOINT layer's job (HttpEndpoint
+        # transport); wire clients only speak JSON.
+        return {"Content-Type": "application/json"}
 
     def answer(self, question: str, passage: str, answer_language: str = "en") -> str:
         """Generate a grounded answer from ``passage`` in ``answer_language``."""

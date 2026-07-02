@@ -12,7 +12,8 @@ storage:
   partition_hierarchy: [org, product_line, product]
 llm:
   model: qwen2.5
-  endpoint: http://localhost:11434/v1
+  endpoint:
+    base_url: http://localhost:11434/v1
 embedding:
   model: bge-m3
 reranker:

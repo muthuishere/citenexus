@@ -19,7 +19,6 @@ the original returns ``None`` and retrieval proceeds single-query.
 from __future__ import annotations
 
 import json
-import os
 from typing import Protocol
 
 from citenexus.http import DEFAULT_TRANSPORT, Transport
@@ -49,25 +48,18 @@ class QueryReformulator:
         *,
         base_url: str,
         model: str,
-        api_key_env: str | None = None,
-        extra_headers: dict[str, str] | None = None,
         transport: Transport | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._model = model
-        self._api_key_env = api_key_env
-        self._extra_headers = dict(extra_headers or {})
         self._transport: Transport = transport or DEFAULT_TRANSPORT
         # The shared reformulation cache: query -> reformulation (or None).
         self._cache: dict[str, str | None] = {}
 
     def _headers(self) -> dict[str, str]:
-        headers = {**self._extra_headers, "Content-Type": "application/json"}
-        if self._api_key_env:
-            key = os.environ.get(self._api_key_env)
-            if key:
-                headers["Authorization"] = f"Bearer {key}"
-        return headers
+        # Auth + provider headers are the ENDPOINT layer's job (HttpEndpoint
+        # transport); wire clients only speak JSON.
+        return {"Content-Type": "application/json"}
 
     def reformulate(self, query: str) -> str | None:
         """The EN reformulation of ``query`` — or ``None`` when it adds nothing."""

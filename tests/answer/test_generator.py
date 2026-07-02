@@ -52,7 +52,6 @@ def _generator(
     return OpenAICompatibleGenerator(
         base_url="http://llm.test/v1",
         model="qwen2.5",
-        api_key_env=api_key_env,
         temperature=temperature,
         max_tokens=max_tokens,
         transport=transport,
@@ -120,25 +119,6 @@ def test_prompt_carries_question_passage_and_language() -> None:
     assert "de" in blob
 
 
-def test_api_key_flows_only_through_authorization_header(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    secret = "sk-not-a-real-key-xyz"
-    monkeypatch.setenv("CITENEXUS_LLM_API_KEY", secret)
-    t = RecordingTransport()
-    _generator(t, api_key_env="CITENEXUS_LLM_API_KEY").answer("q", "passage")
-    assert t.last_headers["Authorization"] == f"Bearer {secret}"
-    url, body, _ = t.calls[-1]
-    assert secret not in url
-    assert secret not in body.decode("utf-8")
-
-
-def test_no_api_key_sends_no_authorization_header() -> None:
-    t = RecordingTransport()
-    _generator(t).answer("q", "passage")
-    assert "Authorization" not in t.last_headers
-
-
 def _real_endpoint_reachable(base_url: str) -> bool:
     parsed = urlparse(base_url)
     host = parsed.hostname or "localhost"
@@ -160,7 +140,6 @@ def test_real_llm_endpoint() -> None:
     generator = OpenAICompatibleGenerator(
         base_url=base_url,
         model=os.environ.get("CITENEXUS_LLM_MODEL", "qwen2.5"),
-        api_key_env="CITENEXUS_LLM_API_KEY",
     )
     passage = "The employee shall not disclose confidential information."
     answer = generator.answer("Can the employee disclose information?", passage)

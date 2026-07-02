@@ -35,18 +35,6 @@ class LexicalSignal(StrEnum):
     bm25 = "bm25"
 
 
-class LLMProvider(StrEnum):
-    """The answering-model wire protocol (§4b).
-
-    ``openai`` covers any OpenAI-compatible ``/chat/completions`` endpoint —
-    OpenAI, Gemini's OpenAI-compat endpoint, Ollama, vLLM, OpenRouter, …
-    ``anthropic`` is the native Messages API (different shape, own client).
-    """
-
-    openai = "openai"
-    anthropic = "anthropic"
-
-
 class StorageConfig(_Section):
     """S3-native storage + the variable-depth partition hierarchy (§6b)."""
 
@@ -64,29 +52,23 @@ class StorageConfig(_Section):
 class LLMConfig(_Section):
     """The injected answering model (§4b).
 
-    ``provider`` selects the wire protocol — OpenAI-compatible (default; also
-    Gemini/Ollama/OpenRouter) or Anthropic's native Messages API.
+    The endpoint TYPE selects the wire protocol: an ``AnthropicHttpEndpoint``
+    gets the native Messages client; every other endpoint speaks
+    OpenAI-compatible chat completions. Connection details (key, headers,
+    timeout, hooks) live on the endpoint — never here.
     """
 
-    provider: LLMProvider = LLMProvider.openai
     model: str = "qwen2.5"
-    endpoint: str | HttpEndpoint | None = None
-    api_key_env: str | None = None
-    # Extra HTTP headers merged under auth (gateway/Referer/api-version...).
-    headers: dict[str, str] = Field(default_factory=dict)
+    endpoint: HttpEndpoint | None = None
     temperature: float = 0.0
     max_tokens: int | None = None
-    timeout_s: float = 60.0
 
 
 class EmbeddingConfig(_Section):
     """The dense+sparse embedding endpoint (§10, default bge-m3)."""
 
     model: str = "bge-m3"
-    endpoint: str | HttpEndpoint | None = None
-    api_key_env: str | None = None
-    # Extra HTTP headers merged under auth (gateway/Referer/api-version...).
-    headers: dict[str, str] = Field(default_factory=dict)
+    endpoint: HttpEndpoint | None = None
     dense: bool = True
     sparse: bool = True
     batch_size: int = 32
@@ -98,10 +80,7 @@ class RerankerConfig(_Section):
 
     enabled: bool = True
     model: str = "bge-reranker-v2-m3"
-    endpoint: str | HttpEndpoint | None = None
-    api_key_env: str | None = None
-    # Extra HTTP headers merged under auth (gateway/Referer/api-version...).
-    headers: dict[str, str] = Field(default_factory=dict)
+    endpoint: HttpEndpoint | None = None
     top_n: int = 20
 
 
@@ -114,9 +93,7 @@ class ReformulationConfig(_Section):
 
     enabled: bool = False
     model: str = "gemini-2.5-flash-lite"
-    endpoint: str | HttpEndpoint | None = None
-    api_key_env: str | None = None
-    headers: dict[str, str] = Field(default_factory=dict)
+    endpoint: HttpEndpoint | None = None
 
 
 class GraphDistillConfig(_Section):
@@ -129,9 +106,7 @@ class GraphDistillConfig(_Section):
 
     enabled: bool = False
     model: str = "gemini-2.5-flash-lite"
-    endpoint: str | HttpEndpoint | None = None
-    api_key_env: str | None = None
-    headers: dict[str, str] = Field(default_factory=dict)
+    endpoint: HttpEndpoint | None = None
 
 
 class WikiDistillConfig(_Section):
@@ -144,9 +119,7 @@ class WikiDistillConfig(_Section):
 
     enabled: bool = False
     model: str = "gemini-2.5-flash-lite"
-    endpoint: str | HttpEndpoint | None = None
-    api_key_env: str | None = None
-    headers: dict[str, str] = Field(default_factory=dict)
+    endpoint: HttpEndpoint | None = None
 
 
 class VisionPrefilterConfig(_Section):
@@ -163,9 +136,7 @@ class VisionConfig(_Section):
 
     enabled: bool = False
     model: str | None = None
-    endpoint: str | HttpEndpoint | None = None
-    api_key_env: str | None = None
-    headers: dict[str, str] = Field(default_factory=dict)
+    endpoint: HttpEndpoint | None = None
     prefilter: VisionPrefilterConfig = Field(default_factory=VisionPrefilterConfig)
 
 
@@ -192,9 +163,7 @@ class ContextModelConfig(_Section):
 
     enabled: bool = False
     model: str | None = None
-    endpoint: str | HttpEndpoint | None = None
-    api_key_env: str | None = None
-    headers: dict[str, str] = Field(default_factory=dict)
+    endpoint: HttpEndpoint | None = None
 
 
 class VectorStoreConfig(_Section):

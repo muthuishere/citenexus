@@ -60,6 +60,7 @@ def test_full_client_unchanged(tmp_path: Path) -> None:
 def test_from_config_without_llm_is_retrieve_only(tmp_path: Path) -> None:
     import json
 
+    from citenexus import OpenAIHttpEndpoint
     from citenexus.config.schema import CiteNexusConfig, EmbeddingConfig, StorageConfig
     from citenexus.lang.detect import HeuristicDetector
 
@@ -70,7 +71,7 @@ def test_from_config_without_llm_is_retrieve_only(tmp_path: Path) -> None:
 
     cfg = CiteNexusConfig(
         storage=StorageConfig(bucket=str(tmp_path)),
-        embedding=EmbeddingConfig(endpoint="http://embed.test/v1"),
+        embedding=EmbeddingConfig(endpoint=OpenAIHttpEndpoint(base_url="http://embed.test/v1")),
         # no llm endpoint at all — search-only deployment
     )
     rag = CiteNexus.from_config(cfg, detector=HeuristicDetector(), embed_transport=embed_transport)
