@@ -11,15 +11,15 @@ import uuid
 
 import pytest
 
-from trustrag.domain.partition import PartitionPath
-from trustrag.storage.backend import S3Backend
-from trustrag.storage.lance_store import LanceVectorStore
-from trustrag.storage.paths import leaf_vector_uri
+from citenexus.domain.partition import PartitionPath
+from citenexus.storage.backend import S3Backend
+from citenexus.storage.lance_store import LanceVectorStore
+from citenexus.storage.paths import leaf_vector_uri
 
 pytestmark = pytest.mark.integration
 
-ENDPOINT = os.environ.get("TRUSTRAG_S3_ENDPOINT_URL", "http://localhost:19000")
-BUCKET = os.environ.get("TRUSTRAG_BUCKET", "trustrag-local")
+ENDPOINT = os.environ.get("CITENEXUS_S3_ENDPOINT_URL", "http://localhost:19000")
+BUCKET = os.environ.get("CITENEXUS_BUCKET", "citenexus-local")
 KEY = os.environ.get("AWS_ACCESS_KEY_ID", "minioadmin")
 SECRET = os.environ.get("AWS_SECRET_ACCESS_KEY", "minioadmin")
 

@@ -6,15 +6,15 @@
 
 ## 2. Implementation (green)
 
-- [x] 2.1 `src/trustrag/access/scope.py`: `resolve_scope(scope, hierarchy)` → contiguous-prefix `PartitionPath`, rejecting gaps and unknown keys
-- [x] 2.2 `src/trustrag/access/prefilter.py`: `allowed_partition`, `filter_partitions`, `apply_acl_predicate` (opaque acl, optional predicate)
-- [x] 2.3 `src/trustrag/access/__init__.py`: export the four public callables
+- [x] 2.1 `src/citenexus/access/scope.py`: `resolve_scope(scope, hierarchy)` → contiguous-prefix `PartitionPath`, rejecting gaps and unknown keys
+- [x] 2.2 `src/citenexus/access/prefilter.py`: `allowed_partition`, `filter_partitions`, `apply_acl_predicate` (opaque acl, optional predicate)
+- [x] 2.3 `src/citenexus/access/__init__.py`: export the four public callables
 
 ## 3. Verify (scoped)
 
 - [x] 3.1 `uv run pytest tests/access -q` passes
-- [x] 3.2 `uv run ruff check src/trustrag/access tests/access` clean
-- [x] 3.3 `uv run mypy src/trustrag/access tests/access` clean (strict)
+- [x] 3.2 `uv run ruff check src/citenexus/access tests/access` clean
+- [x] 3.3 `uv run mypy src/citenexus/access tests/access` clean (strict)
 
 ## 4. Spec artifacts
 

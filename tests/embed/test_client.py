@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 
 import pytest
 
-from trustrag.embed import OpenAICompatibleEmbedding
+from citenexus.embed import OpenAICompatibleEmbedding
 
 
 class RecordingTransport:
@@ -84,9 +84,9 @@ def test_api_key_flows_only_through_authorization_header(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     secret = "sk-not-a-real-key-xyz"
-    monkeypatch.setenv("TRUSTRAG_EMBED_API_KEY", secret)
+    monkeypatch.setenv("CITENEXUS_EMBED_API_KEY", secret)
     t = RecordingTransport()
-    _plugin(t, api_key_env="TRUSTRAG_EMBED_API_KEY").embed(["a"])
+    _plugin(t, api_key_env="CITENEXUS_EMBED_API_KEY").embed(["a"])
     headers = t.last_headers
     assert headers["Authorization"] == f"Bearer {secret}"
     # the value must not leak into the URL or the request body
@@ -114,13 +114,13 @@ def _real_endpoint_reachable(base_url: str) -> bool:
 
 @pytest.mark.integration
 def test_real_embeddings_endpoint() -> None:
-    base_url = os.environ.get("TRUSTRAG_EMBED_BASE_URL", "http://localhost:11434/v1")
+    base_url = os.environ.get("CITENEXUS_EMBED_BASE_URL", "http://localhost:11434/v1")
     if not _real_endpoint_reachable(base_url):
         pytest.skip(f"embedding endpoint unreachable: {base_url}")
     plugin = OpenAICompatibleEmbedding(
         base_url=base_url,
-        model=os.environ.get("TRUSTRAG_EMBED_MODEL", "bge-m3"),
-        api_key_env="TRUSTRAG_EMBED_API_KEY",
+        model=os.environ.get("CITENEXUS_EMBED_MODEL", "bge-m3"),
+        api_key_env="CITENEXUS_EMBED_API_KEY",
     )
     vecs = plugin.embed(["hello", "world"])
     assert len(vecs) == 2

@@ -1,6 +1,6 @@
-# trustrag-core
+# citenexus-core
 
-TrustRAG's Rust engine — **one core, FFI for all languages**
+CiteNexus's Rust engine — **one core, FFI for all languages**
 ([SPEC-PORTS-v1 §3.4](../docs/SPEC-PORTS-v1.md)). Ships alongside the Python
 library in this repo; the Python extractors remain the behavior reference and
 `tests/core/test_rust_parity.py` proves byte-identical output through the
@@ -22,25 +22,25 @@ no callbacks.
 ## C ABI
 
 ```c
-char* trustrag_extract(const uint8_t* bytes, size_t len,
+char* citenexus_extract(const uint8_t* bytes, size_t len,
                        const char* source_type,   // "pdf" | "docx" | "html" | ...
                        const char* document_id);  // -> ExtractedDoc JSON or {"error": ...}
 
 // store — opaque handle, JSON rows, {"error": ...} on failure
-void* trustrag_store_open(const char* uri, const char* storage_options_json); // NULL on failure
-char* trustrag_store_upsert(void* store, const char* rows_json);              // {"ok":true}
-char* trustrag_store_search(void* store, const char* vector_json, size_t limit); // rows + _distance
-char* trustrag_store_scan(void* store, int64_t limit);                        // limit < 0 = all
-char* trustrag_store_drop(void* store);                                       // {"ok":true}
-void  trustrag_store_close(void* store);
+void* citenexus_store_open(const char* uri, const char* storage_options_json); // NULL on failure
+char* citenexus_store_upsert(void* store, const char* rows_json);              // {"ok":true}
+char* citenexus_store_search(void* store, const char* vector_json, size_t limit); // rows + _distance
+char* citenexus_store_scan(void* store, int64_t limit);                        // limit < 0 = all
+char* citenexus_store_drop(void* store);                                       // {"ok":true}
+void  citenexus_store_close(void* store);
 
 // detect — fastText lid.176 (dense .bin; caller supplies the model path)
-void* trustrag_detector_open(const char* model_path);   // NULL on failure
-char* trustrag_detect(void* detector, const char* text); // {"language":"fr","confidence":0.98}
-void  trustrag_detector_close(void* detector);
+void* citenexus_detector_open(const char* model_path);   // NULL on failure
+char* citenexus_detect(void* detector, const char* text); // {"language":"fr","confidence":0.98}
+void  citenexus_detector_close(void* detector);
 
-void  trustrag_free_string(char* s);   // releases every char* above
-const char* trustrag_core_version(void);
+void  citenexus_free_string(char* s);   // releases every char* above
+const char* citenexus_core_version(void);
 ```
 
 Bindings: cgo (Go, required) · napi-rs (TS, parity path) · pyo3/ctypes (Python).
@@ -55,5 +55,5 @@ cargo build --features pdf   # enable the pdfium-backed PDF extractor
 
 Build prerequisite: `protoc` (lance's build scripts generate protobuf code) —
 `brew install protobuf` on macOS. The lid.176 real-model tests skip unless
-`assets/models/lid.176.bin` exists (or `TRUSTRAG_LID176_PATH` points at it);
+`assets/models/lid.176.bin` exists (or `CITENEXUS_LID176_PATH` points at it);
 nothing is downloaded at test time.

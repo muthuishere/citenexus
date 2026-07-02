@@ -1,6 +1,6 @@
 """Python ↔ Rust extraction parity — the core's conformance arbiter.
 
-trustrag-core (core/) must produce the SAME ExtractedDoc as the Python
+citenexus-core (core/) must produce the SAME ExtractedDoc as the Python
 extractors for the same bytes (SPEC-PORTS-v1 §3.4: one parser implementation,
 byte-identical output). This test loads the built cdylib via ctypes and
 compares field-for-field. Skips when the dylib isn't built:
@@ -18,16 +18,16 @@ from typing import Any
 
 import pytest
 
-from trustrag.extract.csv import CsvExtractor
-from trustrag.extract.html import HtmlExtractor
-from trustrag.extract.md import MdExtractor
-from trustrag.extract.txt import TxtExtractor
+from citenexus.extract.csv import CsvExtractor
+from citenexus.extract.html import HtmlExtractor
+from citenexus.extract.md import MdExtractor
+from citenexus.extract.txt import TxtExtractor
 
 _CORE = Path(__file__).resolve().parents[2] / "core"
 _LIB_NAME = {
-    "Darwin": "libtrustrag_core.dylib",
-    "Linux": "libtrustrag_core.so",
-    "Windows": "trustrag_core.dll",
+    "Darwin": "libcitenexus_core.dylib",
+    "Linux": "libcitenexus_core.so",
+    "Windows": "citenexus_core.dll",
 }[platform.system()]
 
 
@@ -43,25 +43,25 @@ def _dylib() -> Path | None:
 def core() -> ctypes.CDLL:
     path = _dylib()
     if path is None:
-        pytest.skip("trustrag-core not built (run: task core:build)")
+        pytest.skip("citenexus-core not built (run: task core:build)")
     lib = ctypes.CDLL(str(path))
-    lib.trustrag_extract.restype = ctypes.c_void_p
-    lib.trustrag_extract.argtypes = [
+    lib.citenexus_extract.restype = ctypes.c_void_p
+    lib.citenexus_extract.argtypes = [
         ctypes.c_char_p,
         ctypes.c_size_t,
         ctypes.c_char_p,
         ctypes.c_char_p,
     ]
-    lib.trustrag_free_string.argtypes = [ctypes.c_void_p]
+    lib.citenexus_free_string.argtypes = [ctypes.c_void_p]
     return lib
 
 
 def rust_extract(lib: ctypes.CDLL, data: bytes, source_type: str) -> dict[str, Any]:
-    raw = lib.trustrag_extract(data, len(data), source_type.encode(), b"doc")
+    raw = lib.citenexus_extract(data, len(data), source_type.encode(), b"doc")
     try:
         payload: dict[str, Any] = json.loads(ctypes.string_at(raw).decode("utf-8"))
     finally:
-        lib.trustrag_free_string(raw)
+        lib.citenexus_free_string(raw)
     assert "error" not in payload, payload.get("error")
     return payload
 

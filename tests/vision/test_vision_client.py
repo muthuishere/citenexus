@@ -14,7 +14,7 @@ import json
 
 import pytest
 
-from trustrag.vision.client import OpenAICompatibleVision
+from citenexus.vision.client import OpenAICompatibleVision
 
 _PNG = b"\x89PNG\r\n\x1a\n fake image bytes"
 
@@ -93,9 +93,9 @@ def test_non_json_content_falls_back_to_caption() -> None:
 
 def test_api_key_only_in_authorization_header(monkeypatch: pytest.MonkeyPatch) -> None:
     secret = "sk-not-real"
-    monkeypatch.setenv("TRUSTRAG_VISION_KEY", secret)
+    monkeypatch.setenv("CITENEXUS_VISION_KEY", secret)
     t = RecordingTransport()
-    _vision(t, api_key_env="TRUSTRAG_VISION_KEY").describe(_PNG)
+    _vision(t, api_key_env="CITENEXUS_VISION_KEY").describe(_PNG)
     _, body, headers = t.calls[-1]
     assert headers["Authorization"] == f"Bearer {secret}"
     assert secret not in body.decode("utf-8")

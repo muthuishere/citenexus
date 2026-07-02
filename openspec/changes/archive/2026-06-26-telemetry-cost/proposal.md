@@ -4,7 +4,7 @@ Production RAG in regulated domains has to answer two operator questions from da
 one — "what did this cost?" and "can I trust the answers?" — and the cheap way to
 answer both is to recognise they are the *same* event stream read two ways (§6c).
 Bolting on a separate metrics system and a separate billing system duplicates the
-emit path and lets the two drift. TrustRAG instead emits one partition-attributed
+emit path and lets the two drift. CiteNexus instead emits one partition-attributed
 `StageEvent` per pipeline stage; cost and quality are pure views over that stream.
 
 ## What Changes
@@ -39,9 +39,9 @@ in-memory stream. Sinks are where I/O would later live, behind the protocol.
 
 ## Impact
 
-- New module `src/trustrag/telemetry/`: `events.py`, `sinks.py`, `cost.py`,
+- New module `src/citenexus/telemetry/`: `events.py`, `sinks.py`, `cost.py`,
   `counters.py`, `__init__.py`.
-- Reuses `trustrag.domain.PartitionPath` — every event carries the path, so
+- Reuses `citenexus.domain.PartitionPath` — every event carries the path, so
   per-org / product-line attribution is a group-by and prefix filter (§6b, §7c).
 - Downstream: ingest (L3), retrieval (L4), and answer/verify (L5) emit events to
   the configured sink; the worker (L2) reports retry/dead-letter outcomes; the

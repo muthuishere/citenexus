@@ -47,7 +47,7 @@ def test_openrouter_chat_completion_smoke() -> None:
             "messages": [
                 {
                     "role": "user",
-                    "content": "Reply with exactly: TrustRAG regression OK",
+                    "content": "Reply with exactly: CiteNexus regression OK",
                 }
             ],
             "temperature": 0,
@@ -60,8 +60,8 @@ def test_openrouter_chat_completion_smoke() -> None:
         headers={
             "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://github.com/muthuishere/trustrag",
-            "X-Title": "TrustRAG regression",
+            "HTTP-Referer": "https://github.com/muthuishere/citenexus",
+            "X-Title": "CiteNexus regression",
         },
         method="POST",
     )
@@ -70,4 +70,4 @@ def test_openrouter_chat_completion_smoke() -> None:
         payload = json.loads(response.read().decode("utf-8"))
 
     content = payload["choices"][0]["message"]["content"]
-    assert "TrustRAG regression OK" in content
+    assert "CiteNexus regression OK" in content

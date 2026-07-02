@@ -39,7 +39,7 @@ operations idempotent and therefore safe.
 
 ## Impact
 
-- New modules under `src/trustrag/worker/`: `queue.py`, `retry.py`, `executor.py`,
+- New modules under `src/citenexus/worker/`: `queue.py`, `retry.py`, `executor.py`,
   `dlq.py`, `resume.py`, `__init__.py`. New tests under `tests/worker/`.
 - Storage: a local SQLite file (the `processing_manifest`) via stdlib `sqlite3` —
   no new third-party dependency; hermetic in tests (tmp/in-memory only).

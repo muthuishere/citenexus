@@ -46,7 +46,7 @@ where it does not, never blocking extraction.
 
 ## Impact
 
-- New modules under `src/trustrag/extract/`: `txt.py`, `md.py`, `csv.py`,
+- New modules under `src/citenexus/extract/`: `txt.py`, `md.py`, `csv.py`,
   `html.py`, `plain.py`, `docx.py`, `pptx.py`, `pdf.py`, `dispatch.py`. The shared
   types in `extract/types.py` and the package `__init__.py` are unchanged.
 - New tests under `tests/extract/` (incl. a hermetic `fixtures/sample.pdf`).

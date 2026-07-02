@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 
 import pytest
 
-from trustrag.answer.generator import OpenAICompatibleGenerator
+from citenexus.answer.generator import OpenAICompatibleGenerator
 
 
 class RecordingTransport:
@@ -124,9 +124,9 @@ def test_api_key_flows_only_through_authorization_header(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     secret = "sk-not-a-real-key-xyz"
-    monkeypatch.setenv("TRUSTRAG_LLM_API_KEY", secret)
+    monkeypatch.setenv("CITENEXUS_LLM_API_KEY", secret)
     t = RecordingTransport()
-    _generator(t, api_key_env="TRUSTRAG_LLM_API_KEY").answer("q", "passage")
+    _generator(t, api_key_env="CITENEXUS_LLM_API_KEY").answer("q", "passage")
     assert t.last_headers["Authorization"] == f"Bearer {secret}"
     url, body, _ = t.calls[-1]
     assert secret not in url
@@ -154,13 +154,13 @@ def _real_endpoint_reachable(base_url: str) -> bool:
 def test_real_llm_endpoint() -> None:
     import os
 
-    base_url = os.environ.get("TRUSTRAG_LLM_BASE_URL", "http://localhost:11434/v1")
+    base_url = os.environ.get("CITENEXUS_LLM_BASE_URL", "http://localhost:11434/v1")
     if not _real_endpoint_reachable(base_url):
         pytest.skip(f"LLM endpoint unreachable: {base_url}")
     generator = OpenAICompatibleGenerator(
         base_url=base_url,
-        model=os.environ.get("TRUSTRAG_LLM_MODEL", "qwen2.5"),
-        api_key_env="TRUSTRAG_LLM_API_KEY",
+        model=os.environ.get("CITENEXUS_LLM_MODEL", "qwen2.5"),
+        api_key_env="CITENEXUS_LLM_API_KEY",
     )
     passage = "The employee shall not disclose confidential information."
     answer = generator.answer("Can the employee disclose information?", passage)

@@ -1,45 +1,50 @@
-# 0003 — PyPI dist name: `trustrag-ai`
+# 0003 — Product name: `citenexus` (was TrustRAG)
 
-Status: accepted · 2026-07-02
+Status: accepted · 2026-07-02 (supersedes the earlier `trustrag-ai` decision
+made the same day)
 
 ## Context
 
-The natural dist name `trustrag` is already taken on PyPI (ADR-0001 flagged
-this and deferred the resolution to "before the first tag"). We need a publish
-name now that 0.2.0 is release-ready. The **import package stays `trustrag`**
-regardless — hatchling packages `src/trustrag` under whatever dist name we
-choose, and the public API (`from trustrag import TrustRAG`) is unaffected.
+The project was built as **TrustRAG**, but the dist name `trustrag` is taken on
+PyPI by an unrelated, established project — gomate-community/TrustRAG (~1.3k
+GitHub stars, a component-style RAG framework from a Chinese research lab).
+The first resolution was to publish as `trustrag-ai` while keeping import
+`trustrag`. That left two real problems:
 
-Availability was checked against the PyPI simple index on 2026-07-02
-(`https://pypi.org/simple/<name>/` — HTTP 200 = taken, 404 = free):
+1. **Import collision** — their package also ships the `trustrag` module;
+   installing both breaks the environment.
+2. **Brand shadow** — every search for "trustrag" lands on a 1.3k-star project
+   that is not us, forever.
 
-| candidate      | status    |
-|----------------|-----------|
-| `trustrag`     | 200 taken |
-| `trustrag-ai`  | 404 free  |
-| `pytrustrag`   | 404 free  |
-| `trustrag-lib` | 404 free  |
+Pre-first-publish was the last cheap moment to fix the name properly.
 
 ## Decision
 
-Publish as **`trustrag-ai`**.
+Rename the product to **`citenexus`** — dist name, import package
+(`from citenexus import CiteNexus`), Rust crate (`citenexus-core`), C-ABI
+symbol prefix (`citenexus_*`), env-var prefix (`CITENEXUS_*`).
 
-- **Why `trustrag-ai` over `pytrustrag`:** it keeps `trustrag` as the leading
-  token (search, docs, `pip install trustrag-ai` reads naturally) instead of
-  mangling the brand with a `py` prefix — a convention that mostly signals
-  "port of a non-Python thing", which this is not.
-- **Why over `trustrag-lib`:** `-lib` is noise (everything on PyPI is a
-  library); `-ai` at least says what domain the project lives in.
+Why this name:
 
-Wheel/sdist artifacts are `trustrag_ai-<version>*` (PEP 503 normalization);
-the wheel contains the `trustrag/` package. Verified with `uv build`.
+- **It names the differentiator**: the cite-or-abstain gate — citations routed
+  to verbatim evidence are the product.
+- **toolnexus family**: the author's toolnexus established the `*nexus`
+  pattern (a small engine that unifies X); citenexus unifies citations.
+- **Fully virgin** (verified 2026-07-02): PyPI 404, npm 404, crates.io 404,
+  `citenexus.dev` unregistered, no existing project or company by the name —
+  unlike `trustnexus`, whose `.com`/`.ai` are held by an existing entity.
+- **One name on every registry** — the planned Go/TS ports publish under the
+  same brand (`citenexus` on npm, `citenexus-core` on crates.io).
 
 ## Consequences
 
+- `pip install citenexus` / `from citenexus import CiteNexus`.
 - The PyPI **trusted publisher** must be registered under project name
-  `trustrag-ai` (GitHub repo + `release.yml` workflow + environment `pypi`)
+  `citenexus` (GitHub repo + `release.yml` workflow + environment `pypi`)
   before the first `v*` tag is pushed.
-- README/quickstart installs read `pip install trustrag-ai` (or
-  `uv add trustrag-ai`); imports remain `import trustrag`.
-- If `trustrag` ever frees up on PyPI, migrating would be a new decision
-  (dist renames are disruptive; default is to stay on `trustrag-ai`).
+- The GitHub repo should be renamed `muthuishere/citenexus` before launch
+  (GitHub redirects the old URL). The local `.vsync` identity pin keeps
+  `repo=muthuishere_trustrag` until the vault is deliberately migrated.
+- Rejected alternatives: `trustrag-ai` (collision + shadow remained),
+  `trustnexus` (existing entity holds `.com`/`.ai`), `verirag`/`citerag`
+  (suffix-style, weaker than the toolnexus family pattern).

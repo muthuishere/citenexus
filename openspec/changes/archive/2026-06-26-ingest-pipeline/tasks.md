@@ -4,8 +4,8 @@
       EUs with language; unknown→plain; idempotent re-ingest (`unchanged`);
       signal gating (embedding/text upserts; structure persists; slow-path
       enqueues); IngestResult reports eu_ids/n_units.
-- [ ] 1.2 Implement `src/trustrag/ingest/result.py` (`IngestResult`).
-- [ ] 1.3 Implement `src/trustrag/ingest/pipeline.py` (`IngestPipeline`,
+- [ ] 1.2 Implement `src/citenexus/ingest/result.py` (`IngestResult`).
+- [ ] 1.3 Implement `src/citenexus/ingest/pipeline.py` (`IngestPipeline`,
       `Embedder` protocol) wiring dispatch→detect→build→structure→embed→storage,
       signal-gated + idempotent.
 

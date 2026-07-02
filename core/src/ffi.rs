@@ -3,7 +3,7 @@
 //! Contract (SPEC-PORTS-v1 §3.4): JSON in/out, no callbacks. Success returns
 //! the `ExtractedDoc` JSON; failure returns `{"error": "..."}` — the caller
 //! distinguishes by the `error` key. Every returned string MUST be released
-//! with `trustrag_free_string`.
+//! with `citenexus_free_string`.
 
 use std::collections::BTreeMap;
 use std::ffi::{c_char, CStr, CString};
@@ -35,7 +35,7 @@ fn parse_source_type(raw: &str) -> Option<SourceType> {
 /// `bytes` must point to `len` readable bytes; `source_type` and
 /// `document_id` must be valid NUL-terminated UTF-8 C strings.
 #[no_mangle]
-pub unsafe extern "C" fn trustrag_extract(
+pub unsafe extern "C" fn citenexus_extract(
     bytes: *const u8,
     len: usize,
     source_type: *const c_char,
@@ -64,12 +64,12 @@ pub unsafe extern "C" fn trustrag_extract(
     to_c_string(payload)
 }
 
-/// Release a string returned by any `trustrag_*` call.
+/// Release a string returned by any `citenexus_*` call.
 ///
 /// # Safety
 /// `s` must be a pointer previously returned by this library (or null).
 #[no_mangle]
-pub unsafe extern "C" fn trustrag_free_string(s: *mut c_char) {
+pub unsafe extern "C" fn citenexus_free_string(s: *mut c_char) {
     if !s.is_null() {
         drop(CString::from_raw(s));
     }
@@ -77,15 +77,15 @@ pub unsafe extern "C" fn trustrag_free_string(s: *mut c_char) {
 
 /// The core's version, as a static C string (no free needed).
 #[no_mangle]
-pub extern "C" fn trustrag_core_version() -> *const c_char {
+pub extern "C" fn citenexus_core_version() -> *const c_char {
     concat!(env!("CARGO_PKG_VERSION"), "\0").as_ptr() as *const c_char
 }
 
 // ---------------------------------------------------------------------------
-// store — Lance over an opaque handle. Handles come from `trustrag_store_open`
-// (Box::into_raw) and MUST be released with `trustrag_store_close`. Every
+// store — Lance over an opaque handle. Handles come from `citenexus_store_open`
+// (Box::into_raw) and MUST be released with `citenexus_store_close`. Every
 // returned string is JSON (`{"error": ...}` on failure) and MUST be released
-// with `trustrag_free_string`.
+// with `citenexus_free_string`.
 // ---------------------------------------------------------------------------
 
 unsafe fn utf8_arg<'a>(ptr: *const c_char, name: &str) -> Result<&'a str, String> {
@@ -104,9 +104,9 @@ unsafe fn utf8_arg<'a>(ptr: *const c_char, name: &str) -> Result<&'a str, String
 /// # Safety
 /// `uri` must be a valid NUL-terminated UTF-8 C string;
 /// `storage_options_json` must be one too, or null. The returned handle must
-/// be released with `trustrag_store_close` exactly once.
+/// be released with `citenexus_store_close` exactly once.
 #[no_mangle]
-pub unsafe extern "C" fn trustrag_store_open(
+pub unsafe extern "C" fn citenexus_store_open(
     uri: *const c_char,
     storage_options_json: *const c_char,
 ) -> *mut LanceStore {
@@ -134,10 +134,10 @@ pub unsafe extern "C" fn trustrag_store_open(
 /// Returns `{"ok":true}` or `{"error": ...}`.
 ///
 /// # Safety
-/// `handle` must be a live pointer from `trustrag_store_open`; `rows_json`
+/// `handle` must be a live pointer from `citenexus_store_open`; `rows_json`
 /// must be a valid NUL-terminated UTF-8 C string.
 #[no_mangle]
-pub unsafe extern "C" fn trustrag_store_upsert(
+pub unsafe extern "C" fn citenexus_store_upsert(
     handle: *mut LanceStore,
     rows_json: *const c_char,
 ) -> *mut c_char {
@@ -163,10 +163,10 @@ pub unsafe extern "C" fn trustrag_store_upsert(
 /// `{"error": ...}`.
 ///
 /// # Safety
-/// `handle` must be a live pointer from `trustrag_store_open`; `vector_json`
+/// `handle` must be a live pointer from `citenexus_store_open`; `vector_json`
 /// must be a valid NUL-terminated UTF-8 C string.
 #[no_mangle]
-pub unsafe extern "C" fn trustrag_store_search(
+pub unsafe extern "C" fn citenexus_store_search(
     handle: *mut LanceStore,
     vector_json: *const c_char,
     limit: usize,
@@ -192,9 +192,9 @@ pub unsafe extern "C" fn trustrag_store_search(
 /// `{"error": ...}`.
 ///
 /// # Safety
-/// `handle` must be a live pointer from `trustrag_store_open`.
+/// `handle` must be a live pointer from `citenexus_store_open`.
 #[no_mangle]
-pub unsafe extern "C" fn trustrag_store_scan(
+pub unsafe extern "C" fn citenexus_store_scan(
     handle: *mut LanceStore,
     limit: i64,
 ) -> *mut c_char {
@@ -213,9 +213,9 @@ pub unsafe extern "C" fn trustrag_store_scan(
 /// or `{"error": ...}`.
 ///
 /// # Safety
-/// `handle` must be a live pointer from `trustrag_store_open`.
+/// `handle` must be a live pointer from `citenexus_store_open`.
 #[no_mangle]
-pub unsafe extern "C" fn trustrag_store_drop(handle: *mut LanceStore) -> *mut c_char {
+pub unsafe extern "C" fn citenexus_store_drop(handle: *mut LanceStore) -> *mut c_char {
     if handle.is_null() {
         return to_c_string(error_json("null store handle"));
     }
@@ -229,10 +229,10 @@ pub unsafe extern "C" fn trustrag_store_drop(handle: *mut LanceStore) -> *mut c_
 /// Release a store handle. Safe to call with null.
 ///
 /// # Safety
-/// `handle` must be a pointer from `trustrag_store_open` (or null) and must
+/// `handle` must be a pointer from `citenexus_store_open` (or null) and must
 /// not be used after this call.
 #[no_mangle]
-pub unsafe extern "C" fn trustrag_store_close(handle: *mut LanceStore) {
+pub unsafe extern "C" fn citenexus_store_close(handle: *mut LanceStore) {
     if !handle.is_null() {
         drop(Box::from_raw(handle));
     }
@@ -240,7 +240,7 @@ pub unsafe extern "C" fn trustrag_store_close(handle: *mut LanceStore) {
 
 // ---------------------------------------------------------------------------
 // detect — fastText lid.176 over an opaque handle. Handles come from
-// `trustrag_detector_open` and MUST be released with `trustrag_detector_close`.
+// `citenexus_detector_open` and MUST be released with `citenexus_detector_close`.
 // ---------------------------------------------------------------------------
 
 /// Load the lid.176 model at `model_path`. Returns an opaque handle, or null
@@ -249,9 +249,9 @@ pub unsafe extern "C" fn trustrag_store_close(handle: *mut LanceStore) {
 ///
 /// # Safety
 /// `model_path` must be a valid NUL-terminated UTF-8 C string. The returned
-/// handle must be released with `trustrag_detector_close` exactly once.
+/// handle must be released with `citenexus_detector_close` exactly once.
 #[no_mangle]
-pub unsafe extern "C" fn trustrag_detector_open(model_path: *const c_char) -> *mut Detector {
+pub unsafe extern "C" fn citenexus_detector_open(model_path: *const c_char) -> *mut Detector {
     let Ok(path) = utf8_arg(model_path, "model_path") else {
         return std::ptr::null_mut();
     };
@@ -265,10 +265,10 @@ pub unsafe extern "C" fn trustrag_detector_open(model_path: *const c_char) -> *m
 /// `{"language":"fr","confidence":0.98}` or `{"error": ...}`.
 ///
 /// # Safety
-/// `handle` must be a live pointer from `trustrag_detector_open`; `text`
+/// `handle` must be a live pointer from `citenexus_detector_open`; `text`
 /// must be a valid NUL-terminated UTF-8 C string.
 #[no_mangle]
-pub unsafe extern "C" fn trustrag_detect(
+pub unsafe extern "C" fn citenexus_detect(
     handle: *mut Detector,
     text: *const c_char,
 ) -> *mut c_char {
@@ -291,10 +291,10 @@ pub unsafe extern "C" fn trustrag_detect(
 /// Release a detector handle. Safe to call with null.
 ///
 /// # Safety
-/// `handle` must be a pointer from `trustrag_detector_open` (or null) and
+/// `handle` must be a pointer from `citenexus_detector_open` (or null) and
 /// must not be used after this call.
 #[no_mangle]
-pub unsafe extern "C" fn trustrag_detector_close(handle: *mut Detector) {
+pub unsafe extern "C" fn citenexus_detector_close(handle: *mut Detector) {
     if !handle.is_null() {
         drop(Box::from_raw(handle));
     }

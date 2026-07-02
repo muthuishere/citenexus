@@ -3,8 +3,8 @@
 
 use std::io::Write;
 
-use trustrag_core::types::*;
-use trustrag_core::{extract, source_type_for_extension};
+use citenexus_core::types::*;
+use citenexus_core::{extract, source_type_for_extension};
 
 fn run(bytes: &[u8], st: SourceType) -> ExtractedDoc {
     extract(bytes, st, "doc", None).expect("extract failed")

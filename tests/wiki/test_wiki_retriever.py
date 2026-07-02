@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from trustrag.domain.partition import PartitionPath
-from trustrag.retrieve.types import RetrievalSignal
-from trustrag.storage.backend import LocalFsBackend
-from trustrag.storage.lance_store import LanceVectorStore
-from trustrag.testing import FakeEmbedding
-from trustrag.wiki import WikiPage, WikiRetriever, WikiStore
+from citenexus.domain.partition import PartitionPath
+from citenexus.retrieve.types import RetrievalSignal
+from citenexus.storage.backend import LocalFsBackend
+from citenexus.storage.lance_store import LanceVectorStore
+from citenexus.testing import FakeEmbedding
+from citenexus.wiki import WikiPage, WikiRetriever, WikiStore
 
 
 def test_wiki_retriever_returns_underlying_eu(tmp_path: Path) -> None:

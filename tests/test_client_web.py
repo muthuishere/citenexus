@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from trustrag import TrustRAG
-from trustrag.testing import FakeEmbedding, FakeLLM
+from citenexus import CiteNexus
+from citenexus.testing import FakeEmbedding, FakeLLM
 
 _PAGES = {
     "https://kb.test/": (
@@ -24,8 +24,8 @@ def _fetch(url: str) -> tuple[bytes, str]:
     return _PAGES[url].encode("utf-8"), "text/html"
 
 
-def _rag(tmp_path: Path) -> TrustRAG:
-    return TrustRAG(
+def _rag(tmp_path: Path) -> CiteNexus:
+    return CiteNexus(
         tmp_path,
         embedder=FakeEmbedding(),
         generator=FakeLLM(),

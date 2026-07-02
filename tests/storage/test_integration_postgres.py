@@ -13,10 +13,12 @@ import uuid
 
 import pytest
 
-from trustrag.storage.postgres_store import PostgresVectorStore, table_name_for
+from citenexus.storage.postgres_store import PostgresVectorStore, table_name_for
 
-DSN = os.environ.get("TRUSTRAG_PG_DSN", "postgresql://trustrag:trustrag@localhost:15432/trustrag")
-_PORT = int(os.environ.get("TRUSTRAG_PG_PORT", "15432"))
+DSN = os.environ.get(
+    "CITENEXUS_PG_DSN", "postgresql://citenexus:citenexus@localhost:15432/citenexus"
+)
+_PORT = int(os.environ.get("CITENEXUS_PG_PORT", "15432"))
 
 
 def _postgres_up() -> bool:
@@ -33,7 +35,7 @@ def test_postgres_round_trip() -> None:
     if not _postgres_up():
         pytest.skip(f"Postgres not reachable on localhost:{_PORT}")
 
-    table = table_name_for("trustrag_it", f"workspace={uuid.uuid4().hex[:8]}")
+    table = table_name_for("citenexus_it", f"workspace={uuid.uuid4().hex[:8]}")
     store = PostgresVectorStore(dsn=DSN, table=table)
     rows = [
         {

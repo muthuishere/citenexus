@@ -63,7 +63,7 @@ tasks:
       - uv build
 
   core:build:
-    desc: Build the Rust core (trustrag-core cdylib — enables the parity tests)
+    desc: Build the Rust core (citenexus-core cdylib — enables the parity tests)
     dir: core
     cmds:
       - cargo build

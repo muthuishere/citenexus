@@ -9,11 +9,11 @@ page 4, described by a model", not verbatim source text).
 
 from __future__ import annotations
 
-from trustrag.domain.partition import PartitionPath
-from trustrag.evidence.unit import EUType
-from trustrag.extract.types import ImageRef
-from trustrag.vision.describe import VisionRecord
-from trustrag.vision.units import build_vision_units
+from citenexus.domain.partition import PartitionPath
+from citenexus.evidence.unit import EUType
+from citenexus.extract.types import ImageRef
+from citenexus.vision.describe import VisionRecord
+from citenexus.vision.units import build_vision_units
 
 
 def _partition() -> PartitionPath:

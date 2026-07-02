@@ -3,8 +3,8 @@
 import pytest
 from pydantic import ValidationError
 
-from trustrag.domain import PartitionPath
-from trustrag.telemetry import (
+from citenexus.domain import PartitionPath
+from citenexus.telemetry import (
     Cost,
     Outcome,
     PluginRef,

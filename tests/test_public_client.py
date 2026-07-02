@@ -1,13 +1,13 @@
-"""Public TrustRAG client — L5 answer / verify / evaluate."""
+"""Public CiteNexus client — L5 answer / verify / evaluate."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from trustrag import TrustRAG
-from trustrag.answer.flow import Generator
-from trustrag.answer.result import Decision
-from trustrag.testing import FakeEmbedding, FakeLLM
+from citenexus import CiteNexus
+from citenexus.answer.flow import Generator
+from citenexus.answer.result import Decision
+from citenexus.testing import FakeEmbedding, FakeLLM
 
 
 class HallucinatingLLM:
@@ -15,8 +15,8 @@ class HallucinatingLLM:
         return "Paris is the capital of France"
 
 
-def _rag(tmp_path: Path, generator: Generator | None = None) -> TrustRAG:
-    return TrustRAG(
+def _rag(tmp_path: Path, generator: Generator | None = None) -> CiteNexus:
+    return CiteNexus(
         tmp_path,
         embedder=FakeEmbedding(),
         generator=generator or FakeLLM(),

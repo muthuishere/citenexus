@@ -2,7 +2,7 @@
 
 Extraction (§8) produces ordered `ExtractedBlock`s, but retrieval, the graph, and
 every cited answer operate on **Evidence Units** (§7) — the atomic, bbox-cited,
-partition-tagged objects TrustRAG is built on. The library needs the pure,
+partition-tagged objects CiteNexus is built on. The library needs the pure,
 deterministic seam that turns blocks into EUs so ingest can hash, cache, and
 partially rebuild them (§4c) without any model call.
 
@@ -34,9 +34,9 @@ ExtractedBlock/BlockKind (§8) already ship and are reused unchanged. -->
 
 ## Impact
 
-- New module `src/trustrag/evidence/builder.py`, building only on the existing
-  `trustrag.evidence.unit` (§7) and `trustrag.extract.types` (§8) and
-  `trustrag.domain.partition` (§6b). `evidence/__init__.py` is unchanged; the
+- New module `src/citenexus/evidence/builder.py`, building only on the existing
+  `citenexus.evidence.unit` (§7) and `citenexus.extract.types` (§8) and
+  `citenexus.domain.partition` (§6b). `evidence/__init__.py` is unchanged; the
   builder is imported by full path.
 - New tests under `tests/evidence/test_builder.py`. No new dependencies, no
   public-API verb change (this is an internal ingest stage, not a fourth verb).

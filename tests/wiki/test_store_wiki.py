@@ -12,10 +12,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from trustrag.domain.partition import PartitionPath
-from trustrag.storage.backend import LocalFsBackend
-from trustrag.wiki import WikiPage, WikiStore
-from trustrag.wiki.distill import PagesInput
+from citenexus.domain.partition import PartitionPath
+from citenexus.storage.backend import LocalFsBackend
+from citenexus.wiki import WikiPage, WikiStore
+from citenexus.wiki.distill import PagesInput
 
 _PARTITION = PartitionPath.of(("org", "acme"))
 

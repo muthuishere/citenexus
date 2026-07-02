@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from trustrag import TrustRAG
-from trustrag.answer.result import Decision
-from trustrag.config.signals import Signal
-from trustrag.testing import FakeEmbedding, FakeLLM
+from citenexus import CiteNexus
+from citenexus.answer.result import Decision
+from citenexus.config.signals import Signal
+from citenexus.testing import FakeEmbedding, FakeLLM
 
 
-def _rag(tmp_path: Path) -> TrustRAG:
-    return TrustRAG(
+def _rag(tmp_path: Path) -> CiteNexus:
+    return CiteNexus(
         tmp_path,
         signals=[Signal.embedding, Signal.text],
         embedder=FakeEmbedding(),

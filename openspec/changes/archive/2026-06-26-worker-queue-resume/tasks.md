@@ -21,22 +21,22 @@
 
 ## 2. Implement (green)
 
-- [x] 2.1 `src/trustrag/worker/queue.py`: `JobStatus` `StrEnum`; frozen `Job` model;
+- [x] 2.1 `src/citenexus/worker/queue.py`: `JobStatus` `StrEnum`; frozen `Job` model;
       SQLite-backed `DurableQueue` (`processing_manifest`) with idempotent `enqueue`,
       `lease`, `mark_running/done/failed/dead`, `requeue`, `get`, `list_by_status`,
       `close`; default in-memory mode + file path for durability.
-- [x] 2.2 `src/trustrag/worker/retry.py`: frozen `RetryPolicy` with `max_attempts`,
+- [x] 2.2 `src/citenexus/worker/retry.py`: frozen `RetryPolicy` with `max_attempts`,
       pure `backoff_delay(attempt)`, and `should_retry(attempt)`.
-- [x] 2.3 `src/trustrag/worker/executor.py`: `TransientError` (carries stage);
+- [x] 2.3 `src/citenexus/worker/executor.py`: `TransientError` (carries stage);
       `Executor.run` driving success→done / transient→retry / exhaustion-or-permanent
       →dead; idempotent on an already-`done` job; synchronous + deterministic.
-- [x] 2.4 `src/trustrag/worker/dlq.py`: `list_dead`, `redrive`, `redrive_all`.
-- [x] 2.5 `src/trustrag/worker/resume.py`: `resume` re-enqueues every not-`done` job.
-- [x] 2.6 `src/trustrag/worker/__init__.py`: export the public surface.
+- [x] 2.4 `src/citenexus/worker/dlq.py`: `list_dead`, `redrive`, `redrive_all`.
+- [x] 2.5 `src/citenexus/worker/resume.py`: `resume` re-enqueues every not-`done` job.
+- [x] 2.6 `src/citenexus/worker/__init__.py`: export the public surface.
 
 ## 3. Verify
 
 - [x] 3.1 `uv run pytest tests/worker -q` passes.
-- [x] 3.2 `uv run ruff check src/trustrag/worker tests/worker` clean.
-- [x] 3.3 `uv run mypy src/trustrag/worker tests/worker` clean (strict).
+- [x] 3.2 `uv run ruff check src/citenexus/worker tests/worker` clean.
+- [x] 3.3 `uv run mypy src/citenexus/worker tests/worker` clean (strict).
 - [x] 3.4 `npx -y @fission-ai/openspec@latest validate worker-queue-resume` passes.

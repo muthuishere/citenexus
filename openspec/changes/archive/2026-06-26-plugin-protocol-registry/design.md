@@ -1,6 +1,6 @@
 ## Context
 
-TrustRAG is a framework, not a fixed product (v6 §4b): the built-in stages are
+CiteNexus is a framework, not a fixed product (v6 §4b): the built-in stages are
 just defaults, and every stage must be replaceable by a typed plugin so new
 extractors/models/retrievers can be added without changing core, and so §4c can
 stamp each artifact with exactly what produced it. This change lays the protocol

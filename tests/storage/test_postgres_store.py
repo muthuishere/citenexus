@@ -14,8 +14,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from trustrag.storage.postgres_store import PostgresVectorStore
-from trustrag.storage.protocols import TextSearch, VectorStore
+from citenexus.storage.postgres_store import PostgresVectorStore
+from citenexus.storage.protocols import TextSearch, VectorStore
 
 
 class FakeCursor:
@@ -69,7 +69,7 @@ _ROW = {
 
 def _store(conn: FakeConnection) -> PostgresVectorStore:
     return PostgresVectorStore(
-        dsn="postgresql://ignored", table="trustrag_ws_default", connect=lambda: conn
+        dsn="postgresql://ignored", table="citenexus_ws_default", connect=lambda: conn
     )
 
 

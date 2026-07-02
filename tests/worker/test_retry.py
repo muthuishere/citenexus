@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from trustrag.worker import RetryPolicy
+from citenexus.worker import RetryPolicy
 
 
 def test_backoff_delay_grows_exponentially() -> None:

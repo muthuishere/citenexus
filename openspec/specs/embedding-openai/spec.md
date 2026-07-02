@@ -48,7 +48,7 @@ unset), the request SHALL be sent without an `Authorization` header.
 
 #### Scenario: Configured key flows only through the Authorization header
 
-- **WHEN** `api_key_env="TRUSTRAG_EMBED_API_KEY"` is configured, that variable is
+- **WHEN** `api_key_env="CITENEXUS_EMBED_API_KEY"` is configured, that variable is
   set, and `embed(...)` is called
 - **THEN** the headers passed to the transport include
   `Authorization: Bearer <value>` and the key value appears nowhere else

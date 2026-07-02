@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from trustrag.extract.md import MdExtractor
-from trustrag.extract.types import BlockKind, SourceType, StructureType
+from citenexus.extract.md import MdExtractor
+from citenexus.extract.types import BlockKind, SourceType, StructureType
 
 
 def test_headings_and_paragraphs() -> None:

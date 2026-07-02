@@ -1,7 +1,7 @@
-"""``TrustRAG.from_config`` — wire real OpenAI-compatible plugins from config.
+"""``CiteNexus.from_config`` — wire real OpenAI-compatible plugins from config.
 
-The factory is the one place that turns a typed ``TrustRAGConfig`` (endpoints,
-models, temperature, signals) into a ready ``TrustRAG`` client with the real
+The factory is the one place that turns a typed ``CiteNexusConfig`` (endpoints,
+models, temperature, signals) into a ready ``CiteNexus`` client with the real
 embedding / generator / reranker plugins. Transports are injected so this stays
 hermetic: no network, no models.
 """
@@ -11,18 +11,18 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from trustrag.answer.result import Decision
-from trustrag.client import TrustRAG
-from trustrag.config.schema import (
+from citenexus.answer.result import Decision
+from citenexus.client import CiteNexus
+from citenexus.config.schema import (
+    CiteNexusConfig,
     EmbeddingConfig,
     LLMConfig,
     LLMProvider,
     RerankerConfig,
     StorageConfig,
-    TrustRAGConfig,
 )
-from trustrag.config.signals import Signal
-from trustrag.lang.detect import HeuristicDetector
+from citenexus.config.signals import Signal
+from citenexus.lang.detect import HeuristicDetector
 
 
 def _embed_transport(url: str, body: bytes, headers: dict[str, str]) -> bytes:
@@ -47,8 +47,8 @@ def _llm_transport(url: str, body: bytes, headers: dict[str, str]) -> bytes:
     return json.dumps({"choices": [{"message": {"content": passage}}]}).encode("utf-8")
 
 
-def _config(bucket_path: Path) -> TrustRAGConfig:
-    return TrustRAGConfig(
+def _config(bucket_path: Path) -> CiteNexusConfig:
+    return CiteNexusConfig(
         storage=StorageConfig(bucket=str(bucket_path)),
         llm=LLMConfig(endpoint="http://llm.test/v1", model="qwen2.5"),
         embedding=EmbeddingConfig(endpoint="http://embed.test/v1", model="bge-m3"),
@@ -57,8 +57,8 @@ def _config(bucket_path: Path) -> TrustRAGConfig:
     )
 
 
-def _rag(tmp_path: Path) -> TrustRAG:
-    return TrustRAG.from_config(
+def _rag(tmp_path: Path) -> CiteNexus:
+    return CiteNexus.from_config(
         _config(tmp_path),
         detector=HeuristicDetector(),
         embed_transport=_embed_transport,
@@ -95,7 +95,7 @@ def test_from_config_honours_temperature(tmp_path: Path) -> None:
     cfg = _config(tmp_path).model_copy(
         update={"llm": LLMConfig(endpoint="http://llm.test/v1", temperature=0.0)}
     )
-    rag = TrustRAG.from_config(
+    rag = CiteNexus.from_config(
         cfg,
         detector=HeuristicDetector(),
         embed_transport=_embed_transport,
@@ -116,7 +116,7 @@ def _anthropic_transport(url: str, body: bytes, headers: dict[str, str]) -> byte
 
 
 def test_from_config_builds_vision_client_when_enabled(tmp_path: Path) -> None:
-    from trustrag.config.schema import VisionConfig
+    from citenexus.config.schema import VisionConfig
 
     cfg = _config(tmp_path).model_copy(
         update={
@@ -125,7 +125,7 @@ def test_from_config_builds_vision_client_when_enabled(tmp_path: Path) -> None:
             )
         }
     )
-    rag = TrustRAG.from_config(
+    rag = CiteNexus.from_config(
         cfg,
         detector=HeuristicDetector(),
         embed_transport=_embed_transport,
@@ -136,7 +136,7 @@ def test_from_config_builds_vision_client_when_enabled(tmp_path: Path) -> None:
 
 
 def test_from_config_no_vision_when_disabled(tmp_path: Path) -> None:
-    rag = TrustRAG.from_config(
+    rag = CiteNexus.from_config(
         _config(tmp_path),
         detector=HeuristicDetector(),
         embed_transport=_embed_transport,
@@ -146,12 +146,12 @@ def test_from_config_no_vision_when_disabled(tmp_path: Path) -> None:
 
 
 def test_from_config_builds_reformulator_when_enabled(tmp_path: Path) -> None:
-    from trustrag.config.schema import ReformulationConfig
+    from citenexus.config.schema import ReformulationConfig
 
     cfg = _config(tmp_path).model_copy(
         update={"reformulation": ReformulationConfig(enabled=True, endpoint="http://small.test/v1")}
     )
-    rag = TrustRAG.from_config(
+    rag = CiteNexus.from_config(
         cfg,
         detector=HeuristicDetector(),
         embed_transport=_embed_transport,
@@ -166,13 +166,13 @@ def test_from_config_no_reformulator_by_default(tmp_path: Path) -> None:
 
 
 def test_from_config_builds_wiki_distiller_when_enabled(tmp_path: Path) -> None:
-    from trustrag.config.schema import WikiDistillConfig
-    from trustrag.wiki import LLMWikiDistiller
+    from citenexus.config.schema import WikiDistillConfig
+    from citenexus.wiki import LLMWikiDistiller
 
     cfg = _config(tmp_path).model_copy(
         update={"wiki_distill": WikiDistillConfig(enabled=True, endpoint="http://small.test/v1")}
     )
-    rag = TrustRAG.from_config(
+    rag = CiteNexus.from_config(
         cfg,
         detector=HeuristicDetector(),
         embed_transport=_embed_transport,
@@ -189,7 +189,7 @@ def test_from_config_no_wiki_distiller_by_default(tmp_path: Path) -> None:
 def test_wiki_pipeline_survives_dead_distill_endpoint(tmp_path: Path) -> None:
     """Distillation is enhancement-only: a dead endpoint degrades to the
     deterministic wiki and ingest/ask keep working (refresh_slow_path intact)."""
-    from trustrag.config.schema import WikiDistillConfig
+    from citenexus.config.schema import WikiDistillConfig
 
     def dead(url: str, body: bytes, headers: dict[str, str]) -> bytes:
         raise RuntimeError("endpoint down")
@@ -200,7 +200,7 @@ def test_wiki_pipeline_survives_dead_distill_endpoint(tmp_path: Path) -> None:
             "signals": (Signal.embedding, Signal.text, Signal.wiki),
         }
     )
-    rag = TrustRAG.from_config(
+    rag = CiteNexus.from_config(
         cfg,
         detector=HeuristicDetector(),
         embed_transport=_embed_transport,
@@ -218,18 +218,18 @@ def test_wiki_pipeline_survives_dead_distill_endpoint(tmp_path: Path) -> None:
 
 
 def test_from_config_postgres_backend(tmp_path: Path) -> None:
-    from trustrag.config.schema import VectorStoreConfig
-    from trustrag.storage.postgres_store import PostgresVectorStore
+    from citenexus.config.schema import VectorStoreConfig
+    from citenexus.storage.postgres_store import PostgresVectorStore
 
     cfg = _config(tmp_path).model_copy(
         update={
             "vector_store": VectorStoreConfig(
-                backend="postgres", uri="postgresql://localhost:15432/trustrag"
+                backend="postgres", uri="postgresql://localhost:15432/citenexus"
             )
         }
     )
     # Construction is lazy — no connection is opened here, so this stays hermetic.
-    rag = TrustRAG.from_config(
+    rag = CiteNexus.from_config(
         cfg,
         detector=HeuristicDetector(),
         embed_transport=_embed_transport,
@@ -242,13 +242,13 @@ def test_from_config_postgres_backend(tmp_path: Path) -> None:
 def test_from_config_postgres_requires_uri(tmp_path: Path) -> None:
     import pytest
 
-    from trustrag.config.schema import VectorStoreConfig
+    from citenexus.config.schema import VectorStoreConfig
 
     cfg = _config(tmp_path).model_copy(
         update={"vector_store": VectorStoreConfig(backend="postgres")}
     )
     with pytest.raises(ValueError, match=r"vector_store\.uri"):
-        TrustRAG.from_config(
+        CiteNexus.from_config(
             cfg,
             detector=HeuristicDetector(),
             embed_transport=_embed_transport,
@@ -257,7 +257,7 @@ def test_from_config_postgres_requires_uri(tmp_path: Path) -> None:
 
 
 def test_from_config_builds_contextualizer_when_enabled(tmp_path: Path) -> None:
-    from trustrag.config.schema import ContextModelConfig
+    from citenexus.config.schema import ContextModelConfig
 
     cfg = _config(tmp_path).model_copy(
         update={
@@ -266,7 +266,7 @@ def test_from_config_builds_contextualizer_when_enabled(tmp_path: Path) -> None:
             )
         }
     )
-    rag = TrustRAG.from_config(
+    rag = CiteNexus.from_config(
         cfg,
         detector=HeuristicDetector(),
         embed_transport=_embed_transport,
@@ -281,10 +281,10 @@ def test_from_config_no_contextualizer_by_default(tmp_path: Path) -> None:
 
 
 def test_from_config_chunking_disabled_restores_legacy_ids(tmp_path: Path) -> None:
-    from trustrag.config.schema import ChunkingConfig
+    from citenexus.config.schema import ChunkingConfig
 
     cfg = _config(tmp_path).model_copy(update={"chunking": ChunkingConfig(enabled=False)})
-    rag = TrustRAG.from_config(
+    rag = CiteNexus.from_config(
         cfg,
         detector=HeuristicDetector(),
         embed_transport=_embed_transport,
@@ -310,7 +310,7 @@ def test_from_config_anthropic_provider(tmp_path: Path) -> None:
             )
         }
     )
-    rag = TrustRAG.from_config(
+    rag = CiteNexus.from_config(
         cfg,
         detector=HeuristicDetector(),
         embed_transport=_embed_transport,

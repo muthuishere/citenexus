@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from trustrag import TrustRAG
-from trustrag.testing import FakeEmbedding, FakeLLM
+from citenexus import CiteNexus
+from citenexus.testing import FakeEmbedding, FakeLLM
 
 
 class CustomTextSearch:
@@ -33,7 +33,7 @@ class CustomTextSearch:
 
 def test_injected_text_search_serves_the_lexical_signal(tmp_path: Path) -> None:
     custom = CustomTextSearch()
-    rag = TrustRAG(
+    rag = CiteNexus(
         tmp_path,
         embedder=FakeEmbedding(),
         generator=FakeLLM(),

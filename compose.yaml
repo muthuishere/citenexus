@@ -1,4 +1,4 @@
-name: trustrag-local
+name: citenexus-local
 
 # Local S3 (MinIO) so the S3-native storage layer (L2+), the runnable example,
 # and the opt-in integration tests have a real backend to talk to.
@@ -35,14 +35,14 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
-      TRUSTRAG_BUCKET: ${TRUSTRAG_BUCKET:-trustrag-local}
+      CITENEXUS_BUCKET: ${CITENEXUS_BUCKET:-citenexus-local}
     entrypoint: >
       /bin/sh -c "
       until mc alias set local http://minio:9000 \"$$MINIO_ROOT_USER\" \"$$MINIO_ROOT_PASSWORD\"; do
         echo 'waiting for minio...'; sleep 1;
       done;
-      mc mb --ignore-existing \"local/$$TRUSTRAG_BUCKET\";
-      echo \"bucket $$TRUSTRAG_BUCKET ready\";
+      mc mb --ignore-existing \"local/$$CITENEXUS_BUCKET\";
+      echo \"bucket $$CITENEXUS_BUCKET ready\";
       "
 
   # Postgres + pgvector — the second VectorStore backend (opt-in profile).
@@ -51,11 +51,11 @@ services:
     profiles: ["postgres"]
     image: pgvector/pgvector@sha256:dd467f03ca5c5581222490e5217e48a262864ccb659be559f8491bbafdc97da0
     environment:
-      POSTGRES_USER: ${TRUSTRAG_PG_USER:-trustrag}
-      POSTGRES_PASSWORD: ${TRUSTRAG_PG_PASSWORD:-trustrag}
-      POSTGRES_DB: ${TRUSTRAG_PG_DB:-trustrag}
+      POSTGRES_USER: ${CITENEXUS_PG_USER:-citenexus}
+      POSTGRES_PASSWORD: ${CITENEXUS_PG_PASSWORD:-citenexus}
+      POSTGRES_DB: ${CITENEXUS_PG_DB:-citenexus}
     ports:
-      - "${TRUSTRAG_PG_PORT:-15432}:5432"
+      - "${CITENEXUS_PG_PORT:-15432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     restart: unless-stopped

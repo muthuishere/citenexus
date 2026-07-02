@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from trustrag.retrieve.structure import StructureRetriever
-from trustrag.retrieve.types import RetrievalSignal
-from trustrag.storage.backend import LocalFsBackend
-from trustrag.storage.lance_store import LanceVectorStore
+from citenexus.retrieve.structure import StructureRetriever
+from citenexus.retrieve.types import RetrievalSignal
+from citenexus.storage.backend import LocalFsBackend
+from citenexus.storage.lance_store import LanceVectorStore
 
 from .conftest import PARTITION
 
@@ -32,7 +32,7 @@ def test_block_ref_resolves_down_to_chunked_children(
     """A structure node's eu_ref ({doc}::{order}) resolves to the block's
     chunked child EUs ({doc}::{order}::{i}) when only children are stored —
     the default now that ingest chunks blocks."""
-    from trustrag.testing.fakes import FakeEmbedding
+    from citenexus.testing.fakes import FakeEmbedding
 
     embedder = FakeEmbedding()
     store = LanceVectorStore(str(tmp_path / "leaf-chunked"))

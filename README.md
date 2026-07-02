@@ -1,35 +1,35 @@
-# TrustRAG
+# CiteNexus
 
 > Multilingual RAG that answers only when the evidence is strong.
 
 Evidence-first, multilingual, S3-native RAG for domains where a wrong answer is
 worse than no answer (legal, medical, finance/compliance, enterprise search).
-TrustRAG answers **only** from retrieved evidence — every claim is grounded in a
+CiteNexus answers **only** from retrieved evidence — every claim is grounded in a
 bbox-cited source passage, and it refuses or states uncertainty when evidence is
 weak, missing, or conflicting. The guarantee is **"no ungrounded claim,"** not
 "zero hallucination."
 
 The library bundles **no models** — embedding, LLM, reranker, and vision are
-injected endpoints. TrustRAG owns orchestration, storage, retrieval, fusion,
+injected endpoints. CiteNexus owns orchestration, storage, retrieval, fusion,
 grounding, and evaluation.
 
-**TrustRAG supports pluggable vector databases.** Storage is two protocols —
+**CiteNexus supports pluggable vector databases.** Storage is two protocols —
 `VectorStore` (dense) and `TextSearch` (lexical) — and each backend is a named
 (vector, text) pair:
 
 | Backend | Vector | Text | When |
 |---|---|---|---|
 | **Lance** (recommended) | `LanceVectorStore` | `LanceTextSearch` (BM25-lite) | Zero infra, S3-native: point at a bucket and go |
-| **Postgres** | `PostgresVectorStore` (pgvector) | `PostgresTextSearch` (native `tsvector`) | You already run Postgres — `pip install 'trustrag-ai[postgres]'`, set `vector_store.backend: "postgres"` |
+| **Postgres** | `PostgresVectorStore` (pgvector) | `PostgresTextSearch` (native `tsvector`) | You already run Postgres — `pip install 'citenexus[postgres]'`, set `vector_store.backend: "postgres"` |
 | **Yours** | implement `VectorStore` | implement `TextSearch` | Qdrant, Weaviate, Elasticsearch, Tantivy, … |
 
 The seams are independent: mix LanceDB vectors with an Elasticsearch
 `text_search=`, or let one Postgres serve both.
 
 ```python
-from trustrag import TrustRAG
+from citenexus import CiteNexus
 
-rag = TrustRAG(
+rag = CiteNexus(
     "s3://my-bucket",
     embedder=my_embedding_endpoint,
     generator=my_llm_endpoint,
@@ -42,11 +42,11 @@ print(answer)                                    # grounded answer; .sources are
 **The client scales down to what you give it** — every model is optional:
 
 ```python
-rag = TrustRAG("./data")                  # ZERO models: ingest + BM25 text search
+rag = CiteNexus("./data")                  # ZERO models: ingest + BM25 text search
 rag.ingest("handbook.pdf"); rag.retrieve("termination notice")
 
-rag = TrustRAG("./data", embedder=e)      # + vector search (hybrid RRF)
-rag = TrustRAG("./data", embedder=e, generator=g)   # + ask()/stream()/evaluate()
+rag = CiteNexus("./data", embedder=e)      # + vector search (hybrid RRF)
+rag = CiteNexus("./data", embedder=e, generator=g)   # + ask()/stream()/evaluate()
 ```
 
 `ask()` without a generator raises a clear error pointing at `retrieve()` —
@@ -56,17 +56,17 @@ Or wire real OpenAI-compatible endpoints from typed config — one call builds t
 embedding / answering-LLM / reranker plugins (answers stay temperature-0):
 
 ```python
-from trustrag import TrustRAG
-from trustrag.config.schema import EmbeddingConfig, LLMConfig, StorageConfig, TrustRAGConfig
+from citenexus import CiteNexus
+from citenexus.config.schema import EmbeddingConfig, LLMConfig, StorageConfig, CiteNexusConfig
 
-config = TrustRAGConfig(
+config = CiteNexusConfig(
     storage=StorageConfig(bucket="./data"),                       # or "s3://bucket"
     embedding=EmbeddingConfig(endpoint="https://api.jina.ai/v1", model="jina-embeddings-v3",
-                              api_key_env="TRUSTRAG_EMBED_API_KEY"),
+                              api_key_env="CITENEXUS_EMBED_API_KEY"),
     llm=LLMConfig(endpoint="https://generativelanguage.googleapis.com/v1beta/openai",
-                  model="gemini-2.5-flash", api_key_env="TRUSTRAG_LLM_API_KEY"),
+                  model="gemini-2.5-flash", api_key_env="CITENEXUS_LLM_API_KEY"),
 )
-rag = TrustRAG.from_config(config)                                # keys read from env, by name
+rag = CiteNexus.from_config(config)                                # keys read from env, by name
 ```
 
 ## Status
@@ -96,7 +96,7 @@ Unit tests are hermetic (fakes only) and need nothing running.
 `task local:example` runs ingest → ask → evaluate over a tiny multilingual
 corpus using a **cheap, hosted, no-infra** stack:
 
-- **Storage** — LocalFs (a folder). Point `TRUSTRAG_S3_ENDPOINT_URL` at MinIO
+- **Storage** — LocalFs (a folder). Point `CITENEXUS_S3_ENDPOINT_URL` at MinIO
   or Cloudflare R2 to exercise the real S3 path.
 - **Embedding + reranker** — [Jina](https://jina.ai) (`/v1/embeddings` + `/rerank`, one key).
 - **Answering LLM** — Gemini's OpenAI-compatible endpoint (temperature 0).

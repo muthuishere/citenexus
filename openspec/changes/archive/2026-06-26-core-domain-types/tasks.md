@@ -5,8 +5,8 @@
       `is_prefix_of` true/false cases, JSON round-trip.
 - [ ] 1.2 Write failing tests `tests/domain/test_trust.py` asserting TrustMode has
       exactly strict/normal/exploratory.
-- [ ] 1.3 Implement `src/trustrag/domain/partition.py` (PartitionLevel, PartitionPath
-      with `depth`, `is_prefix_of`, serialization) and `src/trustrag/domain/trust.py`
+- [ ] 1.3 Implement `src/citenexus/domain/partition.py` (PartitionLevel, PartitionPath
+      with `depth`, `is_prefix_of`, serialization) and `src/citenexus/domain/trust.py`
       (TrustMode) until 1.1–1.2 pass.
 
 ## 2. Evidence Unit (test-first)
@@ -15,7 +15,7 @@
       missing required field rejected; closed `type` enum (accept community_summary,
       reject footnote); Citation bbox length-4 valid / length-3 rejected; `acl`
       stored verbatim + defaults None + survives JSON round-trip; EU JSON round-trip.
-- [ ] 2.2 Implement `src/trustrag/evidence/unit.py` (EUType, Citation, EvidenceUnit)
+- [ ] 2.2 Implement `src/citenexus/evidence/unit.py` (EUType, Citation, EvidenceUnit)
       until 2.1 passes.
 
 ## 3. Result + signals (test-first)
@@ -26,7 +26,7 @@
       `translation` (untranslated → None; fr passage + en translation both present);
       Result exposes `answer_language` independent of `languages_in_evidence`;
       provenance entry forms a full chain; Result JSON round-trip.
-- [ ] 3.2 Implement `src/trustrag/answer/result.py` (Decision, EvidenceSignals,
+- [ ] 3.2 Implement `src/citenexus/answer/result.py` (Decision, EvidenceSignals,
       SourceRef, Claim, ProvenanceEntry, Result) until 3.1 passes.
 
 ## 4. Gate

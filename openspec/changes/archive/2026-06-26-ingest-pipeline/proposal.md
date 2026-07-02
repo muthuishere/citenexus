@@ -27,7 +27,7 @@ embed → upsert, all idempotent and gated by the client's declared signals (§8
 
 ## Impact
 
-- New `src/trustrag/ingest/`. Reuses storage (L2), extractors/lang/evidence/
+- New `src/citenexus/ingest/`. Reuses storage (L2), extractors/lang/evidence/
   structure (L3), worker (L2), and the `Embedder` seam (real BGE-M3 lands at L4).
   Hermetic tests use LocalFs + local LanceDB + FakeEmbedding; a MinIO variant is
   opt-in.

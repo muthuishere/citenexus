@@ -2,7 +2,7 @@
 //! SPEC-PORTS-v1 §3.4 item 1).
 //!
 //! One Lance database per leaf partition, one table (`evidence_units`), rows
-//! keyed by `eu_id`. Semantics match `src/trustrag/storage/lance_store.py`
+//! keyed by `eu_id`. Semantics match `src/citenexus/storage/lance_store.py`
 //! exactly:
 //!
 //! - `upsert` — merge-insert on `eu_id` (idempotent); the table is created on

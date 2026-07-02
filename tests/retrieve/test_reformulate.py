@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import json
 
-from trustrag.retrieve.reformulate import QueryReformulator
+from citenexus.retrieve.reformulate import QueryReformulator
 
 
 class RecordingTransport:

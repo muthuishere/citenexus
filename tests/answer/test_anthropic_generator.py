@@ -4,7 +4,7 @@ Anthropic is not OpenAI-shaped: POST /v1/messages, `x-api-key` (not Bearer),
 an `anthropic-version` header, `system` as a top-level field, a REQUIRED
 `max_tokens`, and a `content[0].text` response. This client implements the same
 `Generator` protocol as OpenAICompatibleGenerator, so it drops into AnswerFlow /
-TrustRAG unchanged — and still sends temperature (default 0.0) + exposes tokens.
+CiteNexus unchanged — and still sends temperature (default 0.0) + exposes tokens.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ import json
 
 import pytest
 
-from trustrag.answer.anthropic import AnthropicGenerator
+from citenexus.answer.anthropic import AnthropicGenerator
 
 
 class RecordingTransport:
@@ -97,9 +97,9 @@ def test_api_key_flows_only_through_x_api_key_header(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     secret = "sk-ant-not-a-real-key"
-    monkeypatch.setenv("TRUSTRAG_ANTHROPIC_KEY", secret)
+    monkeypatch.setenv("CITENEXUS_ANTHROPIC_KEY", secret)
     t = RecordingTransport()
-    _gen(t, api_key_env="TRUSTRAG_ANTHROPIC_KEY").answer("q", "passage")
+    _gen(t, api_key_env="CITENEXUS_ANTHROPIC_KEY").answer("q", "passage")
     headers = t.last_headers
     assert headers["x-api-key"] == secret
     assert headers["anthropic-version"]

@@ -1,7 +1,7 @@
 """Partition → prefix resolution (spec §6b)."""
 
-from trustrag.domain.partition import PartitionPath
-from trustrag.storage.paths import Layer, layer_prefix, leaf_vector_uri, partition_segment
+from citenexus.domain.partition import PartitionPath
+from citenexus.storage.paths import Layer, layer_prefix, leaf_vector_uri, partition_segment
 
 
 def test_three_level_segment() -> None:

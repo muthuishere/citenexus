@@ -1,6 +1,6 @@
 ## Why
 
-Nothing in the TrustRAG pipeline may be hardwired (v6 §4b): every stage —
+Nothing in the CiteNexus pipeline may be hardwired (v6 §4b): every stage —
 extraction, chunking, embedding, vision, graph extraction, retrieval, reranking,
 judging, evaluation, language detection, memory — must be a swappable, typed
 extension point so the framework can evolve (new models, new extractors, custom
@@ -41,7 +41,7 @@ that seam before any concrete stage is built.
 
 ## Impact
 
-- New module `src/trustrag/plugins/` (`base.py`, `registry.py`).
+- New module `src/citenexus/plugins/` (`base.py`, `registry.py`).
 - Downstream contract: `provenance-and-rebuild` consumes each plugin's
   `plugin_version` for the `produced_by` stamp (§4c); every later stage change
   (ingest, embedding, retrieval, …) implements one of these protocols rather than

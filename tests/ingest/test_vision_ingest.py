@@ -12,14 +12,14 @@ from pathlib import Path
 
 import pytest
 
-import trustrag.ingest.pipeline as pipeline_mod
-from trustrag.domain.partition import PartitionPath
-from trustrag.extract.types import ExtractedBlock, ExtractedDoc, ImageRef, SourceType
-from trustrag.ingest import IngestPipeline
-from trustrag.storage.backend import LocalFsBackend
-from trustrag.storage.paths import Layer, layer_prefix
-from trustrag.testing import FakeEmbedding
-from trustrag.vision import FakeVision
+import citenexus.ingest.pipeline as pipeline_mod
+from citenexus.domain.partition import PartitionPath
+from citenexus.extract.types import ExtractedBlock, ExtractedDoc, ImageRef, SourceType
+from citenexus.ingest import IngestPipeline
+from citenexus.storage.backend import LocalFsBackend
+from citenexus.storage.paths import Layer, layer_prefix
+from citenexus.testing import FakeEmbedding
+from citenexus.vision import FakeVision
 
 PART = PartitionPath.of(("workspace", "w1"))
 

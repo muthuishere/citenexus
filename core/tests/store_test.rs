@@ -1,9 +1,9 @@
 //! LanceStore semantics — must mirror Python's `LanceVectorStore`
-//! (`src/trustrag/storage/lance_store.py`): empty store returns `[]`, upsert
+//! (`src/citenexus/storage/lance_store.py`): empty store returns `[]`, upsert
 //! is idempotent by `eu_id`, search carries `_distance`, drop empties.
 
 use serde_json::{json, Value};
-use trustrag_core::LanceStore;
+use citenexus_core::LanceStore;
 
 fn rows() -> Value {
     json!([

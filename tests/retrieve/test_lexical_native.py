@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from trustrag.retrieve.lexical import LexicalRetriever
-from trustrag.retrieve.types import RetrievalSignal
+from citenexus.retrieve.lexical import LexicalRetriever
+from citenexus.retrieve.types import RetrievalSignal
 
 
 class NativeTextStore:

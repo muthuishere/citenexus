@@ -1,18 +1,18 @@
 //! Detector behavior. Unit tests never download the model — the real-model
 //! test runs ONLY when the dense lid.176.bin is already on disk
-//! (`TRUSTRAG_LID176_PATH` or the repo's `assets/models/lid.176.bin`), and
+//! (`CITENEXUS_LID176_PATH` or the repo's `assets/models/lid.176.bin`), and
 //! silently skips otherwise. Quantized `.ftz` is refused (see detect.rs docs).
 
 use std::path::PathBuf;
 
-use trustrag_core::Detector;
+use citenexus_core::Detector;
 
 fn assets() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../assets/models")
 }
 
 fn model_path() -> Option<PathBuf> {
-    if let Ok(path) = std::env::var("TRUSTRAG_LID176_PATH") {
+    if let Ok(path) = std::env::var("CITENEXUS_LID176_PATH") {
         let path = PathBuf::from(path);
         return path.is_file().then_some(path);
     }
@@ -47,7 +47,7 @@ fn quantized_model_is_refused_not_misdetected() {
 #[test]
 fn real_model_detects_languages() {
     let Some(path) = model_path() else {
-        eprintln!("skipped: lid.176.bin not on disk (set TRUSTRAG_LID176_PATH)");
+        eprintln!("skipped: lid.176.bin not on disk (set CITENEXUS_LID176_PATH)");
         return;
     };
     let detector = Detector::open(path.to_str().unwrap()).expect("load lid.176");

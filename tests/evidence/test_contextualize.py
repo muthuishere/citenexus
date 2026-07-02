@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 
-from trustrag.evidence.contextualize import Contextualizer
+from citenexus.evidence.contextualize import Contextualizer
 
 
 class RecordingTransport:

@@ -2,8 +2,8 @@
 
 import io
 
-from trustrag.domain import PartitionPath
-from trustrag.telemetry import (
+from citenexus.domain import PartitionPath
+from citenexus.telemetry import (
     InMemorySink,
     Stage,
     StageEvent,

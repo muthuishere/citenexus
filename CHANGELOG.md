@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-Dist name on PyPI is **`trustrag-ai`** (the import package is `trustrag`; see
+Dist name on PyPI is **`citenexus`** (the import package is `citenexus`; see
 `docs/adr/0003-pypi-dist-name.md`).
 
 ## [Unreleased]
@@ -18,7 +18,7 @@ missing, or conflicting.
 
 ### Added
 
-- **Public client, three verbs** — `TrustRAG("s3://bucket", signals=[...])` with
+- **Public client, three verbs** — `CiteNexus("s3://bucket", signals=[...])` with
   `ingest()` / `ingest_async()`, `ask()` (strict cite-or-abstain default),
   `retrieve()` (documents-only engine under `ask`), `stream()` (sentence-gated in
   strict mode), memory `recall()`, and `evaluate(csv)` with deterministic
@@ -44,12 +44,12 @@ missing, or conflicting.
   down to evidence units before answering).
 - **Storage seams** — `VectorStore` / `TextSearch` protocols with backend-paired
   implementations: **LanceDB + BM25** (zero-infra default) and
-  **Postgres/pgvector + full-text** (`pip install "trustrag-ai[postgres]"`).
+  **Postgres/pgvector + full-text** (`pip install "citenexus[postgres]"`).
   S3-native layout with manifests, partition resolution, artifact provenance
   stamps, and a partial-rebuild planner.
 - **Trust & access** — variable-depth partitions, scope → `allowed_partitions`
   hard pre-filter (`acl` carried, not enforced), trust modes, warn-only config
-  validation (`trustrag.validate.yaml`).
+  validation (`citenexus.validate.yaml`).
 - **Graph, wiki, memory, streaming** — deterministic rebuildable graph/wiki
   artifacts with retrievers; partition-scoped conversation memory (context, not
   citation evidence); token/sentence streaming from verified results.
@@ -58,7 +58,7 @@ missing, or conflicting.
   views, LLM token-usage surfacing, fused-retrieval events.
 - **Multilingual** — fastText lid.176 language detection (fetched on first use,
   not a pip dep), detection threshold + answer-language fallback chain.
-- **`trustrag-core` (Rust) scaffold** — native extraction engine with
+- **`citenexus-core` (Rust) scaffold** — native extraction engine with
   parity-proven output against the Python reference extractors, groundwork for
   the Go/TypeScript ports (`docs/SPEC-PORTS-v1.md`); optional, Python remains
   the reference implementation.
@@ -67,5 +67,5 @@ missing, or conflicting.
   a tag-triggered release workflow publishing to PyPI via OIDC trusted
   publishing. Runnable multilingual example against local MinIO + Ollama.
 
-[Unreleased]: https://github.com/muthuishere/trustrag/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/muthuishere/trustrag/releases/tag/v0.2.0
+[Unreleased]: https://github.com/muthuishere/citenexus/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/muthuishere/citenexus/releases/tag/v0.2.0

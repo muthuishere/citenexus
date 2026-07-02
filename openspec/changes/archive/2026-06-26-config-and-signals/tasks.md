@@ -9,7 +9,7 @@
 - [x] 2.1 Write failing tests for §17 defaults (strict mode; rrf_k=60; top_k=11; lexical_signal=bge_m3_sparse; detect_confidence_threshold=0.50; answer_in_query_language=true)
 - [x] 2.2 Write failing test: a representative §17 YAML loads into a fully typed config
 - [x] 2.3 Write failing tests: `partition_hierarchy` accepts depth 1, 3, and 4 with arbitrary names
-- [x] 2.4 Implement `config/schema.py` (pydantic v2 sub-models per §17 section + `TrustRAGConfig`) → green
+- [x] 2.4 Implement `config/schema.py` (pydantic v2 sub-models per §17 section + `CiteNexusConfig`) → green
 
 ## 3. Loader + precedence (test-first)
 
@@ -18,7 +18,7 @@
 
 ## 4. Warn-only validation (test-first)
 
-- [x] 4.1 Write failing tests: divergence from `trustrag.validate.yaml` emits a warning and does NOT raise; missing file ⇒ no warning
+- [x] 4.1 Write failing tests: divergence from `citenexus.validate.yaml` emits a warning and does NOT raise; missing file ⇒ no warning
 - [x] 4.2 Implement `config/validate.py` (`validate_client`, `warnings.warn`) → green
 
 ## 5. Gate

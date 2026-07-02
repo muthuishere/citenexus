@@ -5,13 +5,13 @@ from __future__ import annotations
 from collections.abc import Iterable
 from pathlib import Path
 
-from trustrag.domain.partition import PartitionPath
-from trustrag.ingest import IngestPipeline
-from trustrag.storage.backend import LocalFsBackend
-from trustrag.storage.lance_store import LanceVectorStore
-from trustrag.storage.paths import Layer, layer_prefix, leaf_vector_uri
-from trustrag.testing import FakeEmbedding
-from trustrag.worker.queue import DurableQueue
+from citenexus.domain.partition import PartitionPath
+from citenexus.ingest import IngestPipeline
+from citenexus.storage.backend import LocalFsBackend
+from citenexus.storage.lance_store import LanceVectorStore
+from citenexus.storage.paths import Layer, layer_prefix, leaf_vector_uri
+from citenexus.testing import FakeEmbedding
+from citenexus.worker.queue import DurableQueue
 
 PART = PartitionPath.of(("workspace", "w1"))
 

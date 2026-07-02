@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from trustrag.storage.bm25 import Bm25TextSearch
-from trustrag.storage.protocols import TextSearch
+from citenexus.storage.bm25 import Bm25TextSearch
+from citenexus.storage.protocols import TextSearch
 
 
 class ScanStore:

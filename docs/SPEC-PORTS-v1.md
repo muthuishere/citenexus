@@ -1,4 +1,4 @@
-# TrustRAG Language-Port Specification v1 — Go & TypeScript
+# CiteNexus Language-Port Specification v1 — Go & TypeScript
 
 > One contract, three languages. Python is the **reference implementation**;
 > ports conform to this contract, not to Python's source. Discipline borrowed
@@ -38,8 +38,8 @@ Method names follow each language's idiom; **semantics and defaults are fixed**.
 
 | Concept | Python (reference) | Go | TypeScript |
 |---|---|---|---|
-| Construct | `TrustRAG(base_uri, embedder=…, generator=…)` | `trustrag.New(baseURI, trustrag.WithEmbedder(…), …)` | `new TrustRAG(baseUri, { embedder, generator })` |
-| From config | `TrustRAG.from_config(cfg)` | `trustrag.FromConfig(cfg)` | `TrustRAG.fromConfig(cfg)` |
+| Construct | `CiteNexus(base_uri, embedder=…, generator=…)` | `citenexus.New(baseURI, citenexus.WithEmbedder(…), …)` | `new CiteNexus(baseUri, { embedder, generator })` |
+| From config | `CiteNexus.from_config(cfg)` | `citenexus.FromConfig(cfg)` | `CiteNexus.fromConfig(cfg)` |
 | Ingest | `ingest(source, text=, document_id=, acl=)` | `Ingest(ctx, src, …opts)` | `await ingest(source, opts)` |
 | Retrieve | `retrieve(q, k=, conversation_id=)` | `Retrieve(ctx, q, …)` | `await retrieve(q, opts)` |
 | Ask | `ask(q, mode=, answer_language=, conversation_id=)` | `Ask(ctx, q, …)` | `await ask(q, opts)` |
@@ -101,7 +101,7 @@ Postgres semantics: one table per leaf, name = `{prefix}_{sanitized(P)}`
 returns `[]` (parity with an empty Lance leaf); upsert = `INSERT … ON CONFLICT
 (eu_id) DO UPDATE`.
 
-### 3.4 The Rust core (`trustrag-core`) — Go's engine room
+### 3.4 The Rust core (`citenexus-core`) — Go's engine room
 
 Since Go must link Rust for Lance anyway, the bridge is a single Rust crate
 carrying everything Rust does better than the Go ecosystem, over one C ABI
@@ -156,7 +156,7 @@ All model IO is injected endpoints; nothing bundled.
 - API keys: referenced by **environment-variable name** in config
   (`api_key_env`); the value is read at call time and travels only in the auth
   header. Never logged, never stored on the client object.
-- Every default HTTP transport sends `User-Agent: trustrag` (Cloudflare-fronted
+- Every default HTTP transport sends `User-Agent: citenexus` (Cloudflare-fronted
   APIs 403 default library agents).
 - Transports are injectable — unit tests are hermetic in all languages.
 - The four prompts (grounded-answer system prompt with the verbatim-quote rule,
@@ -205,11 +205,11 @@ Citations are **verbatim source text** — never model output, never translated.
 
 ### The shared Rust core — target architecture (DECIDED)
 
-**One Rust library, FFI for all.** `trustrag-core` is the single engine for
+**One Rust library, FFI for all.** `citenexus-core` is the single engine for
 every language — the pydantic-v2 / tokenizers / lancedb playbook:
 
 ```
-                     trustrag-core (Rust)
+                     citenexus-core (Rust)
    v1: store (lance) · extract (pdf/docx/pptx/html/md) · detect (lid.176)
    v2: + the pinned deterministic algorithms (§4): chunker · BM25 · RRF ·
         token gates — they are frozen contracts, so one implementation
@@ -234,19 +234,19 @@ Wherever the core has a capability, a binding uses it; native libraries
 remain only where the core lacks coverage or a platform cannot link it.
 
 ### Go
-- Module `github.com/muthuishere/trustrag-go`. Layout mirrors capability
+- Module `github.com/muthuishere/citenexus-go`. Layout mirrors capability
   packages (`storage`, `retrieve`, `answer`, `ingest`, …).
-- Lance + extraction + detection via `trustrag-core` (cgo); prebuilt static
+- Lance + extraction + detection via `citenexus-core` (cgo); prebuilt static
   libs per platform in releases. Everything else pure Go (pgx, net/http).
 - Concurrency: `context.Context` on every IO call; per-retriever fan-out with
   an errgroup is allowed — ORDER of fused output must stay deterministic.
 - No reflection-based config: decode into typed structs, reject unknown keys.
 
 ### TypeScript
-- Package `trustrag` (npm) or `@trustrag/core`. ESM, Node ≥ 20; types shipped.
+- Package `citenexus` (npm) or `@citenexus/core`. ESM, Node ≥ 20; types shipped.
 - `@lancedb/lancedb` for the Lance pair; `pg` for Postgres; `fetch` transport.
 - Extraction: native libs allowed in ports-v1 (pdfjs-dist, OOXML-direct); the
-  napi binding of `trustrag-core` is the parity path and SHOULD replace them
+  napi binding of `citenexus-core` is the parity path and SHOULD replace them
   once published.
 - All model/transport seams are injectable functions — same hermetic-test rule.
 - The whole public surface is `async`; `stream()` returns an async iterable.

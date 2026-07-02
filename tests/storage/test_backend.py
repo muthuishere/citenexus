@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from trustrag.storage.backend import LocalFsBackend
+from citenexus.storage.backend import LocalFsBackend
 
 
 def test_bytes_round_trip(tmp_path: Path) -> None:

@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from trustrag.plugins.base import RetrieverPlugin
-from trustrag.retrieve.engine import RetrievalEngine
-from trustrag.retrieve.types import Candidate, RetrievalSignal
+from citenexus.plugins.base import RetrieverPlugin
+from citenexus.retrieve.engine import RetrievalEngine
+from citenexus.retrieve.types import Candidate, RetrievalSignal
 
 
 def _candidate(eu_id: str, score: float, text: str = "") -> Candidate:

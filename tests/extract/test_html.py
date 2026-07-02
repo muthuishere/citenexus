@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from trustrag.extract.html import HtmlExtractor
-from trustrag.extract.types import BlockKind, SourceType, StructureType
+from citenexus.extract.html import HtmlExtractor
+from citenexus.extract.types import BlockKind, SourceType, StructureType
 
 HTML = (
     "<html><head><style>p{color:red}</style></head><body>"

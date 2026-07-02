@@ -1,6 +1,6 @@
 """PartitionPath — variable-depth hierarchy with prefix addressing (spec §6b)."""
 
-from trustrag.domain.partition import PartitionPath
+from citenexus.domain.partition import PartitionPath
 
 
 def test_variable_depth_paths() -> None:

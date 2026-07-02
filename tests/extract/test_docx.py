@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import io
 
-from trustrag.extract.docx import DocxExtractor
-from trustrag.extract.types import BlockKind, SourceType, StructureType
+from citenexus.extract.docx import DocxExtractor
+from citenexus.extract.types import BlockKind, SourceType, StructureType
 
 
 def test_headings_paragraphs_and_image(docx_bytes: bytes) -> None:

@@ -1,6 +1,6 @@
 ## Why
 
-TrustRAG's tenancy model is physical and hierarchical (§6b): every Evidence Unit
+CiteNexus's tenancy model is physical and hierarchical (§6b): every Evidence Unit
 lives in a variable-depth partition (org → product line → product) and carries an
 opaque `acl`. Final RBAC enforcement is delegated to an external operator-managed
 store (Postgres or other), keeping the library S3-pure. The library still needs a
@@ -35,7 +35,7 @@ hard pre-filter that shrinks the search space before retrieval (§7c).
 
 ## Impact
 
-- New module `src/trustrag/access/` (`scope.py`, `prefilter.py`, `__init__.py`),
-  building only on the existing `trustrag.domain.partition.PartitionPath`.
+- New module `src/citenexus/access/` (`scope.py`, `prefilter.py`, `__init__.py`),
+  building only on the existing `citenexus.domain.partition.PartitionPath`.
 - New tests under `tests/access/`. No new dependencies; no public-API verb change
   (this is a seam consumed by L3+ retrieval, not a fourth verb).

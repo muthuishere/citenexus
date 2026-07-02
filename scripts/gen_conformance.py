@@ -15,22 +15,22 @@ import json
 from pathlib import Path
 from typing import Any
 
-from trustrag.answer.generator import _SYSTEM_PROMPT
-from trustrag.answer.verify import _STOPWORDS, has_relevance_overlap, is_supported
-from trustrag.domain.partition import PartitionPath
-from trustrag.evidence.builder import build_evidence_units
-from trustrag.evidence.chunked_builder import build_chunked_units
-from trustrag.evidence.chunker import chunk_text
-from trustrag.evidence.contextualize import _PROMPT as _CONTEXTUALIZE_PROMPT
-from trustrag.extract.types import BlockKind, ExtractedBlock, ExtractedDoc, SourceType
-from trustrag.lang.detect import LanguageResult
-from trustrag.lang.fallback import resolve_answer_language
-from trustrag.retrieve.fusion import rrf_fuse
-from trustrag.retrieve.reformulate import _PROMPT as _REFORMULATE_PROMPT
-from trustrag.retrieve.types import Candidate, RetrievalSignal
-from trustrag.storage.bm25 import Bm25TextSearch
-from trustrag.testing.fakes import tokenize
-from trustrag.vision.client import _VISION_PROMPT
+from citenexus.answer.generator import _SYSTEM_PROMPT
+from citenexus.answer.verify import _STOPWORDS, has_relevance_overlap, is_supported
+from citenexus.domain.partition import PartitionPath
+from citenexus.evidence.builder import build_evidence_units
+from citenexus.evidence.chunked_builder import build_chunked_units
+from citenexus.evidence.chunker import chunk_text
+from citenexus.evidence.contextualize import _PROMPT as _CONTEXTUALIZE_PROMPT
+from citenexus.extract.types import BlockKind, ExtractedBlock, ExtractedDoc, SourceType
+from citenexus.lang.detect import LanguageResult
+from citenexus.lang.fallback import resolve_answer_language
+from citenexus.retrieve.fusion import rrf_fuse
+from citenexus.retrieve.reformulate import _PROMPT as _REFORMULATE_PROMPT
+from citenexus.retrieve.types import Candidate, RetrievalSignal
+from citenexus.storage.bm25 import Bm25TextSearch
+from citenexus.testing.fakes import tokenize
+from citenexus.vision.client import _VISION_PROMPT
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _PARTITION = PartitionPath.of(("workspace", "default"))
@@ -177,9 +177,7 @@ def _rrf_cases() -> list[dict[str, Any]]:
     for lists in _RRF_CASES:
         candidate_lists = [
             [
-                Candidate(
-                    eu_id=eu_id, score=1.0 / (rank + 1), signal=RetrievalSignal.vector
-                )
+                Candidate(eu_id=eu_id, score=1.0 / (rank + 1), signal=RetrievalSignal.vector)
                 for rank, eu_id in enumerate(one_list)
             ]
             for one_list in lists
@@ -340,9 +338,7 @@ _LANGUAGE_INPUTS: list[dict[str, Any]] = [
 def _language_cases() -> list[dict[str, Any]]:
     cases = []
     for case in _LANGUAGE_INPUTS:
-        detection = (
-            LanguageResult(**case["detection"]) if case["detection"] is not None else None
-        )
+        detection = LanguageResult(**case["detection"]) if case["detection"] is not None else None
         expected = resolve_answer_language(
             detection=detection,
             answer_language=case["answer_language"],
@@ -421,7 +417,7 @@ def _eu_id_cases() -> dict[str, Any]:
                 "chunked_builder_eu_ids": [u.eu_id for u in chunked_units],
             }
         )
-    raw = "hello trustrag\n"
+    raw = "hello citenexus\n"
     return {
         "cases": cases,
         "checksum_example": {

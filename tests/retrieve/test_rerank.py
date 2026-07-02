@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 
-from trustrag.retrieve.rerank import OpenAICompatibleReranker
-from trustrag.retrieve.types import Candidate, RetrievalSignal
+from citenexus.retrieve.rerank import OpenAICompatibleReranker
+from citenexus.retrieve.types import Candidate, RetrievalSignal
 
 
 def _c(eu_id: str) -> Candidate:

@@ -1,23 +1,23 @@
-"""Warn-only validation against trustrag.validate.yaml (spec §15)."""
+"""Warn-only validation against citenexus.validate.yaml (spec §15)."""
 
 import warnings
 from pathlib import Path
 
 import pytest
 
-from trustrag.config.schema import TrustRAGConfig
-from trustrag.config.validate import validate_client
+from citenexus.config.schema import CiteNexusConfig
+from citenexus.config.validate import validate_client
 
 
-def _config(signals: list[str], doc_types: list[str] | None = None) -> TrustRAGConfig:
+def _config(signals: list[str], doc_types: list[str] | None = None) -> CiteNexusConfig:
     payload: dict[str, object] = {"storage": {"bucket": "s3://b"}, "signals": signals}
     if doc_types is not None:
         payload["doc_types"] = doc_types
-    return TrustRAGConfig.model_validate(payload)
+    return CiteNexusConfig.model_validate(payload)
 
 
 def test_disallowed_signal_warns_but_proceeds(tmp_path: Path) -> None:
-    validate_path = tmp_path / "trustrag.validate.yaml"
+    validate_path = tmp_path / "citenexus.validate.yaml"
     validate_path.write_text("allowed_signals: [embedding, text]\n", encoding="utf-8")
     config = _config(["embedding", "text", "graph"])
     with pytest.warns(UserWarning, match="graph"):
@@ -28,7 +28,7 @@ def test_disallowed_signal_warns_but_proceeds(tmp_path: Path) -> None:
 
 
 def test_disallowed_doc_type_warns(tmp_path: Path) -> None:
-    validate_path = tmp_path / "trustrag.validate.yaml"
+    validate_path = tmp_path / "citenexus.validate.yaml"
     validate_path.write_text("allowed_doc_types: [pdf, txt]\n", encoding="utf-8")
     config = _config(["embedding"], doc_types=["pdf", "docx"])
     with pytest.warns(UserWarning, match="docx"):
@@ -36,7 +36,7 @@ def test_disallowed_doc_type_warns(tmp_path: Path) -> None:
 
 
 def test_within_allowlist_emits_no_warning(tmp_path: Path) -> None:
-    validate_path = tmp_path / "trustrag.validate.yaml"
+    validate_path = tmp_path / "citenexus.validate.yaml"
     validate_path.write_text("allowed_signals: [embedding, text]\n", encoding="utf-8")
     config = _config(["embedding", "text"])
     with warnings.catch_warnings():

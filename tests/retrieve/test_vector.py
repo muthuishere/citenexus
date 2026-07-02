@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from trustrag.retrieve.types import RetrievalSignal
-from trustrag.retrieve.vector import VectorRetriever
-from trustrag.storage.lance_store import LanceVectorStore
-from trustrag.testing.fakes import FakeEmbedding
+from citenexus.retrieve.types import RetrievalSignal
+from citenexus.retrieve.vector import VectorRetriever
+from citenexus.storage.lance_store import LanceVectorStore
+from citenexus.testing.fakes import FakeEmbedding
 
 
 def test_hits_are_vector_signal_ranked_by_similarity(

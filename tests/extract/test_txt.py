@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from trustrag.extract.txt import TxtExtractor
-from trustrag.extract.types import BlockKind, SourceType, StructureType
+from citenexus.extract.txt import TxtExtractor
+from citenexus.extract.types import BlockKind, SourceType, StructureType
 
 
 def test_paragraphs_split_on_blank_lines() -> None:

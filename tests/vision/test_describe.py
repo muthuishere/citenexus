@@ -4,9 +4,9 @@ Hermetic: `FakeVision` is a deterministic in-process plugin (no network). Real
 VL inference needs an injected endpoint; this layer only shapes the output.
 """
 
-from trustrag.extract.types import ImageRef
-from trustrag.plugins.base import VisionPlugin
-from trustrag.vision import FakeVision, VisionRecord, describe_image
+from citenexus.extract.types import ImageRef
+from citenexus.plugins.base import VisionPlugin
+from citenexus.vision import FakeVision, VisionRecord, describe_image
 
 
 def test_fake_vision_is_a_vision_plugin() -> None:

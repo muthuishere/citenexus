@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from trustrag.storage.lance_store import LanceVectorStore
+from citenexus.storage.lance_store import LanceVectorStore
 
 
 def _rows() -> list[dict[str, object]]:

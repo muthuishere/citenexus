@@ -11,13 +11,13 @@ from pathlib import Path
 
 import pytest
 
-from trustrag.domain.partition import PartitionPath
-from trustrag.evidence.structure import StructureIndex, StructureNode
-from trustrag.extract.types import StructureType
-from trustrag.storage.backend import LocalFsBackend
-from trustrag.storage.lance_store import LanceVectorStore
-from trustrag.storage.paths import Layer, layer_prefix
-from trustrag.testing.fakes import FakeEmbedding
+from citenexus.domain.partition import PartitionPath
+from citenexus.evidence.structure import StructureIndex, StructureNode
+from citenexus.extract.types import StructureType
+from citenexus.storage.backend import LocalFsBackend
+from citenexus.storage.lance_store import LanceVectorStore
+from citenexus.storage.paths import Layer, layer_prefix
+from citenexus.testing.fakes import FakeEmbedding
 
 PARTITION = PartitionPath.of(("org", "acme"))
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from trustrag.worker import DurableQueue, JobStatus, list_dead, redrive, redrive_all
+from citenexus.worker import DurableQueue, JobStatus, list_dead, redrive, redrive_all
 
 
 def _queue(tmp_path: Path) -> DurableQueue:

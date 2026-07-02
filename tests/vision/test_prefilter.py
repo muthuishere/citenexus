@@ -5,8 +5,8 @@ OCR-dense, it routes to one of `text` / `ocr` / `vision` / `skip` (§9). Each
 test below is one row of that table.
 """
 
-from trustrag.extract.types import ImageRef
-from trustrag.vision import VisionDecision, VisionPrefilterConfig, decide
+from citenexus.extract.types import ImageRef
+from citenexus.vision import VisionDecision, VisionPrefilterConfig, decide
 
 
 def _image(image_id: str, *, width: int | None, height: int | None) -> ImageRef:

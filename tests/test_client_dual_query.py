@@ -12,9 +12,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from trustrag import TrustRAG
-from trustrag.answer.result import Decision
-from trustrag.testing import FakeEmbedding, FakeLLM
+from citenexus import CiteNexus
+from citenexus.answer.result import Decision
+from citenexus.testing import FakeEmbedding, FakeLLM
 
 _EN_DOC = "Customers can request a full refund within fourteen days of purchase."
 
@@ -35,8 +35,8 @@ class FakeReformulator:
         return self._table.get(query)
 
 
-def _rag(tmp_path: Path, reformulator: FakeReformulator | None) -> TrustRAG:
-    return TrustRAG(
+def _rag(tmp_path: Path, reformulator: FakeReformulator | None) -> CiteNexus:
+    return CiteNexus(
         tmp_path,
         embedder=FakeEmbedding(),
         generator=FakeLLM(),

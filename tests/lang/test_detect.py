@@ -7,8 +7,8 @@ import socket
 import pytest
 from pydantic import ValidationError
 
-from trustrag.lang import FastTextDetector, HeuristicDetector, LanguageResult
-from trustrag.plugins import LanguageDetectorPlugin
+from citenexus.lang import FastTextDetector, HeuristicDetector, LanguageResult
+from citenexus.plugins import LanguageDetectorPlugin
 
 
 def test_language_result_is_frozen_and_typed() -> None:

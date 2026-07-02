@@ -1,6 +1,6 @@
 //! Language detection — fastText lid.176 (SPEC-PORTS-v1 §3.4 item 3).
 //!
-//! The Rust twin of `src/trustrag/lang/detect.py::FastTextDetector`: load the
+//! The Rust twin of `src/citenexus/lang/detect.py::FastTextDetector`: load the
 //! published `lid.176` model (`.ftz` or `.bin`) from a caller-supplied path,
 //! predict the top label, strip the `__label__` prefix, and return
 //! `{language, confidence}`. Same model file, same algorithm — detection is

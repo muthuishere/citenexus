@@ -8,9 +8,9 @@ passage stays verbatim*. Small blocks pass through as a single EU (parent).
 
 from __future__ import annotations
 
-from trustrag.domain.partition import PartitionPath
-from trustrag.evidence.chunked_builder import build_chunked_units
-from trustrag.extract.types import BlockKind, ExtractedBlock, ExtractedDoc, SourceType
+from citenexus.domain.partition import PartitionPath
+from citenexus.evidence.chunked_builder import build_chunked_units
+from citenexus.extract.types import BlockKind, ExtractedBlock, ExtractedDoc, SourceType
 
 
 def _doc(text: str, *, page: int = 1) -> ExtractedDoc:

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from trustrag.retrieve.lexical import LexicalRetriever
-from trustrag.retrieve.types import RetrievalSignal
-from trustrag.storage.lance_store import LanceVectorStore
+from citenexus.retrieve.lexical import LexicalRetriever
+from citenexus.retrieve.types import RetrievalSignal
+from citenexus.storage.lance_store import LanceVectorStore
 
 
 def test_term_matching_document_ranks_first(seeded_store: LanceVectorStore) -> None:

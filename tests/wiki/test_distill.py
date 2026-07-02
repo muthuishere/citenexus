@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 
-from trustrag.wiki.distill import LLMWikiDistiller
+from citenexus.wiki.distill import LLMWikiDistiller
 
 _CORPUS = {
     "nda": (("nda::0", "The employee shall not disclose confidential information."),),

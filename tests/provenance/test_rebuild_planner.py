@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from trustrag.provenance import (
+from citenexus.provenance import (
     Layer,
     ModelManifest,
     ProducedBy,

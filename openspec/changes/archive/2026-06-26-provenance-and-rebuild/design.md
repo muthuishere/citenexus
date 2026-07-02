@@ -5,7 +5,7 @@ the minimum. This change adds the per-artifact provenance stamp and a pure plann
 that computes the stale set. No I/O, no actual rebuilding — the worker and ingest
 layers consume the planner later.
 
-## Stamp model (`src/trustrag/provenance/stamp.py`)
+## Stamp model (`src/citenexus/provenance/stamp.py`)
 
 - `StageStamp` — `{plugin: str, plugin_version: str, endpoint_model: str | None,
   dim: int | None}`. `endpoint_model`/`dim` are populated for vision/embedding.
@@ -17,7 +17,7 @@ layers consume the planner later.
   Persisted per partition as `model_manifest.json` (file I/O is out of scope here;
   this is the value type).
 
-## Rebuild planner (`src/trustrag/provenance/rebuild_planner.py`)
+## Rebuild planner (`src/citenexus/provenance/rebuild_planner.py`)
 
 - **Layers** (the rebuildable artifacts): `extract, ocr, vision, eu, embedding,
   structure, graph, community` (a `Layer` enum).

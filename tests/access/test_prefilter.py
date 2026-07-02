@@ -1,7 +1,7 @@
 """Allowed-partitions hard pre-filter + optional opaque-acl predicate (spec §7c)."""
 
-from trustrag.access import allowed_partition, apply_acl_predicate, filter_partitions
-from trustrag.domain.partition import PartitionPath
+from citenexus.access import allowed_partition, apply_acl_predicate, filter_partitions
+from citenexus.domain.partition import PartitionPath
 
 ACME_CONTRACTS = PartitionPath.of(("org", "acme"), ("product_line", "contracts"))
 ACME_CONTRACTS_NDA = PartitionPath.of(

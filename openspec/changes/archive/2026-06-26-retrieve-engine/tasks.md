@@ -33,6 +33,6 @@
 ## 4. Verify
 
 - [ ] 4.1 `uv run pytest tests/retrieve -m "not integration" -q` green.
-- [ ] 4.2 `uv run ruff check src/trustrag/retrieve tests/retrieve` clean.
-- [ ] 4.3 `uv run mypy src/trustrag/retrieve tests/retrieve` clean.
+- [ ] 4.2 `uv run ruff check src/citenexus/retrieve tests/retrieve` clean.
+- [ ] 4.3 `uv run mypy src/citenexus/retrieve tests/retrieve` clean.
 - [ ] 4.4 `openspec validate retrieve-engine --strict` passes.

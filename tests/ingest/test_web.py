@@ -8,7 +8,7 @@ dependency (stdlib fetch + the bs4 already used by the extractor).
 
 from __future__ import annotations
 
-from trustrag.ingest.web import CrawlResult, FetchTransport, crawl, fetch_url, is_url
+from citenexus.ingest.web import CrawlResult, FetchTransport, crawl, fetch_url, is_url
 
 
 def test_is_url_detects_http_and_https() -> None:

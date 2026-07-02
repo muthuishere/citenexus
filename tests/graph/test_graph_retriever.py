@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from trustrag.domain.partition import PartitionPath
-from trustrag.graph import GraphRetriever, GraphStore
-from trustrag.retrieve.types import RetrievalSignal
-from trustrag.storage.backend import LocalFsBackend
-from trustrag.storage.lance_store import LanceVectorStore
-from trustrag.testing import FakeEmbedding
+from citenexus.domain.partition import PartitionPath
+from citenexus.graph import GraphRetriever, GraphStore
+from citenexus.retrieve.types import RetrievalSignal
+from citenexus.storage.backend import LocalFsBackend
+from citenexus.storage.lance_store import LanceVectorStore
+from citenexus.testing import FakeEmbedding
 
 
 def test_graph_build_and_retrieve_resolves_to_eu(tmp_path: Path) -> None:

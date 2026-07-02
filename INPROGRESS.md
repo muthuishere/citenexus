@@ -24,8 +24,8 @@ _Last updated: 2026-07-02 · branch `main`._
 
 ## Next steps (in order)
 
-1. **Release** — choose the PyPI dist-name (`trustrag` is taken; import remains
-   `trustrag`), build, and publish with trusted publishing. Current local version
+1. **Release** — choose the PyPI dist-name (`citenexus` is taken; import remains
+   `citenexus`), build, and publish with trusted publishing. Current local version
    is `0.2.0` because graph/wiki/streaming/memory are included.
 2. **L6b** — MCP server · external-store auth enforcement · richer graph entity
    extraction/community clustering · richer wiki distillation/lint.
@@ -39,13 +39,13 @@ provably work end-to-end over cheap hosted endpoints:
   behind `ask()`. Always sends `temperature` (default 0.0) → "temp-0 grounded"
   is now enforced, not just a config default. Mirrors the embed/rerank seam
   (injected `transport`, stdlib urllib default, key only via `api_key_env`).
-- **`TrustRAG.from_config(...)`** (`client.py`) — one call builds embedding +
-  generator + reranker plugins from a typed `TrustRAGConfig`; transports are
+- **`CiteNexus.from_config(...)`** (`client.py`) — one call builds embedding +
+  generator + reranker plugins from a typed `CiteNexusConfig`; transports are
   injectable so it's unit-tested hermetically.
 - **Config**: added `api_key_env` to `EmbeddingConfig` + `RerankerConfig` (keyed
   hosted embed/rerank endpoints like Jina need it).
 - **User-Agent fix**: all three default urllib transports now send
-  `User-Agent: trustrag` — Jina (behind Cloudflare) 403s the default urllib UA.
+  `User-Agent: citenexus` — Jina (behind Cloudflare) 403s the default urllib UA.
 - **`example/`** — multilingual corpus (en/de/fr) + `golden.csv` + `run.py`.
   `task local:example` runs ingest → ask → evaluate. Verified live: German Q
   answered in German, groundedness + citation 100%, correct abstention on the
@@ -65,7 +65,7 @@ endpoints/example, then telemetry). Not pushed. `git add .vsync` done.
 ### Telemetry / observability (committed)
 - `OpenAICompatibleGenerator.last_usage` — parses the OpenAI `usage` block into
   `TokenUsage` (input/output tokens) after each call.
-- `TrustRAG(sink=...)` / `from_config(sink=...)` — `ask()` emits a `generate`
+- `CiteNexus(sink=...)` / `from_config(sink=...)` — `ask()` emits a `generate`
   `StageEvent` with real token usage + answer/refuse `Outcome`, partition-attributed.
   No sink = silent no-op. The cost view + quality counters already read this stream.
 
@@ -78,7 +78,7 @@ endpoints/example, then telemetry). Not pushed. `git add .vsync` done.
 - **Vision-into-evidence**: `build_vision_units` + `IngestPipeline(vision=...)`.
   Doc images (any type) → prefilter → describe → figure EU (text=description,
   cite=image page/bbox, eu_id `{doc}::img::{id}`). GUARDED: no client / no bytes /
-  per-image error → text-level only, never fails. `TrustRAG(vision=...)` +
+  per-image error → text-level only, never fails. `CiteNexus(vision=...)` +
   `from_config(vision_transport=...)`.
 - ⚠️ **ONE STEP LEFT for real PDFs**: the built-in extractors don't PERSIST image
   bytes yet (`ImageRef.blob_key` is None). So real PDFs feed no bytes to the VL
@@ -127,9 +127,9 @@ contextualizer is built from config.
 - `storage/postgres_store.py`: **PostgresVectorStore** implements both — pgvector
   cosine + native tsvector ('simple' config, no stemming). One table per leaf;
   empty leaf == [] (42P01 parity); lazy connect; optional extra
-  `trustrag[postgres]` (psycopg).
+  `citenexus[postgres]` (psycopg).
 - `LexicalRetriever` delegates to native TextSearch when available, else BM25-lite.
-- `TrustRAG(vector_store=…)`; `from_config` resolves `vector_store.backend`
+- `CiteNexus(vector_store=…)`; `from_config` resolves `vector_store.backend`
   ("lancedb" | "postgres", uri = DSN). Client + ingest share ONE store instance.
 - compose `postgres` profile (pgvector, :15432) + `task local:postgres:{up,down}`.
 - Verified live on a real pgvector container: store round-trip AND full client
@@ -138,7 +138,7 @@ contextualizer is built from config.
   pair — `LanceVectorStore`+`LanceTextSearch` (BM25-lite over scan) and
   `PostgresVectorStore`+`PostgresTextSearch` (native tsvector). Generic
   `Bm25TextSearch` works over any scannable store; `LeafVectorStore` kept as
-  alias. `TrustRAG(text_search=…)` injects the text seam independently.
+  alias. `CiteNexus(text_search=…)` injects the text seam independently.
 
 ### AGENT-TEAM SESSION (2026-07-02) — ALL OPEN THREADS CLOSED, RELEASE-READY
 Four parallel agents (worktree-isolated), all merged, gate green (455 py + 22 rust):
@@ -153,13 +153,13 @@ Four parallel agents (worktree-isolated), all merged, gate green (455 py + 22 ru
   `{doc}::{order}::{i}`; ChunkingConfig(enabled=True,450,60) + ContextModelConfig;
   chunking.enabled=False restores legacy ids; structure retriever resolves
   block refs down to children; ingest emits extract+embedding telemetry.
-- **Release-ready**: dist name **trustrag-ai** (pypi verified; ADR-0003),
+- **Release-ready**: dist name **citenexus** (pypi verified; ADR-0003),
   CHANGELOG 0.2.0, release.yml verified (SHA-pinned, uv OIDC publish), broken
   console-script removed, conformance/ fixtures (9 files, 52 cases) + drift-
   guard test in the gate.
 - Live example re-verified post-merge: 4/5 answered, 100% grounded+cited.
 
-**TO SHIP (human actions)**: register PyPI trusted publisher for `trustrag-ai`
+**TO SHIP (human actions)**: register PyPI trusted publisher for `citenexus`
 (repo, release.yml, environment pypi) → push branch → tag v0.2.0.
 
 ### Open threads (asked for by user, NOT yet built — sequence for next session)
@@ -188,12 +188,12 @@ the library API itself** (no CLI/MCP — users import, give URLs, call ingest/as
 everything config-driven + plugin-swappable, toolnexus "right-sized" style).
 
 ### What L5 gives the next session
-- `trustrag.retrieve.RetrievalEngine` — run retrievers → RRF (k=60) → rerank top-N.
+- `citenexus.retrieve.RetrievalEngine` — run retrievers → RRF (k=60) → rerank top-N.
 - `VectorRetriever` (dense, over `LeafVectorStore`), `LexicalRetriever` (BM25-lite
   over `scan()`), `StructureRetriever` (structure-index walk). `rrf_fuse`.
 - `OpenAICompatibleEmbedding` (dense, `/v1/embeddings`) + `OpenAICompatibleReranker`
   — injected transport; real endpoints are integration-only.
-- `TrustRAG` public client now exposes `ingest()`, `retrieve()`, `ask()`, and
+- `CiteNexus` public client now exposes `ingest()`, `retrieve()`, `ask()`, and
   `stream()`, memory `recall()`, and `evaluate(csv)`.
 - `AnswerFlow` verifies cite-or-abstain with a conservative token faithfulness gate.
 - `EvaluationReport` gives deterministic aggregate metrics from golden CSVs.
@@ -214,11 +214,11 @@ uv run pytest -m integration -q  # MinIO + fastText integration suite
 ```
 
 - **Tests (last full run):** 311 unit green; 5 integration deselected.
-- **MinIO**: `compose.yaml`, S3 `:19000` / console `:19001` (`minioadmin`), bucket `trustrag-local`.
+- **MinIO**: `compose.yaml`, S3 `:19000` / console `:19001` (`minioadmin`), bucket `citenexus-local`.
 - **Ollama**: currently **down** — real embedding/LLM/rerank integration tests skip until it's up (`task local:ollama:up`). All unit tests use deterministic fakes.
 - **fastText `lid.176`** caches under `assets/models/` (gitignored), downloaded on first real detect.
 
 ## Open decisions
 
-- **PyPI dist-name** — `trustrag` is taken; pick a suffix before the first publish (import stays `trustrag`).
+- **PyPI dist-name** — `citenexus` is taken; pick a suffix before the first publish (import stays `citenexus`).
 - **BGE-M3 sparse** — dense embedding works over Ollama; true BGE-M3 sparse needs a sparse-capable endpoint (FlagEmbedding/infinity). Lexical signal currently uses BM25-lite over stored text.

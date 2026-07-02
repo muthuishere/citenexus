@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from trustrag.extract.plain import PlainExtractor
-from trustrag.extract.types import BlockKind, SourceType, StructureType
+from citenexus.extract.plain import PlainExtractor
+from citenexus.extract.types import BlockKind, SourceType, StructureType
 
 
 def test_raw_string_becomes_one_paragraph() -> None:

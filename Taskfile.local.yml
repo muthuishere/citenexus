@@ -28,7 +28,7 @@ tasks:
       - docker compose up -d
       - 'echo "MinIO S3 API : http://localhost:${MINIO_API_PORT:-19000}"'
       - 'echo "MinIO console: http://localhost:${MINIO_CONSOLE_PORT:-19001}  (minioadmin / minioadmin)"'
-      - 'echo "Bucket       : ${TRUSTRAG_BUCKET:-trustrag-local}"'
+      - 'echo "Bucket       : ${CITENEXUS_BUCKET:-citenexus-local}"'
 
   minio:down:
     desc: Stop local MinIO (keeps the data volume)
@@ -50,7 +50,7 @@ tasks:
     desc: Start Postgres+pgvector (the alternative VectorStore backend)
     cmds:
       - docker compose --profile postgres up -d postgres
-      - 'echo "Postgres DSN : postgresql://trustrag:trustrag@localhost:${TRUSTRAG_PG_PORT:-15432}/trustrag"'
+      - 'echo "Postgres DSN : postgresql://citenexus:citenexus@localhost:${CITENEXUS_PG_PORT:-15432}/citenexus"'
 
   postgres:down:
     desc: Stop Postgres (keeps the data volume)

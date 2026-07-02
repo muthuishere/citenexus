@@ -12,15 +12,15 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from trustrag import TrustRAG
-from trustrag.hooks import Hooks
-from trustrag.testing import FakeEmbedding, FakeLLM
+from citenexus import CiteNexus
+from citenexus.hooks import Hooks
+from citenexus.testing import FakeEmbedding, FakeLLM
 
 _NDA = "The employee shall not disclose confidential information."
 
 
-def _rag(tmp_path: Path, hooks: Hooks) -> TrustRAG:
-    return TrustRAG(tmp_path, embedder=FakeEmbedding(), generator=FakeLLM(), hooks=hooks)
+def _rag(tmp_path: Path, hooks: Hooks) -> CiteNexus:
+    return CiteNexus(tmp_path, embedder=FakeEmbedding(), generator=FakeLLM(), hooks=hooks)
 
 
 def test_hooks_fire_across_the_lifecycle(tmp_path: Path) -> None:

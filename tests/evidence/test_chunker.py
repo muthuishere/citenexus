@@ -10,7 +10,7 @@ respecting chunks — not exact token parity with any one model.
 
 from __future__ import annotations
 
-from trustrag.evidence.chunker import chunk_text
+from citenexus.evidence.chunker import chunk_text
 
 
 def test_short_text_is_one_chunk() -> None:

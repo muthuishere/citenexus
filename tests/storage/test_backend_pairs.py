@@ -11,7 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from trustrag.storage import (
+from citenexus.storage import (
     LanceTextSearch,
     LanceVectorStore,
     LeafVectorStore,

@@ -4,7 +4,7 @@
 > verified against npm / crates.io / the Go module proxy on 2026-07-02.
 > Verdict up front: **TS is fully served off the shelf; Go gets Lance,
 > ALL parsing, and lid.176 detection from one shared Rust core
-> (`trustrag-core`) — one bridge instead of five parser dependencies.**
+> (`citenexus-core`) — one bridge instead of five parser dependencies.**
 
 ## 0. The Rust core — verified crates
 
@@ -32,7 +32,7 @@ with Python.
 |---|---|---|---|
 | Python | `lancedb` (pyo3) | in use | reference |
 | TypeScript | `@lancedb/lancedb` **0.30.0** | npm ✅ | official SDK (napi-rs over the same Rust core) |
-| Go | **none exists** → build `trustrag-lance-ffi` | `lancedb` crate **0.30.0** on crates.io ✅ | thin C-ABI shim over the Rust crate, cgo-linked; exposes exactly `upsert/search/scan/drop` with JSON rows (SPEC §3.4). Same pattern lancedb itself uses for Node (napi-rs) and Python (pyo3) — we're adding the C lane. |
+| Go | **none exists** → build `citenexus-lance-ffi` | `lancedb` crate **0.30.0** on crates.io ✅ | thin C-ABI shim over the Rust crate, cgo-linked; exposes exactly `upsert/search/scan/drop` with JSON rows (SPEC §3.4). Same pattern lancedb itself uses for Node (napi-rs) and Python (pyo3) — we're adding the C lane. |
 
 Rust crate and TS SDK are on the **same 0.30.x version line** — healthy,
 synchronized releases; the shim pins one crate version per port release.
@@ -44,7 +44,7 @@ Both support S3/MinIO object stores natively (same `storage_options`).
 
 | Capability | Python (ref) | TypeScript | Go |
 |---|---|---|---|
-| Lance vector store | `lancedb` | `@lancedb/lancedb` 0.30.0 ✅ | `trustrag-lance-ffi` (ours, cgo) |
+| Lance vector store | `lancedb` | `@lancedb/lancedb` 0.30.0 ✅ | `citenexus-lance-ffi` (ours, cgo) |
 | Postgres vector | `psycopg` | `pg` 8.22.0 ✅ | `pgx/v5` v5.10.0 ✅ + `pgvector-go` v0.4.0 ✅ |
 | S3 backend | `boto3` | `@aws-sdk/client-s3` | `aws-sdk-go-v2` v1.42.1 ✅ (or `minio-go`) |
 | Config schema | `pydantic` | `zod` 4.4.3 ✅ | typed structs + `yaml.v3` v3.0.1 ✅ (strict decode) |
@@ -65,7 +65,7 @@ Both support S3/MinIO object stores natively (same `storage_options`).
 ## 3. The pptx/docx insight: OOXML is just ZIP + XML
 
 `python-docx`/`python-pptx` are conveniences over `word/document.xml` and
-`ppt/slides/slideN.xml` inside a ZIP. TrustRAG only needs **block text +
+`ppt/slides/slideN.xml` inside a ZIP. CiteNexus only needs **block text +
 structure + image refs** — not styling. A ~150-line OOXML walker using each
 language's std `zip` + `xml` covers docx **and** pptx with zero dependencies
 and identical block semantics across ports. **Recommendation: OOXML-direct in
@@ -102,13 +102,13 @@ inject a lid.176 endpoint. Alternative if exactness matters later: add
 runtime — no cgo)**. Since the Lance shim already forces cgo, either mode
 works; WASM mode keeps PDF support alive even in `CGO_ENABLED=0` builds where
 Lance would be swapped for the Postgres backend. Nice degradation story:
-**a pure-Go, no-cgo TrustRAG = Postgres backend + WASM pdfium.**
+**a pure-Go, no-cgo CiteNexus = Postgres backend + WASM pdfium.**
 
 ## 7. Risk register
 
 | Risk | Level | Mitigation |
 |---|---|---|
-| `trustrag-core` maintenance (C ABI, per-platform prebuilds) | **Medium — the main port cost, now amortized over store+parse+detect** | JSON in/out; ~6 exported calls; pin crate versions; prebuilt static libs per platform (lancedb's own packaging pattern) |
+| `citenexus-core` maintenance (C ABI, per-platform prebuilds) | **Medium — the main port cost, now amortized over store+parse+detect** | JSON in/out; ~6 exported calls; pin crate versions; prebuilt static libs per platform (lancedb's own packaging pattern) |
 | pdfium bbox math differs from pdfplumber's | Low-Med | conformance compares block text + page, tolerant on bbox floats (1e-3); long-term Python adopts the core too (pyo3) and the difference disappears |
 | TS extraction drift until it adopts the napi core | Low | conformance fixtures are the arbiter; napi binding is the parity path |
 | Rust `fasttext` crate model-load compat with lid.176 | Low | validated in the core's own CI against pinned fixtures |
@@ -116,7 +116,7 @@ Lance would be swapped for the Postgres backend. Nice degradation story:
 ## 8. Spike verdict
 
 - **The Rust core is the strategy, not a workaround.** One crate
-  (`trustrag-core`: lance store + pdf/docx/pptx/html/md extraction + lid.176
+  (`citenexus-core`: lance store + pdf/docx/pptx/html/md extraction + lid.176
   detection) with three bindings — cgo (Go, required), napi-rs (TS, parity
   path), pyo3 (Python, later). One parser implementation, byte-identical
   `ExtractedDoc` everywhere, one place to fix parsing bugs.

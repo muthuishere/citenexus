@@ -14,16 +14,16 @@
 
 ## 2. Implement (green)
 
-- [x] 2.1 `src/trustrag/lang/detect.py`: frozen `LanguageResult`; `DEFAULT_THRESHOLD`;
+- [x] 2.1 `src/citenexus/lang/detect.py`: frozen `LanguageResult`; `DEFAULT_THRESHOLD`;
       `FastTextDetector(LanguageDetectorPlugin)` with lazy `urllib` download +
       cache of `lid.176.ftz` to `assets/models/`; `HeuristicDetector(LanguageDetectorPlugin)`.
-- [x] 2.2 `src/trustrag/lang/fallback.py`: `resolve_answer_language(...)` (§11a
+- [x] 2.2 `src/citenexus/lang/fallback.py`: `resolve_answer_language(...)` (§11a
       chain) + `flag_code_mixing(...)` helper.
-- [x] 2.3 `src/trustrag/lang/__init__.py`: export the public names.
+- [x] 2.3 `src/citenexus/lang/__init__.py`: export the public names.
 
 ## 3. Verify
 
 - [x] 3.1 `uv run pytest tests/lang -m "not integration" -q` passes.
-- [x] 3.2 `uv run ruff check src/trustrag/lang tests/lang` clean;
-      `uv run mypy src/trustrag/lang tests/lang` clean.
+- [x] 3.2 `uv run ruff check src/citenexus/lang tests/lang` clean;
+      `uv run mypy src/citenexus/lang tests/lang` clean.
 - [x] 3.3 `npx -y @fission-ai/openspec@latest validate --change language-detect` passes.

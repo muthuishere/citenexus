@@ -10,11 +10,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from trustrag import TrustRAG
-from trustrag.answer.result import Decision
-from trustrag.telemetry import InMemorySink, Outcome, Stage
-from trustrag.telemetry.events import TokenUsage
-from trustrag.testing import FakeEmbedding
+from citenexus import CiteNexus
+from citenexus.answer.result import Decision
+from citenexus.telemetry import InMemorySink, Outcome, Stage
+from citenexus.telemetry.events import TokenUsage
+from citenexus.testing import FakeEmbedding
 
 
 class UsageLLM:
@@ -28,8 +28,8 @@ class UsageLLM:
         return passage
 
 
-def _rag(tmp_path: Path, sink: InMemorySink) -> TrustRAG:
-    return TrustRAG(
+def _rag(tmp_path: Path, sink: InMemorySink) -> CiteNexus:
+    return CiteNexus(
         tmp_path,
         embedder=FakeEmbedding(),
         generator=UsageLLM(),
@@ -110,7 +110,7 @@ def test_unchanged_reingest_emits_no_ingest_events(tmp_path: Path) -> None:
 
 
 def test_no_sink_is_a_silent_noop(tmp_path: Path) -> None:
-    rag = TrustRAG(tmp_path, embedder=FakeEmbedding(), generator=UsageLLM())
+    rag = CiteNexus(tmp_path, embedder=FakeEmbedding(), generator=UsageLLM())
     rag.ingest(text="Termination requires thirty days notice.", document_id="c")
     # Must not raise when no sink is configured.
     result = rag.ask("What does termination require?")

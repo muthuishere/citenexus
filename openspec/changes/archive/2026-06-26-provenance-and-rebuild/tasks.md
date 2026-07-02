@@ -20,13 +20,13 @@
 
 ## 2. Implement (green)
 
-- [x] 2.1 `src/trustrag/provenance/stamp.py`: `from __future__ import annotations`;
+- [x] 2.1 `src/citenexus/provenance/stamp.py`: `from __future__ import annotations`;
       `StageStamp`, `ProducedBy`, `ModelManifest` pydantic v2 models (frozen),
       `endpoint_model`/`dim` optional.
-- [x] 2.2 `src/trustrag/provenance/rebuild_planner.py`: `Layer` enum; the DAG
+- [x] 2.2 `src/citenexus/provenance/rebuild_planner.py`: `Layer` enum; the DAG
       adjacency map + downstream-closure helper; the stage→seed-layer map (reranker/
       LLM → none); `plan(current, stamp) -> set[Layer]` doing diff → seed → closure.
-- [x] 2.3 `src/trustrag/provenance/__init__.py`: export the stamp models + `plan`/`Layer`.
+- [x] 2.3 `src/citenexus/provenance/__init__.py`: export the stamp models + `plan`/`Layer`.
 
 ## 3. Verify
 

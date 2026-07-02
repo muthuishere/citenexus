@@ -1,12 +1,12 @@
 [package]
-name = "trustrag-core"
+name = "citenexus-core"
 version = "0.1.0"
 edition = "2021"
-description = "TrustRAG's Rust engine: extraction (pdf/docx/pptx/html/md/csv/txt), lance store access, lid.176 detection. One core, FFI for all languages (SPEC-PORTS-v1 §3.4)."
+description = "CiteNexus's Rust engine: extraction (pdf/docx/pptx/html/md/csv/txt), lance store access, lid.176 detection. One core, FFI for all languages (SPEC-PORTS-v1 §3.4)."
 license = "Apache-2.0"
 
 [lib]
-name = "trustrag_core"
+name = "citenexus_core"
 # cdylib: the C-ABI artifact every language binds (cgo / napi / pyo3 / ctypes).
 # rlib: normal Rust consumption + tests.
 crate-type = ["cdylib", "staticlib", "rlib"]

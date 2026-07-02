@@ -4,7 +4,7 @@ Status: accepted · 2026-06-26
 
 ## Context
 
-TrustRAG is a new standalone **Python** library (the owner's documented kernel is
+CiteNexus is a new standalone **Python** library (the owner's documented kernel is
 Go + React + Bun; it carries **no** Python tooling, packaging, or library-publish
 precedent — so these decisions set precedent rather than match it). We want a
 spec-driven, test-driven build that publishes to PyPI.
@@ -24,9 +24,9 @@ spec-driven, test-driven build that publishes to PyPI.
   third-party actions pinned to commit SHAs and publish `needs: test`; loose
   Conventional Commits; trunk-based + squash-merge.
 - **Publishing (new precedent):** semver, tag → build → **PyPI via OIDC trusted
-  publishing**, CHANGELOG. The dist-name `trustrag` is taken on PyPI; the publish
+  publishing**, CHANGELOG. The dist-name `citenexus` is taken on PyPI; the publish
   name gets resolved (likely a suffix) before the first tag — import package stays
-  `trustrag`.
+  `citenexus`.
 
 ## Consequences
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from trustrag.lang import (
+from citenexus.lang import (
     LanguageResult,
     flag_code_mixing,
     resolve_answer_language,

@@ -3,8 +3,8 @@
 import pytest
 from pydantic import ValidationError
 
-from trustrag.domain.partition import PartitionPath
-from trustrag.evidence.unit import Citation, EUType, EvidenceUnit
+from citenexus.domain.partition import PartitionPath
+from citenexus.evidence.unit import Citation, EUType, EvidenceUnit
 
 
 def _partition() -> PartitionPath:

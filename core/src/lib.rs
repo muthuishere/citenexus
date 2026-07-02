@@ -1,4 +1,4 @@
-//! trustrag-core — TrustRAG's Rust engine (SPEC-PORTS-v1 §3.4).
+//! citenexus-core — CiteNexus's Rust engine (SPEC-PORTS-v1 §3.4).
 //!
 //! One core, FFI for all languages: extraction, lance store access, and
 //! lid.176 detection. The core is the ENGINE, not the brain —

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from trustrag.provenance import (
+from citenexus.provenance import (
     ModelManifest,
     ProducedBy,
     ProvenanceManifest,
