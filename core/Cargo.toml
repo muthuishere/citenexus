@@ -25,6 +25,18 @@ csv = "1"
 # pdf is feature-gated: pdfium-render binds libpdfium dynamically at runtime,
 # so the crate always compiles; enabling the feature adds the binding code.
 pdfium-render = { version = "0.9", optional = true }
+# store: LanceDB (async Rust API — a small tokio runtime lives inside LanceStore;
+# the C ABI stays synchronous). arrow-* pinned to lancedb's arrow major (58).
+lancedb = "0.30"
+tokio = { version = "1", features = ["rt-multi-thread"] }
+futures = "0.3"
+arrow-array = "58"
+arrow-schema = "58"
+arrow-json = "58"
+# detect: fastText lid.176 via the pure-Rust fasttext crate (parses the
+# upstream binary format, dense + quantized). Exact spec model — parity with
+# Python.
+fasttext = "0.8"
 
 [features]
 default = []
@@ -33,3 +45,6 @@ pdf = ["dep:pdfium-render"]
 [profile.release]
 lto = true
 strip = true
+
+[dev-dependencies]
+tempfile = "3.27.0"
