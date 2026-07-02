@@ -12,25 +12,11 @@ from __future__ import annotations
 
 import json
 import os
-import urllib.request
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 
+from citenexus.http import DEFAULT_TRANSPORT, Transport
 from citenexus.plugins.base import RerankerPlugin
 from citenexus.retrieve.types import Candidate
-
-# (url, json body, headers) -> response bytes.
-Transport = Callable[[str, bytes, dict[str, str]], bytes]
-
-
-def _urllib_transport(url: str, body: bytes, headers: dict[str, str]) -> bytes:
-    # Explicit User-Agent: some hosted endpoints (Jina behind Cloudflare) 403
-    # the default ``Python-urllib`` agent.
-    request = urllib.request.Request(
-        url, data=body, headers={"User-Agent": "citenexus", **headers}, method="POST"
-    )
-    with urllib.request.urlopen(request) as response:
-        data: bytes = response.read()
-    return data
 
 
 class OpenAICompatibleReranker(RerankerPlugin):
@@ -45,14 +31,16 @@ class OpenAICompatibleReranker(RerankerPlugin):
         model: str,
         transport: Transport | None = None,
         api_key_env: str | None = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._model = model
-        self._transport = transport or _urllib_transport
+        self._extra_headers = dict(extra_headers or {})
+        self._transport = transport or DEFAULT_TRANSPORT
         self._api_key_env = api_key_env
 
     def _headers(self) -> dict[str, str]:
-        headers = {"Content-Type": "application/json"}
+        headers = {**self._extra_headers, "Content-Type": "application/json"}
         if self._api_key_env:
             key = os.environ.get(self._api_key_env)
             if key:

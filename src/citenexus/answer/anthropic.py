@@ -17,24 +17,15 @@ from __future__ import annotations
 
 import json
 import os
-import urllib.request
 
-from citenexus.answer.generator import _SYSTEM_PROMPT, Transport
+from citenexus.answer.generator import _SYSTEM_PROMPT
+from citenexus.http import DEFAULT_TRANSPORT, Transport
 from citenexus.telemetry.events import TokenUsage
 
 # Pinned Messages API version. Bump deliberately, not silently.
 _ANTHROPIC_VERSION = "2023-06-01"
 # Anthropic requires max_tokens; use a sane default when the caller gives none.
 _DEFAULT_MAX_TOKENS = 1024
-
-
-def _urllib_transport(url: str, body: bytes, headers: dict[str, str]) -> bytes:
-    request = urllib.request.Request(
-        url, data=body, headers={"User-Agent": "citenexus", **headers}, method="POST"
-    )
-    with urllib.request.urlopen(request) as response:
-        data: bytes = response.read()
-    return data
 
 
 class AnthropicGenerator:
@@ -50,6 +41,7 @@ class AnthropicGenerator:
         api_key_env: str | None = None,
         temperature: float = 0.0,
         max_tokens: int = _DEFAULT_MAX_TOKENS,
+        extra_headers: dict[str, str] | None = None,
         transport: Transport | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
@@ -57,7 +49,8 @@ class AnthropicGenerator:
         self._api_key_env = api_key_env
         self._temperature = temperature
         self._max_tokens = max_tokens
-        self._transport: Transport = transport or _urllib_transport
+        self._extra_headers = dict(extra_headers or {})
+        self._transport: Transport = transport or DEFAULT_TRANSPORT
         self.last_usage: TokenUsage | None = None
 
     @property
@@ -66,6 +59,7 @@ class AnthropicGenerator:
 
     def _headers(self) -> dict[str, str]:
         headers = {
+            **self._extra_headers,
             "Content-Type": "application/json",
             "anthropic-version": _ANTHROPIC_VERSION,
         }

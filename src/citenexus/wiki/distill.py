@@ -24,7 +24,7 @@ import json
 from collections.abc import Mapping, Sequence
 from typing import Protocol
 
-from citenexus.answer.generator import Transport, _urllib_transport
+from citenexus.http import DEFAULT_TRANSPORT, Transport
 from citenexus.wiki.store import WikiPage
 
 # The distiller input: document_id -> ordered (eu_id, text) pairs.
@@ -68,18 +68,20 @@ class LLMWikiDistiller:
         base_url: str,
         model: str,
         api_key_env: str | None = None,
+        extra_headers: dict[str, str] | None = None,
         transport: Transport | None = None,
     ) -> None:
         # Store only the env-var *name*, never the secret value.
         self._base_url = base_url.rstrip("/")
         self._model = model
         self._api_key_env = api_key_env
-        self._transport: Transport = transport or _urllib_transport
+        self._extra_headers = dict(extra_headers or {})
+        self._transport: Transport = transport or DEFAULT_TRANSPORT
 
     def _headers(self) -> dict[str, str]:
         import os
 
-        headers = {"Content-Type": "application/json"}
+        headers = {**self._extra_headers, "Content-Type": "application/json"}
         if self._api_key_env:
             key = os.environ.get(self._api_key_env)
             if key:

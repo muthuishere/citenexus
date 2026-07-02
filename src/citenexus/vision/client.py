@@ -21,7 +21,7 @@ import json
 import os
 from typing import Any
 
-from citenexus.answer.generator import Transport, _urllib_transport
+from citenexus.http import DEFAULT_TRANSPORT, Transport
 
 _VISION_PROMPT = (
     "Describe this image for a document search index. Reply with ONLY a JSON "
@@ -64,6 +64,7 @@ class OpenAICompatibleVision:
         temperature: float = 0.0,
         max_tokens: int | None = 512,
         mime_type: str = "image/png",
+        extra_headers: dict[str, str] | None = None,
         transport: Transport | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
@@ -72,14 +73,15 @@ class OpenAICompatibleVision:
         self._temperature = temperature
         self._max_tokens = max_tokens
         self._mime_type = mime_type
-        self._transport: Transport = transport or _urllib_transport
+        self._extra_headers = dict(extra_headers or {})
+        self._transport: Transport = transport or DEFAULT_TRANSPORT
 
     @property
     def _endpoint(self) -> str:
         return f"{self._base_url}/chat/completions"
 
     def _headers(self) -> dict[str, str]:
-        headers = {"Content-Type": "application/json"}
+        headers = {**self._extra_headers, "Content-Type": "application/json"}
         if self._api_key_env:
             key = os.environ.get(self._api_key_env)
             if key:

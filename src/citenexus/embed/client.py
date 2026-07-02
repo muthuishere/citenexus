@@ -19,28 +19,13 @@ from __future__ import annotations
 
 import json
 import os
-import urllib.request
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 
+from citenexus.http import DEFAULT_TRANSPORT, Transport
 from citenexus.plugins.base import EmbeddingPlugin
 
 # (url, json body, headers) -> response bytes. The single seam that lets unit
 # tests run hermetically while the default wires stdlib urllib.
-Transport = Callable[[str, bytes, dict[str, str]], bytes]
-
-
-def _urllib_transport(url: str, body: bytes, headers: dict[str, str]) -> bytes:
-    """The default transport: a stdlib ``urllib.request`` POST (no new deps).
-
-    Sends an explicit ``User-Agent`` — some hosted endpoints (e.g. Jina behind
-    Cloudflare) reject the default ``Python-urllib`` agent with a 403.
-    """
-    request = urllib.request.Request(
-        url, data=body, headers={"User-Agent": "citenexus", **headers}, method="POST"
-    )
-    with urllib.request.urlopen(request) as response:
-        data: bytes = response.read()
-    return data
 
 
 class OpenAICompatibleEmbedding(EmbeddingPlugin):
@@ -54,20 +39,22 @@ class OpenAICompatibleEmbedding(EmbeddingPlugin):
         base_url: str,
         model: str,
         api_key_env: str | None = None,
+        extra_headers: dict[str, str] | None = None,
         transport: Transport | None = None,
     ) -> None:
         # Store only the env-var *name*, never the secret value.
         self._base_url = base_url.rstrip("/")
         self._model = model
         self._api_key_env = api_key_env
-        self._transport: Transport = transport or _urllib_transport
+        self._extra_headers = dict(extra_headers or {})
+        self._transport: Transport = transport or DEFAULT_TRANSPORT
 
     @property
     def _endpoint(self) -> str:
         return f"{self._base_url}/embeddings"
 
     def _headers(self) -> dict[str, str]:
-        headers = {"Content-Type": "application/json"}
+        headers = {**self._extra_headers, "Content-Type": "application/json"}
         if self._api_key_env:
             # Read the key at call time; carry it ONLY in the Authorization
             # header. The value never lands on ``self`` and is never logged.

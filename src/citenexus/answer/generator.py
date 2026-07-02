@@ -23,14 +23,9 @@ from __future__ import annotations
 
 import json
 import os
-import urllib.request
-from collections.abc import Callable
 
+from citenexus.http import DEFAULT_TRANSPORT, Transport
 from citenexus.telemetry.events import TokenUsage
-
-# (url, json body, headers) -> response bytes. The single seam that lets unit
-# tests run hermetically while the default wires stdlib urllib.
-Transport = Callable[[str, bytes, dict[str, str]], bytes]
 
 _SYSTEM_PROMPT = (
     "You are a strict, evidence-first assistant. Answer the question by quoting "
@@ -42,20 +37,6 @@ _SYSTEM_PROMPT = (
     "matches the requested ISO code; otherwise still prefer the passage's exact "
     "wording."
 )
-
-
-def _urllib_transport(url: str, body: bytes, headers: dict[str, str]) -> bytes:
-    """The default transport: a stdlib ``urllib.request`` POST (no new deps).
-
-    Sends an explicit ``User-Agent`` — some hosted endpoints (e.g. behind
-    Cloudflare) reject the default ``Python-urllib`` agent with a 403.
-    """
-    request = urllib.request.Request(
-        url, data=body, headers={"User-Agent": "citenexus", **headers}, method="POST"
-    )
-    with urllib.request.urlopen(request) as response:
-        data: bytes = response.read()
-    return data
 
 
 class OpenAICompatibleGenerator:
@@ -75,6 +56,7 @@ class OpenAICompatibleGenerator:
         api_key_env: str | None = None,
         temperature: float = 0.0,
         max_tokens: int | None = None,
+        extra_headers: dict[str, str] | None = None,
         transport: Transport | None = None,
     ) -> None:
         # Store only the env-var *name*, never the secret value.
@@ -83,7 +65,8 @@ class OpenAICompatibleGenerator:
         self._api_key_env = api_key_env
         self._temperature = temperature
         self._max_tokens = max_tokens
-        self._transport: Transport = transport or _urllib_transport
+        self._extra_headers = dict(extra_headers or {})
+        self._transport: Transport = transport or DEFAULT_TRANSPORT
         # Token usage from the most recent call, for telemetry. ``None`` until
         # the first ``answer()``; the client reads it to emit a generate event.
         self.last_usage: TokenUsage | None = None
@@ -93,7 +76,7 @@ class OpenAICompatibleGenerator:
         return f"{self._base_url}/chat/completions"
 
     def _headers(self) -> dict[str, str]:
-        headers = {"Content-Type": "application/json"}
+        headers = {**self._extra_headers, "Content-Type": "application/json"}
         if self._api_key_env:
             # Read the key at call time; carry it ONLY in the Authorization
             # header. The value never lands on ``self`` and is never logged.

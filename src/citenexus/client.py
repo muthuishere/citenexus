@@ -9,7 +9,6 @@ from typing import Any
 from citenexus.answer.anthropic import AnthropicGenerator
 from citenexus.answer.flow import AnswerFlow, Generator
 from citenexus.answer.generator import OpenAICompatibleGenerator
-from citenexus.answer.generator import Transport as ChatTransport
 from citenexus.answer.result import Decision, Result
 from citenexus.config.schema import CiteNexusConfig, LLMProvider
 from citenexus.config.signals import Signal, resolve_signals
@@ -22,6 +21,8 @@ from citenexus.evidence.chunked_builder import Contextualizer as ContextualizerS
 from citenexus.evidence.contextualize import Contextualizer
 from citenexus.graph import GraphDistiller, GraphRetriever, GraphStore, LLMGraphDistiller
 from citenexus.hooks import Hooks
+from citenexus.http import HttpClient
+from citenexus.http import Transport as ChatTransport
 from citenexus.ingest.pipeline import IngestPipeline, VisionDescriber
 from citenexus.ingest.result import IngestResult
 from citenexus.ingest.web import FetchTransport, crawl, fetch_url, is_url
@@ -232,6 +233,7 @@ class CiteNexus:
         if config.embedding.endpoint:
             embedder = _SingleTextEmbedder(
                 OpenAICompatibleEmbedding(
+                    extra_headers=config.embedding.headers,
                     base_url=config.embedding.endpoint,
                     model=config.embedding.model,
                     api_key_env=config.embedding.api_key_env,
@@ -244,25 +246,28 @@ class CiteNexus:
             pass
         elif config.llm.provider is LLMProvider.anthropic:
             generator = AnthropicGenerator(
+                extra_headers=config.llm.headers,
                 base_url=config.llm.endpoint,
                 model=config.llm.model,
                 api_key_env=config.llm.api_key_env,
                 temperature=config.llm.temperature,
                 max_tokens=config.llm.max_tokens or 1024,
-                transport=llm_transport,
+                transport=llm_transport or HttpClient(timeout_s=config.llm.timeout_s),
             )
         else:
             generator = OpenAICompatibleGenerator(
+                extra_headers=config.llm.headers,
                 base_url=config.llm.endpoint,
                 model=config.llm.model,
                 api_key_env=config.llm.api_key_env,
                 temperature=config.llm.temperature,
                 max_tokens=config.llm.max_tokens,
-                transport=llm_transport,
+                transport=llm_transport or HttpClient(timeout_s=config.llm.timeout_s),
             )
         reranker: RerankerPlugin | None = None
         if config.reranker.enabled and config.reranker.endpoint is not None:
             reranker = OpenAICompatibleReranker(
+                extra_headers=config.reranker.headers,
                 base_url=config.reranker.endpoint,
                 model=config.reranker.model,
                 api_key_env=config.reranker.api_key_env,
@@ -274,6 +279,7 @@ class CiteNexus:
         vision: VisionDescriber | None = None
         if config.vision.enabled and config.vision.endpoint and config.vision.model:
             vision = OpenAICompatibleVision(
+                extra_headers=config.vision.headers,
                 base_url=config.vision.endpoint,
                 model=config.vision.model,
                 api_key_env=config.vision.api_key_env,
@@ -285,6 +291,7 @@ class CiteNexus:
         reformulator: Reformulator | None = None
         if config.reformulation.enabled and config.reformulation.endpoint:
             reformulator = QueryReformulator(
+                extra_headers=config.reformulation.headers,
                 base_url=config.reformulation.endpoint,
                 model=config.reformulation.model,
                 api_key_env=config.reformulation.api_key_env,
@@ -297,6 +304,7 @@ class CiteNexus:
         wiki_distiller: WikiDistiller | None = None
         if config.wiki_distill.enabled and config.wiki_distill.endpoint:
             wiki_distiller = LLMWikiDistiller(
+                extra_headers=config.wiki_distill.headers,
                 base_url=config.wiki_distill.endpoint,
                 model=config.wiki_distill.model,
                 api_key_env=config.wiki_distill.api_key_env,
@@ -308,6 +316,7 @@ class CiteNexus:
         graph_distiller: GraphDistiller | None = None
         if config.graph_distill.enabled and config.graph_distill.endpoint:
             graph_distiller = LLMGraphDistiller(
+                extra_headers=config.graph_distill.headers,
                 base_url=config.graph_distill.endpoint,
                 model=config.graph_distill.model,
                 api_key_env=config.graph_distill.api_key_env,
@@ -339,6 +348,7 @@ class CiteNexus:
             and config.context_model.model
         ):
             contextualizer = Contextualizer(
+                extra_headers=config.context_model.headers,
                 base_url=config.context_model.endpoint,
                 model=config.context_model.model,
                 api_key_env=config.context_model.api_key_env,

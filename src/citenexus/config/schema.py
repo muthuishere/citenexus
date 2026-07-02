@@ -71,6 +71,8 @@ class LLMConfig(_Section):
     model: str = "qwen2.5"
     endpoint: str | None = None
     api_key_env: str | None = None
+    # Extra HTTP headers merged under auth (gateway/Referer/api-version...).
+    headers: dict[str, str] = Field(default_factory=dict)
     temperature: float = 0.0
     max_tokens: int | None = None
     timeout_s: float = 60.0
@@ -82,6 +84,8 @@ class EmbeddingConfig(_Section):
     model: str = "bge-m3"
     endpoint: str | None = None
     api_key_env: str | None = None
+    # Extra HTTP headers merged under auth (gateway/Referer/api-version...).
+    headers: dict[str, str] = Field(default_factory=dict)
     dense: bool = True
     sparse: bool = True
     batch_size: int = 32
@@ -95,6 +99,8 @@ class RerankerConfig(_Section):
     model: str = "bge-reranker-v2-m3"
     endpoint: str | None = None
     api_key_env: str | None = None
+    # Extra HTTP headers merged under auth (gateway/Referer/api-version...).
+    headers: dict[str, str] = Field(default_factory=dict)
     top_n: int = 20
 
 
@@ -109,6 +115,7 @@ class ReformulationConfig(_Section):
     model: str = "gemini-2.5-flash-lite"
     endpoint: str | None = None
     api_key_env: str | None = None
+    headers: dict[str, str] = Field(default_factory=dict)
 
 
 class GraphDistillConfig(_Section):
@@ -123,6 +130,7 @@ class GraphDistillConfig(_Section):
     model: str = "gemini-2.5-flash-lite"
     endpoint: str | None = None
     api_key_env: str | None = None
+    headers: dict[str, str] = Field(default_factory=dict)
 
 
 class WikiDistillConfig(_Section):
@@ -137,6 +145,7 @@ class WikiDistillConfig(_Section):
     model: str = "gemini-2.5-flash-lite"
     endpoint: str | None = None
     api_key_env: str | None = None
+    headers: dict[str, str] = Field(default_factory=dict)
 
 
 class VisionPrefilterConfig(_Section):
@@ -155,6 +164,7 @@ class VisionConfig(_Section):
     model: str | None = None
     endpoint: str | None = None
     api_key_env: str | None = None
+    headers: dict[str, str] = Field(default_factory=dict)
     prefilter: VisionPrefilterConfig = Field(default_factory=VisionPrefilterConfig)
 
 
@@ -183,6 +193,7 @@ class ContextModelConfig(_Section):
     model: str | None = None
     endpoint: str | None = None
     api_key_env: str | None = None
+    headers: dict[str, str] = Field(default_factory=dict)
 
 
 class VectorStoreConfig(_Section):
