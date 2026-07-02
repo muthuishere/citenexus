@@ -103,6 +103,23 @@ eu_id/provenance for ALL docs — deliberate change, do with user. Also needs a
 `context_model` config section (small model) + `from_config` wiring so the
 contextualizer is built from config.
 
+### EN dual-query RRF + core fixes (committed this session — LIVE-VERIFIED)
+- **QueryReformulator** (`retrieve/reformulate.py`): small model rewrites the
+  query in English (temp 0, keeps names/numbers verbatim); **shared cache** per
+  query (failures cached too). `ReformulationConfig` in schema; built by
+  `from_config`. Enhancement-only → None degrades to single-query.
+- **RetrievalEngine.retrieve(extra_queries=…)**: RAG-Fusion — every
+  (retriever x query) list feeds one RRF (k=60); reranker sees the ORIGINAL query.
+- **Relevance gate**: the EN reformulation also counts for relevance overlap
+  (same question in evidence's language). Citations + faithfulness unchanged.
+- **fastText lid.176 by default in from_config** (§11a): heuristic mislabelled
+  fr→es at ingest and poisoned the answer language. Tests inject HeuristicDetector.
+- **Verbatim-quote system prompt**: real LLMs rephrased → extractive gate
+  refused; the prompt now demands word-for-word quoting (gate unchanged).
+- **Example live result** (Jina + Gemini): **2/5 → 4/5 answered**, correct
+  languages (en/de/fr), 100% grounded+cited, remaining refusal is the correct
+  out-of-corpus one. Expected support 40% → 80%.
+
 ### Open threads (asked for by user, NOT yet built — sequence for next session)
 Priority order by "retrieval must be right for legal/medical":
 1. **Chunker / splitting (HIGHEST leverage)** — today `build_evidence_units` is
