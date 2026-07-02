@@ -101,12 +101,25 @@ Postgres semantics: one table per leaf, name = `{prefix}_{sanitized(P)}`
 returns `[]` (parity with an empty Lance leaf); upsert = `INSERT … ON CONFLICT
 (eu_id) DO UPDATE`.
 
-### 3.4 Go/Rust FFI scope
+### 3.4 The Rust core (`trustrag-core`) — Go's engine room
 
-The shim crate (`trustrag-lance-ffi`) exposes exactly the three protocol calls
-plus `drop`, over a C ABI with JSON-encoded rows. Nothing else crosses the
-boundary — retrieval logic, fusion, and grounding stay in Go. The shim is an
-implementation detail of `LanceVectorStore` for Go only.
+Since Go must link Rust for Lance anyway, the bridge is a single Rust crate
+carrying everything Rust does better than the Go ecosystem, over one C ABI
+with JSON in/out:
+
+1. **store** — the Lance `VectorStore` calls: `upsert / search / scan / drop`.
+2. **extract** — `extract(bytes, source_type) -> ExtractedDoc JSON` (blocks +
+   images + structure) for pdf (`pdfium-render`), docx/pptx (OOXML-direct via
+   `quick-xml` + zip), html (`scraper`/html5ever), md (`pulldown-cmark`).
+3. **detect** — fastText **lid.176 via the pure-Rust `fasttext` crate** —
+   the exact spec model, so detection is byte-identical with Python.
+
+Nothing else crosses the boundary: retrieval logic, RRF, gates, chunking,
+orchestration stay in Go. One bridge to maintain instead of five parser
+dependencies, and extraction output is identical across Python and Go by
+construction. TS MAY adopt the same crate via napi-rs in a later rev for
+extraction parity; ports-v1 allows TS to use its native libs (conformance
+fixtures are the arbiter either way).
 
 ## 4. Deterministic algorithm contract
 
@@ -190,12 +203,41 @@ Citations are **verbatim source text** — never model output, never translated.
 
 ## 9. Language-specific implementation notes
 
+### The shared Rust core — target architecture (DECIDED)
+
+**One Rust library, FFI for all.** `trustrag-core` is the single engine for
+every language — the pydantic-v2 / tokenizers / lancedb playbook:
+
+```
+                     trustrag-core (Rust)
+   v1: store (lance) · extract (pdf/docx/pptx/html/md) · detect (lid.176)
+   v2: + the pinned deterministic algorithms (§4): chunker · BM25 · RRF ·
+        token gates — they are frozen contracts, so one implementation
+        replaces cross-language conformance for them
+             /                |                  \
+        cgo C-ABI          napi-rs              pyo3
+           Go             TypeScript            Python
+      (required from     (native libs OK in   (adopts the core when the
+       day one)           ports-v1; SHOULD      pyo3 binding lands —
+                          migrate to core)      strangler-style, features
+                                                never stall on the rewrite;
+                                                Python stays the BEHAVIOR
+                                                reference throughout)
+```
+
+**The core is the engine, not the brain.** Orchestration NEVER moves in:
+the ask flow, cite-or-abstain, plugin seams, hooks, config, and all model
+HTTP calls stay in each host language (IO-bound — no Rust win, and the
+guarantee logic must stay hackable without a Rust toolchain). Boundary rule:
+JSON (Arrow allowed for row batches) in/out, **no callbacks across FFI**.
+Wherever the core has a capability, a binding uses it; native libraries
+remain only where the core lacks coverage or a platform cannot link it.
+
 ### Go
 - Module `github.com/muthuishere/trustrag-go`. Layout mirrors capability
   packages (`storage`, `retrieve`, `answer`, `ingest`, …).
-- Lance via the Rust FFI shim (§3.4); build with `cargo` → static lib, cgo
-  link; prebuilt artifacts per platform in releases (like lancedb's own
-  packaging). Everything else is pure Go (pgx, net/http, encoding/json).
+- Lance + extraction + detection via `trustrag-core` (cgo); prebuilt static
+  libs per platform in releases. Everything else pure Go (pgx, net/http).
 - Concurrency: `context.Context` on every IO call; per-retriever fan-out with
   an errgroup is allowed — ORDER of fused output must stay deterministic.
 - No reflection-based config: decode into typed structs, reject unknown keys.
@@ -203,6 +245,9 @@ Citations are **verbatim source text** — never model output, never translated.
 ### TypeScript
 - Package `trustrag` (npm) or `@trustrag/core`. ESM, Node ≥ 20; types shipped.
 - `@lancedb/lancedb` for the Lance pair; `pg` for Postgres; `fetch` transport.
+- Extraction: native libs allowed in ports-v1 (pdfjs-dist, OOXML-direct); the
+  napi binding of `trustrag-core` is the parity path and SHOULD replace them
+  once published.
 - All model/transport seams are injectable functions — same hermetic-test rule.
 - The whole public surface is `async`; `stream()` returns an async iterable.
 

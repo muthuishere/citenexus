@@ -2,8 +2,29 @@
 
 > Companion to [SPEC-PORTS-v1.md](SPEC-PORTS-v1.md). Every version below was
 > verified against npm / crates.io / the Go module proxy on 2026-07-02.
-> Verdict up front: **TS is fully served off the shelf; Go is fully served
-> except Lance (Rust bridge, as decided) and pptx (parse OOXML directly).**
+> Verdict up front: **TS is fully served off the shelf; Go gets Lance,
+> ALL parsing, and lid.176 detection from one shared Rust core
+> (`trustrag-core`) — one bridge instead of five parser dependencies.**
+
+## 0. The Rust core — verified crates
+
+The decision (locked with Muthu): since Go links Rust for Lance anyway, the
+bridge carries every parser Rust does best, and becomes the shared engine for
+all bindings (cgo/Go now, napi/TS for parity later, pyo3/Python eventually).
+
+| Core duty | Rust crate | Verified on crates.io |
+|---|---|---|
+| Lance store | `lancedb` | **0.30.0** ✅ (same version line as the TS SDK) |
+| PDF text + word rects | `pdfium-render` | **0.9.2** ✅ (pdfium — same engine as go-pdfium) |
+| DOCX/PPTX | `quick-xml` + std zip (OOXML-direct) | **0.41.0** ✅ (`docx-rs` 0.4.20 exists but is writer-focused) |
+| HTML | `scraper` (html5ever, browser-grade) | **0.27.0** ✅ |
+| Markdown | `pulldown-cmark` (CommonMark reference) | **0.13.4** ✅ |
+| Language detect | `fasttext` — **pure-Rust fastText, loads the exact lid.176 model** | **0.8.0** ✅ (alt: `lingua` 1.8.0, `whatlang` 0.18.0) |
+| XLSX (future) | `calamine` | **0.35.0** ✅ |
+
+The pure-Rust `fasttext` crate is the spike's best find: it erases the Go
+detection-drift risk entirely — same model file, same labels, byte-identical
+with Python.
 
 ## 1. The Lance bridge (the one hard problem — decided)
 
@@ -87,20 +108,24 @@ Lance would be swapped for the Postgres backend. Nice degradation story:
 
 | Risk | Level | Mitigation |
 |---|---|---|
-| `trustrag-lance-ffi` maintenance (C ABI, per-platform prebuilds) | **Medium — the main port cost** | shim exposes only 4 calls; JSON rows; pin crate version; prebuilt static libs per platform in releases (lancedb's own packaging pattern) |
-| Go pptx gap | Low | OOXML-direct (§3) |
-| Detection drift in Go | Low | plugin seam + fallback-chain fixtures (§5) |
-| pdfjs bbox math differs from pdfplumber's | Low-Med | conformance compares block text + page, tolerant on bbox floats (1e-3) |
-| officeparser flattens pptx structure | Low | prefer OOXML-direct in TS too |
+| `trustrag-core` maintenance (C ABI, per-platform prebuilds) | **Medium — the main port cost, now amortized over store+parse+detect** | JSON in/out; ~6 exported calls; pin crate versions; prebuilt static libs per platform (lancedb's own packaging pattern) |
+| pdfium bbox math differs from pdfplumber's | Low-Med | conformance compares block text + page, tolerant on bbox floats (1e-3); long-term Python adopts the core too (pyo3) and the difference disappears |
+| TS extraction drift until it adopts the napi core | Low | conformance fixtures are the arbiter; napi binding is the parity path |
+| Rust `fasttext` crate model-load compat with lid.176 | Low | validated in the core's own CI against pinned fixtures |
 
 ## 8. Spike verdict
 
-- **TypeScript: green.** Everything off the shelf, including the official
-  Lance SDK and the *same* lid.176 model via WASM. No blockers.
-- **Go: green with two build items** — the Rust FFI shim (decided, bounded to
-  4 calls) and an OOXML-direct docx/pptx walker (~150 lines, shared design
-  with TS). Everything else is mature: pgx+pgvector-go, goquery crawl,
-  goldmark, go-pdfium (with a no-cgo escape hatch), lingua-go.
-- **Both ports carry web crawl at T1-adjacent cost** — std HTTP + the HTML
-  lib they already need for extraction; the crawler itself is ~100 lines of
-  pure logic (BFS + caps) ported from `ingest/web.py`.
+- **The Rust core is the strategy, not a workaround.** One crate
+  (`trustrag-core`: lance store + pdf/docx/pptx/html/md extraction + lid.176
+  detection) with three bindings — cgo (Go, required), napi-rs (TS, parity
+  path), pyo3 (Python, later). One parser implementation, byte-identical
+  `ExtractedDoc` everywhere, one place to fix parsing bugs.
+- **TypeScript: green today** on native libs (official Lance SDK, pdfjs,
+  cheerio, the same lid.176 via WASM); SHOULD migrate extraction to the napi
+  core when published.
+- **Go: green** — everything hard rides the core; the pure-Go remainder is
+  mature (pgx + pgvector-go, goquery crawl, net/http, yaml.v3).
+- **Web crawl in both** is ~100 lines of pure logic (BFS + caps) ported from
+  `ingest/web.py` — std HTTP + the HTML capability they already have.
+- Legacy .doc/.ppt stays out of scope everywhere (Python included) pending a
+  converter seam (§4).
