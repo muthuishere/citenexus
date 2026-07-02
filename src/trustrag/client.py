@@ -36,7 +36,7 @@ from trustrag.storage.backend import LocalFsBackend, S3Backend, StorageBackend
 from trustrag.storage.lance_store import LeafVectorStore, StorageOptions
 from trustrag.storage.paths import leaf_vector_uri, partition_segment
 from trustrag.storage.postgres_store import PostgresVectorStore, table_name_for
-from trustrag.storage.protocols import VectorStore
+from trustrag.storage.protocols import TextSearch, VectorStore
 from trustrag.stream import stream_result
 from trustrag.telemetry.events import Outcome, Stage, StageEvent
 from trustrag.telemetry.sinks import TelemetrySink
@@ -93,6 +93,7 @@ class TrustRAG:
         fetch_transport: FetchTransport | None = None,
         reformulator: Reformulator | None = None,
         vector_store: VectorStore | None = None,
+        text_search: TextSearch | None = None,
     ) -> None:
         self.base_uri = str(base_uri)
         self.partition = partition or PartitionPath.of(("workspace", "default"))
@@ -122,7 +123,10 @@ class TrustRAG:
         if Signal.embedding in self.signals:
             retrievers.append(VectorRetriever(self._store, embedder))
         if Signal.text in self.signals:
-            retrievers.append(LexicalRetriever(self._store))
+            # Text search is its own store seam: an injected TextSearch wins;
+            # otherwise the vector store is used (native if it ranks text itself
+            # — Postgres tsvector — else wrapped in BM25-lite over scan()).
+            retrievers.append(LexicalRetriever(text_search or self._store))
         if Signal.structure in self.signals:
             retrievers.append(StructureRetriever(self._backend, self.partition, self._store))
         if Signal.graph in self.signals or Signal.community in self.signals:

@@ -13,6 +13,15 @@ The library bundles **no models** — embedding, LLM, reranker, and vision are
 injected endpoints. TrustRAG owns orchestration, storage, retrieval, fusion,
 grounding, and evaluation.
 
+**TrustRAG supports pluggable vector databases.** The recommended default is
+**LanceDB** — embedded, S3-native, zero infrastructure: point at a bucket and
+go. Prefer your own database? Set `vector_store.backend: "postgres"` and bring
+Postgres/pgvector (`pip install 'trustrag[postgres]'` — it also serves the
+lexical signal natively via `tsvector`), or implement the 3-method
+`VectorStore` protocol for anything else (Qdrant, Weaviate, …). Text search is
+its own seam too: any `TextSearch` backend (Elasticsearch, Tantivy, …) can
+serve the lexical signal independently of the vector store.
+
 ```python
 from trustrag import TrustRAG
 
