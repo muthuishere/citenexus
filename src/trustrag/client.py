@@ -118,6 +118,7 @@ class TrustRAG:
             chunk_max_tokens=chunk_max_tokens,
             chunk_overlap=chunk_overlap,
             contextualizer=contextualizer,
+            sink=sink,
         )
         retrievers: list[RetrieverPlugin] = []
         if Signal.embedding in self.signals:

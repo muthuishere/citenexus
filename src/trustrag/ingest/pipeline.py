@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
@@ -18,6 +19,7 @@ from trustrag.lang.fallback import resolve_answer_language
 from trustrag.storage.lance_store import LeafVectorStore, StorageOptions
 from trustrag.storage.manifest import EtagManifest, load_manifest, save_manifest
 from trustrag.storage.paths import Layer, layer_prefix, leaf_vector_uri, partition_segment
+from trustrag.telemetry.events import Stage, StageEvent
 from trustrag.vision.describe import describe_image
 from trustrag.vision.units import build_vision_units
 
@@ -29,6 +31,7 @@ if TYPE_CHECKING:
     from trustrag.extract.types import ImageRef
     from trustrag.plugins.base import LanguageDetectorPlugin, VisionPlugin
     from trustrag.storage.backend import StorageBackend
+    from trustrag.telemetry.sinks import TelemetrySink
     from trustrag.vision.describe import VisionRecord
     from trustrag.worker.queue import DurableQueue
 
@@ -104,6 +107,7 @@ class IngestPipeline:
         chunk_max_tokens: int = 450,
         chunk_overlap: int = 60,
         contextualizer: Contextualizer | None = None,
+        sink: TelemetrySink | None = None,
     ) -> None:
         self._backend = backend
         self._partition = partition
@@ -118,6 +122,7 @@ class IngestPipeline:
         self._chunk_max_tokens = chunk_max_tokens
         self._chunk_overlap = chunk_overlap
         self._contextualizer = contextualizer
+        self._sink = sink
 
     def ingest(
         self,
@@ -138,10 +143,12 @@ class IngestPipeline:
         if not manifest.is_changed(doc_id, checksum):
             return IngestResult(document_id=doc_id, status="unchanged")
 
+        started = time.perf_counter()
         if text is not None:
             doc = extract(text, source_type=SourceType.plain, document_id=doc_id)
         else:
             doc = extract(source, source_type=source_type, document_id=doc_id)
+        self._emit(Stage.extract, doc_id, started)
 
         language = self._detect_language(doc)
         if self._chunking_enabled:
@@ -176,6 +183,7 @@ class IngestPipeline:
 
         # embedding/text signal → embed + upsert into the leaf vector store.
         if Signal.embedding in self._signals or Signal.text in self._signals:
+            started = time.perf_counter()
             rows = [
                 {
                     "eu_id": eu.eu_id,
@@ -190,6 +198,7 @@ class IngestPipeline:
                 for eu in units
             ]
             self._store.upsert(rows)
+            self._emit(Stage.embedding, doc_id, started)
 
         # slow-path signals → enqueue the content hash on the durable worker.
         enqueued = False
@@ -208,6 +217,19 @@ class IngestPipeline:
             eu_ids=tuple(eu.eu_id for eu in units),
             n_units=len(units),
             enqueued_slow_path=enqueued,
+        )
+
+    def _emit(self, stage: Stage, document_id: str, started: float) -> None:
+        """Emit one ingest-stage telemetry event (§6c). No-op without a sink."""
+        if self._sink is None:
+            return
+        self._sink.emit(
+            StageEvent(
+                stage=stage,
+                partition=self._partition,
+                document_id=document_id,
+                duration_ms=(time.perf_counter() - started) * 1000.0,
+            )
         )
 
     def _vision_units(
