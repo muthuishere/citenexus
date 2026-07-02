@@ -20,7 +20,7 @@ grounding, and evaluation.
 | Backend | Vector | Text | When |
 |---|---|---|---|
 | **Lance** (recommended) | `LanceVectorStore` | `LanceTextSearch` (BM25-lite) | Zero infra, S3-native: point at a bucket and go |
-| **Postgres** | `PostgresVectorStore` (pgvector) | `PostgresTextSearch` (native `tsvector`) | You already run Postgres — `pip install 'trustrag[postgres]'`, set `vector_store.backend: "postgres"` |
+| **Postgres** | `PostgresVectorStore` (pgvector) | `PostgresTextSearch` (native `tsvector`) | You already run Postgres — `pip install 'trustrag-ai[postgres]'`, set `vector_store.backend: "postgres"` |
 | **Yours** | implement `VectorStore` | implement `TextSearch` | Qdrant, Weaviate, Elasticsearch, Tantivy, … |
 
 The seams are independent: mix LanceDB vectors with an Elasticsearch

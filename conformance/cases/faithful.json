@@ -1,0 +1,66 @@
+{
+  "supported": [
+    {
+      "answer": "The employee may not disclose confidential information.",
+      "passage": "Policy: The employee may not disclose confidential information. See §4.",
+      "supported": true
+    },
+    {
+      "answer": "EMPLOYEE, may NOT disclose!",
+      "passage": "the employee may not disclose confidential information",
+      "supported": true
+    },
+    {
+      "answer": "The employee may freely disclose information.",
+      "passage": "The employee may not disclose confidential information.",
+      "supported": false
+    },
+    {
+      "answer": "employees the",
+      "passage": "employees must comply",
+      "supported": false
+    },
+    {
+      "answer": "",
+      "passage": "any passage at all",
+      "supported": false
+    },
+    {
+      "answer": "notice period is 30 days",
+      "passage": "the notice period is 30 days per contract",
+      "supported": true
+    },
+    {
+      "answer": "notice period is 60 days",
+      "passage": "the notice period is 30 days per contract",
+      "supported": false
+    }
+  ],
+  "relevance": [
+    {
+      "query": "Can the employee disclose this?",
+      "passage": "The employee may not disclose confidential data.",
+      "relevant": true
+    },
+    {
+      "query": "what is the that",
+      "passage": "the policy covers annual leave",
+      "relevant": false
+    },
+    {
+      "query": "quarterly revenue targets",
+      "passage": "the cafeteria menu changes weekly",
+      "relevant": false
+    },
+    {
+      "query": "does clause 7 apply",
+      "passage": "clause 7 applies to contractors only",
+      "relevant": true
+    },
+    {
+      "query": "தமிழ் கேள்வி",
+      "passage": "தமிழ் ஆவணம்",
+      "relevant": false
+    }
+  ]
+}

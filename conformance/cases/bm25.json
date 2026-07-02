@@ -1,0 +1,109 @@
+[
+  {
+    "name": "single term, tf and length normalization",
+    "rows": [
+      {
+        "eu_id": "d1::0",
+        "text": "the employee may not disclose confidential information"
+      },
+      {
+        "eu_id": "d1::1",
+        "text": "disclose disclose disclose"
+      },
+      {
+        "eu_id": "d2::0",
+        "text": "annual leave policy for employees"
+      }
+    ],
+    "query": "disclose",
+    "expected": [
+      {
+        "eu_id": "d1::1",
+        "score": 0.870377
+      },
+      {
+        "eu_id": "d1::0",
+        "score": 0.398308
+      }
+    ]
+  },
+  {
+    "name": "multi-term idf weighting",
+    "rows": [
+      {
+        "eu_id": "a::0",
+        "text": "contract term and termination clause"
+      },
+      {
+        "eu_id": "a::1",
+        "text": "termination requires written notice"
+      },
+      {
+        "eu_id": "b::0",
+        "text": "contract contract contract everywhere"
+      },
+      {
+        "eu_id": "b::1",
+        "text": "unrelated text about holidays"
+      }
+    ],
+    "query": "contract termination",
+    "expected": [
+      {
+        "eu_id": "a::0",
+        "score": 1.284305
+      },
+      {
+        "eu_id": "b::0",
+        "score": 1.172488
+      },
+      {
+        "eu_id": "a::1",
+        "score": 0.711994
+      }
+    ]
+  },
+  {
+    "name": "zero-score rows are dropped; ties keep input order",
+    "rows": [
+      {
+        "eu_id": "x::0",
+        "text": "alpha beta"
+      },
+      {
+        "eu_id": "x::1",
+        "text": "alpha beta"
+      },
+      {
+        "eu_id": "x::2",
+        "text": "gamma delta"
+      }
+    ],
+    "query": "alpha",
+    "expected": [
+      {
+        "eu_id": "x::0",
+        "score": 0.470004
+      },
+      {
+        "eu_id": "x::1",
+        "score": 0.470004
+      }
+    ]
+  },
+  {
+    "name": "query tokens absent everywhere -> empty result",
+    "rows": [
+      {
+        "eu_id": "y::0",
+        "text": "nothing relevant here"
+      },
+      {
+        "eu_id": "y::1",
+        "text": "still nothing"
+      }
+    ],
+    "query": "quantum entanglement",
+    "expected": []
+  }
+]

@@ -1,0 +1,98 @@
+[
+  {
+    "input": "Hello, World!",
+    "tokens": [
+      "hello",
+      "world"
+    ]
+  },
+  {
+    "input": "The price is $4.50 (approx).",
+    "tokens": [
+      "the",
+      "price",
+      "is",
+      "4",
+      "50",
+      "approx"
+    ]
+  },
+  {
+    "input": "ISO-9001:2015 certified",
+    "tokens": [
+      "iso",
+      "9001",
+      "2015",
+      "certified"
+    ]
+  },
+  {
+    "input": "MixedCASE tokens123abc under_score",
+    "tokens": [
+      "mixedcase",
+      "tokens123abc",
+      "under",
+      "score"
+    ]
+  },
+  {
+    "input": "co-operate re-use state-of-the-art",
+    "tokens": [
+      "co",
+      "operate",
+      "re",
+      "use",
+      "state",
+      "of",
+      "the",
+      "art"
+    ]
+  },
+  {
+    "input": "Café Münster naïve résumé",
+    "tokens": [
+      "caf",
+      "m",
+      "nster",
+      "na",
+      "ve",
+      "r",
+      "sum"
+    ]
+  },
+  {
+    "input": "Über die Straße",
+    "tokens": [
+      "ber",
+      "die",
+      "stra",
+      "e"
+    ]
+  },
+  {
+    "input": "தமிழ் உரை and english words",
+    "tokens": [
+      "and",
+      "english",
+      "words"
+    ]
+  },
+  {
+    "input": "3.14159 and 2e10 numbers",
+    "tokens": [
+      "3",
+      "14159",
+      "and",
+      "2e10",
+      "numbers"
+    ]
+  },
+  {
+    "input": "",
+    "tokens": []
+  },
+  {
+    "input": "   \n\t  ",
+    "tokens": []
+  }
+]
