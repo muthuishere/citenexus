@@ -140,6 +140,28 @@ contextualizer is built from config.
   `Bm25TextSearch` works over any scannable store; `LeafVectorStore` kept as
   alias. `TrustRAG(text_search=…)` injects the text seam independently.
 
+### AGENT-TEAM SESSION (2026-07-02) — ALL OPEN THREADS CLOSED, RELEASE-READY
+Four parallel agents (worktree-isolated), all merged, gate green (455 py + 22 rust):
+- **Rust core**: LanceStore (merge-insert by eu_id) + lid.176 detect over the C ABI;
+  BIDIRECTIONAL interop proven (Rust-written Lance tables read by Python & vice
+  versa). Caveats: needs `protoc` to build; fasttext-rs 0.8 quantized inference
+  broken → dense `lid.176.bin` only (quantized refused loudly).
+- **LLM wiki**: WikiDistiller + LLMWikiDistiller (small model, degrade-to-
+  deterministic), [[links]], browsable Markdown tree in S3 + index.md, lint(),
+  one-hop link retrieval. wiki_distill config section.
+- **Chunking DEFAULT ON** (provenance change, user-approved): child eu_ids
+  `{doc}::{order}::{i}`; ChunkingConfig(enabled=True,450,60) + ContextModelConfig;
+  chunking.enabled=False restores legacy ids; structure retriever resolves
+  block refs down to children; ingest emits extract+embedding telemetry.
+- **Release-ready**: dist name **trustrag-ai** (pypi verified; ADR-0003),
+  CHANGELOG 0.2.0, release.yml verified (SHA-pinned, uv OIDC publish), broken
+  console-script removed, conformance/ fixtures (9 files, 52 cases) + drift-
+  guard test in the gate.
+- Live example re-verified post-merge: 4/5 answered, 100% grounded+cited.
+
+**TO SHIP (human actions)**: register PyPI trusted publisher for `trustrag-ai`
+(repo, release.yml, environment pypi) → push branch → tag v0.2.0.
+
 ### Open threads (asked for by user, NOT yet built — sequence for next session)
 Priority order by "retrieval must be right for legal/medical":
 1. **Chunker / splitting (HIGHEST leverage)** — today `build_evidence_units` is
