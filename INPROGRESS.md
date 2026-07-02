@@ -134,6 +134,11 @@ contextualizer is built from config.
 - compose `postgres` profile (pgvector, :15432) + `task local:postgres:{up,down}`.
 - Verified live on a real pgvector container: store round-trip AND full client
   ingest→ask with correct citation; lexical served by tsvector.
+- **Backend-paired naming** (user call): each backend is a named (vector, text)
+  pair — `LanceVectorStore`+`LanceTextSearch` (BM25-lite over scan) and
+  `PostgresVectorStore`+`PostgresTextSearch` (native tsvector). Generic
+  `Bm25TextSearch` works over any scannable store; `LeafVectorStore` kept as
+  alias. `TrustRAG(text_search=…)` injects the text seam independently.
 
 ### Open threads (asked for by user, NOT yet built — sequence for next session)
 Priority order by "retrieval must be right for legal/medical":
