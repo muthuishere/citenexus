@@ -19,6 +19,7 @@ from trustrag.embed import OpenAICompatibleEmbedding
 from trustrag.embed import Transport as EmbedTransport
 from trustrag.evaluate import EvaluationReport, Evaluator
 from trustrag.graph import GraphRetriever, GraphStore
+from trustrag.hooks import Hooks
 from trustrag.ingest.pipeline import IngestPipeline, VisionDescriber
 from trustrag.ingest.result import IngestResult
 from trustrag.ingest.web import FetchTransport, crawl, fetch_url, is_url
@@ -38,7 +39,7 @@ from trustrag.storage.paths import leaf_vector_uri, partition_segment
 from trustrag.storage.postgres_store import PostgresVectorStore, table_name_for
 from trustrag.storage.protocols import TextSearch, VectorStore
 from trustrag.stream import stream_result
-from trustrag.telemetry.events import Outcome, Stage, StageEvent
+from trustrag.telemetry.events import Outcome, Stage, StageEvent, UnitCount
 from trustrag.telemetry.sinks import TelemetrySink
 from trustrag.vision import OpenAICompatibleVision
 from trustrag.wiki import WikiRetriever, WikiStore
@@ -94,6 +95,7 @@ class TrustRAG:
         reformulator: Reformulator | None = None,
         vector_store: VectorStore | None = None,
         text_search: TextSearch | None = None,
+        hooks: Hooks | None = None,
     ) -> None:
         self.base_uri = str(base_uri)
         self.partition = partition or PartitionPath.of(("workspace", "default"))
@@ -145,6 +147,7 @@ class TrustRAG:
         self._sink = sink
         self._fetch_transport = fetch_transport
         self._reformulator = reformulator
+        self._hooks = hooks or Hooks()
         self._top_k = top_k
 
     @classmethod
@@ -292,6 +295,7 @@ class TrustRAG:
         )
         if result.status == "ingested":
             self.refresh_slow_path()
+        self._hooks.fire("on_ingest", result)
         return result
 
     def _ingest_url(self, url: str, *, document_id: str | None, acl: Any) -> IngestResult:
@@ -353,11 +357,13 @@ class TrustRAG:
         k: int | None = None,
         conversation_id: str | None = None,
     ) -> list[Candidate]:
-        return self._retrieve.retrieve(
+        candidates = self._retrieve.retrieve(
             self._retrieval_query(question, conversation_id=conversation_id),
             k or self._top_k,
             extra_queries=self._extra_queries(question),
         )
+        self._hooks.fire("on_retrieve", question, candidates)
+        return candidates
 
     def ask(
         self,
@@ -374,14 +380,23 @@ class TrustRAG:
         # question in the evidence's language. Citations and the faithfulness
         # gate stay exactly as strict — this only widens *relevance* matching.
         evidence_query = " ".join([retrieval_query, *extra_queries])
+        candidates = self._retrieve.retrieve(
+            retrieval_query, k or self._top_k, extra_queries=extra_queries
+        )
+        self._hooks.fire("on_retrieve", question, candidates)
+        self._emit_fusion(len(candidates))
         result = self._answer.ask(
             question,
-            self._retrieve.retrieve(retrieval_query, k or self._top_k, extra_queries=extra_queries),
+            candidates,
             mode=mode,
             answer_language=answer_language,
             evidence_query=evidence_query,
         )
         self._emit_generate(result)
+        if result.evidence.decision is Decision.answered:
+            self._hooks.fire("on_answer", result)
+        else:
+            self._hooks.fire("on_refuse", result)
         if conversation_id is not None:
             self._memory.append(conversation_id, question, result.answer)
         return result
@@ -416,6 +431,18 @@ class TrustRAG:
             )
         )
 
+    def _emit_fusion(self, n_candidates: int) -> None:
+        """Emit the fused-retrieval telemetry event (§6c). No-op without a sink."""
+        if self._sink is None:
+            return
+        self._sink.emit(
+            StageEvent(
+                stage=Stage.fusion,
+                partition=self.partition,
+                units=UnitCount(candidates=n_candidates),
+            )
+        )
+
     def stream(
         self,
         question: str,
@@ -432,7 +459,10 @@ class TrustRAG:
             answer_language=answer_language,
             conversation_id=conversation_id,
         )
-        return tuple(stream_result(result))
+        chunks = tuple(stream_result(result))
+        for chunk in chunks:
+            self._hooks.fire("on_chunk", chunk)
+        return chunks
 
     def evaluate(self, csv_path: str | Path) -> EvaluationReport:
         return Evaluator(self.ask).evaluate(csv_path)

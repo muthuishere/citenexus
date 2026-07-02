@@ -69,6 +69,18 @@ def test_ask_emits_refused_outcome(tmp_path: Path) -> None:
     assert generate_events[0].outcome is Outcome.refused
 
 
+def test_ask_emits_fusion_event_with_candidate_count(tmp_path: Path) -> None:
+    sink = InMemorySink()
+    rag = _rag(tmp_path, sink)
+    rag.ingest(text="Termination requires thirty days notice.", document_id="c")
+    rag.ask("What does termination require?")
+
+    fusion_events = [e for e in sink.events if e.stage is Stage.fusion]
+    assert len(fusion_events) == 1
+    assert fusion_events[0].units is not None
+    assert fusion_events[0].units.candidates >= 1
+
+
 def test_no_sink_is_a_silent_noop(tmp_path: Path) -> None:
     rag = TrustRAG(tmp_path, embedder=FakeEmbedding(), generator=UsageLLM())
     rag.ingest(text="Termination requires thirty days notice.", document_id="c")
