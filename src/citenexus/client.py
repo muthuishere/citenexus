@@ -37,6 +37,7 @@ from citenexus.retrieve.types import Candidate
 from citenexus.retrieve.vector import QueryEmbedder, VectorRetriever
 from citenexus.storage.backend import LocalFsBackend, S3Backend, StorageBackend
 from citenexus.storage.lance_store import LanceVectorStore, StorageOptions
+from citenexus.storage.location import S3
 from citenexus.storage.paths import leaf_vector_uri, partition_segment
 from citenexus.storage.postgres_store import PostgresVectorStore, table_name_for
 from citenexus.storage.protocols import TextSearch, VectorStore
@@ -89,7 +90,7 @@ class CiteNexus:
 
     def __init__(
         self,
-        base_uri: str | Path,
+        base_uri: str | Path | S3,
         *,
         partition: PartitionPath | None = None,
         signals: Iterable[str | Signal] | None = None,
@@ -115,6 +116,14 @@ class CiteNexus:
         chunk_overlap: int = 60,
         contextualizer: ContextualizerSeam | None = None,
     ) -> None:
+        # A first-class S3 location carries endpoint + credential names and
+        # derives BOTH storage halves; strings/paths keep the simple behavior.
+        if isinstance(base_uri, S3):
+            backend = backend or base_uri.make_backend()
+            storage_options = (
+                storage_options if storage_options is not None else base_uri.lance_storage_options()
+            )
+            base_uri = base_uri.base_uri()
         self.base_uri = str(base_uri)
         self.partition = partition or PartitionPath.of(("workspace", "default"))
         self.signals = resolve_signals(signals)
@@ -316,6 +325,29 @@ class CiteNexus:
                 api_key_env=config.context_model.api_key_env,
                 transport=context_transport,
             )
+
+        # S3-compatible endpoints (MinIO / Cloudflare R2): storage.endpoint_url
+        # wires BOTH halves — the object backend (boto3) and the Lance store's
+        # object-store options — so "point at a bucket" works from config alone.
+        # Credentials come from the standard AWS_* environment variables.
+        if (
+            backend is None
+            and config.storage.bucket.startswith("s3://")
+            and config.storage.endpoint_url
+        ):
+            bucket = config.storage.bucket.removeprefix("s3://").split("/", 1)[0]
+            backend = S3Backend(
+                bucket,
+                endpoint_url=config.storage.endpoint_url,
+                region=config.storage.region or "us-east-1",
+            )
+            if storage_options is None:
+                storage_options = {
+                    "endpoint": config.storage.endpoint_url,
+                    "region": config.storage.region or "us-east-1",
+                }
+                if config.storage.endpoint_url.startswith("http://"):
+                    storage_options["allow_http"] = "true"
 
         return cls(
             config.storage.bucket,

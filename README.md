@@ -27,10 +27,10 @@ The seams are independent: mix LanceDB vectors with an Elasticsearch
 `text_search=`, or let one Postgres serve both.
 
 ```python
-from citenexus import CiteNexus
+from citenexus import CiteNexus, S3
 
 rag = CiteNexus(
-    "s3://my-bucket",
+    S3(bucket="my-bucket"),
     embedder=my_embedding_endpoint,
     generator=my_llm_endpoint,
 )
@@ -43,7 +43,11 @@ print(answer)                                    # grounded answer; .sources are
 and every rung below is additive (nothing above it changes):
 
 ```python
-rag = CiteNexus("./data")
+rag = CiteNexus("./data")                     # a folder…
+rag = CiteNexus(S3(bucket="docs",             # …or real S3/MinIO/R2: ONE object
+                   endpoint_url="https://<r2>.cloudflarestorage.com"))
+                                              #    carries endpoint + credential
+                                              #    env-var names for BOTH stores
 # ZERO models — already FOUR retrieval signals, fused with RRF:
 #   text (BM25) · structure (heading tree) · graph (co-mention) · wiki (page nav)
 rag.ingest("handbook.pdf")
