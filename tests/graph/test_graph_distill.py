@@ -13,7 +13,6 @@ from __future__ import annotations
 import json
 
 from citenexus.graph.distill import GraphDistiller, LLMGraphDistiller
-
 from citenexus.graph.store import GraphIndex
 
 
