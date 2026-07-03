@@ -4,12 +4,15 @@
   "description": "CiteNexus TypeScript port — SPEC-PORTS-v1 conformance (T1 foundation). Evidence-first RAG: answers only from retrieved evidence, cites verbatim, abstains otherwise.",
   "type": "module",
   "license": "Apache-2.0",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@types/node": "^26.1.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   }
