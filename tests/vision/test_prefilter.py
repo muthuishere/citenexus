@@ -5,8 +5,8 @@ OCR-dense, it routes to one of `text` / `ocr` / `vision` / `skip` (§9). Each
 test below is one row of that table.
 """
 
-from trustrag.extract.types import ImageRef
-from trustrag.vision import VisionDecision, VisionPrefilterConfig, decide
+from citenexus.extract.types import ImageRef
+from citenexus.vision import VisionDecision, VisionPrefilterConfig, decide
 
 
 def _image(image_id: str, *, width: int | None, height: int | None) -> ImageRef:
@@ -75,6 +75,5 @@ def test_skip_if_ocr_dense_false_routes_meaningful_to_vision() -> None:
     cfg = VisionPrefilterConfig(skip_if_ocr_dense=False)
     img = _image("img-scan", width=900, height=900)
     assert (
-        decide(img, page_area=1_000_000.0, ocr_text_dense=True, config=cfg)
-        is VisionDecision.vision
+        decide(img, page_area=1_000_000.0, ocr_text_dense=True, config=cfg) is VisionDecision.vision
     )

@@ -35,8 +35,8 @@ doesn't — without ever treating "no structure" as a failure.
 
 ## Impact
 
-- New module `src/trustrag/evidence/structure.py`, building only on the existing
-  `trustrag.extract.types` (§8). `evidence/__init__.py` is unchanged; the module is
+- New module `src/citenexus/evidence/structure.py`, building only on the existing
+  `citenexus.extract.types` (§8). `evidence/__init__.py` is unchanged; the module is
   imported by full path.
 - New tests under `tests/evidence/test_structure.py`. No new dependencies, no
   public-API verb change (this feeds the §10 structure retriever, not a verb).

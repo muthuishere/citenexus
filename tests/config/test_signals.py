@@ -2,7 +2,7 @@
 
 import pytest
 
-from trustrag.config.signals import (
+from citenexus.config.signals import (
     SLOW_PATH_SIGNALS,
     Signal,
     all_signals,

@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from trustrag.retrieve.engine import RetrievalEngine
-from trustrag.retrieve.fusion import rrf_fuse
-from trustrag.retrieve.lexical import LexicalRetriever
-from trustrag.retrieve.structure import StructureRetriever
-from trustrag.retrieve.types import Candidate
-from trustrag.retrieve.vector import VectorRetriever
-from trustrag.storage.backend import LocalFsBackend
-from trustrag.storage.lance_store import LeafVectorStore
-from trustrag.testing.fakes import FakeEmbedding
+from citenexus.retrieve.engine import RetrievalEngine
+from citenexus.retrieve.fusion import rrf_fuse
+from citenexus.retrieve.lexical import LexicalRetriever
+from citenexus.retrieve.structure import StructureRetriever
+from citenexus.retrieve.types import Candidate
+from citenexus.retrieve.vector import VectorRetriever
+from citenexus.storage.backend import LocalFsBackend
+from citenexus.storage.lance_store import LanceVectorStore
+from citenexus.testing.fakes import FakeEmbedding
 
 from .conftest import PARTITION
 
@@ -31,7 +31,7 @@ class _SpyReranker:
 
 
 def _engine(
-    store: LeafVectorStore,
+    store: LanceVectorStore,
     backend: LocalFsBackend,
     embedder: FakeEmbedding,
     reranker: _SpyReranker,
@@ -47,7 +47,7 @@ def _engine(
 
 
 def test_end_to_end_fused_reranked_list(
-    seeded_store: LeafVectorStore,
+    seeded_store: LanceVectorStore,
     backend_with_structure: LocalFsBackend,
     embedder: FakeEmbedding,
 ) -> None:
@@ -61,7 +61,7 @@ def test_end_to_end_fused_reranked_list(
 
 
 def test_identity_reranker_preserves_fused_order(
-    seeded_store: LeafVectorStore,
+    seeded_store: LanceVectorStore,
     backend_with_structure: LocalFsBackend,
     embedder: FakeEmbedding,
 ) -> None:
@@ -74,16 +74,14 @@ def test_identity_reranker_preserves_fused_order(
     lists = [
         VectorRetriever(seeded_store, embedder).retrieve(query, 10),
         LexicalRetriever(seeded_store).retrieve(query, 10),
-        StructureRetriever(backend_with_structure, PARTITION, seeded_store).retrieve(
-            query, 10
-        ),
+        StructureRetriever(backend_with_structure, PARTITION, seeded_store).retrieve(query, 10),
     ]
     expected = [c.eu_id for c in rrf_fuse(lists)]
     assert got == expected
 
 
 def test_k_caps_the_result(
-    seeded_store: LeafVectorStore,
+    seeded_store: LanceVectorStore,
     backend_with_structure: LocalFsBackend,
     embedder: FakeEmbedding,
 ) -> None:

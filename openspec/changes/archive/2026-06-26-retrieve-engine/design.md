@@ -22,7 +22,7 @@ ingest sentinel for "no page") maps back to `None`.
 
 ### Lexical (sparse) — BM25-lite, multilingual-safe
 `LexicalRetriever(store)` scans every row's text once (`store.scan()`),
-tokenizes with `trustrag.testing.fakes.tokenize` (lowercase `[a-z0-9]+`, NO
+tokenizes with `citenexus.testing.fakes.tokenize` (lowercase `[a-z0-9]+`, NO
 stemming, NO stopwords — language-agnostic so it never penalizes non-English
 text), and scores each document with classic BM25 (`k1=1.5`, `b=0.75`):
 `score = Σ_t idf(t)·tf'`, `idf(t)=ln(1+(N−n_t+0.5)/(n_t+0.5))`. A document that

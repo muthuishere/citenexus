@@ -2,7 +2,7 @@
 
 The §4b `EmbeddingPlugin` protocol (`embed(texts) -> list[Embedding]`, where
 `Embedding` is a forward `Any` alias) needs its first concrete implementation.
-Per the project stack, TrustRAG bundles no models: the embedding model is an
+Per the project stack, CiteNexus bundles no models: the embedding model is an
 injected OpenAI-compatible endpoint (local Ollama `bge-m3`, or a FlagEmbedding /
 infinity server). §17 already carries an `EmbeddingConfig` (`model`, `endpoint`,
 `dense`, `sparse`, `batch_size`, `dimensions`). Unit tests must stay hermetic
@@ -35,7 +35,7 @@ and local Ollama is currently DOWN — so the real path is integration-only.
 - **Inject the HTTP via a `transport` callable**
   (`Callable[[str, bytes, dict[str, str]], bytes]` = url, json body, headers →
   response bytes) rather than calling `urllib` directly in `embed`. This is the
-  same "injected endpoint" discipline used across TrustRAG: tests pass a fake
+  same "injected endpoint" discipline used across CiteNexus: tests pass a fake
   transport returning canned JSON, so they are hermetic and flake-free. The
   DEFAULT transport is a tiny `urllib.request` wrapper — stdlib only, no `httpx`.
   Alternative considered: monkeypatching `urllib` in tests — rejected as fragile

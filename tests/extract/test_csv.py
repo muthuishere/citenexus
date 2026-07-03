@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from trustrag.extract.csv import CsvExtractor
-from trustrag.extract.types import BlockKind, SourceType, StructureType
+from citenexus.extract.csv import CsvExtractor
+from citenexus.extract.types import BlockKind, SourceType, StructureType
 
 
 def test_header_schema_and_row_blocks() -> None:

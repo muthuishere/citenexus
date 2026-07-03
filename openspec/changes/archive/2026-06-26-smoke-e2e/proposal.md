@@ -8,7 +8,7 @@ first thing a user can actually *use*.
 ## What Changes
 
 - Add deterministic fakes (`FakeEmbedding` hashing vectorizer, extractive
-  `FakeLLM`, identity `FakeReranker`) under `trustrag.testing` so the guarantee is
+  `FakeLLM`, identity `FakeReranker`) under `citenexus.testing` so the guarantee is
   provable offline and the example needs no model server.
 - Add `SmokePipeline`: `ingest(text, document_id)` → one Evidence Unit, embed,
   content-addressed raw blob, per-leaf vector upsert, etag manifest; and
@@ -23,6 +23,6 @@ first thing a user can actually *use*.
 
 ## Impact
 
-- New `src/trustrag/testing/` and `src/trustrag/smoke/`. Hermetic tests on
+- New `src/citenexus/testing/` and `src/citenexus/smoke/`. Hermetic tests on
   LocalFs + local LanceDB; an opt-in MinIO variant. The public shape (`ingest`/
   `ask`) and the "no ungrounded claim" guarantee are what L3-L5 grow into.

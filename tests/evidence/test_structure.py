@@ -3,8 +3,8 @@
 import pytest
 from pydantic import ValidationError
 
-from trustrag.evidence.structure import StructureIndex, StructureNode, build_structure
-from trustrag.extract.types import (
+from citenexus.evidence.structure import StructureIndex, StructureNode, build_structure
+from citenexus.extract.types import (
     BlockKind,
     ExtractedBlock,
     ExtractedDoc,

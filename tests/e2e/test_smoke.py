@@ -12,11 +12,11 @@ from pathlib import Path
 
 import pytest
 
-from trustrag.answer.result import Decision
-from trustrag.domain.partition import PartitionPath
-from trustrag.smoke import SmokePipeline
-from trustrag.storage.backend import LocalFsBackend
-from trustrag.testing import FakeEmbedding, FakeLLM
+from citenexus.answer.result import Decision
+from citenexus.domain.partition import PartitionPath
+from citenexus.smoke import SmokePipeline
+from citenexus.storage.backend import LocalFsBackend
+from citenexus.testing import FakeEmbedding, FakeLLM
 
 NDA = "The employee shall not disclose confidential information."
 
@@ -71,8 +71,8 @@ def test_retrieves_the_relevant_document(tmp_path: Path) -> None:
 
 # --- opt-in MinIO variant ---------------------------------------------------
 
-ENDPOINT = os.environ.get("TRUSTRAG_S3_ENDPOINT_URL", "http://localhost:19000")
-BUCKET = os.environ.get("TRUSTRAG_BUCKET", "trustrag-local")
+ENDPOINT = os.environ.get("CITENEXUS_S3_ENDPOINT_URL", "http://localhost:19000")
+BUCKET = os.environ.get("CITENEXUS_BUCKET", "citenexus-local")
 KEY = os.environ.get("AWS_ACCESS_KEY_ID", "minioadmin")
 SECRET = os.environ.get("AWS_SECRET_ACCESS_KEY", "minioadmin")
 
@@ -89,12 +89,10 @@ def _minio_up() -> bool:
 def test_smoke_on_minio() -> None:
     if not _minio_up():
         pytest.skip(f"MinIO not reachable on {ENDPOINT}")
-    from trustrag.storage.backend import S3Backend
+    from citenexus.storage.backend import S3Backend
 
     part = PartitionPath.of(("workspace", f"it-{uuid.uuid4().hex}"))
-    backend = S3Backend(
-        BUCKET, endpoint_url=ENDPOINT, access_key_id=KEY, secret_access_key=SECRET
-    )
+    backend = S3Backend(BUCKET, endpoint_url=ENDPOINT, access_key_id=KEY, secret_access_key=SECRET)
     pipeline = SmokePipeline(
         backend=backend,
         base_uri=f"s3://{BUCKET}",
@@ -115,7 +113,7 @@ def test_smoke_on_minio() -> None:
         assert r.evidence.decision is Decision.answered
         assert r.sources[0].document == "nda"
     finally:
-        from trustrag.storage.paths import Layer, layer_prefix
+        from citenexus.storage.paths import Layer, layer_prefix
 
         for layer in (Layer.raw, Layer.manifests, Layer.vector):
             backend.delete_prefix(layer_prefix(layer, part))

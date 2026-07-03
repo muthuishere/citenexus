@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from trustrag.answer.result import (
+from citenexus.answer.result import (
     Claim,
     Decision,
     EvidenceSignals,
@@ -11,12 +11,10 @@ from trustrag.answer.result import (
     Result,
     SourceRef,
 )
-from trustrag.domain.trust import TrustMode
+from citenexus.domain.trust import TrustMode
 
 
-def _result(
-    answer_language: str = "en", evidence_langs: tuple[str, ...] = ("en",)
-) -> Result:
+def _result(answer_language: str = "en", evidence_langs: tuple[str, ...] = ("en",)) -> Result:
     return Result(
         answer="No. The employee cannot disclose confidential information.",
         answer_language=answer_language,

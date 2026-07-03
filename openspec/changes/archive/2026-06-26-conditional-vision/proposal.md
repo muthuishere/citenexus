@@ -38,9 +38,9 @@ endpoint; this change owns only the pre-filter and the orchestration around it.
 
 ## Impact
 
-- New module `src/trustrag/vision/`: `prefilter.py`, `describe.py`, `__init__.py`.
-- Consumes `trustrag.extract.types.ImageRef` (input; unchanged) and the
-  `VisionPlugin` seam from `trustrag.plugins.base` (unchanged).
+- New module `src/citenexus/vision/`: `prefilter.py`, `describe.py`, `__init__.py`.
+- Consumes `citenexus.extract.types.ImageRef` (input; unchanged) and the
+  `VisionPlugin` seam from `citenexus.plugins.base` (unchanged).
 - Downstream: ingestion (L3) routes extracted `ImageRef`s through `decide`, and
   the evidence-builder turns each `VisionRecord` into a figure/diagram Evidence
   Unit (§7). No dependency or API changes elsewhere; pillow already present.

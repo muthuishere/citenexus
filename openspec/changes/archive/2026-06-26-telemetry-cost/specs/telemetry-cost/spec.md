@@ -27,7 +27,7 @@ ok, retry, dead_letter, refused, and verify_failed.
 ### Requirement: Pluggable telemetry sinks
 
 The system SHALL expose a `TelemetrySink` structural protocol with a single
-`emit(event)` method, so any operator-supplied sink is accepted without TrustRAG
+`emit(event)` method, so any operator-supplied sink is accepted without CiteNexus
 depending on it. It SHALL ship an `InMemorySink` that collects emitted events in
 order and a `StdoutSink` that writes each event as one JSON line to a stream.
 

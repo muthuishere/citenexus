@@ -1,6 +1,6 @@
 ## Context
 
-This is the first capability of TrustRAG, built foundation-first. Everything
+This is the first capability of CiteNexus, built foundation-first. Everything
 downstream (ingest, retrieval, answer, eval) imports these models. They are pure:
 no I/O, no plugins, no storage. Stack is Python ≥3.11, pydantic v2, mypy --strict,
 ruff. The models must faithfully encode the v6 invariants (§7, §6b, §12, §14, §16).
@@ -24,12 +24,12 @@ ruff. The models must faithfully encode the v6 invariants (§7, §6b, §12, §14
 ## Decisions
 
 - **Module layout** (one concern per file):
-  - `src/trustrag/evidence/unit.py` — `EUType` (StrEnum), `Citation`, `EvidenceUnit`.
-  - `src/trustrag/domain/partition.py` — `PartitionLevel` (a `(level, value)` pair)
+  - `src/citenexus/evidence/unit.py` — `EUType` (StrEnum), `Citation`, `EvidenceUnit`.
+  - `src/citenexus/domain/partition.py` — `PartitionLevel` (a `(level, value)` pair)
     and `PartitionPath` (ordered tuple of levels) with `depth`, `is_prefix_of`,
     `as_pairs`, stable serialization.
-  - `src/trustrag/domain/trust.py` — `TrustMode` (StrEnum: strict/normal/exploratory).
-  - `src/trustrag/answer/result.py` — `EvidenceSignals`, `Decision` (StrEnum),
+  - `src/citenexus/domain/trust.py` — `TrustMode` (StrEnum: strict/normal/exploratory).
+  - `src/citenexus/answer/result.py` — `EvidenceSignals`, `Decision` (StrEnum),
     `SourceRef`, `Claim`, `ProvenanceEntry`, `Result`.
 - **pydantic v2 `BaseModel`** for everything, `model_config = ConfigDict(frozen=True,
   extra="forbid")` so models are hashable/immutable and typos are caught. `acl` is

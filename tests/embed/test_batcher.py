@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from trustrag.embed import embed_in_batches
+from citenexus.embed import embed_in_batches
 
 
 class CountingPlugin:

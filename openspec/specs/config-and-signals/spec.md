@@ -92,9 +92,9 @@ override earlier ones), exposed as a `from_config(...)` entry point.
 - **WHEN** a YAML file sets `trust.default_mode: normal` and an environment override sets it to `strict`
 - **THEN** the resolved configuration reports `trust.default_mode` as `strict`
 
-### Requirement: Validation against trustrag.validate.yaml warns and never errors
+### Requirement: Validation against citenexus.validate.yaml warns and never errors
 
-When a `trustrag.validate.yaml` allow-list is supplied, the library SHALL compare
+When a `citenexus.validate.yaml` allow-list is supplied, the library SHALL compare
 the live client's declared `signals` (and doc types) against `allowed_signals`
 (and `allowed_doc_types`) and SHALL emit a warning on divergence while proceeding.
 It MUST NOT raise. When no validation file is supplied, no check SHALL run.
@@ -107,6 +107,6 @@ It MUST NOT raise. When no validation file is supplied, no check SHALL run.
 
 #### Scenario: Missing validation file means no check
 
-- **WHEN** no `trustrag.validate.yaml` is provided
+- **WHEN** no `citenexus.validate.yaml` is provided
 - **THEN** no validation warning is emitted and construction proceeds normally
 

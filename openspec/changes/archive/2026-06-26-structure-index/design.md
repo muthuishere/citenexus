@@ -5,7 +5,7 @@ slide sequence, table schema, thread order, page layout, or none. v3.2's core ru
 is that structure is optional and degrades to nothing without blocking retrieval.
 This change adds the index that captures whatever structure an `ExtractedDoc`
 declares (`structure_type`) into one uniform node shape, building only on the
-already-shipped `trustrag.extract.types` (§8).
+already-shipped `citenexus.extract.types` (§8).
 
 ## Goals / Non-Goals
 

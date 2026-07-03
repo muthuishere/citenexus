@@ -6,7 +6,7 @@
 operator-managed store (Postgres or other). This change adds the seam that
 consumes that store's decision: scope→prefix resolution plus a hard
 allowed-partitions pre-filter, building only on the already-shipped
-`trustrag.domain.partition.PartitionPath` (`is_prefix_of`, variable depth).
+`citenexus.domain.partition.PartitionPath` (`is_prefix_of`, variable depth).
 
 ## Goals / Non-Goals
 

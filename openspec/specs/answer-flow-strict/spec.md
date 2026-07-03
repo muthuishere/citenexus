@@ -10,7 +10,7 @@ claim is supported by cited evidence. Otherwise it refuses.
 
 ### Requirement: Public client answers only from verified evidence
 
-`TrustRAG.ask()` SHALL retrieve candidates, generate an answer from selected
+`CiteNexus.ask()` SHALL retrieve candidates, generate an answer from selected
 evidence, and return `Decision.refused` when no relevant candidate exists or the
 generated answer fails the faithfulness gate.
 
@@ -30,7 +30,7 @@ generated answer fails the faithfulness gate.
 
 ### Requirement: Evaluation CSV produces aggregate metrics
 
-`TrustRAG.evaluate(csv)` SHALL read a golden CSV with a `question` or `query`
+`CiteNexus.evaluate(csv)` SHALL read a golden CSV with a `question` or `query`
 column and return aggregate answer, refusal, groundedness, citation, and expected
 support metrics.
 

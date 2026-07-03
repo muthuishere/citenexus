@@ -11,15 +11,15 @@ import uuid
 
 import pytest
 
-from trustrag.domain.partition import PartitionPath
-from trustrag.storage.backend import S3Backend
-from trustrag.storage.lance_store import LeafVectorStore
-from trustrag.storage.paths import leaf_vector_uri
+from citenexus.domain.partition import PartitionPath
+from citenexus.storage.backend import S3Backend
+from citenexus.storage.lance_store import LanceVectorStore
+from citenexus.storage.paths import leaf_vector_uri
 
 pytestmark = pytest.mark.integration
 
-ENDPOINT = os.environ.get("TRUSTRAG_S3_ENDPOINT_URL", "http://localhost:19000")
-BUCKET = os.environ.get("TRUSTRAG_BUCKET", "trustrag-local")
+ENDPOINT = os.environ.get("CITENEXUS_S3_ENDPOINT_URL", "http://localhost:19000")
+BUCKET = os.environ.get("CITENEXUS_BUCKET", "citenexus-local")
 KEY = os.environ.get("AWS_ACCESS_KEY_ID", "minioadmin")
 SECRET = os.environ.get("AWS_SECRET_ACCESS_KEY", "minioadmin")
 
@@ -39,9 +39,7 @@ def _require_minio() -> None:
 
 
 def test_s3_backend_round_trip_and_delete() -> None:
-    backend = S3Backend(
-        BUCKET, endpoint_url=ENDPOINT, access_key_id=KEY, secret_access_key=SECRET
-    )
+    backend = S3Backend(BUCKET, endpoint_url=ENDPOINT, access_key_id=KEY, secret_access_key=SECRET)
     prefix = f"raw/it-{uuid.uuid4().hex}"
     digest = backend.put_blob(prefix, b"evidence-bytes")
     assert backend.exists(f"{prefix}/{digest}")
@@ -60,7 +58,7 @@ def test_lance_leaf_on_s3() -> None:
         "secret_access_key": SECRET,
         "region": "us-east-1",
     }
-    store = LeafVectorStore(uri, storage_options=so)
+    store = LanceVectorStore(uri, storage_options=so)
     try:
         store.upsert(
             [

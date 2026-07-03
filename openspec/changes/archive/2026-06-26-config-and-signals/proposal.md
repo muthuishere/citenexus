@@ -1,6 +1,6 @@
 ## Why
 
-TrustRAG's public surface is convention-over-configuration (§15): `TrustRAG("s3://bucket")`
+CiteNexus's public surface is convention-over-configuration (§15): `CiteNexus("s3://bucket")`
 must just work, while the single most important knob — which of the six retrieval signals a
 client builds and queries — has to be declared once and then honored everywhere. Without a
 typed config layer and a signal-capability gate, ingest would pay for graph/wiki layers a
@@ -21,7 +21,7 @@ answer) consults config and the signal gate.
 - A `Signal` enum `{embedding, text, graph, community, structure, wiki}` and gating
   predicates that answer "does ingest build signal X?" and "does ask query signal X?".
   Declaring `signals=["embedding","text"]` gates OUT graph/community/wiki for both phases.
-- An optional warn-only validation pass against `trustrag.validate.yaml`
+- An optional warn-only validation pass against `citenexus.validate.yaml`
   (`allowed_signals`, `allowed_doc_types`): divergence emits a WARNING and proceeds; it
   NEVER raises, and a missing file means no check.
 - No pipeline behavior — this change delivers typed config + signal gating + validation only.
@@ -39,7 +39,7 @@ answer) consults config and the signal gate.
 
 ## Impact
 
-- New modules: `src/trustrag/config/schema.py`, `config/loader.py`, `config/signals.py`,
+- New modules: `src/citenexus/config/schema.py`, `config/loader.py`, `config/signals.py`,
   `config/validate.py`.
 - Consumed later by the ingest pipeline (signal-gated build) and the retrieval/answer layer
   (signal-gated query). No external dependencies beyond pydantic v2 (+ stdlib yaml via a

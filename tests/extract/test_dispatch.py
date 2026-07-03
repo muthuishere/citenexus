@@ -6,16 +6,16 @@ from pathlib import Path
 
 import pytest
 
-from trustrag.extract.csv import CsvExtractor
-from trustrag.extract.dispatch import extract, extractor_for
-from trustrag.extract.docx import DocxExtractor
-from trustrag.extract.html import HtmlExtractor
-from trustrag.extract.md import MdExtractor
-from trustrag.extract.pdf import PdfExtractor
-from trustrag.extract.plain import PlainExtractor
-from trustrag.extract.pptx import PptxExtractor
-from trustrag.extract.txt import TxtExtractor
-from trustrag.extract.types import ExtractedDoc, SourceType
+from citenexus.extract.csv import CsvExtractor
+from citenexus.extract.dispatch import extract, extractor_for
+from citenexus.extract.docx import DocxExtractor
+from citenexus.extract.html import HtmlExtractor
+from citenexus.extract.md import MdExtractor
+from citenexus.extract.pdf import PdfExtractor
+from citenexus.extract.plain import PlainExtractor
+from citenexus.extract.pptx import PptxExtractor
+from citenexus.extract.txt import TxtExtractor
+from citenexus.extract.types import ExtractedDoc, SourceType
 
 
 @pytest.mark.parametrize(

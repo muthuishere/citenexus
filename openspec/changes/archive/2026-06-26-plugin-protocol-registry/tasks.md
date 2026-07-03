@@ -18,16 +18,16 @@
 
 ## 2. Implement (green)
 
-- [x] 2.1 `src/trustrag/plugins/base.py`: `from __future__ import annotations`;
+- [x] 2.1 `src/citenexus/plugins/base.py`: `from __future__ import annotations`;
       common `Plugin` ABC with `plugin_version`; the 11 protocol ABCs with their
       abstract contract methods (signatures per the spec). `RetrieverPlugin`
       limited to returning ranked candidates — no fusion/grounding hook.
-- [x] 2.2 `src/trustrag/plugins/registry.py`: `PluginRegistry` with the
+- [x] 2.2 `src/citenexus/plugins/registry.py`: `PluginRegistry` with the
       single-slot dict + retriever fusion list; `register_plugin`,
       `register_retriever`, `resolve`, and `use(plugin)` type-dispatch; enforce
       type-conformance and non-empty `plugin_version`; reject multi-protocol
       objects.
-- [x] 2.3 `src/trustrag/plugins/__init__.py`: export the protocols + registry.
+- [x] 2.3 `src/citenexus/plugins/__init__.py`: export the protocols + registry.
 
 ## 3. Verify
 

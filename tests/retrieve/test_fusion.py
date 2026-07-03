@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from trustrag.retrieve.fusion import rrf_fuse
-from trustrag.retrieve.types import Candidate, RetrievalSignal
+from citenexus.retrieve.fusion import rrf_fuse
+from citenexus.retrieve.types import Candidate, RetrievalSignal
 
 
 def _c(eu_id: str, score: float, signal: RetrievalSignal) -> Candidate:

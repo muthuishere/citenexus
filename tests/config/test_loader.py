@@ -2,9 +2,9 @@
 
 from pathlib import Path
 
-from trustrag.config.loader import from_config
-from trustrag.config.schema import LexicalSignal
-from trustrag.domain.trust import TrustMode
+from citenexus.config.loader import from_config
+from citenexus.config.schema import LexicalSignal
+from citenexus.domain.trust import TrustMode
 
 SECTION17_YAML = """
 storage:
@@ -12,7 +12,8 @@ storage:
   partition_hierarchy: [org, product_line, product]
 llm:
   model: qwen2.5
-  endpoint: http://localhost:11434/v1
+  endpoint:
+    base_url: http://localhost:11434/v1
 embedding:
   model: bge-m3
 reranker:
@@ -68,7 +69,7 @@ def test_from_yaml_string() -> None:
 
 
 def test_from_yaml_path(tmp_path: Path) -> None:
-    path = tmp_path / "trustrag.yaml"
+    path = tmp_path / "citenexus.yaml"
     path.write_text(SECTION17_YAML, encoding="utf-8")
     config = from_config(path, env={})
     assert config.storage.bucket == "s3://my-bucket"
@@ -76,12 +77,12 @@ def test_from_yaml_path(tmp_path: Path) -> None:
 
 
 def test_environment_override_wins_over_file(tmp_path: Path) -> None:
-    path = tmp_path / "trustrag.yaml"
+    path = tmp_path / "citenexus.yaml"
     path.write_text(
         "storage:\n  bucket: s3://b\ntrust:\n  default_mode: normal\n",
         encoding="utf-8",
     )
-    config = from_config(path, env={"TRUSTRAG_TRUST__DEFAULT_MODE": "strict"})
+    config = from_config(path, env={"CITENEXUS_TRUST__DEFAULT_MODE": "strict"})
     assert config.trust.default_mode is TrustMode.strict
 
 
@@ -95,14 +96,12 @@ def test_dict_override_wins_over_yaml() -> None:
 
 
 def test_precedence_env_beats_dict_beats_yaml(tmp_path: Path) -> None:
-    path = tmp_path / "trustrag.yaml"
-    path.write_text(
-        "storage:\n  bucket: s3://b\nretrieval:\n  top_k: 5\n", encoding="utf-8"
-    )
+    path = tmp_path / "citenexus.yaml"
+    path.write_text("storage:\n  bucket: s3://b\nretrieval:\n  top_k: 5\n", encoding="utf-8")
     # yaml says 5, dict override says 7, env says 9 -> env wins
     config = from_config(
         path,
         overrides={"retrieval": {"top_k": 7}},
-        env={"TRUSTRAG_RETRIEVAL__TOP_K": "9"},
+        env={"CITENEXUS_RETRIEVAL__TOP_K": "9"},
     )
     assert config.retrieval.top_k == 9

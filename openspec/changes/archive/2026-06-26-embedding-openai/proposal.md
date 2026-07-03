@@ -1,7 +1,7 @@
 ## Why
 
 The §4b `EmbeddingPlugin` protocol exists but has no concrete implementation, so
-nothing can actually turn evidence text into vectors. TrustRAG bundles no models
+nothing can actually turn evidence text into vectors. CiteNexus bundles no models
 (§4b) — embeddings come from an injected, OpenAI-compatible endpoint (local
 Ollama / FlagEmbedding / infinity). This change lands the first concrete
 `EmbeddingPlugin` so the L4 retrieval layer has real dense vectors to index.
@@ -34,7 +34,7 @@ Ollama / FlagEmbedding / infinity). This change lands the first concrete
 
 ## Impact
 
-- New module `src/trustrag/embed/` (`client.py`, `batcher.py`, `__init__.py`)
+- New module `src/citenexus/embed/` (`client.py`, `batcher.py`, `__init__.py`)
   and tests under `tests/embed/`.
 - No new dependencies — stdlib `urllib` only. No `pyproject.toml` change.
 - Honest scope: returns DENSE vectors only. BGE-M3 **sparse** weights need a

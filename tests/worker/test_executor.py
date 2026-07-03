@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from trustrag.worker import (
+from citenexus.worker import (
     DurableQueue,
     Executor,
     JobStatus,

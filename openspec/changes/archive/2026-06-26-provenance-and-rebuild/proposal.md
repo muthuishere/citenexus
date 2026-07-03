@@ -40,7 +40,7 @@ ingest/graph layers (L3+).
 
 ## Impact
 
-- New modules: `src/trustrag/provenance/stamp.py`, `src/trustrag/provenance/rebuild_planner.py`.
+- New modules: `src/citenexus/provenance/stamp.py`, `src/citenexus/provenance/rebuild_planner.py`.
 - Depends conceptually on `plugin-protocol-registry`: the stamp records each stage's
   `{plugin, plugin_version}`, and the planner diffs against the registry's current
   plugin/model versions.

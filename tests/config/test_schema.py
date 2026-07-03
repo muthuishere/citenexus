@@ -3,13 +3,13 @@
 import pytest
 from pydantic import ValidationError
 
-from trustrag.config.schema import LexicalSignal, TrustRAGConfig
-from trustrag.config.signals import Signal
-from trustrag.domain.trust import TrustMode
+from citenexus.config.schema import CiteNexusConfig, LexicalSignal
+from citenexus.config.signals import Signal
+from citenexus.domain.trust import TrustMode
 
 
 def test_defaults_match_specification() -> None:
-    config = TrustRAGConfig(storage={"bucket": "s3://my-bucket"})
+    config = CiteNexusConfig(storage={"bucket": "s3://my-bucket"})
     assert config.trust.default_mode is TrustMode.strict
     assert config.retrieval.rrf_k == 60
     assert config.retrieval.top_k == 11
@@ -19,27 +19,25 @@ def test_defaults_match_specification() -> None:
 
 
 def test_default_client_declares_all_signals() -> None:
-    config = TrustRAGConfig(storage={"bucket": "s3://my-bucket"})
+    config = CiteNexusConfig(storage={"bucket": "s3://my-bucket"})
     assert set(config.signals) == set(Signal)
 
 
 def test_unknown_signal_is_rejected_with_validation_error() -> None:
     with pytest.raises(ValidationError) as exc:
-        TrustRAGConfig(storage={"bucket": "s3://b"}, signals=["telepathy"])
+        CiteNexusConfig(storage={"bucket": "s3://b"}, signals=["telepathy"])
     assert "telepathy" in str(exc.value)
 
 
 def test_partition_hierarchy_accepts_any_depth() -> None:
-    flat = TrustRAGConfig(
-        storage={"bucket": "s3://b", "partition_hierarchy": ["workspace"]}
-    )
-    three = TrustRAGConfig(
+    flat = CiteNexusConfig(storage={"bucket": "s3://b", "partition_hierarchy": ["workspace"]})
+    three = CiteNexusConfig(
         storage={
             "bucket": "s3://b",
             "partition_hierarchy": ["org", "product_line", "product"],
         }
     )
-    four = TrustRAGConfig(
+    four = CiteNexusConfig(
         storage={
             "bucket": "s3://b",
             "partition_hierarchy": ["firm", "practice", "client", "matter"],
@@ -52,17 +50,17 @@ def test_partition_hierarchy_accepts_any_depth() -> None:
 
 def test_partition_hierarchy_rejects_empty() -> None:
     with pytest.raises(ValidationError):
-        TrustRAGConfig(storage={"bucket": "s3://b", "partition_hierarchy": []})
+        CiteNexusConfig(storage={"bucket": "s3://b", "partition_hierarchy": []})
 
 
 def test_full_section17_surface_validates() -> None:
-    config = TrustRAGConfig.model_validate(
+    config = CiteNexusConfig.model_validate(
         {
             "storage": {
                 "bucket": "s3://my-bucket",
                 "partition_hierarchy": ["org", "product_line", "product"],
             },
-            "llm": {"model": "qwen2.5", "endpoint": "http://localhost:11434/v1"},
+            "llm": {"model": "qwen2.5", "endpoint": {"base_url": "http://localhost:11434/v1"}},
             "embedding": {"model": "bge-m3"},
             "reranker": {"model": "bge-reranker-v2-m3"},
             "vision": {"enabled": True, "prefilter": {"enabled": True}},

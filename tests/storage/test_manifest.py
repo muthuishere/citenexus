@@ -2,9 +2,9 @@
 
 from pathlib import Path
 
-from trustrag.domain.partition import PartitionPath
-from trustrag.storage.backend import LocalFsBackend
-from trustrag.storage.manifest import (
+from citenexus.domain.partition import PartitionPath
+from citenexus.storage.backend import LocalFsBackend
+from citenexus.storage.manifest import (
     EtagManifest,
     ProcessingManifest,
     load_manifest,

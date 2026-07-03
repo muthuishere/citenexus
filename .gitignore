@@ -33,3 +33,15 @@ infra/vault/
 .DS_Store
 *.lance/
 example/.data/
+
+# Example runtime data (LocalFs store created by `task local:example`)
+example/.citenexus-data/
+.citenexus-data/
+
+# Rust core build artifacts
+core/target/
+
+# agent worktrees
+.claude/worktrees/
+example/.trustrag-data/
+.trustrag-data/

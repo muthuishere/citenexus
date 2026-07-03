@@ -8,7 +8,7 @@ Stream answer text without weakening the verification guarantee.
 
 ### Requirement: Streaming wraps verified results
 
-`TrustRAG.stream()` SHALL call the same verified answer path as `ask()` and emit
+`CiteNexus.stream()` SHALL call the same verified answer path as `ask()` and emit
 chunks only from the resulting `Result`.
 
 #### Scenario: Strict stream is sentence-gated

@@ -46,7 +46,7 @@ L5 answer-flow has fused, reranked EUs to ground on.
 
 ## Impact
 
-- New modules under `src/trustrag/retrieve/` (`vector.py`, `lexical.py`,
+- New modules under `src/citenexus/retrieve/` (`vector.py`, `lexical.py`,
   `structure.py`, `fusion.py`, `rerank.py`, `engine.py`); `__init__.py` and
   `types.py` are untouched (exports wired separately).
 - New tests under `tests/retrieve/`.

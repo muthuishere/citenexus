@@ -1,4 +1,4 @@
-# TrustRAG — Project Instructions
+# CiteNexus — Project Instructions
 
 Evidence-first, multilingual, S3-native RAG library for domains where a wrong
 answer is worse than no answer (legal, medical, finance/compliance, enterprise
@@ -31,9 +31,9 @@ behavior ships. This file is *how we build it*; the spec is *what we build*.
 
 - **uv** (env / deps / lock) · **hatchling** build backend · **pytest** (+coverage)
   · **ruff** (lint + format) · **mypy --strict**. `src/` layout. Python ≥ 3.11.
-- `pyproject.toml` (PEP 621). Import name `trustrag`.
+- `pyproject.toml` (PEP 621). Import name `citenexus`.
 - **No bundled models.** Embedding / LLM / reranker / vision are injected
-  endpoints (OpenAI-compatible). TrustRAG owns orchestration, storage, retrieval,
+  endpoints (OpenAI-compatible). CiteNexus owns orchestration, storage, retrieval,
   fusion, grounding, evaluation.
 
 ## Conventions (carried from the reqsume kernel; library-adapted)
@@ -59,8 +59,8 @@ behavior ships. This file is *how we build it*; the spec is *what we build*.
 A local **MinIO** is the S3 backend for the storage layer (L2+), the example, and
 the opt-in integration tests. `task local:minio:up` starts it and auto-creates the
 bucket: S3 API `:19000`, console `:19001` (`minioadmin`/`minioadmin`), bucket
-`trustrag-local` (high ports isolate it from any other MinIO on 9000). Images
-pinned by digest. Env template in `.env.example` (`TRUSTRAG_S3_ENDPOINT_URL`,
+`citenexus-local` (high ports isolate it from any other MinIO on 9000). Images
+pinned by digest. Env template in `.env.example` (`CITENEXUS_S3_ENDPOINT_URL`,
 `AWS_*`, model base-urls). Unit tests stay hermetic (fakes) and need nothing
 running; only integration/example touch MinIO + Ollama.
 
@@ -85,7 +85,7 @@ Each L is one or more OpenSpec changes, built test-first, then archived.
 - **L1 — Core domain (pure, exhaustively unit-tested):** `core-domain-types`
   (EvidenceUnit, variable-depth PartitionPath, Result/Provenance/EvidenceSignals,
   trust modes) · `config-and-signals` (`signals=[…]` capability gate + warn-only
-  `trustrag.validate.yaml`) · `plugin-protocol-registry` (11 typed ABCs +
+  `citenexus.validate.yaml`) · `plugin-protocol-registry` (11 typed ABCs +
   registry + `rag.use()`) · `provenance-and-rebuild` (artifact stamps + partial-
   rebuild planner = §4c matrix).
 - **L2 — Storage & runtime:** `storage-partition-seam` (S3 + manifests + leaf-
@@ -120,8 +120,8 @@ Each L is one or more OpenSpec changes, built test-first, then archived.
 ### Public API target (DHH-style, three verbs)
 
 ```python
-from trustrag import TrustRAG
-rag = TrustRAG("s3://my-bucket", signals=["embedding", "text"])  # signals gate ingest+ask
+from citenexus import CiteNexus
+rag = CiteNexus("s3://my-bucket", signals=["embedding", "text"])  # signals gate ingest+ask
 rag.ingest()                                                     # any type; sync, or ingest_async
 answer = rag.ask("Can the employee disclose this?")             # strict default; answer in query language
 score = rag.evaluate("golden.csv")                               # scored, audited
@@ -132,7 +132,7 @@ surface and the small-model escape hatch.
 
 ## Open decisions to resolve at L0
 
-- **PyPI dist name** — `trustrag` may be taken; pick a fallback dist name if so
-  (import stays `trustrag`).
+- **PyPI dist name** — `citenexus` may be taken; pick a fallback dist name if so
+  (import stays `citenexus`).
 - **fastText `lid.176`** (~126 MB) is a vendored asset behind
   `LanguageDetectorPlugin` — fetch on first use / cache, not a pip dep.

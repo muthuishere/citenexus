@@ -13,7 +13,7 @@ validation contract. Stack: Python ≥3.11, pydantic v2, mypy --strict.
 - A `Signal` enum + gating predicates that ingest and ask consult to build/query only
   declared signals.
 - A loader with deterministic dict/YAML/env precedence and a `from_config(...)` front door.
-- A warn-only validation pass against `trustrag.validate.yaml` (never raises).
+- A warn-only validation pass against `citenexus.validate.yaml` (never raises).
 
 **Non-Goals:**
 - Executing any ingest/retrieval/answer behavior (later layers).
@@ -24,7 +24,7 @@ validation contract. Stack: Python ≥3.11, pydantic v2, mypy --strict.
 
 - **Modules:**
   - `config/schema.py` — pydantic v2 `BaseModel` sub-models per §17 section, composed into a
-    top-level `TrustRAGConfig`. Defaults live on the fields so a bare config is valid.
+    top-level `CiteNexusConfig`. Defaults live on the fields so a bare config is valid.
   - `config/signals.py` — `Signal(StrEnum)` with the six members; a `SignalSet` resolver
     (None ⇒ all six) and the predicates `builds_on_ingest(signal)` /
     `queried_on_ask(signal)` / `requires_slow_path()` (true iff any of graph/community/wiki).

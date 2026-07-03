@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import io
 
-from trustrag.extract.pptx import PptxExtractor
-from trustrag.extract.types import BlockKind, SourceType, StructureType
+from citenexus.extract.pptx import PptxExtractor
+from citenexus.extract.types import BlockKind, SourceType, StructureType
 
 
 def test_one_block_per_slide_and_picture(pptx_bytes: bytes) -> None:

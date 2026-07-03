@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from trustrag.plugins import (
+from citenexus.plugins import (
     ChunkerPlugin,
     EmbeddingPlugin,
     EvaluatorPlugin,

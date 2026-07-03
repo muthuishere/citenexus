@@ -2,8 +2,8 @@
 
 import pytest
 
-from trustrag.access import resolve_scope
-from trustrag.domain.partition import PartitionPath
+from citenexus.access import resolve_scope
+from citenexus.domain.partition import PartitionPath
 
 HIERARCHY = ("org", "product_line", "product")
 

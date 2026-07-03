@@ -4,8 +4,8 @@ Named *groundedness*, never *hallucination*: without ground truth the share of
 claims that passed the faithfulness gate is all we can honestly compute.
 """
 
-from trustrag.domain import PartitionPath
-from trustrag.telemetry import (
+from citenexus.domain import PartitionPath
+from citenexus.telemetry import (
     Outcome,
     Stage,
     StageEvent,

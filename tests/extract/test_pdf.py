@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from trustrag.extract.pdf import PdfExtractor
-from trustrag.extract.types import BlockKind, SourceType, StructureType
+from citenexus.extract.pdf import PdfExtractor
+from citenexus.extract.types import BlockKind, SourceType, StructureType
 
 SAMPLE_PDF = Path(__file__).parent / "fixtures" / "sample.pdf"
 

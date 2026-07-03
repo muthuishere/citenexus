@@ -2,10 +2,10 @@
 
 import pytest
 
-from trustrag.domain.partition import PartitionPath
-from trustrag.evidence.builder import build_evidence_units
-from trustrag.evidence.unit import EUType
-from trustrag.extract.types import (
+from citenexus.domain.partition import PartitionPath
+from citenexus.evidence.builder import build_evidence_units
+from citenexus.evidence.unit import EUType
+from citenexus.extract.types import (
     BlockKind,
     ExtractedBlock,
     ExtractedDoc,

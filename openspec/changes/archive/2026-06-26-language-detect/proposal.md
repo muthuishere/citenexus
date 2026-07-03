@@ -40,7 +40,7 @@ seam so the L5 answer flow can rely on a concrete, testable language signal.
 
 ## Impact
 
-- New module `src/trustrag/lang/` (`detect.py`, `fallback.py`, `__init__.py`).
+- New module `src/citenexus/lang/` (`detect.py`, `fallback.py`, `__init__.py`).
 - Model asset cached under `assets/models/lid.176.ftz` (gitignored); fetched on
   first use, never bundled and not a pip dependency. `fasttext` is the only
   runtime dependency, already installed.

@@ -12,21 +12,21 @@
 
 ## 2. Implement (green)
 
-- [x] 2.1 `src/trustrag/vision/prefilter.py`: `VisionDecision` StrEnum
+- [x] 2.1 `src/citenexus/vision/prefilter.py`: `VisionDecision` StrEnum
       (text/ocr/vision/skip); frozen `VisionPrefilterConfig`
       (`min_area_ratio=0.05`, `skip_if_ocr_dense=True`, optional aspect bounds);
       pure `decide(image, *, page_area, ocr_text_dense, config)` per §9.
-- [x] 2.2 `src/trustrag/vision/describe.py`: frozen EU-ready `VisionRecord`;
+- [x] 2.2 `src/citenexus/vision/describe.py`: frozen EU-ready `VisionRecord`;
       thin `describe_image(image, plugin)` that shapes the injected plugin's
       result; deterministic, network-free `FakeVision(VisionPlugin)`.
-- [x] 2.3 `src/trustrag/vision/__init__.py`: export `VisionDecision`,
+- [x] 2.3 `src/citenexus/vision/__init__.py`: export `VisionDecision`,
       `VisionPrefilterConfig`, `decide`, `VisionRecord`, `describe_image`,
       `FakeVision`.
 
 ## 3. Verify
 
 - [x] 3.1 `uv run pytest tests/vision -q` green.
-- [x] 3.2 `uv run ruff check src/trustrag/vision tests/vision` clean.
-- [x] 3.3 `uv run mypy src/trustrag/vision tests/vision` clean (strict).
+- [x] 3.2 `uv run ruff check src/citenexus/vision tests/vision` clean.
+- [x] 3.3 `uv run mypy src/citenexus/vision tests/vision` clean (strict).
 - [x] 3.4 `npx -y @fission-ai/openspec@latest validate conditional-vision --strict`
       reports valid.

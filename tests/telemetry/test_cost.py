@@ -2,8 +2,8 @@
 
 from pytest import approx
 
-from trustrag.domain import PartitionPath
-from trustrag.telemetry import (
+from citenexus.domain import PartitionPath
+from citenexus.telemetry import (
     CostRates,
     EndpointRate,
     Stage,
@@ -42,9 +42,7 @@ def test_compute_cost_from_tokens() -> None:
 
 def test_compute_cost_from_units() -> None:
     vision = StageEvent(stage=Stage.vision, partition=ACME, units=UnitCount(images=4))
-    rerank = StageEvent(
-        stage=Stage.rerank, partition=ACME, units=UnitCount(candidates=50)
-    )
+    rerank = StageEvent(stage=Stage.rerank, partition=ACME, units=UnitCount(candidates=50))
     assert compute_cost(vision, RATES) == approx(0.04)
     assert compute_cost(rerank, RATES) == approx(0.1)
 

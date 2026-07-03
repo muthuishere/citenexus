@@ -1,6 +1,6 @@
 ## Why
 
-S3 is TrustRAG's source of truth and every index is a rebuildable cache (§2). The
+S3 is CiteNexus's source of truth and every index is a rebuildable cache (§2). The
 storage layer is what makes that real: it maps a variable-depth `PartitionPath`
 (§6b) to physical S3 prefixes, stores raw blobs content-addressed, persists the
 manifests that drive change-detection and rebuilds, and opens **one LanceDB per
@@ -28,6 +28,6 @@ filesystem (hermetic tests) and S3/MinIO (integration, the example, prod).
 
 ## Impact
 
-- New modules under `src/trustrag/storage/`. New deps already added: `boto3`,
+- New modules under `src/citenexus/storage/`. New deps already added: `boto3`,
   `lancedb`. Hermetic tests use `LocalFsBackend` + a local LanceDB path; an opt-in
   `@pytest.mark.integration` suite runs the same contract against the compose MinIO.

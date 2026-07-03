@@ -1,6 +1,6 @@
 ## Why
 
-TrustRAG is built foundation-first: every later layer (ingest, retrieval, answer,
+CiteNexus is built foundation-first: every later layer (ingest, retrieval, answer,
 eval) imports a shared vocabulary of typed domain objects. Before any I/O or
 plugin exists we need those objects fixed and exhaustively tested, because they
 encode the system's hard invariants — bbox-cited evidence, structured (not
@@ -32,15 +32,15 @@ No configuration loading, no plugins, no storage I/O — pure pydantic v2 models
 ### New Capabilities
 - `core-domain-types`: the shared, I/O-free domain models (EvidenceUnit,
   PartitionPath, Result + SourceRef + EvidenceSignals + ProvenanceEntry, TrustMode)
-  that every other TrustRAG layer depends on.
+  that every other CiteNexus layer depends on.
 
 ### Modified Capabilities
 <!-- none — this is the first capability -->
 
 ## Impact
 
-- New modules: `src/trustrag/evidence/unit.py`, `src/trustrag/domain/partition.py`,
-  `src/trustrag/domain/trust.py`, `src/trustrag/answer/result.py`.
+- New modules: `src/citenexus/evidence/unit.py`, `src/citenexus/domain/partition.py`,
+  `src/citenexus/domain/trust.py`, `src/citenexus/answer/result.py`.
 - New dependency already present: `pydantic>=2.7`.
 - Downstream: ingest/retrieve/answer/eval will import these; their specs assume
   this vocabulary. No runtime systems affected yet.
