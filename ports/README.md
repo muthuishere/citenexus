@@ -10,13 +10,16 @@ Rust core ([`../core`](../core), `citenexus-core`) is the shared engine for
 extraction, Lance store access, and lid.176 detection, exposed over one C ABI
 (cgo for Go, napi-rs for TS). See SPEC-PORTS-v1 §3.4 / §9.
 
-## Status — foundation slice (SPEC-PORTS-v1 §4)
+## Status — foundation + hermetic guarantee (SPEC-PORTS-v1 §4/§7)
 
-The **deterministic algorithm core** is implemented and green against the shared
-fixtures in both languages. This is the load-bearing base every T1 capability
-(ingest / retrieve / ask / evaluate) sits on.
+The **deterministic algorithm core** (§4) and the **hermetic cite-or-abstain ask
+flow** (§0/§7) are implemented and green against the shared fixtures in both
+languages. The guarantee — an answer is emitted only when a retrieved passage is
+relevant *and* the generated answer passes the faithfulness gate, else the flow
+refuses — is now proven offline in Go and TS, byte-identical to the Python
+reference.
 
-| §4 algorithm | fixture | Go (`ports/go`) | TypeScript (`ports/ts`) |
+| Capability | fixture | Go (`ports/go`) | TypeScript (`ports/ts`) |
 |---|---|:--:|:--:|
 | Tokenizer | `tokenize.json` | ✅ | ✅ |
 | BM25-lite | `bm25.json` | ✅ | ✅ |
@@ -25,13 +28,18 @@ fixtures in both languages. This is the load-bearing base every T1 capability
 | Recursive chunker | `chunker.json` | ✅ | ✅ |
 | Evidence-unit ids (block + chunked) | `eu_ids.json` | ✅ | ✅ |
 | Answer-language fallback chain | `language.json` | ✅ | ✅ |
+| **Hermetic ask (cite-or-abstain)** | `e2e_hermetic.json` | ✅ | ✅ |
+| **Result JSON serialization (§7)** | `result_roundtrip.json` | ✅ | ✅ |
 
-**Not yet ported** (tracked): T1 orchestration (client, ingest, retrieve, the
-`ask` faithfulness-gated flow, evaluate), Lance/Postgres store bindings, the
-Rust-core FFI wiring, hooks/telemetry/streaming, and the Result-JSON +
-end-to-end hermetic fixtures (`result_roundtrip.json`, `e2e_hermetic.json` — not
-yet present in `conformance/`). A port MUST NOT ship `ask()` without the
-faithfulness gate (§1).
+The ask flow runs on deterministic fakes (hash embedding + extractive LLM, both
+pinned in §4) over an in-memory cosine store — no network, no FFI. A port MUST
+NOT ship `ask()` without the faithfulness gate (§1); here it is real control
+flow, verified.
+
+**Not yet ported** (tracked, next increments): the Rust-core **FFI bindings**
+(cgo / napi-rs) for real Lance + extraction + lid.176 at scale · real **HTTP
+model clients** (OpenAI-compatible + Anthropic, injectable transports) ·
+S3/Postgres storage · hooks / telemetry / streaming · `evaluate(csv)`.
 
 ## Run the conformance suite
 
