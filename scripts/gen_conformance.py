@@ -16,7 +16,22 @@ from pathlib import Path
 from typing import Any
 
 from citenexus.answer.generator import _SYSTEM_PROMPT
-from citenexus.answer.verify import _STOPWORDS, has_relevance_overlap, is_supported
+from citenexus.answer.result import (
+    Claim,
+    Decision,
+    EvidenceSignals,
+    ProvenanceEntry,
+    Result,
+    SourceRef,
+)
+from citenexus.answer.verify import (
+    _STOPWORDS,
+    content_tokens,
+    has_relevance_overlap,
+    is_supported,
+)
+from citenexus.domain.trust import TrustMode
+from citenexus.testing.fakes import FakeEmbedding, FakeLLM
 from citenexus.domain.partition import PartitionPath
 from citenexus.evidence.builder import build_evidence_units
 from citenexus.evidence.chunked_builder import build_chunked_units
@@ -432,6 +447,150 @@ def _eu_id_cases() -> dict[str, Any]:
 
 
 # --------------------------------------------------------------------------- #
+# cases/e2e_hermetic.json — corpus + questions -> cite-or-abstain outcome.
+#
+# This is §0 executed offline: with the pinned hash FakeEmbedding and the
+# extractive FakeLLM, every port must reproduce the SAME decision/document/
+# passage. It mirrors citenexus.smoke.SmokePipeline.ask over an in-memory cosine
+# store (no LanceDB, no filesystem — the semantics ports must implement, not the
+# storage). Questions are designed so content-token grounding selects exactly one
+# document, so the outcome does not hinge on cosine tie-breaking.
+# --------------------------------------------------------------------------- #
+
+_REFUSAL = "I can't answer that from the available evidence."
+
+_E2E_CORPUS: list[dict[str, str]] = [
+    {"document_id": "nda", "text": "The employee shall not disclose confidential information."},
+    {"document_id": "leave", "text": "Employees are entitled to thirty days of annual leave."},
+    {
+        "document_id": "termination",
+        "text": "The contract termination clause requires ninety days written notice.",
+    },
+]
+
+_E2E_QUESTIONS: list[str] = [
+    "Can the employee disclose confidential information?",
+    "How many days of annual leave do employees get?",
+    "What notice does the termination clause require?",
+    "What is the capital of France?",  # no content overlap -> abstain
+]
+
+_E2E_TOP_K = 5
+
+
+def _cosine(a: list[float], b: list[float]) -> float:
+    return sum(x * y for x, y in zip(a, b, strict=True))
+
+
+def _hermetic_ask(question: str) -> dict[str, Any]:
+    """The reference cite-or-abstain outcome for ``question`` over the corpus.
+
+    Reuses the exact pinned primitives: FakeEmbedding (§4 hash), content-token
+    grounding (relevance gate), the extractive FakeLLM, and is_supported (the
+    faithfulness gate). Vectors are L2-normalized, so cosine == dot product.
+    """
+    embedder = FakeEmbedding()
+    llm = FakeLLM()
+    rows = [
+        {
+            "eu_id": f"{doc['document_id']}::0",
+            "document_id": doc["document_id"],
+            "text": doc["text"],
+            "vector": embedder.embed(doc["text"]),
+        }
+        for doc in _E2E_CORPUS
+    ]
+    qvec = embedder.embed(question)
+    # Rank by descending cosine, stable tie-break by insertion order; take top_k.
+    ranked = sorted(rows, key=lambda r: -_cosine(qvec, r["vector"]))[:_E2E_TOP_K]
+    q_terms = content_tokens(question)
+    grounded = [r for r in ranked if q_terms & content_tokens(str(r["text"]))]
+    if not grounded:
+        return {"decision": Decision.refused.value, "answer": _REFUSAL,
+                "document": None, "passage": None, "eu_id": None}
+    top = grounded[0]
+    passage = str(top["text"])
+    answer = llm.answer(question, passage)
+    if not is_supported(answer, passage):
+        return {"decision": Decision.refused.value, "answer": _REFUSAL,
+                "document": None, "passage": None, "eu_id": None}
+    return {
+        "decision": Decision.answered.value,
+        "answer": answer,
+        "document": str(top["document_id"]),
+        "passage": passage,
+        "eu_id": str(top["eu_id"]),
+    }
+
+
+def _e2e_hermetic_cases() -> dict[str, Any]:
+    return {
+        "corpus": _E2E_CORPUS,
+        "top_k": _E2E_TOP_K,
+        "refusal_answer": _REFUSAL,
+        "cases": [{"question": q, "expected": _hermetic_ask(q)} for q in _E2E_QUESTIONS],
+    }
+
+
+# --------------------------------------------------------------------------- #
+# cases/result_roundtrip.json — canonical Result JSON (§7). Ports must serialize
+# an equivalent Result to byte-identical JSON (field names, enum values, null
+# handling, empty arrays).
+# --------------------------------------------------------------------------- #
+
+
+def _result_roundtrip_cases() -> list[dict[str, Any]]:
+    answered = Result(
+        answer="The employee shall not disclose confidential information.",
+        answer_language="en",
+        mode=TrustMode.strict,
+        evidence=EvidenceSignals(
+            decision=Decision.answered,
+            supporting_sources=1,
+            distinct_documents=1,
+            all_claims_verified=True,
+            languages_in_evidence=("en",),
+        ),
+        claims=(
+            Claim(
+                claim="The employee shall not disclose confidential information.",
+                supported=True,
+                sources=("nda::0",),
+            ),
+        ),
+        sources=(
+            SourceRef(
+                document="nda",
+                passage="The employee shall not disclose confidential information.",
+                passage_language="en",
+                source_uri="raw/workspace=default/nda-sha",
+            ),
+        ),
+        provenance=(
+            ProvenanceEntry(
+                claim="The employee shall not disclose confidential information.",
+                evidence_unit="nda::0",
+                document_id="nda",
+                s3_object="raw/workspace=default/nda-sha",
+                checksum="a" * 64,
+                produced_by={"embedding": "fake-hashing"},
+            ),
+        ),
+    )
+    refused = Result(
+        answer=_REFUSAL,
+        answer_language="en",
+        mode=TrustMode.strict,
+        evidence=EvidenceSignals(decision=Decision.refused),
+        missing_evidence=("no sufficiently relevant evidence found",),
+    )
+    return [
+        {"name": "answered with full provenance", "result": answered.model_dump(mode="json")},
+        {"name": "refused on no evidence", "result": refused.model_dump(mode="json")},
+    ]
+
+
+# --------------------------------------------------------------------------- #
 # entry points
 # --------------------------------------------------------------------------- #
 
@@ -452,6 +611,8 @@ def generate() -> dict[str, str]:
         "cases/chunker.json": _render(_chunker_cases()),
         "cases/language.json": _render(_language_cases()),
         "cases/eu_ids.json": _render(_eu_id_cases()),
+        "cases/e2e_hermetic.json": _render(_e2e_hermetic_cases()),
+        "cases/result_roundtrip.json": _render(_result_roundtrip_cases()),
     }
 
 

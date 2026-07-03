@@ -1,0 +1,83 @@
+[
+  {
+    "name": "answered with full provenance",
+    "result": {
+      "answer": "The employee shall not disclose confidential information.",
+      "answer_language": "en",
+      "mode": "strict",
+      "evidence": {
+        "decision": "answered",
+        "supporting_sources": 1,
+        "distinct_documents": 1,
+        "retrieval_score_spread": 0.0,
+        "all_claims_verified": true,
+        "unsupported_claims_removed": 0,
+        "conflicts_detected": 0,
+        "languages_in_evidence": [
+          "en"
+        ]
+      },
+      "claims": [
+        {
+          "claim": "The employee shall not disclose confidential information.",
+          "supported": true,
+          "sources": [
+            "nda::0"
+          ]
+        }
+      ],
+      "sources": [
+        {
+          "document": "nda",
+          "passage": "The employee shall not disclose confidential information.",
+          "passage_language": "en",
+          "page": null,
+          "bbox": null,
+          "source_uri": "raw/workspace=default/nda-sha",
+          "translation": null
+        }
+      ],
+      "missing_evidence": [],
+      "conflicts": [],
+      "provenance": [
+        {
+          "claim": "The employee shall not disclose confidential information.",
+          "evidence_unit": "nda::0",
+          "document_id": "nda",
+          "s3_object": "raw/workspace=default/nda-sha",
+          "checksum": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "page": null,
+          "bbox": null,
+          "produced_by": {
+            "embedding": "fake-hashing"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "refused on no evidence",
+    "result": {
+      "answer": "I can't answer that from the available evidence.",
+      "answer_language": "en",
+      "mode": "strict",
+      "evidence": {
+        "decision": "refused",
+        "supporting_sources": 0,
+        "distinct_documents": 0,
+        "retrieval_score_spread": 0.0,
+        "all_claims_verified": false,
+        "unsupported_claims_removed": 0,
+        "conflicts_detected": 0,
+        "languages_in_evidence": []
+      },
+      "claims": [],
+      "sources": [],
+      "missing_evidence": [
+        "no sufficiently relevant evidence found"
+      ],
+      "conflicts": [],
+      "provenance": []
+    }
+  }
+]

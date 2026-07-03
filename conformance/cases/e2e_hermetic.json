@@ -1,0 +1,60 @@
+{
+  "corpus": [
+    {
+      "document_id": "nda",
+      "text": "The employee shall not disclose confidential information."
+    },
+    {
+      "document_id": "leave",
+      "text": "Employees are entitled to thirty days of annual leave."
+    },
+    {
+      "document_id": "termination",
+      "text": "The contract termination clause requires ninety days written notice."
+    }
+  ],
+  "top_k": 5,
+  "refusal_answer": "I can't answer that from the available evidence.",
+  "cases": [
+    {
+      "question": "Can the employee disclose confidential information?",
+      "expected": {
+        "decision": "answered",
+        "answer": "The employee shall not disclose confidential information.",
+        "document": "nda",
+        "passage": "The employee shall not disclose confidential information.",
+        "eu_id": "nda::0"
+      }
+    },
+    {
+      "question": "How many days of annual leave do employees get?",
+      "expected": {
+        "decision": "answered",
+        "answer": "Employees are entitled to thirty days of annual leave.",
+        "document": "leave",
+        "passage": "Employees are entitled to thirty days of annual leave.",
+        "eu_id": "leave::0"
+      }
+    },
+    {
+      "question": "What notice does the termination clause require?",
+      "expected": {
+        "decision": "answered",
+        "answer": "The contract termination clause requires ninety days written notice.",
+        "document": "termination",
+        "passage": "The contract termination clause requires ninety days written notice.",
+        "eu_id": "termination::0"
+      }
+    },
+    {
+      "question": "What is the capital of France?",
+      "expected": {
+        "decision": "refused",
+        "answer": "I can't answer that from the available evidence.",
+        "document": null,
+        "passage": null,
+        "eu_id": null
+      }
+    }
+  ]
+}
