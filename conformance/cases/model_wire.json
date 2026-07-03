@@ -1,0 +1,215 @@
+{
+  "requests": [
+    {
+      "name": "openai chat answer, temperature always sent, no max_tokens",
+      "client": "openai_chat",
+      "config": {
+        "base_url": "https://api.example.com/v1",
+        "model": "qwen2.5"
+      },
+      "inputs": {
+        "question": "Can the employee disclose confidential information?",
+        "passage": "The employee shall not disclose confidential information.",
+        "answer_language": "en"
+      },
+      "expected_request": {
+        "method": "POST",
+        "url": "https://api.example.com/v1/chat/completions",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "model": "qwen2.5",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are a strict, evidence-first assistant. Answer the question by quoting the exact sentence or phrase from the provided passage that answers it — VERBATIM, word for word, with no rephrasing, no added words, and no commentary. If the passage does not contain the answer, say you cannot answer from the evidence. The verifier rejects any word not present in the passage, so never paraphrase. Quote in the passage's own language when it matches the requested ISO code; otherwise still prefer the passage's exact wording."
+            },
+            {
+              "role": "user",
+              "content": "Answer language (ISO code): en\n\nPassage:\nThe employee shall not disclose confidential information.\n\nQuestion: Can the employee disclose confidential information?"
+            }
+          ],
+          "temperature": 0.0
+        }
+      }
+    },
+    {
+      "name": "openai chat answer with max_tokens and non-en language",
+      "client": "openai_chat",
+      "config": {
+        "base_url": "https://api.example.com/v1",
+        "model": "qwen2.5",
+        "max_tokens": 256
+      },
+      "inputs": {
+        "question": "Can the employee disclose confidential information?",
+        "passage": "The employee shall not disclose confidential information.",
+        "answer_language": "de"
+      },
+      "expected_request": {
+        "method": "POST",
+        "url": "https://api.example.com/v1/chat/completions",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "model": "qwen2.5",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are a strict, evidence-first assistant. Answer the question by quoting the exact sentence or phrase from the provided passage that answers it — VERBATIM, word for word, with no rephrasing, no added words, and no commentary. If the passage does not contain the answer, say you cannot answer from the evidence. The verifier rejects any word not present in the passage, so never paraphrase. Quote in the passage's own language when it matches the requested ISO code; otherwise still prefer the passage's exact wording."
+            },
+            {
+              "role": "user",
+              "content": "Answer language (ISO code): de\n\nPassage:\nThe employee shall not disclose confidential information.\n\nQuestion: Can the employee disclose confidential information?"
+            }
+          ],
+          "temperature": 0.0,
+          "max_tokens": 256
+        }
+      }
+    },
+    {
+      "name": "anthropic messages: top-level system + default max_tokens 1024",
+      "client": "anthropic",
+      "config": {
+        "base_url": "https://api.anthropic.com",
+        "model": "claude-x"
+      },
+      "inputs": {
+        "question": "Can the employee disclose confidential information?",
+        "passage": "The employee shall not disclose confidential information.",
+        "answer_language": "en"
+      },
+      "expected_request": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "model": "claude-x",
+          "system": "You are a strict, evidence-first assistant. Answer the question by quoting the exact sentence or phrase from the provided passage that answers it — VERBATIM, word for word, with no rephrasing, no added words, and no commentary. If the passage does not contain the answer, say you cannot answer from the evidence. The verifier rejects any word not present in the passage, so never paraphrase. Quote in the passage's own language when it matches the requested ISO code; otherwise still prefer the passage's exact wording.",
+          "messages": [
+            {
+              "role": "user",
+              "content": "Answer language (ISO code): en\n\nPassage:\nThe employee shall not disclose confidential information.\n\nQuestion: Can the employee disclose confidential information?"
+            }
+          ],
+          "max_tokens": 1024,
+          "temperature": 0.0
+        }
+      }
+    },
+    {
+      "name": "openai embeddings: batched input, order preserved",
+      "client": "openai_embed",
+      "config": {
+        "base_url": "https://api.example.com/v1",
+        "model": "bge-m3"
+      },
+      "inputs": {
+        "texts": [
+          "The employee shall not disclose confidential information.",
+          "Employees are entitled to annual leave."
+        ]
+      },
+      "expected_request": {
+        "method": "POST",
+        "url": "https://api.example.com/v1/embeddings",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "model": "bge-m3",
+          "input": [
+            "The employee shall not disclose confidential information.",
+            "Employees are entitled to annual leave."
+          ]
+        }
+      }
+    }
+  ],
+  "responses": [
+    {
+      "name": "openai chat parse",
+      "client": "openai_chat",
+      "response_body": {
+        "choices": [
+          {
+            "message": {
+              "content": "The employee shall not disclose confidential information."
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 8
+        }
+      },
+      "expected": "The employee shall not disclose confidential information."
+    },
+    {
+      "name": "anthropic parse multi-block text-only",
+      "client": "anthropic",
+      "response_body": {
+        "content": [
+          {
+            "type": "text",
+            "text": "The employee "
+          },
+          {
+            "type": "tool_use",
+            "id": "t1",
+            "name": "x",
+            "input": {}
+          },
+          {
+            "type": "text",
+            "text": "shall not disclose."
+          }
+        ],
+        "usage": {
+          "input_tokens": 20,
+          "output_tokens": 6
+        }
+      },
+      "expected": "The employee shall not disclose."
+    },
+    {
+      "name": "openai embeddings parse",
+      "client": "openai_embed",
+      "response_body": {
+        "data": [
+          {
+            "embedding": [
+              0.1,
+              0.2,
+              0.3
+            ]
+          },
+          {
+            "embedding": [
+              0.4,
+              0.5,
+              0.6
+            ]
+          }
+        ]
+      },
+      "expected": [
+        [
+          0.1,
+          0.2,
+          0.3
+        ],
+        [
+          0.4,
+          0.5,
+          0.6
+        ]
+      ]
+    }
+  ]
+}

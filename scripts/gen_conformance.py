@@ -30,7 +30,10 @@ from citenexus.answer.verify import (
     has_relevance_overlap,
     is_supported,
 )
+from citenexus.answer.anthropic import AnthropicGenerator
+from citenexus.answer.generator import OpenAICompatibleGenerator
 from citenexus.domain.trust import TrustMode
+from citenexus.embed.client import OpenAICompatibleEmbedding
 from citenexus.testing.fakes import FakeEmbedding, FakeLLM
 from citenexus.domain.partition import PartitionPath
 from citenexus.evidence.builder import build_evidence_units
@@ -591,6 +594,139 @@ def _result_roundtrip_cases() -> list[dict[str, Any]]:
 
 
 # --------------------------------------------------------------------------- #
+# cases/model_wire.json — the §5 model-client wire contract. For each client the
+# fixture pins (a) the EXACT HTTP request bytes it must emit for given inputs and
+# (b) the parsed output for a canned response. Captured from the Python reference
+# clients via a recording transport, so ports reproduce the wire byte-for-byte
+# with an injected fake transport (hermetic, no network). Auth headers are the
+# endpoint layer's job (never here) — the wire body carries no secrets.
+# --------------------------------------------------------------------------- #
+
+_WIRE_QUESTION = "Can the employee disclose confidential information?"
+_WIRE_PASSAGE = "The employee shall not disclose confidential information."
+_WIRE_ANSWER = "The employee shall not disclose confidential information."
+
+
+class _Capture:
+    """Recording transport: stores the request, returns a canned response."""
+
+    def __init__(self, response: bytes) -> None:
+        self._response = response
+        self.call: dict[str, Any] | None = None
+
+    def __call__(self, url: str, body: bytes, headers: dict[str, str]) -> bytes:
+        self.call = {
+            "method": "POST",
+            "url": url,
+            "headers": dict(headers),
+            "body": json.loads(body.decode("utf-8")),
+        }
+        return self._response
+
+
+def _wire_requests() -> list[dict[str, Any]]:
+    requests: list[dict[str, Any]] = []
+
+    # OpenAI-compatible chat (/chat/completions), no max_tokens.
+    cap = _Capture(b'{"choices":[{"message":{"content":"x"}}]}')
+    OpenAICompatibleGenerator(
+        base_url="https://api.example.com/v1", model="qwen2.5", transport=cap
+    ).answer(_WIRE_QUESTION, _WIRE_PASSAGE, "en")
+    requests.append(
+        {
+            "name": "openai chat answer, temperature always sent, no max_tokens",
+            "client": "openai_chat",
+            "config": {"base_url": "https://api.example.com/v1", "model": "qwen2.5"},
+            "inputs": {"question": _WIRE_QUESTION, "passage": _WIRE_PASSAGE, "answer_language": "en"},
+            "expected_request": cap.call,
+        }
+    )
+
+    # OpenAI-compatible chat with max_tokens set.
+    cap = _Capture(b'{"choices":[{"message":{"content":"x"}}]}')
+    OpenAICompatibleGenerator(
+        base_url="https://api.example.com/v1", model="qwen2.5", max_tokens=256, transport=cap
+    ).answer(_WIRE_QUESTION, _WIRE_PASSAGE, "de")
+    requests.append(
+        {
+            "name": "openai chat answer with max_tokens and non-en language",
+            "client": "openai_chat",
+            "config": {"base_url": "https://api.example.com/v1", "model": "qwen2.5", "max_tokens": 256},
+            "inputs": {"question": _WIRE_QUESTION, "passage": _WIRE_PASSAGE, "answer_language": "de"},
+            "expected_request": cap.call,
+        }
+    )
+
+    # Anthropic Messages (/v1/messages): system top-level, required max_tokens.
+    cap = _Capture(b'{"content":[{"type":"text","text":"x"}]}')
+    AnthropicGenerator(
+        base_url="https://api.anthropic.com", model="claude-x", transport=cap
+    ).answer(_WIRE_QUESTION, _WIRE_PASSAGE, "en")
+    requests.append(
+        {
+            "name": "anthropic messages: top-level system + default max_tokens 1024",
+            "client": "anthropic",
+            "config": {"base_url": "https://api.anthropic.com", "model": "claude-x"},
+            "inputs": {"question": _WIRE_QUESTION, "passage": _WIRE_PASSAGE, "answer_language": "en"},
+            "expected_request": cap.call,
+        }
+    )
+
+    # OpenAI-compatible embeddings (/embeddings): batched input list.
+    cap = _Capture(b'{"data":[{"embedding":[0.1]},{"embedding":[0.2]}]}')
+    OpenAICompatibleEmbedding(
+        base_url="https://api.example.com/v1", model="bge-m3", transport=cap
+    ).embed([_WIRE_PASSAGE, "Employees are entitled to annual leave."])
+    requests.append(
+        {
+            "name": "openai embeddings: batched input, order preserved",
+            "client": "openai_embed",
+            "config": {"base_url": "https://api.example.com/v1", "model": "bge-m3"},
+            "inputs": {"texts": [_WIRE_PASSAGE, "Employees are entitled to annual leave."]},
+            "expected_request": cap.call,
+        }
+    )
+    return requests
+
+
+def _wire_responses() -> list[dict[str, Any]]:
+    responses: list[dict[str, Any]] = []
+
+    # OpenAI chat: reply = choices[0].message.content.
+    chat_body = {"choices": [{"message": {"content": _WIRE_ANSWER}}], "usage": {"prompt_tokens": 12, "completion_tokens": 8}}
+    chat_out = OpenAICompatibleGenerator(
+        base_url="https://x", model="m", transport=lambda _u, _b, _h: json.dumps(chat_body).encode()
+    ).answer(_WIRE_QUESTION, _WIRE_PASSAGE, "en")
+    responses.append({"name": "openai chat parse", "client": "openai_chat", "response_body": chat_body, "expected": chat_out})
+
+    # Anthropic: concat content[].text, non-text blocks ignored, order kept.
+    anth_body = {
+        "content": [
+            {"type": "text", "text": "The employee "},
+            {"type": "tool_use", "id": "t1", "name": "x", "input": {}},
+            {"type": "text", "text": "shall not disclose."},
+        ],
+        "usage": {"input_tokens": 20, "output_tokens": 6},
+    }
+    anth_out = AnthropicGenerator(
+        base_url="https://x", model="m", transport=lambda _u, _b, _h: json.dumps(anth_body).encode()
+    ).answer(_WIRE_QUESTION, _WIRE_PASSAGE, "en")
+    responses.append({"name": "anthropic parse multi-block text-only", "client": "anthropic", "response_body": anth_body, "expected": anth_out})
+
+    # Embeddings: data[].embedding as float vectors, input order preserved.
+    emb_body = {"data": [{"embedding": [0.1, 0.2, 0.3]}, {"embedding": [0.4, 0.5, 0.6]}]}
+    emb_out = OpenAICompatibleEmbedding(
+        base_url="https://x", model="m", transport=lambda _u, _b, _h: json.dumps(emb_body).encode()
+    ).embed(["a", "b"])
+    responses.append({"name": "openai embeddings parse", "client": "openai_embed", "response_body": emb_body, "expected": emb_out})
+    return responses
+
+
+def _model_wire_cases() -> dict[str, Any]:
+    return {"requests": _wire_requests(), "responses": _wire_responses()}
+
+
+# --------------------------------------------------------------------------- #
 # entry points
 # --------------------------------------------------------------------------- #
 
@@ -613,6 +749,7 @@ def generate() -> dict[str, str]:
         "cases/eu_ids.json": _render(_eu_id_cases()),
         "cases/e2e_hermetic.json": _render(_e2e_hermetic_cases()),
         "cases/result_roundtrip.json": _render(_result_roundtrip_cases()),
+        "cases/model_wire.json": _render(_model_wire_cases()),
     }
 
 
