@@ -30,16 +30,20 @@ reference.
 | Answer-language fallback chain | `language.json` | ✅ | ✅ |
 | **Hermetic ask (cite-or-abstain)** | `e2e_hermetic.json` | ✅ | ✅ |
 | **Result JSON serialization (§7)** | `result_roundtrip.json` | ✅ | ✅ |
+| **HTTP model clients** §5 (OpenAI chat + Anthropic + embeddings) | `model_wire.json` | ✅ | ✅ |
 
 The ask flow runs on deterministic fakes (hash embedding + extractive LLM, both
 pinned in §4) over an in-memory cosine store — no network, no FFI. A port MUST
 NOT ship `ask()` without the faithfulness gate (§1); here it is real control
-flow, verified.
+flow, verified. The §5 model clients speak plain HTTP through an **injectable
+transport** (hermetic tests, no network) and carry **no secret** — auth headers
+are the endpoint layer's job; the wire body and headers (Content-Type only) are
+proven byte-identical to the Python reference via `model_wire.json`.
 
 **Not yet ported** (tracked, next increments): the Rust-core **FFI bindings**
-(cgo / napi-rs) for real Lance + extraction + lid.176 at scale · real **HTTP
-model clients** (OpenAI-compatible + Anthropic, injectable transports) ·
-S3/Postgres storage · hooks / telemetry / streaming · `evaluate(csv)`.
+(cgo / napi-rs) for real Lance + extraction + lid.176 at scale · a default HTTP
+transport + typed endpoint layer (auth) around the §5 clients · S3/Postgres
+storage · hooks / telemetry / streaming · `evaluate(csv)`.
 
 ## Run the conformance suite
 
