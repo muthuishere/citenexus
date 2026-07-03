@@ -45,3 +45,8 @@ core/target/
 .claude/worktrees/
 example/.trustrag-data/
 .trustrag-data/
+
+# Language ports
+ports/ts/node_modules/
+ports/ts/dist/
+ports/go/**/*.test
