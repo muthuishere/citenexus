@@ -10,6 +10,19 @@ Dist name on PyPI is **`citenexus`** (the import package is `citenexus`; see
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-04
+
+### Added
+- **Rust engine bound into the Go and TS ports via FFI** (opt-in): the shared
+  `citenexus-core` C ABI is now callable from **Go (cgo, `citenexus_ffi` build
+  tag)** and **TS (koffi)** — `extract`, `detect` (lid.176), and the LanceDB
+  `store` — plus a minimal `ingest` orchestrator in each (extract → chunk → embed
+  → store). The pure ports stay `go get` / `npm i`-clean; the native engine is
+  strictly opt-in.
+- **native-libs release workflow**: on a `v*` tag, cross-builds
+  `citenexus_core` for darwin/linux/windows × amd64/arm64 and attaches the
+  libraries to the GitHub Release for consumers to download.
+
 ## [0.3.0] - 2026-07-04
 
 Unified version across all four languages (python/go/js/rust ship the same number).

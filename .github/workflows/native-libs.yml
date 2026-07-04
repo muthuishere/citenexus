@@ -1,0 +1,80 @@
+name: native-libs
+
+# On a v* tag, cross-build the citenexus-core native library (the shared Rust
+# engine behind the Go cgo + TS koffi FFI bindings) for every OS/arch and attach
+# them to the GitHub Release. This is what makes the FFI "work across all
+# platforms" — Go/TS consumers download the matching lib for their platform.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Ensure a release exists for this tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release view "$GITHUB_REF_NAME" || gh release create "$GITHUB_REF_NAME" --generate-notes
+
+  build:
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14      # Apple silicon
+            asset: citenexus_core-darwin-arm64.dylib
+            libname: libcitenexus_core.dylib
+          - os: macos-13      # Intel mac
+            asset: citenexus_core-darwin-amd64.dylib
+            libname: libcitenexus_core.dylib
+          - os: ubuntu-latest
+            asset: citenexus_core-linux-amd64.so
+            libname: libcitenexus_core.so
+          - os: ubuntu-24.04-arm
+            asset: citenexus_core-linux-arm64.so
+            libname: libcitenexus_core.so
+          - os: windows-latest
+            asset: citenexus_core-windows-amd64.dll
+            libname: citenexus_core.dll
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install protoc (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Install protoc (macOS)
+        if: runner.os == 'macOS'
+        run: brew install protobuf
+      - name: Install protoc (Windows)
+        if: runner.os == 'Windows'
+        run: choco install protoc -y
+
+      - name: Build release cdylib
+        working-directory: rust
+        run: cargo build --release
+
+      - name: Stage + upload asset (unix)
+        if: runner.os != 'Windows'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp "rust/target/release/${{ matrix.libname }}" "${{ matrix.asset }}"
+          shasum -a 256 "${{ matrix.asset }}" > "${{ matrix.asset }}.sha256"
+          gh release upload "$GITHUB_REF_NAME" "${{ matrix.asset }}" "${{ matrix.asset }}.sha256" --clobber
+
+      - name: Stage + upload asset (windows)
+        if: runner.os == 'Windows'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          cp "rust/target/release/${{ matrix.libname }}" "${{ matrix.asset }}"
+          sha256sum "${{ matrix.asset }}" > "${{ matrix.asset }}.sha256"
+          gh release upload "$GITHUB_REF_NAME" "${{ matrix.asset }}" "${{ matrix.asset }}.sha256" --clobber
