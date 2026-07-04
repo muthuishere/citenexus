@@ -1,5 +1,5 @@
 {
-  "name": "@citenexus/core",
+  "name": "@muthuishere/citenexus-core",
   "version": "0.4.0",
   "description": "CiteNexus TypeScript port — SPEC-PORTS-v1 conformance. Evidence-first RAG: answers only from retrieved evidence, cites verbatim, abstains otherwise.",
   "type": "module",

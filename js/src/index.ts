@@ -1,8 +1,8 @@
-// @citenexus/core — public entry (the pure, dependency-free surface).
+// @muthuishere/citenexus-core — public entry (the pure, dependency-free surface).
 //
 // The optional native-engine bindings (Rust core via koffi: extract/detect/store,
-// ingest) are separate subpath imports — "@citenexus/core/ffi" and
-// "@citenexus/core/ingest" — because they load a platform-native library at
+// ingest) are separate subpath imports — "@muthuishere/citenexus-core/ffi" and
+// "@muthuishere/citenexus-core/ingest" — because they load a platform-native library at
 // runtime. Importing this root entry pulls in NO native dependency.
 export * from "./tokenize/tokenize.js";
 export * from "./bm25/bm25.js";
