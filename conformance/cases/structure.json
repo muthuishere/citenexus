@@ -1,0 +1,132 @@
+{
+  "cases": [
+    {
+      "name": "heading tree",
+      "document_id": "doc-h",
+      "structure_type": "heading_tree",
+      "blocks": [
+        {
+          "order": 0,
+          "kind": "heading",
+          "text": "Chapter 1",
+          "level": 1
+        },
+        {
+          "order": 1,
+          "kind": "paragraph",
+          "text": "body text",
+          "level": null
+        },
+        {
+          "order": 2,
+          "kind": "heading",
+          "text": "Section 1.1",
+          "level": 2
+        },
+        {
+          "order": 3,
+          "kind": "heading",
+          "text": "Section 1.2",
+          "level": 2
+        },
+        {
+          "order": 4,
+          "kind": "heading",
+          "text": "Chapter 2",
+          "level": 1
+        }
+      ],
+      "expected": {
+        "document_id": "doc-h",
+        "structure_type": "heading_tree",
+        "nodes": [
+          {
+            "node_id": "doc-h::0",
+            "parent_id": null,
+            "label": "Chapter 1",
+            "kind": "heading",
+            "eu_ref": "doc-h::0"
+          },
+          {
+            "node_id": "doc-h::2",
+            "parent_id": "doc-h::0",
+            "label": "Section 1.1",
+            "kind": "heading",
+            "eu_ref": "doc-h::2"
+          },
+          {
+            "node_id": "doc-h::3",
+            "parent_id": "doc-h::0",
+            "label": "Section 1.2",
+            "kind": "heading",
+            "eu_ref": "doc-h::3"
+          },
+          {
+            "node_id": "doc-h::4",
+            "parent_id": null,
+            "label": "Chapter 2",
+            "kind": "heading",
+            "eu_ref": "doc-h::4"
+          }
+        ]
+      }
+    },
+    {
+      "name": "slide sequence",
+      "document_id": "doc-s",
+      "structure_type": "slide_sequence",
+      "blocks": [
+        {
+          "order": 0,
+          "kind": "slide",
+          "text": "Title slide",
+          "level": null
+        },
+        {
+          "order": 1,
+          "kind": "slide",
+          "text": "Agenda",
+          "level": null
+        }
+      ],
+      "expected": {
+        "document_id": "doc-s",
+        "structure_type": "slide_sequence",
+        "nodes": [
+          {
+            "node_id": "doc-s::0",
+            "parent_id": null,
+            "label": "Title slide",
+            "kind": "slide",
+            "eu_ref": "doc-s::0"
+          },
+          {
+            "node_id": "doc-s::1",
+            "parent_id": null,
+            "label": "Agenda",
+            "kind": "slide",
+            "eu_ref": "doc-s::1"
+          }
+        ]
+      }
+    },
+    {
+      "name": "no structure",
+      "document_id": "doc-n",
+      "structure_type": "none",
+      "blocks": [
+        {
+          "order": 0,
+          "kind": "paragraph",
+          "text": "just prose",
+          "level": null
+        }
+      ],
+      "expected": {
+        "document_id": "doc-n",
+        "structure_type": "none",
+        "nodes": []
+      }
+    }
+  ]
+}

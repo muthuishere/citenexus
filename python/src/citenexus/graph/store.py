@@ -8,6 +8,8 @@ node/edge builder while keeping the storage and retriever contract stable.
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Iterable, Mapping
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -90,31 +92,7 @@ class GraphStore:
             if distilled is not None:
                 self.save(distilled)
                 return distilled
-        mentions: dict[str, set[str]] = {}
-        co_mentions: Counter[tuple[str, str]] = Counter()
-        for row in rows:
-            eu_id = str(row["eu_id"])
-            tokens = sorted(_graph_tokens(str(row.get("text", ""))))
-            for token in tokens:
-                mentions.setdefault(token, set()).add(eu_id)
-            for left_idx, left in enumerate(tokens):
-                for right in tokens[left_idx + 1 :]:
-                    co_mentions[(left, right)] += 1
-
-        nodes = tuple(
-            GraphNode(
-                node_id=_node_id(label),
-                label=label,
-                eu_refs=tuple(sorted(eu_refs)),
-            )
-            for label, eu_refs in sorted(mentions.items())
-        )
-        edges = tuple(
-            GraphEdge(source=_node_id(left), target=_node_id(right), weight=weight)
-            for (left, right), weight in sorted(co_mentions.items())
-            if weight > 0
-        )
-        index = GraphIndex(nodes=nodes, edges=edges)
+        index = build_comention_graph(rows)
         self.save(index)
         return index
 
@@ -125,6 +103,36 @@ class GraphStore:
         if not self._backend.exists(self.key):
             return None
         return GraphIndex.model_validate(self._backend.get_json(self.key))
+
+
+def build_comention_graph(rows: Iterable[Mapping[str, Any]]) -> GraphIndex:
+    """The deterministic, model-free co-mention graph over EU rows (§10b).
+
+    Pure function (no storage): each row is ``{eu_id, text}``. A node is a content
+    token of length ≥ 4; an edge is a within-EU co-mention, weighted by count.
+    Nodes sort by label, edges by (source-label, target-label) — so the artifact
+    is byte-stable across languages. This is the arbiter for the Go/TS ports.
+    """
+    mentions: dict[str, set[str]] = {}
+    co_mentions: Counter[tuple[str, str]] = Counter()
+    for row in rows:
+        eu_id = str(row["eu_id"])
+        tokens = sorted(_graph_tokens(str(row.get("text", ""))))
+        for token in tokens:
+            mentions.setdefault(token, set()).add(eu_id)
+        for left_idx, left in enumerate(tokens):
+            for right in tokens[left_idx + 1 :]:
+                co_mentions[(left, right)] += 1
+    nodes = tuple(
+        GraphNode(node_id=_node_id(label), label=label, eu_refs=tuple(sorted(eu_refs)))
+        for label, eu_refs in sorted(mentions.items())
+    )
+    edges = tuple(
+        GraphEdge(source=_node_id(left), target=_node_id(right), weight=weight)
+        for (left, right), weight in sorted(co_mentions.items())
+        if weight > 0
+    )
+    return GraphIndex(nodes=nodes, edges=edges)
 
 
 def _graph_tokens(text: str) -> set[str]:

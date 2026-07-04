@@ -1,0 +1,361 @@
+{
+  "cases": [
+    {
+      "name": "two overlapping docs",
+      "rows": [
+        {
+          "eu_id": "d1::0",
+          "text": "The employee cannot disclose confidential salary information."
+        },
+        {
+          "eu_id": "d2::0",
+          "text": "Confidential salary information stays private under the policy."
+        }
+      ],
+      "expected": {
+        "nodes": [
+          {
+            "node_id": "node:cannot",
+            "label": "cannot",
+            "eu_refs": [
+              "d1::0"
+            ]
+          },
+          {
+            "node_id": "node:confidential",
+            "label": "confidential",
+            "eu_refs": [
+              "d1::0",
+              "d2::0"
+            ]
+          },
+          {
+            "node_id": "node:disclose",
+            "label": "disclose",
+            "eu_refs": [
+              "d1::0"
+            ]
+          },
+          {
+            "node_id": "node:employee",
+            "label": "employee",
+            "eu_refs": [
+              "d1::0"
+            ]
+          },
+          {
+            "node_id": "node:information",
+            "label": "information",
+            "eu_refs": [
+              "d1::0",
+              "d2::0"
+            ]
+          },
+          {
+            "node_id": "node:policy",
+            "label": "policy",
+            "eu_refs": [
+              "d2::0"
+            ]
+          },
+          {
+            "node_id": "node:private",
+            "label": "private",
+            "eu_refs": [
+              "d2::0"
+            ]
+          },
+          {
+            "node_id": "node:salary",
+            "label": "salary",
+            "eu_refs": [
+              "d1::0",
+              "d2::0"
+            ]
+          },
+          {
+            "node_id": "node:stays",
+            "label": "stays",
+            "eu_refs": [
+              "d2::0"
+            ]
+          },
+          {
+            "node_id": "node:under",
+            "label": "under",
+            "eu_refs": [
+              "d2::0"
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "source": "node:cannot",
+            "target": "node:confidential",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:cannot",
+            "target": "node:disclose",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:cannot",
+            "target": "node:employee",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:cannot",
+            "target": "node:information",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:cannot",
+            "target": "node:salary",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:confidential",
+            "target": "node:disclose",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:confidential",
+            "target": "node:employee",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:confidential",
+            "target": "node:information",
+            "weight": 2,
+            "relation": null
+          },
+          {
+            "source": "node:confidential",
+            "target": "node:policy",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:confidential",
+            "target": "node:private",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:confidential",
+            "target": "node:salary",
+            "weight": 2,
+            "relation": null
+          },
+          {
+            "source": "node:confidential",
+            "target": "node:stays",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:confidential",
+            "target": "node:under",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:disclose",
+            "target": "node:employee",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:disclose",
+            "target": "node:information",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:disclose",
+            "target": "node:salary",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:employee",
+            "target": "node:information",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:employee",
+            "target": "node:salary",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:information",
+            "target": "node:policy",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:information",
+            "target": "node:private",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:information",
+            "target": "node:salary",
+            "weight": 2,
+            "relation": null
+          },
+          {
+            "source": "node:information",
+            "target": "node:stays",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:information",
+            "target": "node:under",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:policy",
+            "target": "node:private",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:policy",
+            "target": "node:salary",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:policy",
+            "target": "node:stays",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:policy",
+            "target": "node:under",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:private",
+            "target": "node:salary",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:private",
+            "target": "node:stays",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:private",
+            "target": "node:under",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:salary",
+            "target": "node:stays",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:salary",
+            "target": "node:under",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:stays",
+            "target": "node:under",
+            "weight": 1,
+            "relation": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "no long tokens",
+      "rows": [
+        {
+          "eu_id": "x::0",
+          "text": "a b to of the it is"
+        }
+      ],
+      "expected": {
+        "nodes": [],
+        "edges": []
+      }
+    },
+    {
+      "name": "single doc self co-mention",
+      "rows": [
+        {
+          "eu_id": "s::0",
+          "text": "Bitcoin funding funding spike spike bitcoin"
+        }
+      ],
+      "expected": {
+        "nodes": [
+          {
+            "node_id": "node:bitcoin",
+            "label": "bitcoin",
+            "eu_refs": [
+              "s::0"
+            ]
+          },
+          {
+            "node_id": "node:funding",
+            "label": "funding",
+            "eu_refs": [
+              "s::0"
+            ]
+          },
+          {
+            "node_id": "node:spike",
+            "label": "spike",
+            "eu_refs": [
+              "s::0"
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "source": "node:bitcoin",
+            "target": "node:funding",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:bitcoin",
+            "target": "node:spike",
+            "weight": 1,
+            "relation": null
+          },
+          {
+            "source": "node:funding",
+            "target": "node:spike",
+            "weight": 1,
+            "relation": null
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -40,8 +40,16 @@ from citenexus.evidence.builder import build_evidence_units
 from citenexus.evidence.chunked_builder import build_chunked_units
 from citenexus.evidence.chunker import chunk_text
 from citenexus.evidence.contextualize import _PROMPT as _CONTEXTUALIZE_PROMPT
-from citenexus.extract.types import BlockKind, ExtractedBlock, ExtractedDoc, SourceType
+from citenexus.evidence.structure import build_structure
+from citenexus.extract.types import (
+    BlockKind,
+    ExtractedBlock,
+    ExtractedDoc,
+    SourceType,
+    StructureType,
+)
 from citenexus.graph.distill import _PROMPT as _GRAPH_DISTILL_PROMPT
+from citenexus.graph.store import build_comention_graph
 from citenexus.lang.detect import LanguageResult
 from citenexus.lang.fallback import resolve_answer_language
 from citenexus.retrieve.fusion import rrf_fuse
@@ -735,6 +743,97 @@ def _render(obj: Any) -> str:
     return json.dumps(obj, indent=2, ensure_ascii=False) + "\n"
 
 
+# --------------------------------------------------------------------------- #
+# cases/graph_comention.json — deterministic co-mention graph (§10b).
+# Input: EU rows {eu_id, text}. Output: the exact GraphIndex JSON. Nodes are
+# content tokens of length >= 4; edges are within-EU co-mentions, weighted.
+# --------------------------------------------------------------------------- #
+
+_GRAPH_CORPORA: list[dict[str, Any]] = [
+    {
+        "name": "two overlapping docs",
+        "rows": [
+            {"eu_id": "d1::0", "text": "The employee cannot disclose confidential salary information."},
+            {"eu_id": "d2::0", "text": "Confidential salary information stays private under the policy."},
+        ],
+    },
+    {
+        "name": "no long tokens",
+        "rows": [{"eu_id": "x::0", "text": "a b to of the it is"}],
+    },
+    {
+        "name": "single doc self co-mention",
+        "rows": [{"eu_id": "s::0", "text": "Bitcoin funding funding spike spike bitcoin"}],
+    },
+]
+
+
+def _graph_comention_cases() -> dict[str, Any]:
+    cases = []
+    for spec in _GRAPH_CORPORA:
+        index = build_comention_graph(spec["rows"])
+        cases.append({**spec, "expected": index.model_dump(mode="json")})
+    return {"cases": cases}
+
+
+# --------------------------------------------------------------------------- #
+# cases/structure.json — best-effort document Structure Index (§7b).
+# heading_tree nests headings by level; slide_sequence is flat; else zero nodes.
+# --------------------------------------------------------------------------- #
+
+_STRUCTURE_DOCS: list[dict[str, Any]] = [
+    {
+        "name": "heading tree",
+        "document_id": "doc-h",
+        "structure_type": "heading_tree",
+        "blocks": [
+            {"order": 0, "kind": "heading", "text": "Chapter 1", "level": 1},
+            {"order": 1, "kind": "paragraph", "text": "body text", "level": None},
+            {"order": 2, "kind": "heading", "text": "Section 1.1", "level": 2},
+            {"order": 3, "kind": "heading", "text": "Section 1.2", "level": 2},
+            {"order": 4, "kind": "heading", "text": "Chapter 2", "level": 1},
+        ],
+    },
+    {
+        "name": "slide sequence",
+        "document_id": "doc-s",
+        "structure_type": "slide_sequence",
+        "blocks": [
+            {"order": 0, "kind": "slide", "text": "Title slide", "level": None},
+            {"order": 1, "kind": "slide", "text": "Agenda", "level": None},
+        ],
+    },
+    {
+        "name": "no structure",
+        "document_id": "doc-n",
+        "structure_type": "none",
+        "blocks": [{"order": 0, "kind": "paragraph", "text": "just prose", "level": None}],
+    },
+]
+
+
+def _structure_cases() -> dict[str, Any]:
+    cases = []
+    for spec in _STRUCTURE_DOCS:
+        doc = ExtractedDoc(
+            document_id=spec["document_id"],
+            source_type=SourceType.plain,
+            structure_type=StructureType(spec["structure_type"]),
+            blocks=tuple(
+                ExtractedBlock(
+                    order=b["order"],
+                    kind=BlockKind(b["kind"]),
+                    text=b["text"],
+                    level=b["level"],
+                )
+                for b in spec["blocks"]
+            ),
+        )
+        index = build_structure(doc)
+        cases.append({**spec, "expected": index.model_dump(mode="json")})
+    return {"cases": cases}
+
+
 def generate() -> dict[str, str]:
     """All fixtures as {relative path under conformance/: rendered JSON text}."""
     return {
@@ -750,6 +849,8 @@ def generate() -> dict[str, str]:
         "cases/e2e_hermetic.json": _render(_e2e_hermetic_cases()),
         "cases/result_roundtrip.json": _render(_result_roundtrip_cases()),
         "cases/model_wire.json": _render(_model_wire_cases()),
+        "cases/graph_comention.json": _render(_graph_comention_cases()),
+        "cases/structure.json": _render(_structure_cases()),
     }
 
 
@@ -759,7 +860,7 @@ def main() -> None:
         path = base / rel_path
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
-        print(f"wrote {path.relative_to(_REPO_ROOT)}")
+        print(f"wrote {path.relative_to(_REPO_ROOT.parent)}")
 
 
 if __name__ == "__main__":
