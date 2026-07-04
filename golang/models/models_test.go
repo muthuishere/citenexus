@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/muthuishere/citenexus-go/internal/conform"
+	"github.com/muthuishere/citenexus/golang/internal/conform"
 )
 
 // The §5 HTTP model clients are proven against the shared model_wire.json

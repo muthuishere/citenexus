@@ -3,7 +3,7 @@ package answer
 import (
 	"testing"
 
-	"github.com/muthuishere/citenexus-go/internal/conform"
+	"github.com/muthuishere/citenexus/golang/internal/conform"
 )
 
 // eqOptStr compares an actual value (present flag + value) against an expected

@@ -3,7 +3,7 @@ package lang
 import (
 	"testing"
 
-	"github.com/muthuishere/citenexus-go/internal/conform"
+	"github.com/muthuishere/citenexus/golang/internal/conform"
 )
 
 // Proven against the shared fixture: every §11a fallback case must match the

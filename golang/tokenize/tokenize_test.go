@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/muthuishere/citenexus-go/internal/conform"
+	"github.com/muthuishere/citenexus/golang/internal/conform"
 )
 
 // The tokenizer is proven against the shared fixture — every case must match the

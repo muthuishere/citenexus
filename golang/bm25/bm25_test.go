@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/muthuishere/citenexus-go/internal/conform"
+	"github.com/muthuishere/citenexus/golang/internal/conform"
 )
 
 // BM25 ranking is proven against the shared fixture — every case must match the

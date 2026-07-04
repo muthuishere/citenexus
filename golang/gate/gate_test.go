@@ -3,7 +3,7 @@ package gate
 import (
 	"testing"
 
-	"github.com/muthuishere/citenexus-go/internal/conform"
+	"github.com/muthuishere/citenexus/golang/internal/conform"
 )
 
 // The gates are proven against the shared fixture — every "supported" and

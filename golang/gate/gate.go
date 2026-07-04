@@ -15,7 +15,7 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/muthuishere/citenexus-go/tokenize"
+	"github.com/muthuishere/citenexus/golang/tokenize"
 )
 
 var (

@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/muthuishere/citenexus-go/internal/conform"
+	"github.com/muthuishere/citenexus/golang/internal/conform"
 )
 
 // The Evidence-Unit id + block builder is proven against the shared fixture:

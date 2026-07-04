@@ -9,9 +9,9 @@ package answer
 import (
 	"sort"
 
-	"github.com/muthuishere/citenexus-go/fakes"
-	"github.com/muthuishere/citenexus-go/gate"
-	"github.com/muthuishere/citenexus-go/result"
+	"github.com/muthuishere/citenexus/golang/fakes"
+	"github.com/muthuishere/citenexus/golang/gate"
+	"github.com/muthuishere/citenexus/golang/result"
 )
 
 // Doc is one corpus document: a stable id and its text.

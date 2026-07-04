@@ -11,7 +11,7 @@ import (
 	"math"
 	"sort"
 
-	"github.com/muthuishere/citenexus-go/tokenize"
+	"github.com/muthuishere/citenexus/golang/tokenize"
 )
 
 // Standard BM25 saturation / length-normalization constants.

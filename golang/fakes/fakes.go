@@ -9,7 +9,7 @@ import (
 	"crypto/sha1"
 	"math"
 
-	"github.com/muthuishere/citenexus-go/tokenize"
+	"github.com/muthuishere/citenexus/golang/tokenize"
 )
 
 // Dim is the fixed embedding dimensionality (§4).

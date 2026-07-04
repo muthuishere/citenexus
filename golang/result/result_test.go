@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/muthuishere/citenexus-go/internal/conform"
+	"github.com/muthuishere/citenexus/golang/internal/conform"
 )
 
 func strPtr(s string) *string { return &s }

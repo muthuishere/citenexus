@@ -7,17 +7,18 @@
 One repo, one language per top-level folder, shared contract in the middle:
 
 ```
-python/       reference library (full RAG + Brain) — PyPI `citenexus`
-golang/       Go port (§4 core + hermetic ask + model clients + Brain) — `citenexus-go`
-js/           TypeScript port (§4 core + hermetic ask + model clients) — `@citenexus/core`
+python/       reference library (full RAG) — PyPI `citenexus`
+golang/       Go port (§4 core + hermetic ask + model clients) — `github.com/muthuishere/citenexus/golang`
+js/           TypeScript port (§4 core + hermetic ask + model clients) — npm `@citenexus/core`
 rust/         Rust core (extraction, store, lid.176) — crates.io `citenexus-core`
 conformance/  shared cross-language fixtures — the real contract; a fixture edit breaks any drifting port
 docs/  openspec/  .github/   design, specs, and CI shared across all languages
 ```
 
-Each language folder is self-contained (its own build file + tests). The
-standalone **Brain CLI** lives in its own repo (`nexus-workspace/brain`) and
-imports `golang/`.
+Each language folder is self-contained (its own build file + tests) but versioned
+together (one version across all). Install the Go port with
+`go get github.com/muthuishere/citenexus/golang` (monorepo submodule, tagged
+`golang/vX.Y.Z`).
 
 
 Evidence-first, multilingual, S3-native RAG for domains where a wrong answer is
