@@ -27,11 +27,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14      # Apple silicon
+          - os: macos-14      # Apple silicon (Intel mac intentionally not supported)
             asset: citenexus_core-darwin-arm64.dylib
-            libname: libcitenexus_core.dylib
-          - os: macos-13      # Intel mac
-            asset: citenexus_core-darwin-amd64.dylib
             libname: libcitenexus_core.dylib
           - os: ubuntu-latest
             asset: citenexus_core-linux-amd64.so
