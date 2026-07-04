@@ -17,7 +17,7 @@ import (
 func dir() string {
 	_, self, _, _ := runtime.Caller(0)
 	// self = <repo>/ports/go/internal/conform/conform.go → up 4 to <repo>.
-	repo := filepath.Join(filepath.Dir(self), "..", "..", "..", "..")
+	repo := filepath.Join(filepath.Dir(self), "..", "..", "..")
 	return filepath.Join(repo, "conformance")
 }
 

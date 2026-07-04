@@ -8,7 +8,7 @@ import { dirname, join } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
 // here = <repo>/ports/ts/src/conform → up 4 to <repo>.
-const conformanceDir = join(here, "..", "..", "..", "..", "conformance");
+const conformanceDir = join(here, "..", "..", "..", "conformance");
 
 /** Parse conformance/cases/<name> (e.g. "tokenize.json"). */
 export function loadCase<T>(name: string): T {

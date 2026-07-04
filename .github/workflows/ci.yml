@@ -36,7 +36,9 @@ jobs:
 
       - name: Sync deps
         run: task setup
+        working-directory: python
 
       # The canonical gate — same `task check` developers run locally.
       - name: Lint + typecheck + unit tests
         run: task check
+        working-directory: python

@@ -39,7 +39,7 @@ example/.citenexus-data/
 .citenexus-data/
 
 # Rust core build artifacts
-core/target/
+rust/target/
 
 # agent worktrees
 .claude/worktrees/
@@ -47,6 +47,9 @@ example/.trustrag-data/
 .trustrag-data/
 
 # Language ports
-ports/ts/node_modules/
-ports/ts/dist/
-ports/go/**/*.test
+js/node_modules/
+js/dist/
+golang/**/*.test
+
+# Built brain binary (CLI lives in its own repo)
+/brain

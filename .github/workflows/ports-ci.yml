@@ -1,18 +1,22 @@
 name: ports-ci
 
-# The Go + TS ports prove the SPEC-PORTS-v1 §4 deterministic contract against the
-# shared conformance/ fixtures. Runs when a port or the fixtures change (a fixture
-# edit must break any drifting port). Third-party actions pinned to commit SHAs.
+# The Go + TS + Rust ports prove the SPEC-PORTS-v1 §4 deterministic contract
+# against the shared conformance/ fixtures. Runs when a port or the fixtures
+# change (a fixture edit must break any drifting port). Actions pinned to SHAs.
 on:
   pull_request:
     paths:
-      - "ports/**"
+      - "golang/**"
+      - "js/**"
+      - "rust/**"
       - "conformance/**"
       - ".github/workflows/ports-ci.yml"
   push:
     branches: [main]
     paths:
-      - "ports/**"
+      - "golang/**"
+      - "js/**"
+      - "rust/**"
       - "conformance/**"
       - ".github/workflows/ports-ci.yml"
 
@@ -35,9 +39,9 @@ jobs:
           go-version: "1.26"
           cache: false # pure-stdlib module, no go.sum to key a cache on
       - name: Vet
-        run: cd ports/go && go vet ./...
+        run: cd golang && go vet ./...
       - name: Conformance tests
-        run: cd ports/go && go test ./...
+        run: cd golang && go test ./...
 
   ts:
     runs-on: ubuntu-latest
@@ -49,10 +53,18 @@ jobs:
         with:
           node-version: "20"
           cache: npm
-          cache-dependency-path: ports/ts/package-lock.json
+          cache-dependency-path: js/package-lock.json
       - name: Install
-        run: cd ports/ts && npm ci
+        run: cd js && npm ci
       - name: Typecheck
-        run: cd ports/ts && npm run typecheck
+        run: cd js && npm run typecheck
       - name: Conformance tests
-        run: cd ports/ts && npm test
+        run: cd js && npm test
+
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Build + test
+        run: cd rust && cargo test

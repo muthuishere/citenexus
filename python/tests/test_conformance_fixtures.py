@@ -16,7 +16,7 @@ from typing import cast
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _SCRIPT = _REPO_ROOT / "scripts" / "gen_conformance.py"
-_CONFORMANCE = _REPO_ROOT / "conformance"
+_CONFORMANCE = _REPO_ROOT.parent / "conformance"
 
 
 def _regenerate() -> dict[str, str]:

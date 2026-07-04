@@ -32,6 +32,8 @@ jobs:
 
       - name: Build
         run: uv build
+        working-directory: python
 
       - name: Publish (trusted publishing)
         run: uv publish
+        working-directory: python

@@ -2,6 +2,24 @@
 
 > Multilingual RAG that answers only when the evidence is strong.
 
+## Repository layout (polyglot)
+
+One repo, one language per top-level folder, shared contract in the middle:
+
+```
+python/       reference library (full RAG + Brain) — PyPI `citenexus`
+golang/       Go port (§4 core + hermetic ask + model clients + Brain) — `citenexus-go`
+js/           TypeScript port (§4 core + hermetic ask + model clients) — `@citenexus/core`
+rust/         Rust core (extraction, store, lid.176) — crates.io `citenexus-core`
+conformance/  shared cross-language fixtures — the real contract; a fixture edit breaks any drifting port
+docs/  openspec/  .github/   design, specs, and CI shared across all languages
+```
+
+Each language folder is self-contained (its own build file + tests). The
+standalone **Brain CLI** lives in its own repo (`nexus-workspace/brain`) and
+imports `golang/`.
+
+
 Evidence-first, multilingual, S3-native RAG for domains where a wrong answer is
 worse than no answer (legal, medical, finance/compliance, enterprise search).
 CiteNexus answers **only** from retrieved evidence — every claim is grounded in a

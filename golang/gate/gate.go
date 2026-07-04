@@ -28,7 +28,7 @@ var (
 func stopwordsPath() string {
 	_, self, _, _ := runtime.Caller(0)
 	// self = <repo>/ports/go/gate/gate.go → up 3 to <repo>.
-	repo := filepath.Join(filepath.Dir(self), "..", "..", "..")
+	repo := filepath.Join(filepath.Dir(self), "..", "..")
 	return filepath.Join(repo, "conformance", "stopwords.json")
 }
 

@@ -754,7 +754,7 @@ def generate() -> dict[str, str]:
 
 
 def main() -> None:
-    base = _REPO_ROOT / "conformance"
+    base = _REPO_ROOT.parent / "conformance"
     for rel_path, text in generate().items():
         path = base / rel_path
         path.parent.mkdir(parents=True, exist_ok=True)

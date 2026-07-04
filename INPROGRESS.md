@@ -4,7 +4,29 @@ Working state for picking the build back up. The durable plan + conventions live
 in [`CLAUDE.md`](CLAUDE.md); the living spec is under `openspec/specs/`; this file
 is just "where we are right now."
 
-_Last updated: 2026-07-02 · branch `main`._
+_Last updated: 2026-07-03 · branch `main`._
+
+## SESSION 2026-07-03 — polyglot restructure (Brain moved OUT)
+
+**Decision:** the Brain is now its own **Go-only** repo (`muthuishere/brain`, at
+`../brain`) — CLI + library. CiteNexus stays a pure **RAG** library. The brain was
+removed from all four CiteNexus languages; its design docs moved to `../brain/docs/`.
+
+CiteNexus was restructured to the toolnexus **polyglot layout** (top-level
+`python/` `golang/` `js/` `rust/`, shared `conformance/ docs/ openspec/ .github/`).
+CI rewired: ci.yml→python/, ports-ci.yml→go+ts+rust, release.yml builds PyPI from
+python/. Path fixes done (Go stopwords/conform, TS fixtures, Python conformance,
+`.gitignore` repointed to new dirs).
+
+Verified green after the move + brain removal:
+`cd python && task check` → **476** (ruff+mypy+tests; rust-parity skips) ·
+`cd golang && go test ./...` · `cd js && npm test` (74) + tsc · `cd rust && cargo test`.
+
+Committed on branch `restructure-polyglot` (see git log). To ship next: no code
+changes needed — optionally cut a PyPI release from `python/` (same `citenexus`
+0.2.0 contract, now just relocated).
+
+---
 
 ## Snapshot
 
