@@ -4,43 +4,34 @@
 // when every answer token appears in the cited passage, plus a content-token
 // relevance overlap test.
 //
-// The 44-word stopword set is loaded from the pinned conformance/stopwords.json
-// (SPEC-PORTS-v1 §10), never hardcoded, so every port shares one list.
+// The 44-word stopword set is the pinned SPEC-PORTS-v1 §10 list. It is EMBEDDED
+// (a copy of conformance/stopwords.json, frozen per §10) so this module is
+// self-contained and works when consumed as a Go dependency — a filesystem read
+// of the shared conformance/ dir would not exist in the module cache.
 package gate
 
 import (
+	_ "embed"
 	"encoding/json"
-	"os"
-	"path/filepath"
-	"runtime"
 	"sync"
 
 	"github.com/muthuishere/citenexus/golang/tokenize"
 )
+
+//go:embed stopwords.json
+var stopwordsJSON []byte
 
 var (
 	stopwordsOnce sync.Once
 	stopwords     map[string]struct{}
 )
 
-// stopwordsPath resolves conformance/stopwords.json relative to THIS source
-// file so the pinned list is found from any working directory.
-func stopwordsPath() string {
-	_, self, _, _ := runtime.Caller(0)
-	// self = <repo>/ports/go/gate/gate.go → up 3 to <repo>.
-	repo := filepath.Join(filepath.Dir(self), "..", "..")
-	return filepath.Join(repo, "conformance", "stopwords.json")
-}
-
-// loadStopwords reads and caches the pinned 44-word stopword set.
+// loadStopwords parses and caches the pinned 44-word stopword set from the
+// embedded copy.
 func loadStopwords() map[string]struct{} {
 	stopwordsOnce.Do(func() {
-		raw, err := os.ReadFile(stopwordsPath())
-		if err != nil {
-			panic("gate: read stopwords.json: " + err.Error())
-		}
 		var words []string
-		if err := json.Unmarshal(raw, &words); err != nil {
+		if err := json.Unmarshal(stopwordsJSON, &words); err != nil {
 			panic("gate: unmarshal stopwords.json: " + err.Error())
 		}
 		set := make(map[string]struct{}, len(words))
