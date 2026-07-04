@@ -1,10 +1,10 @@
 name: release
 
-# Tag-triggered publish to PyPI via OIDC trusted publishing (no API token).
-# Gated on the test job — publish only happens if the gate is green.
-# Dist-name is "citenexus" (import stays `citenexus`; see ADR-0003). Register
-# the PyPI trusted publisher for project "citenexus" (this repo, this
-# workflow file, environment "pypi") before pushing the first real tag.
+# Tag-triggered publish via OIDC trusted publishing (no API tokens):
+#   - PyPI  → project "citenexus" (environment "pypi")
+#   - npm   → "@muthuishere/citenexus-core" (trusted publisher: this repo + release.yml)
+# Both gated on the test job. Crates.io + the Go tag + native libs are separate
+# (native-libs.yml builds the cross-platform Rust cdylibs on the same tag).
 on:
   push:
     tags: ['v*']
@@ -37,3 +37,25 @@ jobs:
       - name: Publish (trusted publishing)
         run: uv publish
         working-directory: python
+
+  publish-npm:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC trusted publishing to npm (no token)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+      - name: Upgrade npm (OIDC trusted publishing needs >= 11.5.1)
+        run: npm install -g npm@latest
+      - name: Install + publish (trusted publishing)
+        working-directory: js
+        run: |
+          npm ci
+          npm publish --provenance --access public
