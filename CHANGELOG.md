@@ -10,6 +10,14 @@ Dist name on PyPI is **`citenexus`** (the import package is `citenexus`; see
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-07-03
+
+### Changed
+- Repository restructured to a polyglot layout: one language per top-level folder
+  (`python/`, `golang/`, `js/`, `rust/`) with shared `conformance/`, `docs/`,
+  `openspec/`, and `.github/`. No change to the published `citenexus` package's
+  behavior or public API — this release is functionally identical to 0.2.0.
+
 ## [0.2.0] - 2026-07-02
 
 First public release. Evidence-first, multilingual, S3-native RAG: answers only
