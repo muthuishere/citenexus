@@ -10,6 +10,20 @@ Dist name on PyPI is **`citenexus`** (the import package is `citenexus`; see
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-04
+
+Unified version across all four languages (python/go/js/rust ship the same number).
+
+### Added
+- **Byte-identical semantic extraction in the Go and TS ports**: the deterministic
+  **co-mention graph** (`build_comention_graph`) and **document structure index**
+  (`build_structure`), proven against new shared conformance fixtures
+  (`graph_comention.json`, `structure.json`). Python remains the arbiter.
+
+### Changed
+- `citenexus.graph.store.build_comention_graph` extracted as a pure function (the
+  cross-language arbiter); `GraphStore.build_from_store` behavior is unchanged.
+
 ## [0.2.1] - 2026-07-03
 
 ### Changed
