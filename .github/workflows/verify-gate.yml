@@ -1,0 +1,42 @@
+name: verify-gate
+
+# Dogfoods our own product: the CiteNexus Verify composite action
+# (.github/actions/verify) runs as a real CI gate against a fixture of
+# genuinely grounded claims. A regression in the faithfulness gate or the
+# CLI itself fails this job, not just the unit suite.
+on:
+  pull_request:
+    paths:
+      - "python/src/citenexus/answer/verify.py"
+      - "python/src/citenexus/cli/**"
+      - "python/src/citenexus/tokenize.py"
+      - ".github/actions/verify/**"
+      - ".github/verify-fixtures/**"
+      - ".github/workflows/verify-gate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "python/src/citenexus/answer/verify.py"
+      - "python/src/citenexus/cli/**"
+      - "python/src/citenexus/tokenize.py"
+      - ".github/actions/verify/**"
+      - ".github/verify-fixtures/**"
+      - ".github/workflows/verify-gate.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dogfood:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Install citenexus from this checkout (not PyPI — proves this PR's code)
+        run: pip install ./python
+      - name: Run citenexus verify against the dogfood fixture
+        run: citenexus verify .github/verify-fixtures/dogfood.json
