@@ -64,14 +64,14 @@ tasks:
 
   core:build:
     desc: Build the Rust core (citenexus-core cdylib — enables the parity tests)
-    dir: core
+    dir: ../rust
     cmds:
       - cargo build
 
   core:test:
     desc: Rust core unit tests + the Python↔Rust extraction parity suite
     cmds:
-      - cd core && cargo test
+      - cd ../rust && cargo test
       - task: core:build
       - uv run pytest tests/core -q
 
