@@ -13,15 +13,13 @@ from __future__ import annotations
 
 import hashlib
 import math
-import re
 from typing import TypeVar
 
-_TOKEN_RE = re.compile(r"[a-z0-9]+")
+from citenexus.tokenize import tokenize
+
 T = TypeVar("T")
 
-
-def tokenize(text: str) -> list[str]:
-    return _TOKEN_RE.findall(text.lower())
+__all__ = ["FakeEmbedding", "FakeLLM", "FakeReranker", "tokenize"]
 
 
 class FakeEmbedding:

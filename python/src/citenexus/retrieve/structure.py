@@ -17,7 +17,7 @@ from citenexus.evidence.structure import StructureIndex, StructureNode
 from citenexus.plugins.base import RetrieverPlugin
 from citenexus.retrieve.types import Candidate, RetrievalSignal
 from citenexus.storage.paths import Layer, layer_prefix
-from citenexus.testing.fakes import tokenize
+from citenexus.tokenize import tokenize
 
 if TYPE_CHECKING:
     from citenexus.domain.partition import PartitionPath

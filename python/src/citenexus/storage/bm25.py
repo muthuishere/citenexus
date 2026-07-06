@@ -20,7 +20,7 @@ import math
 from collections import Counter
 from typing import TYPE_CHECKING, Any
 
-from citenexus.testing.fakes import tokenize
+from citenexus.tokenize import tokenize
 
 if TYPE_CHECKING:
     from citenexus.storage.protocols import VectorStore
