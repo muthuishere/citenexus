@@ -28,6 +28,9 @@ dependencies = [
 # Postgres/pgvector VectorStore backend (LanceDB is the zero-infra default).
 postgres = ["psycopg[binary]>=3.2"]
 
+[project.scripts]
+citenexus = "citenexus.cli:main"
+
 [dependency-groups]
 dev = [
     "pytest>=8",
