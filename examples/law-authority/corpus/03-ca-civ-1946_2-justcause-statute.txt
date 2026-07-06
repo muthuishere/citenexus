@@ -1,0 +1,12 @@
+SOURCE: California Civil Code section 1946.2 (Tenant Protection Act of 2019 — just cause for termination; official statute text)
+URL: https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=CIV&sectionNum=1946.2.
+
+1946.2.
+
+(a) Notwithstanding any other law, after a tenant has continuously and lawfully occupied a residential real property for 12 months, the owner of the residential real property shall not terminate a tenancy without just cause, which shall be stated in the written notice to terminate tenancy. If any additional adult tenants are added to the lease before an existing tenant has continuously and lawfully occupied the residential real property for 24 months, then this subdivision shall only apply if either of the following are satisfied:
+
+(1) All of the tenants have continuously and lawfully occupied the residential real property for 12 months or more.
+
+(2) One or more tenants have continuously and lawfully occupied the residential real property for 24 months or more.
+
+(b) For purposes of this section, "just cause" means either at-fault just cause (such as default in the payment of rent, or a breach of a material term of the lease) or no-fault just cause (such as the owner's intent to occupy the residential real property, or withdrawal of the residential real property from the rental market).

@@ -1,0 +1,7 @@
+document_id,authority_tier,authority_rank,label
+01-ca-civ-1946_1-statute,controlling-statute,1,CA Civil Code 1946.1 — controlling residential periodic-tenancy statute (binding)
+02-mak-v-berkeley-2015-appellate,binding-appellate,1,CA Court of Appeal (2015) applying 1946.1 (binding precedent)
+03-ca-civ-1946_2-justcause-statute,statute,1,CA Civil Code 1946.2 — Tenant Protection Act just-cause statute (binding)
+04-ca-civ-1946-general-statute,general-statute,3,CA Civil Code 1946 — general statute; 1946.1 controls residential (Notwithstanding Section 1946)
+05-nolo-month-to-month-blog,secondary-blog,5,Nolo self-help summary (non-binding secondary source)
+06-florida-83_57-statute,out-of-jurisdiction,5,Florida Statutes 83.57 — binding in FL only; non-authority for a California question
