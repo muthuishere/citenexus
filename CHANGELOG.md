@@ -10,6 +10,27 @@ Dist name on PyPI is **`citenexus`** (the import package is `citenexus`; see
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-07
+
+### Added
+- **Any supported format → markdown** (`emit-markdown`): a deterministic
+  `to_markdown(ExtractedDoc)` emitter — Python reference
+  (`citenexus.extract.to_markdown`) and byte-identical Rust twin
+  (`emit::markdown`, parity-tested) — plus one C ABI front door
+  `citenexus_to_markdown(bytes, len, source_type)` exposed in every binding:
+  Go `core.ToMarkdown`, TS `toMarkdown` (`@muthuishere/citenexus-core/ffi`).
+  Covers html, pdf (feature-gated), docx, pptx, xlsx, md, csv, txt, plain.
+- **xlsx extraction** (`SourceType.xlsx`): csv-twin semantics per sheet — a
+  heading block per sheet name, `col: value` table blocks zipped against the
+  sheet's first-row header, `page` = 1-based sheet index. Python via
+  `openpyxl` (reference), Rust via `calamine` — byte-identical, plus a shared
+  `conformance/fixtures/sample.xlsx`.
+
+### Fixed
+- The Python↔Rust extract parity suite was silently skipping since the repo
+  restructure (it looked for the dylib under `python/core`); it now points at
+  `rust/target` and runs again.
+
 ## [0.4.0] - 2026-07-04
 
 ### Added

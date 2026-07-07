@@ -10,8 +10,9 @@ real C ABI.
 
 | Area | Status |
 |---|---|
-| **extract** — txt · csv · md · html · docx · pptx (OOXML-direct) | ✅ implemented, parity-tested |
+| **extract** — txt · csv · md · html · docx · pptx (OOXML-direct) · xlsx (calamine) | ✅ implemented, parity-tested |
 | **extract** — pdf (pdfium, runtime-bound) | behind the `pdf` feature |
+| **emit** — any supported format → markdown (`citenexus_to_markdown`), deterministic, byte-identical with the Python reference | ✅ implemented, parity-tested |
 | **store** — Lance (`upsert/search/scan/drop`, merge-insert by `eu_id`) | ✅ implemented; `tests/core/test_rust_store_parity.py` proves Rust-written tables are read (scan + search) by Python's `LanceVectorStore` and vice versa — same URI, same bytes |
 | **detect** — fastText lid.176 (pure-Rust `fasttext` crate) | ✅ implemented — **dense `lid.176.bin` only**: the crate's quantized (`.ftz`) inference diverges from upstream in 0.8.0, so quantized models are refused with an error (see `src/detect.rs`) |
 
@@ -25,6 +26,9 @@ no callbacks.
 char* citenexus_extract(const uint8_t* bytes, size_t len,
                        const char* source_type,   // "pdf" | "docx" | "html" | ...
                        const char* document_id);  // -> ExtractedDoc JSON or {"error": ...}
+
+char* citenexus_to_markdown(const uint8_t* bytes, size_t len,
+                           const char* source_type); // -> {"markdown": ...} or {"error": ...}
 
 // store — opaque handle, JSON rows, {"error": ...} on failure
 void* citenexus_store_open(const char* uri, const char* storage_options_json); // NULL on failure

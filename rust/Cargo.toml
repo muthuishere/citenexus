@@ -1,8 +1,8 @@
 [package]
 name = "citenexus-core"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
-description = "CiteNexus's Rust engine: extraction (pdf/docx/pptx/html/md/csv/txt), lance store access, lid.176 detection. One core, FFI for all languages (SPEC-PORTS-v1 §3.4)."
+description = "CiteNexus's Rust engine: extraction (pdf/docx/pptx/xlsx/html/md/csv/txt), any-format→markdown emission, lance store access, lid.176 detection. One core, FFI for all languages (SPEC-PORTS-v1 §3.4)."
 license = "Apache-2.0"
 repository = "https://github.com/muthuishere/citenexus"
 readme = "README.md"
@@ -19,8 +19,9 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # extract: html (browser-grade html5ever), markdown (CommonMark reference),
-# OOXML docx/pptx (zip + streaming xml), csv.
+# OOXML docx/pptx (zip + streaming xml), xlsx (calamine), csv.
 scraper = "0.27"
+calamine = { version = "0.36", features = ["dates"] }
 ego-tree = "0.11"
 pulldown-cmark = "0.13"
 quick-xml = "0.41"

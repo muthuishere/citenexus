@@ -20,10 +20,13 @@ import pytest
 
 from citenexus.extract.csv import CsvExtractor
 from citenexus.extract.html import HtmlExtractor
+from citenexus.extract.markdown import to_markdown
 from citenexus.extract.md import MdExtractor
 from citenexus.extract.txt import TxtExtractor
+from citenexus.extract.xlsx import XlsxExtractor
 
-_CORE = Path(__file__).resolve().parents[2] / "core"
+_CORE = Path(__file__).resolve().parents[3] / "rust"
+_FIXTURES = Path(__file__).resolve().parents[3] / "conformance" / "fixtures"
 _LIB_NAME = {
     "Darwin": "libcitenexus_core.dylib",
     "Linux": "libcitenexus_core.so",
@@ -52,6 +55,12 @@ def core() -> ctypes.CDLL:
         ctypes.c_char_p,
         ctypes.c_char_p,
     ]
+    lib.citenexus_to_markdown.restype = ctypes.c_void_p
+    lib.citenexus_to_markdown.argtypes = [
+        ctypes.c_char_p,
+        ctypes.c_size_t,
+        ctypes.c_char_p,
+    ]
     lib.citenexus_free_string.argtypes = [ctypes.c_void_p]
     return lib
 
@@ -64,6 +73,17 @@ def rust_extract(lib: ctypes.CDLL, data: bytes, source_type: str) -> dict[str, A
         lib.citenexus_free_string(raw)
     assert "error" not in payload, payload.get("error")
     return payload
+
+
+def rust_markdown(lib: ctypes.CDLL, data: bytes, source_type: str) -> str:
+    raw = lib.citenexus_to_markdown(data, len(data), source_type.encode())
+    try:
+        payload: dict[str, Any] = json.loads(ctypes.string_at(raw).decode("utf-8"))
+    finally:
+        lib.citenexus_free_string(raw)
+    assert "error" not in payload, payload.get("error")
+    markdown: str = payload["markdown"]
+    return markdown
 
 
 def blocks_of(doc: Any) -> list[dict[str, Any]]:
@@ -111,3 +131,32 @@ def test_rust_matches_python(
     assert rust_doc["source_type"] == str(python_doc.source_type.value)
     assert rust_doc["structure_type"] == str(python_doc.structure_type.value)
     assert blocks_of(rust_doc) == blocks_of(python_doc)
+
+
+@pytest.mark.parametrize(
+    ("source_type", "text", "extractor"),
+    [
+        ("txt", _TXT, TxtExtractor),
+        ("csv", _CSV, CsvExtractor),
+        ("md", _MD, MdExtractor),
+        ("html", _HTML, HtmlExtractor),
+    ],
+)
+def test_markdown_parity_text_formats(
+    core: ctypes.CDLL, source_type: str, text: str, extractor: type
+) -> None:
+    """to_markdown(extract(...)) in Python == citenexus_to_markdown, byte-identical."""
+    python_md = to_markdown(extractor(document_id="doc").extract(text))
+    rust_md = rust_markdown(core, text.encode("utf-8"), source_type)
+    assert rust_md == python_md
+
+
+def test_xlsx_extract_and_markdown_parity(core: ctypes.CDLL) -> None:
+    data = (_FIXTURES / "sample.xlsx").read_bytes()
+    python_doc = XlsxExtractor(document_id="doc").extract(data)
+    rust_doc = rust_extract(core, data, "xlsx")
+
+    assert rust_doc["source_type"] == str(python_doc.source_type.value)
+    assert rust_doc["structure_type"] == str(python_doc.structure_type.value)
+    assert blocks_of(rust_doc) == blocks_of(python_doc)
+    assert rust_markdown(core, data, "xlsx") == to_markdown(python_doc)

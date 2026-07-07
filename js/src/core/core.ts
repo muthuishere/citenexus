@@ -47,6 +47,7 @@ type Sym = ReturnType<ReturnType<typeof koffi.load>["func"]>;
 interface Symbols {
   version: Sym;
   extract: Sym;
+  toMarkdown: Sym;
   freeString: Sym;
   detectorOpen: Sym;
   detect: Sym;
@@ -76,6 +77,11 @@ function symbols(): Symbols {
       "const uint8_t*",
       "size_t",
       "const char*",
+      "const char*",
+    ]),
+    toMarkdown: lib.func("citenexus_to_markdown", "void*", [
+      "const uint8_t*",
+      "size_t",
       "const char*",
     ]),
     freeString: lib.func("citenexus_free_string", "void", ["void*"]),
@@ -169,6 +175,18 @@ export function extract(
   const buf = bytes.length > 0 ? bytes : new Uint8Array(0);
   const raw = takeString(sym.extract(buf, buf.length, sourceType, documentID), sym);
   return parseJson<ExtractedDoc>(raw);
+}
+
+/**
+ * Convert raw bytes of `sourceType` ("docx", "xlsx", "html", …) straight to
+ * markdown via the shared Rust extract+emit path. Throws on a core-reported
+ * error.
+ */
+export function toMarkdown(bytes: Uint8Array, sourceType: string): string {
+  const sym = symbols();
+  const buf = bytes.length > 0 ? bytes : new Uint8Array(0);
+  const raw = takeString(sym.toMarkdown(buf, buf.length, sourceType), sym);
+  return parseJson<{ markdown: string }>(raw).markdown;
 }
 
 // ---- detect ----------------------------------------------------------------

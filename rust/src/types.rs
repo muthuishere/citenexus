@@ -30,6 +30,7 @@ pub enum SourceType {
     Pdf,
     Docx,
     Pptx,
+    Xlsx,
     Html,
     Md,
     Txt,

@@ -1,5 +1,6 @@
 """Universal extraction: any input → an ``ExtractedDoc`` (shared types here)."""
 
+from citenexus.extract.markdown import to_markdown
 from citenexus.extract.types import (
     BlockKind,
     ExtractedBlock,
@@ -16,4 +17,5 @@ __all__ = [
     "ImageRef",
     "SourceType",
     "StructureType",
+    "to_markdown",
 ]

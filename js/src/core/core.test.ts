@@ -5,13 +5,13 @@
 // module is isolated so consumers without the native library are unaffected.
 
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdtempSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 
-import { version, extract, detect, Store } from "./core.js";
+import { version, extract, toMarkdown, detect, Store } from "./core.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // src/core -> ../../../assets/models/lid.176.bin
@@ -43,6 +43,22 @@ describe("citenexus-core FFI", () => {
     expect(doc.document_id).toBe("doc1");
     expect(doc.blocks.length).toBeGreaterThan(0);
     expect(doc.blocks[0]!.text.length).toBeGreaterThan(0);
+  });
+
+  it("toMarkdown() converts the xlsx fixture sheet by sheet", () => {
+    // src/core -> ../../../conformance/fixtures/sample.xlsx
+    const fixture = resolve(HERE, "..", "..", "..", "conformance", "fixtures", "sample.xlsx");
+    const markdown = toMarkdown(readFileSync(fixture), "xlsx");
+    expect(markdown).toContain("# People");
+    expect(markdown).toContain("name: ada, age: 36, active: true");
+    expect(markdown).toContain("# Scores");
+    expect(markdown.endsWith("\n")).toBe(true);
+  });
+
+  it("toMarkdown() throws the core-reported error on invalid bytes", () => {
+    expect(() => toMarkdown(new TextEncoder().encode("not a workbook"), "xlsx")).toThrow(
+      /citenexus-core/,
+    );
   });
 
   it("Store round-trips upsert -> scan -> search against a temp dir", () => {

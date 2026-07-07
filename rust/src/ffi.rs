@@ -64,6 +64,41 @@ pub unsafe extern "C" fn citenexus_extract(
     to_c_string(payload)
 }
 
+/// Convert `bytes[0..len]` of `source_type` straight to markdown: extract,
+/// then render deterministically (`emit::markdown`). Returns malloc'd JSON:
+/// `{"markdown": "..."}`, or `{"error": ...}`.
+///
+/// # Safety
+/// `bytes` must point to `len` readable bytes; `source_type` must be a valid
+/// NUL-terminated UTF-8 C string.
+#[no_mangle]
+pub unsafe extern "C" fn citenexus_to_markdown(
+    bytes: *const u8,
+    len: usize,
+    source_type: *const c_char,
+) -> *mut c_char {
+    if bytes.is_null() || source_type.is_null() {
+        return to_c_string(error_json("null argument"));
+    }
+    let data = std::slice::from_raw_parts(bytes, len);
+    let source_type = match CStr::from_ptr(source_type).to_str() {
+        Ok(s) => s,
+        Err(_) => return to_c_string(error_json("source_type is not UTF-8")),
+    };
+    let Some(kind) = parse_source_type(source_type) else {
+        return to_c_string(error_json(&format!("unknown source_type: {source_type}")));
+    };
+
+    let payload = match extract::extract(data, kind, "doc", None) {
+        Ok(doc) => {
+            let markdown = crate::emit::markdown::to_markdown(&doc);
+            serde_json::json!({ "markdown": markdown }).to_string()
+        }
+        Err(message) => error_json(&message),
+    };
+    to_c_string(payload)
+}
+
 /// Release a string returned by any `citenexus_*` call.
 ///
 /// # Safety
@@ -194,10 +229,7 @@ pub unsafe extern "C" fn citenexus_store_search(
 /// # Safety
 /// `handle` must be a live pointer from `citenexus_store_open`.
 #[no_mangle]
-pub unsafe extern "C" fn citenexus_store_scan(
-    handle: *mut LanceStore,
-    limit: i64,
-) -> *mut c_char {
+pub unsafe extern "C" fn citenexus_store_scan(handle: *mut LanceStore, limit: i64) -> *mut c_char {
     if handle.is_null() {
         return to_c_string(error_json("null store handle"));
     }

@@ -12,6 +12,7 @@ pub mod ooxml;
 #[cfg(feature = "pdf")]
 pub mod pdf;
 pub mod txt;
+pub mod xlsx;
 
 use crate::types::*;
 
@@ -36,6 +37,7 @@ pub fn extract(
         SourceType::Csv => Ok(csv::extract(&text(), document_id, source_uri)),
         SourceType::Docx => ooxml::extract_docx(bytes, document_id, source_uri),
         SourceType::Pptx => ooxml::extract_pptx(bytes, document_id, source_uri),
+        SourceType::Xlsx => xlsx::extract(bytes, document_id, source_uri),
         #[cfg(feature = "pdf")]
         SourceType::Pdf => pdf::extract(bytes, document_id, source_uri),
         #[cfg(not(feature = "pdf"))]
@@ -53,6 +55,7 @@ pub fn source_type_for_extension(ext: &str) -> SourceType {
         "html" | "htm" => SourceType::Html,
         "docx" => SourceType::Docx,
         "pptx" => SourceType::Pptx,
+        "xlsx" => SourceType::Xlsx,
         "pdf" => SourceType::Pdf,
         _ => SourceType::Plain,
     }

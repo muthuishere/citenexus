@@ -22,6 +22,7 @@ class SourceType(StrEnum):
     pdf = "pdf"
     docx = "docx"
     pptx = "pptx"
+    xlsx = "xlsx"
     html = "html"
     md = "md"
     txt = "txt"

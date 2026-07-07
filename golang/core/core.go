@@ -15,6 +15,7 @@ package core
 #include <stdlib.h>
 #include <stdint.h>
 char* citenexus_extract(const uint8_t* bytes, size_t len, const char* source_type, const char* document_id);
+char* citenexus_to_markdown(const uint8_t* bytes, size_t len, const char* source_type);
 void citenexus_free_string(char* s);
 const char* citenexus_core_version();
 
@@ -57,6 +58,22 @@ func Extract(data []byte, sourceType, documentID string) string {
 	defer C.free(unsafe.Pointer(cDocID))
 
 	out := C.citenexus_extract(bp, C.size_t(len(data)), cSourceType, cDocID)
+	defer C.citenexus_free_string(out)
+	return C.GoString(out)
+}
+
+// ToMarkdown converts raw bytes of sourceType ("docx", "xlsx", "html", …)
+// straight to markdown via the shared Rust extract+emit path. Returns the C
+// ABI's JSON verbatim: `{"markdown":...}` or `{"error":...}`.
+func ToMarkdown(data []byte, sourceType string) string {
+	var bp *C.uint8_t
+	if len(data) > 0 {
+		bp = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	}
+	cSourceType := C.CString(sourceType)
+	defer C.free(unsafe.Pointer(cSourceType))
+
+	out := C.citenexus_to_markdown(bp, C.size_t(len(data)), cSourceType)
 	defer C.citenexus_free_string(out)
 	return C.GoString(out)
 }

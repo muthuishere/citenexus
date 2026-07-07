@@ -39,6 +39,32 @@ func TestExtractPlain(t *testing.T) {
 	}
 }
 
+func TestToMarkdown(t *testing.T) {
+	data, err := os.ReadFile("../../conformance/fixtures/sample.xlsx")
+	if err != nil {
+		t.Fatalf("read xlsx fixture: %v", err)
+	}
+	out := ToMarkdown(data, "xlsx")
+	var payload struct {
+		Markdown string `json:"markdown"`
+		Error    string `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(out), &payload); err != nil {
+		t.Fatalf("to_markdown output not valid JSON: %v\n%s", err, out)
+	}
+	if payload.Error != "" {
+		t.Fatalf("to_markdown returned error: %s", payload.Error)
+	}
+	if !strings.Contains(payload.Markdown, "# People") ||
+		!strings.Contains(payload.Markdown, "name: ada, age: 36, active: true") {
+		t.Fatalf("unexpected markdown: %q", payload.Markdown)
+	}
+
+	if out := ToMarkdown([]byte("not a workbook"), "xlsx"); !strings.Contains(out, `"error"`) {
+		t.Fatalf("expected error for invalid workbook, got: %s", out)
+	}
+}
+
 // TestStoreRoundTrip drives the real Rust Lance store over a temp directory URI:
 // open → upsert one row → scan finds it → search finds it.
 func TestStoreRoundTrip(t *testing.T) {

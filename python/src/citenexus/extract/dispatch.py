@@ -20,6 +20,7 @@ from citenexus.extract.plain import PlainExtractor
 from citenexus.extract.pptx import PptxExtractor
 from citenexus.extract.txt import TxtExtractor
 from citenexus.extract.types import ExtractedDoc, SourceType
+from citenexus.extract.xlsx import XlsxExtractor
 from citenexus.plugins.base import ExtractorPlugin
 
 
@@ -39,6 +40,7 @@ _BY_EXTENSION: dict[str, _ExtractorFactory] = {
     ".htm": HtmlExtractor,
     ".docx": DocxExtractor,
     ".pptx": PptxExtractor,
+    ".xlsx": XlsxExtractor,
     ".pdf": PdfExtractor,
 }
 
@@ -51,6 +53,7 @@ _BY_SOURCE_TYPE: dict[SourceType, _ExtractorFactory] = {
     SourceType.html: HtmlExtractor,
     SourceType.docx: DocxExtractor,
     SourceType.pptx: PptxExtractor,
+    SourceType.xlsx: XlsxExtractor,
     SourceType.pdf: PdfExtractor,
     SourceType.plain: PlainExtractor,
 }
