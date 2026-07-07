@@ -4,6 +4,11 @@
   "description": "CiteNexus TypeScript port — SPEC-PORTS-v1 conformance. Evidence-first RAG: answers only from retrieved evidence, cites verbatim, abstains otherwise.",
   "type": "module",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/muthuishere/citenexus.git",
+    "directory": "js"
+  },
   "engines": {
     "node": ">=20"
   },
