@@ -113,26 +113,33 @@ PDF or Word doc is ingested as ordinary paragraph text, not a structured
 `table` block. If your evidence is tabular and lives in a PDF/DOCX, treat it
 as prose for now.
 
-**Image-to-text via a vision model** — real, and gated by a deterministic
-pre-filter so vision isn't called on every image. `vision/prefilter.py`'s
-`decide()` routes each extracted image to one of four outcomes per §9 of the
-spec: `text` (page already has a text layer — skip), `ocr` (a scanned-text
-raster — cheaper/more faithful via OCR than a VL model), `vision` (a real
-figure — this is the only path that spends a model call), or `skip`
-(decoration below `min_area_ratio` or a banner/strip aspect ratio).
-`vision/describe.py`'s `describe_image()` calls the injected `VisionPlugin`
-and shapes its output into a `VisionRecord` (caption, description, detected
-objects/relationships, any OCR text read out of the image) that becomes a
-citable figure Evidence Unit. `vision/client.py`'s `OpenAICompatibleVision` is
-the concrete client — base64-encodes image bytes into an OpenAI-style
-`image_url` data URI and posts to any OpenAI-compatible `/chat/completions`
-vision endpoint (Gemini's OpenAI-compat endpoint, GPT-4o, a local VL server).
-Enable it by passing `vision=` to the client (see the scaling ladder above).
-**Honest gap:** `PdfExtractor` builds `ImageRef`s from `page.images` metadata
-(id, page, bbox) but doesn't yet persist the actual image bytes
-(`ImageRef.blob_key` stays `None`) — so the vision path is fully proven with
-injected bytes in tests, but a real PDF's images aren't automatically piped
-through to a vision call yet without wiring that persistence step yourself.
+**Image-to-text via a vision model** — the description → citable-EU half is
+real and end-to-end: `vision/describe.py`'s `describe_image()` calls the
+injected `VisionPlugin` and shapes its output into a `VisionRecord` (caption,
+description, detected objects/relationships, any OCR text read out of the
+image); `vision/units.py`'s `build_vision_units()` turns each
+`(ImageRef, VisionRecord)` pair into a real `EvidenceUnit(type=figure)`, cited
+by page + bbox exactly like any other unit. `vision/client.py`'s
+`OpenAICompatibleVision` is the concrete client — base64-encodes image bytes
+into an OpenAI-style `image_url` data URI and posts to any OpenAI-compatible
+`/chat/completions` vision endpoint (Gemini's OpenAI-compat endpoint, GPT-4o,
+a local VL server). Enable it by passing `vision=` to the client (see the
+scaling ladder above). **Two honest gaps, not one:**
+1. `vision/prefilter.py`'s `decide()` — the deterministic §9 router (text /
+   ocr / vision / skip, gated on area ratio + aspect ratio + OCR-density) — is
+   a real, tested, pure function, but **it is never called from the ingest
+   pipeline** (`ingest/pipeline.py`). Every image that reaches vision today
+   goes straight to a model call; nothing currently skips decoration or
+   routes scanned text to OCR instead. The routing logic exists but isn't
+   wired up yet.
+2. `PdfExtractor`/`DocxExtractor`/`PptxExtractor` build `ImageRef`s with
+   `blob_key=None` (bytes are never persisted). `ingest/pipeline.py`'s
+   `_image_bytes()` fetches bytes via `image.blob_key` and returns `None` if
+   it's unset — which it always is for real documents — so `_vision_units()`
+   silently skips every image and vision never fires on a real PDF/DOCX/PPTX
+   today. The full pipeline (bytes → describe → cite) is proven only with
+   manually-injected bytes (tests) or a caller who persists blobs and sets
+   `blob_key` themselves.
 
 **`citenexus verify`** — a standalone CLI for the faithfulness gate, useful
 outside a running `CiteNexus` instance (e.g. a CI gate on someone else's RAG
@@ -160,7 +167,7 @@ network, no extra dep) is the offline/test default.
 | ask/stream/evaluate with per-claim faithfulness gate | ✅ shipped (generator required) |
 | `citenexus verify` — standalone faithfulness-gate CLI + CI Action | ✅ shipped, Python only |
 | Table extraction (structured `table` evidence blocks) | ✅ shipped for **CSV only** — PDF/DOCX/PPTX/HTML tables fall through as plain paragraph text |
-| Image-to-text via injected vision model (conditional §9 pre-filter) | ✅ shipped — `text`/`ocr`/`vision`/`skip` routing, `OpenAICompatibleVision` client |
+| Image-to-text via injected vision model (describe → citable figure EU) | ✅ shipped, but **inert on real docs** — no extractor persists image bytes, and the §9 `decide()` pre-filter isn't wired into ingest yet |
 | Real lid.176 language detection (`FastTextDetector`) | ✅ shipped (`detector=`), `HeuristicDetector` is the no-network default |
 | LLM wiki distillation (concept pages, `[[links]]`, S3 Markdown tree, lint) | ✅ shipped (`wiki_distiller=`) |
 | Contextual chunking · dual-query RRF · hooks · telemetry · web crawl · Postgres backend | ✅ shipped |
@@ -168,7 +175,15 @@ network, no extra dep) is the offline/test default.
 | Leiden community clustering | ⏳ not yet (community signal rides the graph retriever) |
 | True BGE-M3 sparse lexical | ⏳ BM25-lite stands in (needs a sparse-capable endpoint) |
 | Image bytes from real PDFs for vision | ⏳ extractors don't persist rasters yet (vision path proven with injected bytes) |
+| §9 vision pre-filter wired into ingest | ⏳ `vision/prefilter.py::decide()` exists and is tested, but `ingest/pipeline.py` never calls it |
+| Lists (bullet/numbered) as structured evidence | ❌ not captured at all in HTML/Markdown (content dropped, not flattened); DOCX list text survives as plain paragraph text, structure lost |
+| Code blocks as structured evidence | ❌ `BlockKind.code`/`EUType.code_block` are defined but no extractor ever produces them |
+| Footnotes / captions | ❌ no extractor or evidence concept for either |
+| Document metadata (title, author, date, page count) | ❌ not captured — `ExtractedDoc` carries no metadata fields |
 | LLM-as-judge · MCP server | ⏳ later (config sections reserved) |
+
+Full block-by-block trace (captured → carried as a typed unit → actually
+citable), including the gaps above: [`docs/CONTENT-COVERAGE.md`](docs/CONTENT-COVERAGE.md).
 
 Or wire real OpenAI-compatible endpoints from typed config — one call builds the
 embedding / answering-LLM / reranker plugins (answers stay temperature-0):
