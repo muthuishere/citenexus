@@ -73,6 +73,7 @@ class PdfExtractor(ExtractorPlugin):
         blocks: list[ExtractedBlock] = []
         images: list[ImageRef] = []
         image_bytes: dict[str, bytes] = {}
+        image_page_area: dict[str, float] = {}
         with pdfplumber.open(opened) as pdf:
             for index, page in enumerate(pdf.pages):
                 number = index + 1
@@ -86,20 +87,25 @@ class PdfExtractor(ExtractorPlugin):
                         bbox=_page_text_bbox(page),
                     )
                 )
+                page_area = float(page.width) * float(page.height)
                 for img_index, img in enumerate(page.images):
                     image_id = f"page{number}-img{img_index}"
+                    x0, top, x1, bottom = (
+                        float(img["x0"]),
+                        float(img["top"]),
+                        float(img["x1"]),
+                        float(img["bottom"]),
+                    )
                     images.append(
                         ImageRef(
                             image_id=image_id,
                             page=number,
-                            bbox=(
-                                float(img["x0"]),
-                                float(img["top"]),
-                                float(img["x1"]),
-                                float(img["bottom"]),
-                            ),
+                            bbox=(x0, top, x1, bottom),
+                            width=round(x1 - x0),
+                            height=round(bottom - top),
                         )
                     )
+                    image_page_area[image_id] = page_area
                     data = _image_data(img)
                     if data is not None:
                         image_bytes[image_id] = data
@@ -112,4 +118,5 @@ class PdfExtractor(ExtractorPlugin):
             blocks=tuple(blocks),
             images=tuple(images),
             image_bytes=image_bytes,
+            image_page_area=image_page_area,
         )

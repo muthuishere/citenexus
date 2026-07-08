@@ -21,6 +21,7 @@ from citenexus.storage.manifest import EtagManifest, load_manifest, save_manifes
 from citenexus.storage.paths import Layer, layer_prefix, leaf_vector_uri, partition_segment
 from citenexus.telemetry.events import Stage, StageEvent
 from citenexus.vision.describe import describe_image
+from citenexus.vision.prefilter import VisionDecision, VisionPrefilterConfig, decide
 from citenexus.vision.units import build_vision_units
 
 if TYPE_CHECKING:
@@ -104,6 +105,7 @@ class IngestPipeline:
         queue: DurableQueue | None = None,
         default_answer_language: str = "en",
         vision: VisionDescriber | None = None,
+        vision_prefilter: VisionPrefilterConfig | None = None,
         vector_store: VectorStore | None = None,
         chunking_enabled: bool = True,
         chunk_max_tokens: int = 450,
@@ -123,6 +125,7 @@ class IngestPipeline:
         self._queue = queue
         self._default_language = default_answer_language
         self._vision = vision
+        self._vision_prefilter = vision_prefilter or VisionPrefilterConfig()
         self._chunking_enabled = chunking_enabled
         self._chunk_max_tokens = chunk_max_tokens
         self._chunk_overlap = chunk_overlap
@@ -275,8 +278,23 @@ class IngestPipeline:
         vision = self._vision
         if vision is None or not getattr(doc, "images", ()):
             return []
+        page_areas: dict[str, float] = getattr(doc, "image_page_area", None) or {}
         described: list[tuple[ImageRef, VisionRecord]] = []
         for image in doc.images:
+            # §9 pre-filter: route by real page/image geometry when the
+            # extractor supplied a page area (currently PDF only — docx/pptx
+            # have no fixed page geometry, so they fall through to vision
+            # unconditionally, preserving prior behavior for those formats).
+            page_area = page_areas.get(image.image_id)
+            if page_area is not None:
+                decision = decide(
+                    image,
+                    page_area=page_area,
+                    ocr_text_dense=False,
+                    config=self._vision_prefilter,
+                )
+                if decision is not VisionDecision.vision:
+                    continue
             data = self._image_bytes(image)
             if data is None:
                 continue
