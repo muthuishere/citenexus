@@ -58,6 +58,59 @@ def _page_text_bbox(page: Any) -> BBox | None:
     return (x0, top, x1, bottom)
 
 
+def _text_excluding_tables(page: Any, tables: list[Any]) -> Any:
+    """``page``, with every detected table's region cropped out.
+
+    Without this, a table's cell text is captured TWICE: once as its own typed
+    ``BlockKind.table`` row (see ``_extract_tables``) and again inside the raw
+    page paragraph text — which both dilutes the paragraph EU and lets it tie
+    a table row on retrieval score for the exact fact the table row exists to
+    answer. Mirrors how an embedded image never leaks into paragraph text.
+    """
+    filtered = page
+    for table in tables:
+        filtered = filtered.outside_bbox(table.bbox)
+    return filtered
+
+
+def _extract_tables(
+    tables: list[Any], page_number: int, start_order: int
+) -> tuple[list[ExtractedBlock], int]:
+    """Real ruled/aligned tables (already located via ``page.find_tables()``)
+    -> one ``BlockKind.table`` block per data row (first row is the header,
+    carried as ``structure_path``) — the same ``"col: value"`` rendering
+    ``extract/csv.py`` uses, so a table row from a PDF cites identically to
+    one from a CSV. Returns the new blocks and the next free ``order`` value
+    (``ExtractedBlock.order`` must stay globally unique — it feeds ``eu_id``
+    downstream).
+    """
+    blocks: list[ExtractedBlock] = []
+    order = start_order
+    for table in tables:
+        rows = table.extract()
+        if len(rows) < 2:
+            continue
+        header = tuple(cell or "" for cell in rows[0])
+        bbox = cast("BBox", tuple(float(v) for v in table.bbox))
+        for row_index, row in enumerate(rows[1:]):
+            rendered = ", ".join(
+                f"{col}: {val or ''}" for col, val in zip(header, row, strict=False)
+            )
+            blocks.append(
+                ExtractedBlock(
+                    order=order,
+                    kind=BlockKind.table,
+                    text=rendered,
+                    page=page_number,
+                    bbox=bbox,
+                    level=row_index,
+                    structure_path=header,
+                )
+            )
+            order += 1
+    return blocks, order
+
+
 class PdfExtractor(ExtractorPlugin):
     """One paragraph block per page (text + page number + a word-derived bbox);
     page images become ``ImageRef``s anchored to their page and box."""
@@ -74,19 +127,25 @@ class PdfExtractor(ExtractorPlugin):
         images: list[ImageRef] = []
         image_bytes: dict[str, bytes] = {}
         image_page_area: dict[str, float] = {}
+        order = 0
         with pdfplumber.open(opened) as pdf:
             for index, page in enumerate(pdf.pages):
                 number = index + 1
-                text = (page.extract_text() or "").strip()
+                tables = page.find_tables()
+                text_page = _text_excluding_tables(page, tables) if tables else page
+                text = (text_page.extract_text() or "").strip()
                 blocks.append(
                     ExtractedBlock(
-                        order=index,
+                        order=order,
                         kind=BlockKind.paragraph,
                         text=text,
                         page=number,
-                        bbox=_page_text_bbox(page),
+                        bbox=_page_text_bbox(text_page),
                     )
                 )
+                order += 1
+                table_blocks, order = _extract_tables(tables, number, order)
+                blocks.extend(table_blocks)
                 page_area = float(page.width) * float(page.height)
                 for img_index, img in enumerate(page.images):
                     image_id = f"page{number}-img{img_index}"
