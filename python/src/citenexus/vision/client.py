@@ -71,7 +71,7 @@ class OpenAICompatibleVision:
         base_url: str,
         model: str,
         temperature: float = 0.0,
-        max_tokens: int | None = 512,
+        max_tokens: int | None = 8192,
         mime_type: str = "image/png",
         transport: Transport | None = None,
     ) -> None:
