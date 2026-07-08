@@ -40,6 +40,28 @@ class HtmlExtractor(ExtractorPlugin):
         order = 0
         has_heading = False
 
+        # <table> was previously outside the [*_HEADINGS, "p"] selector, so
+        # its content was dropped entirely (not flattened, not cited). Pull
+        # each table's rows out FIRST (each data row -> "col: value", same
+        # convention as extract/csv.py -> its own BlockKind.table) and
+        # decompose the <table> so its cell text can't also leak into a
+        # paragraph block if a cell happens to nest a <p>.
+        table_rows: list[tuple[tuple[str, ...], int, str]] = []
+        for table in soup.find_all("table"):
+            rows = [
+                [cell.get_text(strip=True) for cell in tr.find_all(["td", "th"])]
+                for tr in table.find_all("tr")
+            ]
+            table.decompose()
+            if len(rows) < 2:
+                continue
+            header = tuple(rows[0])
+            for row_index, row in enumerate(rows[1:]):
+                rendered = ", ".join(
+                    f"{col}: {val}" for col, val in zip(header, row, strict=False)
+                )
+                table_rows.append((header, row_index, rendered))
+
         for el in soup.find_all([*_HEADINGS, "p"]):
             if not isinstance(el, Tag):
                 continue
@@ -70,6 +92,18 @@ class HtmlExtractor(ExtractorPlugin):
                         structure_path=tuple(t for _, t in stack),
                     )
                 )
+            order += 1
+
+        for header, row_index, rendered in table_rows:
+            blocks.append(
+                ExtractedBlock(
+                    order=order,
+                    kind=BlockKind.table,
+                    text=rendered,
+                    level=row_index,
+                    structure_path=header,
+                )
+            )
             order += 1
 
         structure = StructureType.heading_tree if has_heading else StructureType.none
