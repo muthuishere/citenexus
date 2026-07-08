@@ -76,6 +76,42 @@ def test_empty_document_renders_empty() -> None:
     assert to_markdown(_doc()) == ""
 
 
+def _table_row(header: tuple[str, ...], cells: tuple[str, ...]) -> ExtractedBlock:
+    return ExtractedBlock(
+        order=0,
+        kind=BlockKind.table,
+        text="ignored verbatim text",
+        structure_path=header,
+        cells=cells,
+    )
+
+
+def test_contiguous_rows_fuse_into_one_gfm_table() -> None:
+    doc = _doc(
+        _table_row(("name", "age"), ("ada", "36")),
+        _table_row(("name", "age"), ("lin", "29")),
+    )
+    assert to_markdown(doc) == "| name | age |\n| --- | --- |\n| ada | 36 |\n| lin | 29 |\n"
+
+
+def test_different_headers_and_short_rows_split_and_pad() -> None:
+    doc = _doc(
+        _table_row(("a", "b"), ("1",)),  # short row → padded
+        _table_row(("x",), ("9", "extra")),  # new header → new table; extra truncated
+    )
+    assert to_markdown(doc) == "| a | b |\n| --- | --- |\n| 1 |  |\n\n| x |\n| --- |\n| 9 |\n"
+
+
+def test_pipes_and_newlines_in_cells_are_escaped() -> None:
+    doc = _doc(_table_row(("h|x", "y"), ("a|b", "c\nd")))
+    assert to_markdown(doc) == "| h\\|x | y |\n| --- | --- |\n| a\\|b | c d |\n"
+
+
+def test_headerless_table_block_stays_verbatim() -> None:
+    doc = _doc(_block(BlockKind.table, "name: ada, age: 36"))
+    assert to_markdown(doc) == "name: ada, age: 36\n"
+
+
 def test_rendering_is_deterministic() -> None:
     doc = _doc(
         _block(BlockKind.heading, "T", level=1),

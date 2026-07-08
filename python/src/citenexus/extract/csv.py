@@ -36,7 +36,8 @@ class CsvExtractor(ExtractorPlugin):
             header = tuple(rows[0])
             structure = StructureType.table_schema
             for row_index, row in enumerate(rows[1:]):
-                rendered = ", ".join(f"{col}: {val}" for col, val in zip(header, row, strict=False))
+                pairs = list(zip(header, row, strict=False))  # zip-shortest
+                rendered = ", ".join(f"{col}: {val}" for col, val in pairs)
                 blocks.append(
                     ExtractedBlock(
                         order=row_index,
@@ -44,6 +45,7 @@ class CsvExtractor(ExtractorPlugin):
                         text=rendered,
                         level=row_index,
                         structure_path=header,
+                        cells=tuple(val for _, val in pairs),
                     )
                 )
 

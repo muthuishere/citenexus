@@ -1,6 +1,6 @@
 [package]
 name = "citenexus-core"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
 description = "CiteNexus's Rust engine: extraction (pdf/docx/pptx/xlsx/html/md/csv/txt), any-format→markdown emission, lance store access, lid.176 detection. One core, FFI for all languages (SPEC-PORTS-v1 §3.4)."
 license = "Apache-2.0"

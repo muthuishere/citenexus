@@ -10,6 +10,30 @@ Dist name on PyPI is **`citenexus`** (the import package is `citenexus`; see
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-08
+
+### Added
+- **GFM pipe tables** in `to_markdown`: a run of contiguous `table` blocks
+  sharing a header (`structure_path`) now fuses into one GitHub-flavored pipe
+  table built from a new `ExtractedBlock.cells` field, with `|`/newline
+  escaping and short-row padding. Per-row citation granularity is preserved —
+  each row stays its own block/EvidenceUnit; fusion happens only at render.
+  csv and xlsx extractors populate `cells`; a headerless `table` block still
+  falls back to verbatim text.
+- **HTML links and lists**: `<a href>` renders inline as `[text](href)` and
+  `<ul>`/`<ol>` become `- ` / `1. ` line blocks from their direct `<li>`
+  children (elements nested in a list are not double-emitted). Byte-identical
+  across the Rust (`scraper`) and Python (`bs4`) twins.
+- **Base64 data-URI images**: a new standalone-image extractor sniffs
+  png/jpeg/gif/webp magic and inlines the bytes as
+  `![image](data:image/<mime>;base64,…)`; above a 256 KiB cap, or for an
+  unrecognized magic, it emits the `![image]()` placeholder. `SourceType.image`
+  now routes here instead of falling back to plain text.
+
+### Changed
+- `ExtractedBlock` gains a `cells: list[str]` field (defaults to empty, like
+  `structure_path`), reflected in the C ABI JSON and the JS/TS binding type.
+
 ## [0.5.0] - 2026-07-07
 
 ### Added

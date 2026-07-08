@@ -14,6 +14,7 @@ from typing import Any, Protocol
 from citenexus.extract.csv import CsvExtractor
 from citenexus.extract.docx import DocxExtractor
 from citenexus.extract.html import HtmlExtractor
+from citenexus.extract.image import ImageExtractor
 from citenexus.extract.md import MdExtractor
 from citenexus.extract.pdf import PdfExtractor
 from citenexus.extract.plain import PlainExtractor
@@ -45,7 +46,7 @@ _BY_EXTENSION: dict[str, _ExtractorFactory] = {
 }
 
 # Maps an explicit SourceType to its extractor class (types with no dedicated
-# extractor in this capability — e.g. `image` — fall back to plain).
+# extractor in this capability fall back to plain).
 _BY_SOURCE_TYPE: dict[SourceType, _ExtractorFactory] = {
     SourceType.txt: TxtExtractor,
     SourceType.md: MdExtractor,
@@ -55,6 +56,7 @@ _BY_SOURCE_TYPE: dict[SourceType, _ExtractorFactory] = {
     SourceType.pptx: PptxExtractor,
     SourceType.xlsx: XlsxExtractor,
     SourceType.pdf: PdfExtractor,
+    SourceType.image: ImageExtractor,
     SourceType.plain: PlainExtractor,
 }
 

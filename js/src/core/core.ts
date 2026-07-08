@@ -137,6 +137,8 @@ export interface ExtractedBlock {
   bbox?: unknown;
   level?: number | null;
   structure_path: string[];
+  /** Raw cell values for `table` blocks (aligned to the header on `structure_path`); empty otherwise. */
+  cells: string[];
 }
 
 export interface ExtractedDoc {

@@ -39,6 +39,7 @@ pub fn extract(
             bbox: None, // word-derived bbox lands with the conformance pass
             level: None,
             structure_path: vec![],
+            cells: vec![],
         });
 
         let mut img_index = 0usize;

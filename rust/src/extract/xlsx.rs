@@ -56,6 +56,7 @@ pub fn extract(
             bbox: None,
             level: Some(1),
             structure_path: vec![],
+            cells: vec![],
         });
         order += 1;
 
@@ -78,12 +79,13 @@ pub fn extract(
             if values.iter().all(String::is_empty) {
                 continue;
             }
-            let rendered = header
+            let pairs: Vec<(&String, &String)> = header.iter().zip(values.iter()).collect();
+            let rendered = pairs
                 .iter()
-                .zip(values.iter())
                 .map(|(col, val)| format!("{col}: {val}"))
                 .collect::<Vec<_>>()
                 .join(", ");
+            let cells = pairs.iter().map(|(_, val)| (*val).clone()).collect();
             blocks.push(ExtractedBlock {
                 order,
                 kind: BlockKind::Table,
@@ -92,6 +94,7 @@ pub fn extract(
                 bbox: None,
                 level: Some(row_index),
                 structure_path: header.clone(),
+                cells,
             });
             order += 1;
             row_index += 1;

@@ -63,6 +63,7 @@ pub fn extract(text: &str, document_id: &str, source_uri: Option<String>) -> Ext
                         bbox: None,
                         level: Some(level),
                         structure_path: ancestors,
+                        cells: vec![],
                     });
                     stack.push((level, content));
                     has_heading = true;
@@ -81,6 +82,7 @@ pub fn extract(text: &str, document_id: &str, source_uri: Option<String>) -> Ext
                             bbox: None,
                             level: None,
                             structure_path: stack.iter().map(|(_, t)| t.clone()).collect(),
+                            cells: vec![],
                         });
                         order += 1;
                     }

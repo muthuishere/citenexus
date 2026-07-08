@@ -12,10 +12,15 @@ using these deterministic rules:
 - `heading` → `#` repeated `clamp(level or 1, 1, 6)` times, a space, then the
   block text.
 - `paragraph`, `thread_turn`, `ocr_block` → the block text verbatim.
-- `table` → the block text verbatim (v1 carries the extractor's row rendering;
-  pipe-table fidelity arrives with structured table extraction).
+- `table` → a run of contiguous `table` blocks sharing the same non-empty
+  `structure_path` (their header) fuses into ONE GitHub-flavored pipe table:
+  a header row from `structure_path`, a `| --- |` separator, then one row per
+  block built from its `cells` (truncated/`""`-padded to the header width).
+  Each cell has `|`→`\|` and newline→space applied. A `table` block with an
+  empty `structure_path` falls back to its text verbatim.
 - `code` → the block text wrapped in triple-backtick fences on their own lines.
-- `image` → the block text verbatim (caption/OCR text) when non-empty,
+- `image` → the block text verbatim (caption/OCR text, or an inline
+  `![image](data:…base64…)` data-URI from the image extractor) when non-empty,
   otherwise the literal placeholder `![image]()`.
 - `slide` → a `## Slide {page}` heading (1-based slide number from `page`;
   omitted entirely when `page` is null) followed by a blank line and the slide
@@ -40,6 +45,22 @@ string. The function is total over the closed `BlockKind` set and never fails.
 
 - **WHEN** a doc has no blocks
 - **THEN** `to_markdown` returns the empty string.
+
+#### Scenario: Contiguous table rows fuse into a GFM pipe table
+
+- **WHEN** two consecutive `table` blocks share `structure_path` `(name, age)`
+  with `cells` `(ada, 36)` and `(lin, 29)`
+- **THEN** they render as one table:
+  `| name | age |` / `| --- | --- |` / `| ada | 36 |` / `| lin | 29 |`,
+  and a following block with a different `structure_path` starts a new table.
+
+#### Scenario: A standalone image inlines as a base64 data-URI
+
+- **WHEN** an image file at or below the 256 KiB inline cap with a recognized
+  magic (png/jpeg/gif/webp) is extracted
+- **THEN** its `image` block text is `![image](data:image/<mime>;base64,<…>)`;
+  above the cap or for an unrecognized magic the text is empty and the emitter
+  renders the `![image]()` placeholder.
 
 ### Requirement: Excel workbooks extract as per-sheet tables
 

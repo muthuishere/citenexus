@@ -2,11 +2,12 @@
 //!
 //! A known `SourceType` selects the extractor; unknown types fall back to
 //! plain text (one paragraph block per blank-line chunk, like txt but with
-//! `source_type=plain`). Binary types (docx/pptx/pdf) take bytes; text types
-//! decode UTF-8 lossily first (Python reads text files as UTF-8 too).
+//! `source_type=plain`). Binary types (docx/pptx/pdf/xlsx/image) take bytes;
+//! text types decode UTF-8 lossily first (Python reads text files as UTF-8 too).
 
 pub mod csv;
 pub mod html;
+pub mod image;
 pub mod md;
 pub mod ooxml;
 #[cfg(feature = "pdf")]
@@ -42,7 +43,8 @@ pub fn extract(
         SourceType::Pdf => pdf::extract(bytes, document_id, source_uri),
         #[cfg(not(feature = "pdf"))]
         SourceType::Pdf => Err("pdf support requires the `pdf` feature".to_string()),
-        SourceType::Plain | SourceType::Image => Ok(plain(&text(), document_id, source_uri)),
+        SourceType::Image => Ok(image::extract(bytes, document_id, source_uri)),
+        SourceType::Plain => Ok(plain(&text(), document_id, source_uri)),
     }
 }
 

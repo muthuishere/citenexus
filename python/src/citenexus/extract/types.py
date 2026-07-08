@@ -84,6 +84,10 @@ class ExtractedBlock(BaseModel):
     level: int | None = None
     # Path of ancestor headings/sections, if known (feeds EvidenceUnit.structure_path).
     structure_path: tuple[str, ...] = ()
+    # Raw cell values for ``table`` blocks, aligned to the header on
+    # ``structure_path``; empty for every non-table block. Feeds GFM pipe-table
+    # emission. Like ``structure_path``, defaults to () — never null.
+    cells: tuple[str, ...] = ()
 
 
 class ExtractedDoc(BaseModel):

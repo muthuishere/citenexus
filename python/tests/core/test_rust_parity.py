@@ -98,6 +98,7 @@ def blocks_of(doc: Any) -> list[dict[str, Any]]:
                 "page": b["page"],
                 "level": b["level"],
                 "structure_path": list(b["structure_path"]),
+                "cells": list(b["cells"]),
             }
         )
     return out
@@ -110,6 +111,13 @@ _HTML = (
     "<html><body><h1>Policy</h1><script>var x=1;</script>"
     "<p>Employees accrue leave.</p><h2>Remote</h2><p>Needs approval.</p></body></html>"
 )
+_HTML_RICH = (
+    "<html><body><h1>Guide</h1>"
+    '<p>See <a href="https://x.test/leave">the policy</a> for details.</p>'
+    "<ul><li>First point</li><li>Second <b>bold</b> point</li></ul>"
+    '<ol><li>Step <a href="/a">one</a></li><li>Step two</li></ol>'
+    "</body></html>"
+)
 
 
 @pytest.mark.parametrize(
@@ -119,6 +127,7 @@ _HTML = (
         ("csv", _CSV, CsvExtractor),
         ("md", _MD, MdExtractor),
         ("html", _HTML, HtmlExtractor),
+        ("html", _HTML_RICH, HtmlExtractor),
     ],
 )
 def test_rust_matches_python(
@@ -140,6 +149,7 @@ def test_rust_matches_python(
         ("csv", _CSV, CsvExtractor),
         ("md", _MD, MdExtractor),
         ("html", _HTML, HtmlExtractor),
+        ("html", _HTML_RICH, HtmlExtractor),
     ],
 )
 def test_markdown_parity_text_formats(
@@ -149,6 +159,18 @@ def test_markdown_parity_text_formats(
     python_md = to_markdown(extractor(document_id="doc").extract(text))
     rust_md = rust_markdown(core, text.encode("utf-8"), source_type)
     assert rust_md == python_md
+
+
+def test_image_extract_and_markdown_parity(core: ctypes.CDLL) -> None:
+    from citenexus.extract.image import ImageExtractor
+
+    png = b"\x89PNG\r\n\x1a\n" + bytes(range(64)) * 4
+    python_doc = ImageExtractor(document_id="doc").extract(png)
+    rust_doc = rust_extract(core, png, "image")
+
+    assert rust_doc["source_type"] == str(python_doc.source_type.value)
+    assert blocks_of(rust_doc) == blocks_of(python_doc)
+    assert rust_markdown(core, png, "image") == to_markdown(python_doc)
 
 
 def test_xlsx_extract_and_markdown_parity(core: ctypes.CDLL) -> None:

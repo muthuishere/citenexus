@@ -68,6 +68,11 @@ pub struct ExtractedBlock {
     /// (possibly empty) list here, never null.
     #[serde(default)]
     pub structure_path: Vec<String>,
+    /// Raw cell values for `table` blocks (one per column, aligned to the
+    /// header carried on `structure_path`). Empty for every non-table block;
+    /// like `structure_path`, defaults to a plain list, never null.
+    #[serde(default)]
+    pub cells: Vec<String>,
 }
 
 impl ExtractedBlock {
@@ -80,6 +85,7 @@ impl ExtractedBlock {
             bbox: None,
             level: None,
             structure_path: vec![],
+            cells: vec![],
         }
     }
 }

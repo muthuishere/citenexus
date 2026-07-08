@@ -21,12 +21,13 @@ pub fn extract(text: &str, document_id: &str, source_uri: Option<String>) -> Ext
     if let Some((header, body)) = rows.split_first() {
         structure = StructureType::TableSchema;
         for (row_index, row) in body.iter().enumerate() {
-            let rendered = header
+            let pairs: Vec<(&String, &String)> = header.iter().zip(row.iter()).collect(); // zip-shortest, like Python's zip(strict=False)
+            let rendered = pairs
                 .iter()
-                .zip(row.iter()) // zip-shortest, like Python's zip(strict=False)
                 .map(|(col, val)| format!("{col}: {val}"))
                 .collect::<Vec<_>>()
                 .join(", ");
+            let cells = pairs.iter().map(|(_, val)| (*val).clone()).collect();
             blocks.push(ExtractedBlock {
                 order: row_index,
                 kind: BlockKind::Table,
@@ -35,6 +36,7 @@ pub fn extract(text: &str, document_id: &str, source_uri: Option<String>) -> Ext
                 bbox: None,
                 level: Some(row_index as u32),
                 structure_path: header.clone(),
+                cells,
             });
         }
     }

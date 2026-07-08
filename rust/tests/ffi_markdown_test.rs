@@ -63,9 +63,11 @@ fn xlsx_fixture_converts_sheet_by_sheet() {
         .to_string();
     assert_eq!(
         markdown,
-        "# People\n\nname: ada, age: 36, active: true\n\n\
-         name: alan, age: 41.5, active: false\n\n\
-         # Scores\n\nteam: red, points: 30\n"
+        "# People\n\n\
+         | name | age | active |\n| --- | --- | --- |\n\
+         | ada | 36 | true |\n| alan | 41.5 | false |\n\n\
+         # Scores\n\n\
+         | team | points |\n| --- | --- |\n| red | 30 |\n"
     );
 }
 

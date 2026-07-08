@@ -77,9 +77,8 @@ class XlsxExtractor(ExtractorPlugin):
                 values = [_cell_text(v) for v in row]
                 if not any(values):
                     continue
-                rendered = ", ".join(
-                    f"{col}: {val}" for col, val in zip(header, values, strict=False)
-                )
+                pairs = list(zip(header, values, strict=False))  # zip-shortest
+                rendered = ", ".join(f"{col}: {val}" for col, val in pairs)
                 blocks.append(
                     ExtractedBlock(
                         order=order,
@@ -88,6 +87,7 @@ class XlsxExtractor(ExtractorPlugin):
                         page=sheet_index,
                         level=row_index,
                         structure_path=header,
+                        cells=tuple(val for _, val in pairs),
                     )
                 )
                 order += 1
