@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any
+import io
+from typing import Any, cast
 
 import pdfplumber
+from PIL import Image, UnidentifiedImageError
 
 from citenexus.evidence.unit import BBox
 from citenexus.extract.plain import open_binary
@@ -17,6 +19,31 @@ from citenexus.extract.types import (
     StructureType,
 )
 from citenexus.plugins.base import ExtractorPlugin
+
+
+def _image_data(img: Any) -> bytes | None:
+    """Decode one ``page.images`` entry's raw raster bytes, or ``None`` if unusable.
+
+    ``pdfplumber``/``pdfminer`` expose the undecoded raster via the ``stream``
+    key's ``.get_data()``. Not every embedded stream is a valid standalone
+    image (some filters need page-level context to interpret) — validated by
+    a real Pillow decode so a bad image is skipped rather than breaking the
+    whole page.
+    """
+    stream = img.get("stream")
+    if stream is None:
+        return None
+    try:
+        data = cast("bytes", stream.get_data())
+    except Exception:
+        return None
+    if not data:
+        return None
+    try:
+        Image.open(io.BytesIO(data)).load()
+    except (UnidentifiedImageError, OSError, ValueError):
+        return None
+    return data
 
 
 def _page_text_bbox(page: Any) -> BBox | None:
@@ -45,6 +72,7 @@ class PdfExtractor(ExtractorPlugin):
 
         blocks: list[ExtractedBlock] = []
         images: list[ImageRef] = []
+        image_bytes: dict[str, bytes] = {}
         with pdfplumber.open(opened) as pdf:
             for index, page in enumerate(pdf.pages):
                 number = index + 1
@@ -59,9 +87,10 @@ class PdfExtractor(ExtractorPlugin):
                     )
                 )
                 for img_index, img in enumerate(page.images):
+                    image_id = f"page{number}-img{img_index}"
                     images.append(
                         ImageRef(
-                            image_id=f"page{number}-img{img_index}",
+                            image_id=image_id,
                             page=number,
                             bbox=(
                                 float(img["x0"]),
@@ -71,6 +100,9 @@ class PdfExtractor(ExtractorPlugin):
                             ),
                         )
                     )
+                    data = _image_data(img)
+                    if data is not None:
+                        image_bytes[image_id] = data
 
         return ExtractedDoc(
             document_id=doc_id,
@@ -79,4 +111,5 @@ class PdfExtractor(ExtractorPlugin):
             source_uri=source_uri,
             blocks=tuple(blocks),
             images=tuple(images),
+            image_bytes=image_bytes,
         )

@@ -73,11 +73,15 @@ class DocxExtractor(ExtractorPlugin):
                 )
             order += 1
 
-        images = tuple(
-            ImageRef(image_id=rel_id)
-            for rel_id, rel in document.part.rels.items()
-            if "image" in rel.reltype
-        )
+        images: list[ImageRef] = []
+        image_bytes: dict[str, bytes] = {}
+        for rel_id, rel in document.part.rels.items():
+            if "image" not in rel.reltype:
+                continue
+            images.append(ImageRef(image_id=rel_id))
+            blob = getattr(rel.target_part, "blob", None)
+            if blob:
+                image_bytes[rel_id] = blob
 
         return ExtractedDoc(
             document_id=doc_id,
@@ -85,5 +89,6 @@ class DocxExtractor(ExtractorPlugin):
             structure_type=StructureType.heading_tree,
             source_uri=source_uri,
             blocks=tuple(blocks),
-            images=images,
+            images=tuple(images),
+            image_bytes=image_bytes,
         )

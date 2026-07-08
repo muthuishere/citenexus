@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from citenexus.evidence.unit import BBox
 
@@ -96,3 +96,8 @@ class ExtractedDoc(BaseModel):
     source_uri: str | None = None
     blocks: tuple[ExtractedBlock, ...] = ()
     images: tuple[ImageRef, ...] = ()
+    # Transient: raw bytes for images in `images`, keyed by `ImageRef.image_id`.
+    # Not persisted itself — the ingest pipeline reads this once to store each
+    # image via StorageBackend.put_bytes and stamp `ImageRef.blob_key`. Kept off
+    # the frozen `ImageRef` model to avoid copying large blobs on every access.
+    image_bytes: dict[str, bytes] = Field(default_factory=dict)

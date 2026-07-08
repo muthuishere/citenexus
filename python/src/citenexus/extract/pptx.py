@@ -34,6 +34,7 @@ class PptxExtractor(ExtractorPlugin):
 
         blocks: list[ExtractedBlock] = []
         images: list[ImageRef] = []
+        image_bytes: dict[str, bytes] = {}
 
         for index, slide in enumerate(presentation.slides):
             page = index + 1
@@ -44,7 +45,14 @@ class PptxExtractor(ExtractorPlugin):
                     if frame_text:
                         texts.append(frame_text)
                 if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
-                    images.append(ImageRef(image_id=f"slide{page}-{shape.shape_id}", page=page))
+                    image_id = f"slide{page}-{shape.shape_id}"
+                    images.append(ImageRef(image_id=image_id, page=page))
+                    try:
+                        blob = shape.image.blob
+                    except Exception:
+                        blob = None
+                    if blob:
+                        image_bytes[image_id] = blob
             blocks.append(
                 ExtractedBlock(
                     order=index,
@@ -62,4 +70,5 @@ class PptxExtractor(ExtractorPlugin):
             source_uri=source_uri,
             blocks=tuple(blocks),
             images=tuple(images),
+            image_bytes=image_bytes,
         )

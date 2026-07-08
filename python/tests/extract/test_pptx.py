@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import io
 
+from PIL import Image
+
 from citenexus.extract.pptx import PptxExtractor
 from citenexus.extract.types import BlockKind, SourceType, StructureType
 
@@ -20,3 +22,9 @@ def test_one_block_per_slide_and_picture(pptx_bytes: bytes) -> None:
 
     assert len(doc.images) == 1
     assert doc.images[0].page == 1
+    assert doc.images[0].blob_key is None  # stamped by the ingest pipeline, not here
+
+    data = doc.image_bytes[doc.images[0].image_id]
+    assert len(data) > 0
+    decoded = Image.open(io.BytesIO(data))
+    decoded.load()

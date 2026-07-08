@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import io
 
+from PIL import Image
+
 from citenexus.extract.docx import DocxExtractor
 from citenexus.extract.types import BlockKind, SourceType, StructureType
 
@@ -32,3 +34,9 @@ def test_headings_paragraphs_and_image(docx_bytes: bytes) -> None:
 
     assert len(doc.images) == 1
     assert doc.images[0].image_id
+    assert doc.images[0].blob_key is None  # stamped by the ingest pipeline, not here
+
+    data = doc.image_bytes[doc.images[0].image_id]
+    assert len(data) > 0
+    decoded = Image.open(io.BytesIO(data))
+    decoded.load()
