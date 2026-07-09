@@ -7,6 +7,7 @@ from typing import Any
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 
+from citenexus.evidence.unit import DocumentMetadata
 from citenexus.extract.plain import open_binary
 from citenexus.extract.types import (
     BlockKind,
@@ -17,6 +18,19 @@ from citenexus.extract.types import (
     StructureType,
 )
 from citenexus.plugins.base import ExtractorPlugin
+
+
+def _pptx_metadata(presentation: Any) -> DocumentMetadata:
+    """``core_properties`` — title/author/created; ``page_count`` is the
+    slide count (PPTX's natural analog to a page)."""
+    props = presentation.core_properties
+    created = props.created.isoformat() if props.created is not None else None
+    return DocumentMetadata(
+        title=props.title or None,
+        author=props.author or None,
+        created=created,
+        page_count=len(presentation.slides),
+    )
 
 
 class PptxExtractor(ExtractorPlugin):
@@ -95,6 +109,7 @@ class PptxExtractor(ExtractorPlugin):
             source_type=SourceType.pptx,
             structure_type=StructureType.slide_sequence,
             source_uri=source_uri,
+            metadata=_pptx_metadata(presentation),
             blocks=tuple(blocks),
             images=tuple(images),
             image_bytes=image_bytes,

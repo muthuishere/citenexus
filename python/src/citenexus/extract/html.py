@@ -7,6 +7,7 @@ from typing import Any
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 
+from citenexus.evidence.unit import DocumentMetadata
 from citenexus.extract.plain import load_text
 from citenexus.extract.types import (
     BlockKind,
@@ -18,6 +19,15 @@ from citenexus.extract.types import (
 from citenexus.plugins.base import ExtractorPlugin
 
 _HEADINGS = ("h1", "h2", "h3", "h4", "h5", "h6")
+
+
+def _html_metadata(soup: Any) -> DocumentMetadata:
+    """``<title>`` and ``<meta name="author">`` — HTML has no standard
+    created-date or page-count concept, so those stay ``None``."""
+    title = soup.title.get_text(strip=True) if soup.title else None
+    author_tag = soup.find("meta", attrs={"name": "author"})
+    author = author_tag.get("content") if author_tag is not None else None
+    return DocumentMetadata(title=title or None, author=author or None)
 
 
 def _li_own_text(li: Tag) -> str:
@@ -53,6 +63,7 @@ class HtmlExtractor(ExtractorPlugin):
     def extract(self, source: Any) -> ExtractedDoc:
         text, doc_id, source_uri = load_text(source, self.document_id)
         soup = BeautifulSoup(text, "html.parser")
+        metadata = _html_metadata(soup)
         for junk in soup(["script", "style"]):
             junk.decompose()
 
@@ -175,5 +186,6 @@ class HtmlExtractor(ExtractorPlugin):
             source_type=SourceType.html,
             structure_type=structure,
             source_uri=source_uri,
+            metadata=metadata,
             blocks=tuple(blocks),
         )
