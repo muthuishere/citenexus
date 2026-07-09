@@ -19,3 +19,7 @@ export * from "./answer/answer.js";
 export * from "./graph/graph.js";
 export * from "./structure/structure.js";
 export * from "./fakes/fakes.js";
+// Storage seam: VectorStore/TextSearch protocols + the pgvector backend. The
+// Postgres store imports `pg` lazily at first connection, so this root entry
+// stays dependency-free (parity with Python's citenexus.storage).
+export * from "./storage/index.js";

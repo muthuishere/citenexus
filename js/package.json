@@ -1,6 +1,6 @@
 {
   "name": "@muthuishere/citenexus-core",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "CiteNexus TypeScript port — SPEC-PORTS-v1 conformance. Evidence-first RAG: answers only from retrieved evidence, cites verbatim, abstains otherwise.",
   "type": "module",
   "license": "Apache-2.0",
@@ -27,6 +27,10 @@
     "./ingest": {
       "types": "./dist/ingest/ingest.d.ts",
       "import": "./dist/ingest/ingest.js"
+    },
+    "./storage": {
+      "types": "./dist/storage/index.d.ts",
+      "import": "./dist/storage/index.js"
     }
   },
   "files": [
@@ -44,6 +48,8 @@
     "vitest": "^2.1.0"
   },
   "optionalDependencies": {
-    "koffi": "^3.1.0"
+    "koffi": "^3.1.0",
+    "pg": "^8.13.0",
+    "pgvector": "^0.2.0"
   }
 }
