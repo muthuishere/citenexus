@@ -20,6 +20,27 @@ from citenexus.plugins.base import ExtractorPlugin
 _HEADINGS = ("h1", "h2", "h3", "h4", "h5", "h6")
 
 
+def _li_own_text(li: Tag) -> str:
+    """``li``'s own text, EXCLUDING any nested ``<ul>``/``<ol>`` subtree.
+
+    A naive ``li.get_text()`` on a list item containing a nested list would
+    duplicate the nested items' text (they're also captured as their own
+    blocks by the same top-level ``find_all("li")`` walk) — only descend into
+    non-list children.
+    """
+    parts: list[str] = []
+    for child in li.children:
+        if isinstance(child, Tag):
+            if child.name in ("ul", "ol"):
+                continue
+            part = child.get_text(strip=True)
+        else:
+            part = str(child).strip()
+        if part:
+            parts.append(part)
+    return " ".join(parts)
+
+
 class HtmlExtractor(ExtractorPlugin):
     """Walk headings and paragraphs in document order; ``<script>``/``<style>``
     subtrees are removed before extraction so no markup or code leaks into text."""
@@ -62,10 +83,28 @@ class HtmlExtractor(ExtractorPlugin):
                 )
                 table_rows.append((header, row_index, rendered))
 
-        for el in soup.find_all([*_HEADINGS, "p"]):
+        # <pre> (a code block, conventionally <pre><code>...</code></pre>) was
+        # never selected either — BlockKind.code/EUType.code_block are
+        # defined and mapped but no extractor ever constructed one. Pull it
+        # out FIRST and decompose it, same treatment as tables: preserves
+        # internal whitespace/newlines (no strip=True) since code is
+        # whitespace-significant, unlike prose.
+        code_blocks: list[str] = []
+        for pre in soup.find_all("pre"):
+            content = pre.get_text().strip("\n")
+            pre.decompose()
+            if content:
+                code_blocks.append(content)
+
+        # <ul>/<ol>/<li> were previously outside the selector too — a list's
+        # text was dropped entirely, not even flattened. Each <li> becomes
+        # its own BlockKind.paragraph (no dedicated list EU type exists yet;
+        # this matches how a DOCX "List Bullet" paragraph already reaches the
+        # evidence store today — text survives, numbering/nesting does not).
+        for el in soup.find_all([*_HEADINGS, "p", "li"]):
             if not isinstance(el, Tag):
                 continue
-            content = el.get_text(strip=True)
+            content = _li_own_text(el) if el.name == "li" else el.get_text(strip=True)
             if not content:
                 continue
             if el.name in _HEADINGS:
@@ -104,6 +143,10 @@ class HtmlExtractor(ExtractorPlugin):
                     structure_path=header,
                 )
             )
+            order += 1
+
+        for content in code_blocks:
+            blocks.append(ExtractedBlock(order=order, kind=BlockKind.code, text=content))
             order += 1
 
         structure = StructureType.heading_tree if has_heading else StructureType.none
