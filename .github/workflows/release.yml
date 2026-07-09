@@ -53,7 +53,11 @@ jobs:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
       - name: Upgrade npm (OIDC trusted publishing needs >= 11.5.1)
-        run: npm install -g npm@latest
+        # Pin to 11.5.1: npm@latest ships a broken provenance path that fails to
+        # load its bundled `sigstore` module on the runner (MODULE_NOT_FOUND).
+        # The OIDC publish path loads sigstore regardless of --provenance, so the
+        # version pin — not the flag — is the actual fix.
+        run: npm install -g npm@11.5.1
       - name: Install + publish (trusted publishing)
         working-directory: js
         # --provenance dropped: npm@latest's provenance path fails to load the
