@@ -6,6 +6,7 @@ from typing import Any
 
 from docx import Document
 
+from citenexus.evidence.unit import DocumentMetadata
 from citenexus.extract.plain import open_binary
 from citenexus.extract.types import (
     BlockKind,
@@ -16,6 +17,14 @@ from citenexus.extract.types import (
     StructureType,
 )
 from citenexus.plugins.base import ExtractorPlugin
+
+
+def _docx_metadata(document: Any) -> DocumentMetadata:
+    """``core_properties`` — title/author/created (no page count: DOCX has no
+    fixed pagination without rendering)."""
+    props = document.core_properties
+    created = props.created.isoformat() if props.created is not None else None
+    return DocumentMetadata(title=props.title or None, author=props.author or None, created=created)
 
 
 def _heading_level(style_name: str) -> int | None:
@@ -73,17 +82,48 @@ class DocxExtractor(ExtractorPlugin):
                 )
             order += 1
 
-        images = tuple(
-            ImageRef(image_id=rel_id)
-            for rel_id, rel in document.part.rels.items()
-            if "image" in rel.reltype
-        )
+        # document.tables is a separate flat list (table-cell paragraphs are
+        # NOT included in document.paragraphs above, so no duplication risk
+        # like PDF's page.extract_text() had). First row is the header;
+        # each subsequent row renders "col: value" — same convention as
+        # extract/csv.py — -> its own citable BlockKind.table.
+        for table in document.tables:
+            rows = [[cell.text.strip() for cell in row.cells] for row in table.rows]
+            if len(rows) < 2:
+                continue
+            header = tuple(rows[0])
+            for row_index, row in enumerate(rows[1:]):
+                rendered = ", ".join(
+                    f"{col}: {val}" for col, val in zip(header, row, strict=False)
+                )
+                blocks.append(
+                    ExtractedBlock(
+                        order=order,
+                        kind=BlockKind.table,
+                        text=rendered,
+                        level=row_index,
+                        structure_path=header,
+                    )
+                )
+                order += 1
+
+        images: list[ImageRef] = []
+        image_bytes: dict[str, bytes] = {}
+        for rel_id, rel in document.part.rels.items():
+            if "image" not in rel.reltype:
+                continue
+            images.append(ImageRef(image_id=rel_id))
+            blob = getattr(rel.target_part, "blob", None)
+            if blob:
+                image_bytes[rel_id] = blob
 
         return ExtractedDoc(
             document_id=doc_id,
             source_type=SourceType.docx,
             structure_type=StructureType.heading_tree,
             source_uri=source_uri,
+            metadata=_docx_metadata(document),
             blocks=tuple(blocks),
-            images=images,
+            images=tuple(images),
+            image_bytes=image_bytes,
         )

@@ -1,0 +1,25 @@
+{
+  "question": "Can the employee disclose this?",
+  "claims": [
+    {
+      "id": "disclosure-policy",
+      "text": "The employee may not disclose confidential information.",
+      "citations": [
+        {
+          "id": "policy-doc",
+          "passage": "Policy: The employee may not disclose confidential information."
+        }
+      ]
+    },
+    {
+      "id": "notice-period",
+      "text": "The notice period is 30 days.",
+      "citations": [
+        {
+          "id": "contract-clause",
+          "passage": "The notice period is 30 days per contract."
+        }
+      ]
+    }
+  ]
+}

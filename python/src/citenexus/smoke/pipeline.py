@@ -16,7 +16,7 @@ from citenexus.domain.trust import TrustMode
 from citenexus.storage.lance_store import LanceVectorStore, StorageOptions
 from citenexus.storage.manifest import EtagManifest, load_manifest, save_manifest
 from citenexus.storage.paths import Layer, layer_prefix, leaf_vector_uri
-from citenexus.testing.fakes import tokenize
+from citenexus.tokenize import tokenize
 
 if TYPE_CHECKING:
     from citenexus.domain.partition import PartitionPath

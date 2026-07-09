@@ -25,12 +25,18 @@ from citenexus.vision.describe import VisionRecord
 def _record_text(record: VisionRecord) -> str:
     """Compose the searchable text from a vision record's fields."""
     parts = [record.short_caption, record.detailed_description]
+    if record.image_type:
+        parts.append(f"image type: {record.image_type}")
     if record.objects:
         parts.append(", ".join(record.objects))
     if record.relationships:
         parts.append("; ".join(record.relationships))
     if record.ocr_text:
         parts.append(record.ocr_text)
+    if record.data_values:
+        parts.append(
+            "; ".join(f"{dv.get('label')}: {dv.get('value')}" for dv in record.data_values)
+        )
     return "\n".join(part for part in parts if part and part.strip()).strip()
 
 

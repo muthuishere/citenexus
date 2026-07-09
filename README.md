@@ -91,19 +91,99 @@ Or declare it all in one typed config: `CiteNexus.from_config(cfg)` builds only
 what the config enables. `ask()` without a generator raises a clear error
 pointing at `retrieve()` — search-only deployments are first-class, not a crash.
 
+## What it ingests, what it does
+
+**Extractors** (`python/src/citenexus/extract/`) — one plugin per file type,
+routed by `dispatch.py`: PDF (`pdf.py`, via `pdfplumber` — per-page text + word
+bboxes), DOCX (`docx.py`, via `python-docx` — heading tree + paragraphs), PPTX
+(`pptx.py` — one block per slide), HTML (`html.py`), Markdown (`md.py`), CSV
+(`csv.py`), plain text (`txt.py`), and an unknown-type fallback (`plain.py`).
+Anything not on the list falls through to plain-text rather than failing
+ingest.
+
+**Tables** — real, structured table extraction ships **for CSV only**.
+`CsvExtractor.extract` (`extract/csv.py`) treats the header row as schema and
+renders every data row as a `BlockKind.table` evidence block (`"col: value"`
+pairs, `structure_path` = header) — a genuine table-aware evidence type, not
+just flattened text. **Honest gap:** PDF, DOCX, PPTX, and HTML tables are
+**not** detected as tables today — `PdfExtractor` calls
+`page.extract_text()` (never `page.extract_tables()`), and `DocxExtractor`
+iterates `document.paragraphs` only (never `document.tables`), so a table in a
+PDF or Word doc is ingested as ordinary paragraph text, not a structured
+`table` block. If your evidence is tabular and lives in a PDF/DOCX, treat it
+as prose for now.
+
+**Image-to-text via a vision model** — the description → citable-EU half is
+real and end-to-end: `vision/describe.py`'s `describe_image()` calls the
+injected `VisionPlugin` and shapes its output into a `VisionRecord` (caption,
+description, detected objects/relationships, any OCR text read out of the
+image); `vision/units.py`'s `build_vision_units()` turns each
+`(ImageRef, VisionRecord)` pair into a real `EvidenceUnit(type=figure)`, cited
+by page + bbox exactly like any other unit. `vision/client.py`'s
+`OpenAICompatibleVision` is the concrete client — base64-encodes image bytes
+into an OpenAI-style `image_url` data URI and posts to any OpenAI-compatible
+`/chat/completions` vision endpoint (Gemini's OpenAI-compat endpoint, GPT-4o,
+a local VL server). Enable it by passing `vision=` to the client (see the
+scaling ladder above). **Two honest gaps, not one:**
+1. `vision/prefilter.py`'s `decide()` — the deterministic §9 router (text /
+   ocr / vision / skip, gated on area ratio + aspect ratio + OCR-density) — is
+   a real, tested, pure function, but **it is never called from the ingest
+   pipeline** (`ingest/pipeline.py`). Every image that reaches vision today
+   goes straight to a model call; nothing currently skips decoration or
+   routes scanned text to OCR instead. The routing logic exists but isn't
+   wired up yet.
+2. `PdfExtractor`/`DocxExtractor`/`PptxExtractor` build `ImageRef`s with
+   `blob_key=None` (bytes are never persisted). `ingest/pipeline.py`'s
+   `_image_bytes()` fetches bytes via `image.blob_key` and returns `None` if
+   it's unset — which it always is for real documents — so `_vision_units()`
+   silently skips every image and vision never fires on a real PDF/DOCX/PPTX
+   today. The full pipeline (bytes → describe → cite) is proven only with
+   manually-injected bytes (tests) or a caller who persists blobs and sets
+   `blob_key` themselves.
+
+**`citenexus verify`** — a standalone CLI for the faithfulness gate, useful
+outside a running `CiteNexus` instance (e.g. a CI gate on someone else's RAG
+output). `citenexus verify <input.json> [--format text|json]` calls the exact
+`is_supported`/`has_relevance_overlap` functions `ask()` uses internally
+(`python/src/citenexus/cli/verify.py`), proving `tokens(claim) ⊆
+tokens(passage)` deterministically — no LLM call, no S3, no network. Install
+via `pip install citenexus`, entry point `citenexus.cli:main`
+(`pyproject.toml`). There's also a matching GitHub Action
+(`.github/actions/`) that wraps it as a CI dogfood gate. Python-only for now —
+no Go/JS/Rust CLI equivalent, though the JS port has an analogous library-level
+gate (`js/src/gate/gate.ts`).
+
+**Language detection** — real, not a stub. `lang/detect.py`'s
+`FastTextDetector` lazily downloads Facebook's `lid.176.ftz` model on first use
+and predicts via `fasttext.load_model` (needs the optional `fasttext` package
++ network for that one-time fetch); a `HeuristicDetector` (script-majority, no
+network, no extra dep) is the offline/test default.
+
 **Capability status (honest):**
 
 | Capability | Status |
 |---|---|
 | text (BM25) · structure · graph · wiki · vector · RRF fusion | ✅ shipped, zero-model tier included |
 | ask/stream/evaluate with per-claim faithfulness gate | ✅ shipped (generator required) |
+| `citenexus verify` — standalone faithfulness-gate CLI + CI Action | ✅ shipped, Python only |
+| Table extraction (structured `table` evidence blocks) | ✅ shipped for **CSV only** — PDF/DOCX/PPTX/HTML tables fall through as plain paragraph text |
+| Image-to-text via injected vision model (describe → citable figure EU) | ✅ shipped, but **inert on real docs** — no extractor persists image bytes, and the §9 `decide()` pre-filter isn't wired into ingest yet |
+| Real lid.176 language detection (`FastTextDetector`) | ✅ shipped (`detector=`), `HeuristicDetector` is the no-network default |
 | LLM wiki distillation (concept pages, `[[links]]`, S3 Markdown tree, lint) | ✅ shipped (`wiki_distiller=`) |
-| Contextual chunking · dual-query RRF · vision-into-evidence · hooks · telemetry · web crawl · Postgres backend | ✅ shipped |
+| Contextual chunking · dual-query RRF · hooks · telemetry · web crawl · Postgres backend | ✅ shipped |
 | **LLM graph extraction** (entity/relation model behind the graph signal) | ⏳ not yet — graph is deterministic co-mention; the `GraphExtractorPlugin` seam exists, no LLM impl |
 | Leiden community clustering | ⏳ not yet (community signal rides the graph retriever) |
 | True BGE-M3 sparse lexical | ⏳ BM25-lite stands in (needs a sparse-capable endpoint) |
 | Image bytes from real PDFs for vision | ⏳ extractors don't persist rasters yet (vision path proven with injected bytes) |
+| §9 vision pre-filter wired into ingest | ⏳ `vision/prefilter.py::decide()` exists and is tested, but `ingest/pipeline.py` never calls it |
+| Lists (bullet/numbered) as structured evidence | ❌ not captured at all in HTML/Markdown (content dropped, not flattened); DOCX list text survives as plain paragraph text, structure lost |
+| Code blocks as structured evidence | ❌ `BlockKind.code`/`EUType.code_block` are defined but no extractor ever produces them |
+| Footnotes / captions | ❌ no extractor or evidence concept for either |
+| Document metadata (title, author, date, page count) | ❌ not captured — `ExtractedDoc` carries no metadata fields |
 | LLM-as-judge · MCP server | ⏳ later (config sections reserved) |
+
+Full block-by-block trace (captured → carried as a typed unit → actually
+citable), including the gaps above: [`docs/CONTENT-COVERAGE.md`](docs/CONTENT-COVERAGE.md).
 
 Or wire real OpenAI-compatible endpoints from typed config — one call builds the
 embedding / answering-LLM / reranker plugins (answers stay temperature-0):

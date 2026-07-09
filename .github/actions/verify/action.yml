@@ -1,0 +1,56 @@
+name: "CiteNexus Verify"
+description: >-
+  Deterministically prove each cited claim is grounded in its passage — the
+  CiteNexus faithfulness gate, standalone. No LLM call, no model endpoint.
+inputs:
+  input:
+    description: "Path or glob to one or more verify-input JSON files"
+    required: true
+  fail-on-ungrounded:
+    description: >-
+      Fail the step when any claim is ungrounded (exit 1). Malformed input
+      (exit 2) always fails regardless of this setting.
+    required: false
+    default: "true"
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+      with:
+        python-version: "3.11"
+    - name: Install citenexus
+      shell: bash
+      run: pip install citenexus
+    - name: Run citenexus verify
+      shell: bash
+      env:
+        VERIFY_INPUT_GLOB: ${{ inputs.input }}
+        FAIL_ON_UNGROUNDED: ${{ inputs.fail-on-ungrounded }}
+      run: |
+        set -uo pipefail
+        shopt -s nullglob
+        files=( $VERIFY_INPUT_GLOB )
+        if [ ${#files[@]} -eq 0 ]; then
+          echo "::error::no files matched input glob '$VERIFY_INPUT_GLOB'"
+          exit 2
+        fi
+        worst_exit=0
+        for f in "${files[@]}"; do
+          echo "::group::citenexus verify $f"
+          citenexus verify "$f"
+          code=$?
+          echo "::endgroup::"
+          if [ "$code" -eq 2 ]; then
+            echo "::error file=$f::malformed verify-input"
+          elif [ "$code" -eq 1 ]; then
+            echo "::error file=$f::one or more claims failed the faithfulness gate"
+          fi
+          if [ "$code" -gt "$worst_exit" ]; then worst_exit=$code; fi
+        done
+        if [ "$worst_exit" -eq 2 ]; then
+          exit 2
+        fi
+        if [ "$worst_exit" -eq 1 ] && [ "$FAIL_ON_UNGROUNDED" != "false" ]; then
+          exit 1
+        fi

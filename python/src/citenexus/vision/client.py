@@ -23,10 +23,21 @@ from typing import Any
 from citenexus.http import DEFAULT_TRANSPORT, Transport
 
 _VISION_PROMPT = (
-    "Describe this image for a document search index. Reply with ONLY a JSON "
-    "object with keys: short_caption (string), detailed_description (string), "
-    "objects (array of strings), relationships (array of strings), ocr_text "
-    "(string of any text visible in the image). Do not add prose outside the JSON."
+    "Describe this image for a document search index, covering every aspect so a "
+    "later question about the image can be answered from your description alone. "
+    "Reply with ONLY a JSON object with keys: "
+    "short_caption (string), "
+    "detailed_description (string — if the image is a chart/diagram/table, describe "
+    "its layout and structure, every visible number/label/axis value, the colors used "
+    "and what they encode if there is a legend, and the spatial relationships between "
+    "elements), "
+    "objects (array of strings), "
+    "relationships (array of strings), "
+    "ocr_text (string of any text visible in the image, verbatim), "
+    "data_values (array of objects {label, value} for any numeric/tabular values shown "
+    "in a chart, graph, or table-as-image; empty array if none), "
+    "image_type (one of: photo, chart, diagram, screenshot, table, handwriting, logo, "
+    "other). Do not add prose outside the JSON."
 )
 
 
@@ -60,7 +71,7 @@ class OpenAICompatibleVision:
         base_url: str,
         model: str,
         temperature: float = 0.0,
-        max_tokens: int | None = 512,
+        max_tokens: int | None = 8192,
         mime_type: str = "image/png",
         transport: Transport | None = None,
     ) -> None:

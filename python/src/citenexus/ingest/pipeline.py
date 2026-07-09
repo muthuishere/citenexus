@@ -21,6 +21,7 @@ from citenexus.storage.manifest import EtagManifest, load_manifest, save_manifes
 from citenexus.storage.paths import Layer, layer_prefix, leaf_vector_uri, partition_segment
 from citenexus.telemetry.events import Stage, StageEvent
 from citenexus.vision.describe import describe_image
+from citenexus.vision.prefilter import VisionDecision, VisionPrefilterConfig, decide
 from citenexus.vision.units import build_vision_units
 
 if TYPE_CHECKING:
@@ -104,6 +105,7 @@ class IngestPipeline:
         queue: DurableQueue | None = None,
         default_answer_language: str = "en",
         vision: VisionDescriber | None = None,
+        vision_prefilter: VisionPrefilterConfig | None = None,
         vector_store: VectorStore | None = None,
         chunking_enabled: bool = True,
         chunk_max_tokens: int = 450,
@@ -123,6 +125,7 @@ class IngestPipeline:
         self._queue = queue
         self._default_language = default_answer_language
         self._vision = vision
+        self._vision_prefilter = vision_prefilter or VisionPrefilterConfig()
         self._chunking_enabled = chunking_enabled
         self._chunk_max_tokens = chunk_max_tokens
         self._chunk_overlap = chunk_overlap
@@ -154,6 +157,8 @@ class IngestPipeline:
         else:
             doc = extract(source, source_type=source_type, document_id=doc_id)
         self._emit(Stage.extract, doc_id, started)
+
+        doc = self._persist_image_bytes(doc)
 
         language = self._detect_language(doc)
         if self._chunking_enabled:
@@ -236,6 +241,31 @@ class IngestPipeline:
             )
         )
 
+    def _persist_image_bytes(self, doc: Any) -> Any:
+        """Store any extracted image bytes and stamp ``blob_key`` on their ``ImageRef``.
+
+        Extractors carry raw bytes back transiently on ``doc.image_bytes``
+        (keyed by ``image_id``), never on the frozen ``ImageRef`` itself. This
+        persists each one via the same ``StorageBackend.put_bytes`` seam used
+        for the raw document blob, then rebuilds ``doc.images`` with
+        ``blob_key`` set so ``_vision_units`` can load them back.
+        """
+        raw_images: dict[str, bytes] = getattr(doc, "image_bytes", None) or {}
+        images = getattr(doc, "images", ())
+        if not raw_images or not images:
+            return doc
+        prefix = layer_prefix(Layer.raw, self._partition)
+        updated: list[Any] = []
+        for image in images:
+            data = raw_images.get(image.image_id)
+            if data is None:
+                updated.append(image)
+                continue
+            blob_key = f"{prefix}/images/{doc.document_id}/{image.image_id}"
+            self._backend.put_bytes(blob_key, data)
+            updated.append(image.model_copy(update={"blob_key": blob_key}))
+        return doc.model_copy(update={"images": tuple(updated)})
+
     def _vision_units(
         self, doc: Any, *, doc_id: str, language: str, acl: Any
     ) -> list[EvidenceUnit]:
@@ -248,8 +278,23 @@ class IngestPipeline:
         vision = self._vision
         if vision is None or not getattr(doc, "images", ()):
             return []
+        page_areas: dict[str, float] = getattr(doc, "image_page_area", None) or {}
         described: list[tuple[ImageRef, VisionRecord]] = []
         for image in doc.images:
+            # §9 pre-filter: route by real page/image geometry when the
+            # extractor supplied a page area (currently PDF only — docx/pptx
+            # have no fixed page geometry, so they fall through to vision
+            # unconditionally, preserving prior behavior for those formats).
+            page_area = page_areas.get(image.image_id)
+            if page_area is not None:
+                decision = decide(
+                    image,
+                    page_area=page_area,
+                    ocr_text_dense=False,
+                    config=self._vision_prefilter,
+                )
+                if decision is not VisionDecision.vision:
+                    continue
             data = self._image_bytes(image)
             if data is None:
                 continue

@@ -37,6 +37,10 @@ class VisionRecord(BaseModel):
     objects: tuple[str, ...] = ()
     relationships: tuple[str, ...] = ()
     ocr_text: str | None = None
+    # Numeric/tabular values read off a chart, graph, or table-as-image.
+    data_values: tuple[dict[str, Any], ...] = ()
+    # photo | chart | diagram | screenshot | table | handwriting | logo | other.
+    image_type: str | None = None
 
 
 def _as_mapping(result: Any) -> Mapping[str, Any]:
@@ -63,6 +67,8 @@ def describe_image(image: ImageRef, plugin: VisionPlugin) -> VisionRecord:
         objects=tuple(data.get("objects") or ()),
         relationships=tuple(data.get("relationships") or ()),
         ocr_text=data.get("ocr_text"),
+        data_values=tuple(data.get("data_values") or ()),
+        image_type=data.get("image_type"),
     )
 
 

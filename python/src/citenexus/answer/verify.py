@@ -8,7 +8,7 @@ plugins a stable seam to improve precision without weakening the guarantee.
 
 from __future__ import annotations
 
-from citenexus.testing.fakes import tokenize
+from citenexus.tokenize import tokenize
 
 _STOPWORDS = frozenset(
     {

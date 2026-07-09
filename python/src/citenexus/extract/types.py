@@ -11,9 +11,9 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
-from citenexus.evidence.unit import BBox
+from citenexus.evidence.unit import BBox, DocumentMetadata
 
 
 class SourceType(StrEnum):
@@ -99,5 +99,17 @@ class ExtractedDoc(BaseModel):
     source_type: SourceType
     structure_type: StructureType = StructureType.none
     source_uri: str | None = None
+    metadata: DocumentMetadata | None = None
     blocks: tuple[ExtractedBlock, ...] = ()
     images: tuple[ImageRef, ...] = ()
+    # Transient: raw bytes for images in `images`, keyed by `ImageRef.image_id`.
+    # Not persisted itself — the ingest pipeline reads this once to store each
+    # image via StorageBackend.put_bytes and stamp `ImageRef.blob_key`. Kept off
+    # the frozen `ImageRef` model to avoid copying large blobs on every access.
+    image_bytes: dict[str, bytes] = Field(default_factory=dict)
+    # Transient: the area (in the same units as ImageRef.width*height) of the
+    # PAGE each image sits on, keyed by `ImageRef.image_id` — lets the ingest
+    # pipeline call `vision.prefilter.decide()` with a real area_ratio (§9).
+    # Extractors with no fixed page geometry (docx/pptx) simply omit an entry;
+    # the pipeline then skips the pre-filter and vision-describes unconditionally.
+    image_page_area: dict[str, float] = Field(default_factory=dict)
