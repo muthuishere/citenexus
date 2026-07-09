@@ -70,6 +70,25 @@ class MdExtractor(ExtractorPlugin):
                     )
                     order += 1
                 i += 3
+            elif tok.type in ("fence", "code_block"):
+                # BlockKind.code / EUType.code_block are defined and mapped
+                # (evidence/builder.py:_KIND_TO_TYPE) but no extractor ever
+                # constructed one — a fenced (```lang) or 4-space-indented
+                # code block is a single token (not an open/close pair), with
+                # its literal source in .content (never HTML-escaped/inline
+                # tokens like paragraph/heading text is).
+                content = tok.content.rstrip("\n")
+                if content:
+                    blocks.append(
+                        ExtractedBlock(
+                            order=order,
+                            kind=BlockKind.code,
+                            text=content,
+                            structure_path=tuple(t for _, t in stack),
+                        )
+                    )
+                    order += 1
+                i += 1
             else:
                 i += 1
 

@@ -83,6 +83,19 @@ class HtmlExtractor(ExtractorPlugin):
                 )
                 table_rows.append((header, row_index, rendered))
 
+        # <pre> (a code block, conventionally <pre><code>...</code></pre>) was
+        # never selected either — BlockKind.code/EUType.code_block are
+        # defined and mapped but no extractor ever constructed one. Pull it
+        # out FIRST and decompose it, same treatment as tables: preserves
+        # internal whitespace/newlines (no strip=True) since code is
+        # whitespace-significant, unlike prose.
+        code_blocks: list[str] = []
+        for pre in soup.find_all("pre"):
+            content = pre.get_text().strip("\n")
+            pre.decompose()
+            if content:
+                code_blocks.append(content)
+
         # <ul>/<ol>/<li> were previously outside the selector too — a list's
         # text was dropped entirely, not even flattened. Each <li> becomes
         # its own BlockKind.paragraph (no dedicated list EU type exists yet;
@@ -130,6 +143,10 @@ class HtmlExtractor(ExtractorPlugin):
                     structure_path=header,
                 )
             )
+            order += 1
+
+        for content in code_blocks:
+            blocks.append(ExtractedBlock(order=order, kind=BlockKind.code, text=content))
             order += 1
 
         structure = StructureType.heading_tree if has_heading else StructureType.none
