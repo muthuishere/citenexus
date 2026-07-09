@@ -23,13 +23,24 @@ def _jpeg_bytes(width: int = 40, height: int = 30) -> bytes:
     return buf.getvalue()
 
 
-def build_pdf_with_image(text: str = "Hello PDF with image") -> bytes:
-    """A minimal, valid single-page PDF containing one real JPEG image XObject."""
+def build_pdf_with_image(
+    text: str = "Hello PDF with image", display_size: tuple[int, int] = (220, 220)
+) -> bytes:
+    """A minimal, valid single-page PDF containing one real JPEG image XObject.
+
+    ``display_size`` is the ``cm``-transform size (PDF points) the image is
+    placed at on the 612x792pt page — the default (220x220, area_ratio ~0.10)
+    clears the §9 pre-filter's ``min_area_ratio`` (0.05) as a "meaningful
+    figure"; pass something small (e.g. ``(40, 40)``, ratio ~0.004) to build a
+    decoration-sized image that the pre-filter should skip.
+    """
     jpeg = _jpeg_bytes()
     width, height = Image.open(io.BytesIO(jpeg)).size
+    disp_w, disp_h = display_size
 
     content_stream = (
-        f"BT /F1 12 Tf 50 700 Td ({text}) Tj ET q 100 0 0 100 50 500 cm /Im1 Do Q".encode()
+        f"BT /F1 12 Tf 50 700 Td ({text}) Tj ET "
+        f"q {disp_w} 0 0 {disp_h} 50 480 cm /Im1 Do Q".encode()
     )
 
     objects: list[bytes] = []
