@@ -7,6 +7,7 @@ from typing import Any
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 
+from citenexus.evidence.unit import DocumentMetadata
 from citenexus.extract.plain import load_text
 from citenexus.extract.types import (
     BlockKind,
@@ -18,6 +19,15 @@ from citenexus.extract.types import (
 from citenexus.plugins.base import ExtractorPlugin
 
 _HEADINGS = ("h1", "h2", "h3", "h4", "h5", "h6")
+
+
+def _html_metadata(soup: Any) -> DocumentMetadata:
+    """``<title>`` and ``<meta name="author">`` — HTML has no standard
+    created-date or page-count concept, so those stay ``None``."""
+    title = soup.title.get_text(strip=True) if soup.title else None
+    author_tag = soup.find("meta", attrs={"name": "author"})
+    author = author_tag.get("content") if author_tag is not None else None
+    return DocumentMetadata(title=title or None, author=author or None)
 
 
 def _li_own_text(li: Tag) -> str:
@@ -53,6 +63,7 @@ class HtmlExtractor(ExtractorPlugin):
     def extract(self, source: Any) -> ExtractedDoc:
         text, doc_id, source_uri = load_text(source, self.document_id)
         soup = BeautifulSoup(text, "html.parser")
+        metadata = _html_metadata(soup)
         for junk in soup(["script", "style"]):
             junk.decompose()
 
@@ -68,7 +79,13 @@ class HtmlExtractor(ExtractorPlugin):
         # decompose the <table> so its cell text can't also leak into a
         # paragraph block if a cell happens to nest a <p>.
         table_rows: list[tuple[tuple[str, ...], int, str]] = []
+        captions: list[str] = []
         for table in soup.find_all("table"):
+            caption_tag = table.find("caption")
+            if caption_tag is not None:
+                caption_text = caption_tag.get_text(strip=True)
+                if caption_text:
+                    captions.append(caption_text)
             rows = [
                 [cell.get_text(strip=True) for cell in tr.find_all(["td", "th"])]
                 for tr in table.find_all("tr")
@@ -82,6 +99,16 @@ class HtmlExtractor(ExtractorPlugin):
                     f"{col}: {val}" for col, val in zip(header, row, strict=False)
                 )
                 table_rows.append((header, row_index, rendered))
+
+        # <figcaption> (a figure's real caption text — distinct from a vision
+        # model's own generated short_caption for an image, see row 5/row 6
+        # of the coverage doc) was never selected either. Pull it out and
+        # decompose it so it can't also leak into a surrounding paragraph.
+        for figcaption in soup.find_all("figcaption"):
+            caption_text = figcaption.get_text(strip=True)
+            figcaption.decompose()
+            if caption_text:
+                captions.append(caption_text)
 
         # <pre> (a code block, conventionally <pre><code>...</code></pre>) was
         # never selected either — BlockKind.code/EUType.code_block are
@@ -149,11 +176,16 @@ class HtmlExtractor(ExtractorPlugin):
             blocks.append(ExtractedBlock(order=order, kind=BlockKind.code, text=content))
             order += 1
 
+        for caption_text in captions:
+            blocks.append(ExtractedBlock(order=order, kind=BlockKind.paragraph, text=caption_text))
+            order += 1
+
         structure = StructureType.heading_tree if has_heading else StructureType.none
         return ExtractedDoc(
             document_id=doc_id,
             source_type=SourceType.html,
             structure_type=structure,
             source_uri=source_uri,
+            metadata=metadata,
             blocks=tuple(blocks),
         )

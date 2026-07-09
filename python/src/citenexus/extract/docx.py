@@ -6,6 +6,7 @@ from typing import Any
 
 from docx import Document
 
+from citenexus.evidence.unit import DocumentMetadata
 from citenexus.extract.plain import open_binary
 from citenexus.extract.types import (
     BlockKind,
@@ -16,6 +17,14 @@ from citenexus.extract.types import (
     StructureType,
 )
 from citenexus.plugins.base import ExtractorPlugin
+
+
+def _docx_metadata(document: Any) -> DocumentMetadata:
+    """``core_properties`` — title/author/created (no page count: DOCX has no
+    fixed pagination without rendering)."""
+    props = document.core_properties
+    created = props.created.isoformat() if props.created is not None else None
+    return DocumentMetadata(title=props.title or None, author=props.author or None, created=created)
 
 
 def _heading_level(style_name: str) -> int | None:
@@ -113,6 +122,7 @@ class DocxExtractor(ExtractorPlugin):
             source_type=SourceType.docx,
             structure_type=StructureType.heading_tree,
             source_uri=source_uri,
+            metadata=_docx_metadata(document),
             blocks=tuple(blocks),
             images=tuple(images),
             image_bytes=image_bytes,

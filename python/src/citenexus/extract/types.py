@@ -13,7 +13,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from citenexus.evidence.unit import BBox
+from citenexus.evidence.unit import BBox, DocumentMetadata
 
 
 class SourceType(StrEnum):
@@ -94,6 +94,7 @@ class ExtractedDoc(BaseModel):
     source_type: SourceType
     structure_type: StructureType = StructureType.none
     source_uri: str | None = None
+    metadata: DocumentMetadata | None = None
     blocks: tuple[ExtractedBlock, ...] = ()
     images: tuple[ImageRef, ...] = ()
     # Transient: raw bytes for images in `images`, keyed by `ImageRef.image_id`.
