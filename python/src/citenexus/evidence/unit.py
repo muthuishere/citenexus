@@ -35,6 +35,23 @@ class EUType(StrEnum):
     community_summary = "community_summary"
 
 
+class DocumentMetadata(BaseModel):
+    """Best-effort document-level metadata (§8/row 8) — title/author/created
+    date/page count, read from each format's own real metadata API (PDF
+    ``Document Info``, DOCX/PPTX ``core_properties``, HTML ``<title>``/
+    ``<meta name="author">``). Every field is optional: a format either has
+    no such concept (a CSV has no "author") or the source document simply
+    didn't set it — absence is not extraction failure.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    title: str | None = None
+    author: str | None = None
+    created: str | None = None  # ISO-ish string, as the source format gives it
+    page_count: int | None = None
+
+
 class Citation(BaseModel):
     """Verifiable provenance for a passage: page + bbox + the verbatim text."""
 
@@ -65,6 +82,9 @@ class EvidenceUnit(BaseModel):
     source_uri: str | None = None
     entities: tuple[str, ...] = ()
     structure_path: tuple[str, ...] | None = None
+    # The owning document's title/author/created/page_count, denormalized onto
+    # every EU from that document (same pattern as document_id) — row 8.
+    document_metadata: DocumentMetadata | None = None
 
     # Deferred-RBAC metadata: opaque, caller-supplied, persisted but NEVER parsed
     # or schema-imposed by the library (§7c).

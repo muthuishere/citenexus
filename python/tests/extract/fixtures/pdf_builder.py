@@ -83,3 +83,48 @@ def build_pdf_with_image(
         out.write(f"{off:010d} 00000 n \n".encode())
     out.write((f"trailer\n<< /Size {n} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF").encode())
     return out.getvalue()
+
+
+def build_pdf_with_metadata(
+    *, title: str, author: str, created: str = "D:20260709120000Z", text: str = "Body text."
+) -> bytes:
+    """A minimal, valid single-page, text-only PDF with a real ``/Info``
+    dictionary — what ``pdfplumber.PDF.metadata`` reads title/author/created
+    from (row 8)."""
+    content_stream = f"BT /F1 12 Tf 50 700 Td ({text}) Tj ET".encode()
+
+    objects: list[bytes] = []
+    objects.append(b"<< /Type /Catalog /Pages 2 0 R >>")
+    objects.append(b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>")
+    objects.append(
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+        b"/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>"
+    )
+    objects.append(
+        f"<< /Length {len(content_stream)} >>\nstream\n".encode()
+        + content_stream
+        + b"\nendstream"
+    )
+    objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+    objects.append(f"<< /Title ({title}) /Author ({author}) /CreationDate ({created}) >>".encode())
+
+    out = io.BytesIO()
+    out.write(b"%PDF-1.4\n")
+    offsets: list[int] = [0]
+    for index, body in enumerate(objects, start=1):
+        offsets.append(out.tell())
+        out.write(f"{index} 0 obj\n".encode())
+        out.write(body)
+        out.write(b"\nendobj\n")
+
+    xref_offset = out.tell()
+    n = len(objects) + 1
+    out.write(f"xref\n0 {n}\n".encode())
+    out.write(b"0000000000 65535 f \n")
+    for off in offsets[1:]:
+        out.write(f"{off:010d} 00000 n \n".encode())
+    out.write(
+        f"trailer\n<< /Size {n} /Root 1 0 R /Info 6 0 R >>\n"
+        f"startxref\n{xref_offset}\n%%EOF".encode()
+    )
+    return out.getvalue()
