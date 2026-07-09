@@ -79,6 +79,7 @@ def build_chunked_units(
                     page=block.page,
                     source_uri=doc.source_uri,
                     structure_path=block.structure_path,
+                    document_metadata=doc.metadata,
                     acl=acl,
                 )
             )

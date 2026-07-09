@@ -8,7 +8,7 @@ from typing import Any, cast
 import pdfplumber
 from PIL import Image, UnidentifiedImageError
 
-from citenexus.evidence.unit import BBox
+from citenexus.evidence.unit import BBox, DocumentMetadata
 from citenexus.extract.plain import open_binary
 from citenexus.extract.types import (
     BlockKind,
@@ -19,6 +19,19 @@ from citenexus.extract.types import (
     StructureType,
 )
 from citenexus.plugins.base import ExtractorPlugin
+
+
+def _pdf_metadata(pdf: Any) -> DocumentMetadata:
+    """Real ``/Info`` dictionary values — title/author/created — plus page
+    count. Every field is best-effort: absence in the source PDF is not an
+    extraction failure."""
+    info = pdf.metadata or {}
+    return DocumentMetadata(
+        title=info.get("Title") or None,
+        author=info.get("Author") or None,
+        created=info.get("CreationDate") or None,
+        page_count=len(pdf.pages),
+    )
 
 
 def _image_data(img: Any) -> bytes | None:
@@ -129,6 +142,7 @@ class PdfExtractor(ExtractorPlugin):
         image_page_area: dict[str, float] = {}
         order = 0
         with pdfplumber.open(opened) as pdf:
+            metadata = _pdf_metadata(pdf)
             for index, page in enumerate(pdf.pages):
                 number = index + 1
                 tables = page.find_tables()
@@ -174,6 +188,7 @@ class PdfExtractor(ExtractorPlugin):
             source_type=SourceType.pdf,
             structure_type=StructureType.page_layout,
             source_uri=source_uri,
+            metadata=metadata,
             blocks=tuple(blocks),
             images=tuple(images),
             image_bytes=image_bytes,
