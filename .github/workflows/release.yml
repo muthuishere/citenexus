@@ -56,6 +56,10 @@ jobs:
         run: npm install -g npm@latest
       - name: Install + publish (trusted publishing)
         working-directory: js
+        # --provenance dropped: npm@latest's provenance path fails to load the
+        # bundled `sigstore` module on the runner (MODULE_NOT_FOUND). OIDC trusted
+        # publishing itself does not need provenance. Re-add once a known-good npm
+        # version with a working provenance path is pinned.
         run: |
           npm ci
-          npm publish --provenance --access public
+          npm publish --access public
