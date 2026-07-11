@@ -1,0 +1,70 @@
+# SPIKE: prove the prebuilt-core distribution seam works across OS/arch and all
+# three bindings (Python ctypes / TS koffi / Go purego) loading ONE cdylib.
+# Not production CI — action tags would be SHA-pinned before any merge.
+name: spike-prebuilt-ffi
+
+on:
+  push:
+    branches: ["spike/prebuilt-ffi**"]
+    paths:
+      - "spikes/prebuilt-ffi/**"
+      - ".github/workflows/spike-prebuilt-ffi.yml"
+  workflow_dispatch:
+
+jobs:
+  build-and-load:
+    name: ${{ matrix.key }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest,    key: linux-x86_64,   libname: libcitenexus_spike.so }
+          - { os: ubuntu-24.04-arm, key: linux-aarch64,   libname: libcitenexus_spike.so }
+          - { os: macos-14,         key: darwin-aarch64,  libname: libcitenexus_spike.dylib }
+          - { os: windows-latest,   key: windows-x86_64,  libname: citenexus_spike.dll }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: spikes/prebuilt-ffi
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Rust cdylib (rustup is preinstalled on GH runners)
+        working-directory: spikes/prebuilt-ffi/rust
+        run: cargo build --release
+
+      - name: Resolve absolute SPIKE_LIB (OS-aware)
+        shell: bash
+        run: |
+          LIB="$PWD/rust/target/release/${{ matrix.libname }}"
+          if [ "$RUNNER_OS" = "Windows" ]; then LIB="$(cygpath -w "$LIB")"; fi
+          echo "SPIKE_LIB=$LIB" >> "$GITHUB_ENV"
+          echo "resolved SPIKE_LIB=$LIB"
+
+      # --- Python (ctypes, stdlib) ---
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Python loader
+        shell: bash
+        run: python3 python/check.py
+
+      # --- TS/JS (koffi) ---
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - name: Node loader
+        working-directory: spikes/prebuilt-ffi/node
+        shell: bash
+        run: |
+          npm install --no-audit --no-fund
+          node check.mjs
+
+      # --- Go (purego) — Unix in this spike; Windows/purego is a noted follow-up ---
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.23" }
+      - name: Go loader
+        if: runner.os != 'Windows'
+        working-directory: spikes/prebuilt-ffi/go
+        shell: bash
+        run: |
+          go mod tidy
+          go run check.go

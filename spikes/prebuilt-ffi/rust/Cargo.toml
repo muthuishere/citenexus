@@ -1,0 +1,12 @@
+[package]
+name = "citenexus_spike"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "citenexus_spike"
+# cdylib = the one C-ABI artifact every language loads (ctypes / koffi / purego).
+crate-type = ["cdylib"]
+
+# Standalone workspace so this spike never touches citenexus-core's deps.
+[workspace]
