@@ -24,6 +24,7 @@ from citenexus.storage.backend import LocalFsBackend
 from citenexus.storage.paths import Layer, layer_prefix
 from citenexus.testing import FakeEmbedding
 from citenexus.vision import FakeVision
+from citenexus.vision.fulfill import fulfill_vision_requests
 
 PART = PartitionPath.of(("workspace", "w1"))
 
@@ -101,7 +102,7 @@ def test_ingest_passes_fulfiller_only_pending_requests(
     monkeypatch.setattr(pipeline_mod, "extract", lambda *a, **k: _two_image_doc(k0, k1))
 
     seen: dict[str, Any] = {}
-    real = pipeline_mod.fulfill_vision_requests
+    real = fulfill_vision_requests  # the genuine impl the spy delegates to
 
     def _spy(requests: Any, plugin: Any) -> Any:
         seen["requests"] = list(requests)

@@ -11,7 +11,7 @@ page 4, described by a model", not verbatim source text.
 from __future__ import annotations
 
 from citenexus.domain.partition import PartitionPath
-from citenexus.domain.vision import PendingVisionRequest, VisionPayload, VisionSourceRef
+from citenexus.domain.vision import BBox, PendingVisionRequest, VisionPayload, VisionSourceRef
 from citenexus.evidence.unit import EUType
 from citenexus.vision.describe import VisionRecord
 from citenexus.vision.units import build_vision_units
@@ -22,12 +22,12 @@ def _partition() -> PartitionPath:
 
 
 def _request(
-    request_id: str, *, page: int | None = None, bbox: object = None
+    request_id: str, *, page: int | None = None, bbox: BBox | None = None
 ) -> PendingVisionRequest:
     return PendingVisionRequest(
         request_id=request_id,
         payload=VisionPayload(prompt="p", image_url="data:image/png;base64,QUJD"),
-        source_ref=VisionSourceRef(document=request_id.split("::")[0], page=page, bbox=bbox),  # type: ignore[arg-type]
+        source_ref=VisionSourceRef(document=request_id.split("::")[0], page=page, bbox=bbox),
     )
 
 
