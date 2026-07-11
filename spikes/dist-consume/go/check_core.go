@@ -20,13 +20,14 @@ func main() {
 	}
 	fmt.Printf("[go] core at %s\n", path)
 
-	lib, err := purego.Dlopen(path, purego.RTLD_NOW|purego.RTLD_GLOBAL)
+	// corefetch.Open is build-tagged: dlopen on Unix, LoadLibrary on Windows.
+	handle, err := corefetch.Open(path)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "[go] dlopen failed:", err)
+		fmt.Fprintln(os.Stderr, "[go] load failed:", err)
 		os.Exit(1)
 	}
 	var version func() string
-	purego.RegisterLibFunc(&version, lib, "citenexus_core_version")
+	purego.RegisterLibFunc(&version, handle, "citenexus_core_version")
 
 	ver := version()
 	// NOTE: the release is TAGGED v0.7.0 but the cdylib embeds the Rust CRATE

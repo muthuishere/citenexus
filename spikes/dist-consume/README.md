@@ -28,6 +28,14 @@ Release asset** (the true Tier-2 path CI uses).
 
 ## Honest findings
 
+- **Windows + Go/purego is a real blocker.** In the D1 real-core run, Windows
+  built the core ✅ and the Python (ctypes) ✅ and Node (koffi) ✅ loaders loaded
+  it — but the Go loader **failed to compile**: `undefined: purego.Dlopen`,
+  `purego.RTLD_NOW`, `purego.RTLD_GLOBAL`. Those symbols are **Unix-only**
+  (`//go:build !windows`); on Windows purego loads via `golang.org/x/sys/windows`
+  `LoadLibrary` + `RegisterLibFunc(&fn, uintptr(handle), ...)`. Fix = a
+  build-tagged `dlopen_windows.go`. The consume CI here targets the three Unix
+  platforms; Windows-Go is a documented follow-up (Python/TS work on Windows).
 - The v0.7.0 Release cdylib reports core version **`0.6.0`** — native-libs
   artifacts are keyed by the **git tag** (`v0.7.0`) but the cdylib embeds the
   **Rust crate version** (`rust/Cargo.toml`, then 0.6.0). Distribution should key

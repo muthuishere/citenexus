@@ -33,8 +33,11 @@ else
   echo "cdylib: downloading + SHA256-verifying Release asset $asset (v$core_ver)"
   base="https://github.com/muthuishere/citenexus/releases/download/v$core_ver"
   curl -fsSL "$base/$asset" -o "$src_lib"
-  curl -fsSL "$base/$asset.sha256" -o "$src_lib.sha256"
-  ( cd "$work" && shasum -a 256 -c "$(basename "$src_lib").sha256" )
+  curl -fsSL "$base/$asset.sha256" -o "$work/asset.sha256"
+  want="$(awk '{print $1; exit}' "$work/asset.sha256")"
+  got="$(shasum -a 256 "$src_lib" | awk '{print $1}')"
+  [ "$got" = "$want" ] || { echo "SHA256 mismatch: got $got want $want"; exit 1; }
+  echo "SHA256 OK ($got)"
 fi
 
 # 1) build the pure wheel with a dedicated builder venv (PEP 668 safe)
