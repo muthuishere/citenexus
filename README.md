@@ -20,6 +20,21 @@ together (one version across all). Install the Go port with
 `go get github.com/muthuishere/citenexus/golang` (monorepo submodule, tagged
 `golang/vX.Y.Z`).
 
+### Native core & distribution (roadmap)
+
+The heavy, must-be-identical stages — binary-document extraction, `lid.176`
+detection, and the Lance store — live once in the Rust core (`rust/`, a C-ABI
+cdylib). Today the Go/JS/Python ports reimplement the pure logic and bind that
+core opt-in (Go behind the `citenexus_ffi` build tag; JS via `koffi`; Python via
+`ctypes`). **Planned (not yet shipped):** ship the core as a **prebuilt,
+per-platform** library so every binding auto-loads it with **no toolchain** —
+Python via platform wheels, TS via npm `optionalDependencies`, Go via `go:embed`
++ `purego` — plus a shared `lid.176` fetch-cache with SHA256 verification, built
+by a two-tier CI (rare cross-compile matrix → durable release; per-tag repackage
+→ PyPI / npm / Go via OIDC). The **load seam is proven** across linux x64+arm64,
+macOS arm64, and windows x64 (`spikes/prebuilt-ffi/`); cross-compiling the full
+core and the packaging are still in progress.
+
 
 Evidence-first, multilingual, S3-native RAG for domains where a wrong answer is
 worse than no answer (legal, medical, finance/compliance, enterprise search).
@@ -31,6 +46,14 @@ weak, missing, or conflicting. The guarantee is **"no ungrounded claim,"** not
 The library bundles **no models** — embedding, LLM, reranker, and vision are
 injected endpoints. CiteNexus owns orchestration, storage, retrieval, fusion,
 grounding, and evaluation.
+
+**Scope — document-evidence RAG, on purpose.** CiteNexus ingests *artifacts*
+(PDF, DOCX, PPTX, HTML, MD, TXT, CSV, images-into-evidence) and answers over
+them. It is deliberately **not** a source-code / call-graph tool (use a dedicated
+one — evaluated and declined for this core), a memory "brain", a model host, or
+an end-user app — it's a library; CLIs, dashboards, and agents are built *on* it.
+The filter for what lands here: a capability must ingest an artifact or improve
+grounded retrieval / evaluation **and** hold the "no ungrounded claim" bar.
 
 **CiteNexus supports pluggable vector databases.** Storage is two protocols —
 `VectorStore` (dense) and `TextSearch` (lexical) — and each backend is a named
@@ -153,6 +176,20 @@ via `pip install citenexus`, entry point `citenexus.cli:main`
 no Go/JS/Rust CLI equivalent, though the JS port has an analogous library-level
 gate (`js/src/gate/gate.ts`).
 
+**LLM wiki (Karpathy-shaped, navigate-not-cite)** — pass `wiki_distiller=` and a
+small model distils the corpus into a browsable wiki: summary pages plus concept
+pages that span documents, each with `[[links]]`, keywords, and the EU ids it's
+grounded in (`wiki/distill.py`), stored as a Markdown tree in S3 (`pages/*.md` +
+`index.md` + an append-only `log.md`). Its genuine edge over other knowledge/code
+wikis is the **navigate-not-cite invariant**: a page is never a citation target —
+every hit resolves down to bbox-cited Evidence Units, and any `eu_ref` the model
+invents is sanitized out, so distilled navigation can never become an ungrounded
+claim. **Honest gaps (it's a grounded *skeleton*, not yet a deep Karpathy wiki):**
+the distiller is a single whole-corpus call (`_MAX_CORPUS_CHARS = 24_000`, each EU
+truncated to 500 chars) — a shallow stand-in, not deep per-document/per-community
+distillation; and the incremental `integrate_document()` writes a *deterministic*
+page, not a distilled one (the LLM path runs only on a full `build_from_store`).
+
 **Language detection** — real, not a stub. `lang/detect.py`'s
 `FastTextDetector` lazily downloads Facebook's `lid.176.ftz` model on first use
 and predicts via `fasttext.load_model` (needs the optional `fasttext` package
@@ -169,7 +206,7 @@ network, no extra dep) is the offline/test default.
 | Table extraction (structured `table` evidence blocks) | ✅ shipped for **CSV only** — PDF/DOCX/PPTX/HTML tables fall through as plain paragraph text |
 | Image-to-text via injected vision model (describe → citable figure EU) | ✅ shipped, but **inert on real docs** — no extractor persists image bytes, and the §9 `decide()` pre-filter isn't wired into ingest yet |
 | Real lid.176 language detection (`FastTextDetector`) | ✅ shipped (`detector=`), `HeuristicDetector` is the no-network default |
-| LLM wiki distillation (concept pages, `[[links]]`, S3 Markdown tree, lint) | ✅ shipped (`wiki_distiller=`) |
+| LLM wiki distillation — grounded, navigate-not-cite (concept pages, `[[links]]`, S3 Markdown tree) | ⚠️ shipped but **shallow** (`wiki_distiller=`) — one 24k-char whole-corpus call; the incremental `integrate_document()` writes deterministic (non-distilled) pages. Deep per-doc distill + incremental distill = not yet |
 | Contextual chunking · dual-query RRF · hooks · telemetry · web crawl · Postgres backend | ✅ shipped |
 | **LLM graph extraction** (entity/relation model behind the graph signal) | ⏳ not yet — graph is deterministic co-mention; the `GraphExtractorPlugin` seam exists, no LLM impl |
 | Leiden community clustering | ⏳ not yet (community signal rides the graph retriever) |
@@ -221,6 +258,12 @@ exposes `ingest()`, `retrieve()`, `ask()`, `stream()`, memory recall, and
 MCP and external auth enforcement are still later work. See [`CLAUDE.md`](CLAUDE.md)
 for the build plan and conventions, and [`docs/SPEC-v6.md`](docs/SPEC-v6.md) for
 the full specification.
+
+**Validated live** (real Jina + Gemini, not fakes): on a small multilingual
+legal/HR corpus, CiteNexus answered Dutch questions in Dutch (answer-language
+invariant), produced grounded verbatim citations, attributed public-law vs
+internal-policy sources correctly, and abstained on an out-of-corpus question —
+100% groundedness + citation on the golden set. Reproduce with `task local:example`.
 
 ## Develop
 
