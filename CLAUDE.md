@@ -78,7 +78,8 @@ Worked examples:
   implement → `/opsx:apply` → `/opsx:archive` (folds the delta into the living
   spec under `openspec/specs/`). OpenSpec owns the spec system — we do **not**
   run a second `docs/specs/` flow alongside it. `docs/` holds only `SPEC-v6.md`
-  + ADRs.
+  + ADRs. **How to run it so context stays cheap (commit + `/clear` at every
+  phase boundary): [`docs/OPENSPEC-WORKFLOW.md`](docs/OPENSPEC-WORKFLOW.md).**
 - **Test-driven, genuinely.** Red → green → refactor per change. Spec tables are
   fixtures: the §4c rebuild matrix, §9 vision decision table, and §11a language
   cases become tests directly. Tests use **deterministic fakes** (hash-based
