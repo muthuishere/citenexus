@@ -1,0 +1,95 @@
+# SPIKE: prove the REAL citenexus-core (lancedb + arrow + tokio + fasttext)
+# cross-compiles as a release cdylib AND is loadable by all three bindings
+# (Python ctypes / TS koffi / Go purego) calling a REAL symbol,
+# `citenexus_core_version()`, on every OS/arch we ship.
+#
+# The toy spike (spike-prebuilt-ffi) proved the LOAD SEAM; native-libs.yml
+# proves the BUILD on tag. This closes the gap between them: build the real
+# core, then actually dlopen it and call an exported function — no Rust
+# toolchain in the loaders, per-platform.
+#
+# Not production CI — action tags would be SHA-pinned before any merge.
+name: spike-dist-real-core
+
+on:
+  push:
+    branches: ["spike/dist-real-core**"]
+    paths:
+      - "spikes/dist-real-core/**"
+      - "rust/**"
+      - ".github/workflows/spike-dist-real-core.yml"
+  workflow_dispatch:
+
+jobs:
+  build-and-load:
+    name: ${{ matrix.key }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest,    key: linux-x86_64,   libname: libcitenexus_core.so }
+          - { os: ubuntu-24.04-arm, key: linux-aarch64,   libname: libcitenexus_core.so }
+          - { os: macos-14,         key: darwin-aarch64,  libname: libcitenexus_core.dylib }
+          - { os: windows-latest,   key: windows-x86_64,  libname: citenexus_core.dll }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # 1) protoc — lancedb/arrow pull in prost, whose build needs a protoc.
+      - name: Install protoc (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Install protoc (macOS)
+        if: runner.os == 'macOS'
+        run: brew install protobuf
+      - name: Install protoc (Windows)
+        if: runner.os == 'Windows'
+        run: choco install protoc -y
+
+      # 2) Build the REAL core as a release cdylib. `pdf` feature OFF (default),
+      #    so pdfium is not linked. rustup is preinstalled; we build the host
+      #    target natively (no `rustup target add` needed).
+      - name: Build citenexus-core release cdylib
+        working-directory: rust
+        run: cargo build --release
+
+      - name: Resolve CORE_LIB + expected version (OS-aware)
+        shell: bash
+        run: |
+          LIB="$PWD/rust/target/release/${{ matrix.libname }}"
+          if [ "$RUNNER_OS" = "Windows" ]; then LIB="$(cygpath -w "$LIB")"; fi
+          test -f "$LIB" || { echo "cdylib not found at $LIB"; exit 1; }
+          echo "CORE_LIB=$LIB" >> "$GITHUB_ENV"
+          # crate version straight from rust/Cargo.toml — the loaders assert the
+          # symbol returns exactly this, proving we loaded the lib we just built.
+          VER="$(grep -m1 '^version' rust/Cargo.toml | sed -E 's/.*"([^"]+)".*/\1/')"
+          echo "EXPECT_CORE_VERSION=$VER" >> "$GITHUB_ENV"
+          echo "resolved CORE_LIB=$LIB  EXPECT_CORE_VERSION=$VER"
+
+      # 3a) Python (ctypes, stdlib) ------------------------------------------
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Python loader
+        shell: bash
+        run: python3 spikes/dist-real-core/python/check_core.py
+
+      # 3b) TS/JS (koffi) ----------------------------------------------------
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - name: Node loader
+        working-directory: spikes/dist-real-core/node
+        shell: bash
+        run: |
+          npm install --no-audit --no-fund
+          node check_core.mjs
+
+      # 3c) Go (purego) — attempt on ALL platforms (purego v0.9 supports
+      #     windows/amd64); if Windows regresses, this job's log documents it.
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.23" }
+      - name: Go loader
+        working-directory: spikes/dist-real-core/go
+        shell: bash
+        run: |
+          go mod tidy
+          go run check_core.go
