@@ -49,8 +49,10 @@ describe("citenexus-core FFI", () => {
     // src/core -> ../../../conformance/fixtures/sample.xlsx
     const fixture = resolve(HERE, "..", "..", "..", "conformance", "fixtures", "sample.xlsx");
     const markdown = toMarkdown(readFileSync(fixture), "xlsx");
+    // Sheets emit as GFM pipe tables (the shipped emit-markdown behavior).
     expect(markdown).toContain("# People");
-    expect(markdown).toContain("name: ada, age: 36, active: true");
+    expect(markdown).toContain("| name | age | active |");
+    expect(markdown).toContain("| ada | 36 | true |");
     expect(markdown).toContain("# Scores");
     expect(markdown.endsWith("\n")).toBe(true);
   });
