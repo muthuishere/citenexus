@@ -92,17 +92,31 @@ class OpenAICompatibleVision:
         return {"Content-Type": "application/json"}
 
     def describe(self, image_region: Any) -> dict[str, Any]:
-        """Describe an image; returns the record mapping ``describe_image`` shapes."""
+        """Describe an image's bytes; returns the mapping ``describe_image`` shapes.
+
+        The standalone (non-two-phase) entry: encodes the bytes with this client's
+        configured ``mime_type`` and the pinned prompt, then completes.
+        """
         raw = _image_bytes(image_region)
         data_uri = f"data:{self._mime_type};base64,{base64.b64encode(raw).decode()}"
+        return self._complete(data_uri, _VISION_PROMPT)
+
+    def describe_payload(self, image_url: str, prompt: str) -> dict[str, Any]:
+        """Fulfill a two-phase `PendingVisionRequest`: POST the core's already-assembled
+        ``image_url`` data URI + prompt **verbatim** (no re-encode), so the reference
+        host sends exactly the emitted payload the ports reproduce."""
+        return self._complete(image_url, prompt)
+
+    def _complete(self, image_url: str, prompt: str) -> dict[str, Any]:
+        """POST one prompt + image_url to ``/chat/completions`` and parse the reply."""
         request: dict[str, object] = {
             "model": self._model,
             "messages": [
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": _VISION_PROMPT},
-                        {"type": "image_url", "image_url": {"url": data_uri}},
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": image_url}},
                     ],
                 }
             ],

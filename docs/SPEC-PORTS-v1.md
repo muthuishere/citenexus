@@ -277,6 +277,23 @@ A `conformance/` directory in this repo, versioned with the spec:
 - `cases/e2e_hermetic.json` — corpus + questions → decision/source/passage,
   run with the hash fake embedding + extractive fake LLM (both pinned in §4),
   so every language proves cite-or-abstain end-to-end offline.
+- `cases/vision_orchestration.json` — the two-phase vision seam (ADR-0005, §9):
+  the ordered `emit` list of `PendingVisionRequest`s (byte-identical data-URI +
+  prompt + `source_ref`), the `fulfilled` records, the `assembled` figure EUs,
+  and a `degrade` join where an unfulfilled request yields no EU. The two `images`
+  carry PNG vs JPEG magic bytes: the emitted `payload.image_url` declares each
+  image's **true** media type (sniffed from the magic bytes — png/jpeg/gif/webp,
+  else png), so a port MUST sniff the format, not hardcode `image/png`.
+
+**The vision FFI seam.** Vision is host-fulfilled: the core exposes two bound
+entry points across the FFI — **emit** (parse an artifact → the `emit` list) and
+**assemble** (`{request_id: description}` → figure EUs). Between them each port
+implements a thin, in-language **fulfiller**: "POST this payload → return the
+description string." The API key lives only in that fulfiller's transport and
+never crosses into the core. Ports reproduce `emit` and `assembled` from the
+fixture byte-for-byte; only the raw model call in the middle differs per
+language. Degrade-to-text is part of the contract: a request the host leaves
+unfulfilled (or fails) yields no figure EU and never fails ingest.
 
 **Interop test (CI, opt-in like MinIO):** Python ingests the example corpus
 into MinIO → the port under test runs `ask()` against that bucket → answers

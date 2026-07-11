@@ -53,3 +53,6 @@ golang/**/*.test
 
 # Built brain binary (CLI lives in its own repo)
 /brain
+
+# personal corpus (bank/card statements, private docs) — never commit
+corpus/

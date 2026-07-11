@@ -1,24 +1,28 @@
-"""Turn described document images into cited Evidence Units (§9).
+"""Assemble phase — join fulfilled descriptions into cited figure EUs (§9).
 
-A figure that clears the §9 pre-filter and is described by the vision plugin
-becomes a first-class Evidence Unit so it is retrievable in context with the
-surrounding text. The unit's ``text`` is the model's description (caption +
-detail + any OCR'd text); its ``Citation`` points at the real image region
-(page + bbox) — navigate the description, cite the figure. The ``eu_id`` is
-namespaced ``{document_id}::img::{image_id}`` so it never collides with the
-block units (``{document_id}::{order}``).
+The third phase of the two-phase vision seam (ADR-0005): the core emitted
+`PendingVisionRequest`s, the host fulfilled them into ``{request_id: VisionRecord}``,
+and this joins the two by ``request_id`` to build the figure Evidence Units. Each
+unit's ``text`` is the model's description (so it's retrievable in context); its
+``Citation`` points at the real image region carried on the request's
+``source_ref`` (page + bbox) — navigate the description, cite the figure. The
+``eu_id`` is the request's ``request_id`` (``{document}::img::{image_id}``), so it
+never collides with block units (``{document}::{order}``).
 
-Pure and deterministic: the vision *call* happens upstream (``describe_image``);
-this only shapes ``(ImageRef, VisionRecord)`` pairs into units.
+Per-request isolation and degrade-to-text live here: a request with no fulfilled
+description, or an empty one, yields no unit and never fails the rest — identical
+to the "no vision plugin" path. Pure and deterministic: the vision *call* happened
+host-side; this only shapes descriptions into units.
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from citenexus.domain.partition import PartitionPath
+from citenexus.domain.vision import PendingVisionRequest
 from citenexus.evidence.unit import Citation, EUType, EvidenceUnit
-from citenexus.extract.types import ImageRef
 from citenexus.vision.describe import VisionRecord
 
 
@@ -41,31 +45,39 @@ def _record_text(record: VisionRecord) -> str:
 
 
 def build_vision_units(
-    described: list[tuple[ImageRef, VisionRecord]],
+    requests: Sequence[PendingVisionRequest],
+    fulfilled: Mapping[str, VisionRecord],
     *,
-    document_id: str,
     partition: PartitionPath,
     language: str,
     acl: Any = None,
-    source_uri: str | None = None,
 ) -> list[EvidenceUnit]:
-    """Shape described images into figure Evidence Units; skip empty descriptions."""
+    """Assemble figure Evidence Units by joining requests to fulfilled records.
+
+    Joins on ``request_id``: a request the host did not fulfill (absent from
+    ``fulfilled``), or whose description is empty, yields no unit and does not
+    fail the others — per-request degrade-to-text.
+    """
     units: list[EvidenceUnit] = []
-    for image, record in described:
+    for request in requests:
+        record = fulfilled.get(request.request_id)
+        if record is None:
+            continue
         text = _record_text(record)
         if not text:
             continue
+        ref = request.source_ref
         units.append(
             EvidenceUnit(
-                eu_id=f"{document_id}::img::{image.image_id}",
+                eu_id=request.request_id,
                 partition=partition,
-                document_id=document_id,
+                document_id=ref.document,
                 type=EUType.figure,
                 language=language,
                 text=text,
-                citation=Citation(passage=text, page=image.page, bbox=image.bbox),
-                page=image.page,
-                source_uri=source_uri,
+                citation=Citation(passage=text, page=ref.page, bbox=ref.bbox),
+                page=ref.page,
+                source_uri=ref.source_uri,
                 acl=acl,
             )
         )

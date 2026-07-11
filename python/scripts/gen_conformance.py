@@ -10,6 +10,7 @@ Run with:  uv run python scripts/gen_conformance.py
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 from pathlib import Path
@@ -58,6 +59,10 @@ from citenexus.retrieve.types import Candidate, RetrievalSignal
 from citenexus.storage.bm25 import Bm25TextSearch
 from citenexus.testing.fakes import tokenize
 from citenexus.vision.client import _VISION_PROMPT
+from citenexus.vision.describe import FakeVision
+from citenexus.vision.fulfill import fulfill_vision_requests
+from citenexus.vision.requests import build_pending_request
+from citenexus.vision.units import build_vision_units
 from citenexus.wiki.distill import _PROMPT as _WIKI_DISTILL_PROMPT
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -739,6 +744,77 @@ def _model_wire_cases() -> dict[str, Any]:
 # --------------------------------------------------------------------------- #
 
 
+# --------------------------------------------------------------------------- #
+# cases/vision_orchestration.json — the two-phase vision seam (ADR-0005, §9).
+#
+# Pins the plain-data contract of emit -> fulfill -> assemble so Go/TS/Rust
+# reproduce it byte-for-byte. `emit` is the ordered tuple of PendingVisionRequests
+# the core produces from vision-routed images (data URI + prompt + source_ref);
+# the two images carry PNG vs JPEG magic bytes, pinning that the emitted payload
+# declares each image's TRUE media type (sniffed, not hardcoded) so a port that
+# POSTs the payload verbatim never mislabels the format. `assembled_eus` is the
+# figure EUs the core builds after the host fulfills them (here with the
+# deterministic FakeVision). `degrade` shows a request the host left unfulfilled
+# yielding no EU — per-request degrade-to-text. Only the raw model call between
+# emit and fulfill may differ per language.
+# --------------------------------------------------------------------------- #
+
+_VISION_IMAGES: list[dict[str, Any]] = [
+    {
+        "image_id": "page1-fig0",
+        "page": 1,
+        "bbox": [10.0, 20.0, 110.0, 220.0],
+        "bytes": b"\x89PNG\r\n\x1a\n citenexus conformance png figure",
+    },
+    {
+        "image_id": "page2-fig1",
+        "page": 2,
+        "bbox": [0.0, 0.0, 50.0, 50.0],
+        "bytes": b"\xff\xd8\xff\xe0 citenexus conformance jpeg figure",
+    },
+]
+
+
+def _vision_orchestration_cases() -> dict[str, Any]:
+    document_id = "annual-report"
+    source_uri = "raw/annual-report.pdf"
+    requests = [
+        build_pending_request(
+            document_id=document_id,
+            image_id=img["image_id"],
+            data=img["bytes"],
+            prompt=_VISION_PROMPT,
+            page=img["page"],
+            bbox=tuple(img["bbox"]),
+            source_uri=source_uri,
+        )
+        for img in _VISION_IMAGES
+    ]
+    fulfilled = fulfill_vision_requests(requests, FakeVision())
+    assembled = build_vision_units(requests, fulfilled, partition=_PARTITION, language="en")
+
+    # Degrade: the host fulfills only the second request; the first yields no EU.
+    partial = {requests[1].request_id: fulfilled[requests[1].request_id]}
+    degraded = build_vision_units(requests, partial, partition=_PARTITION, language="en")
+
+    return {
+        "document_id": document_id,
+        "source_uri": source_uri,
+        "language": "en",
+        "images": [
+            {"image_id": img["image_id"], "bytes_b64": base64.b64encode(img["bytes"]).decode()}
+            for img in _VISION_IMAGES
+        ],
+        "emit": [r.model_dump(mode="json") for r in requests],
+        "fulfilled": {rid: rec.model_dump(mode="json") for rid, rec in fulfilled.items()},
+        "assembled_eus": [eu.model_dump(mode="json") for eu in assembled],
+        "degrade": {
+            "fulfilled": {rid: rec.model_dump(mode="json") for rid, rec in partial.items()},
+            "assembled_eu_ids": [eu.eu_id for eu in degraded],
+        },
+    }
+
+
 def _render(obj: Any) -> str:
     return json.dumps(obj, indent=2, ensure_ascii=False) + "\n"
 
@@ -851,6 +927,7 @@ def generate() -> dict[str, str]:
         "cases/model_wire.json": _render(_model_wire_cases()),
         "cases/graph_comention.json": _render(_graph_comention_cases()),
         "cases/structure.json": _render(_structure_cases()),
+        "cases/vision_orchestration.json": _render(_vision_orchestration_cases()),
     }
 
 

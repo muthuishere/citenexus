@@ -57,11 +57,10 @@ def _as_mapping(result: Any) -> Mapping[str, Any]:
     )
 
 
-def describe_image(image: ImageRef, plugin: VisionPlugin) -> VisionRecord:
-    """Call the injected vision plugin and shape its output into a `VisionRecord`."""
-    data = _as_mapping(plugin.describe(image))
+def record_from_mapping(image_id: str, data: Mapping[str, Any]) -> VisionRecord:
+    """Shape a plugin's record mapping into a `VisionRecord` for the given image."""
     return VisionRecord(
-        image_id=image.image_id,
+        image_id=image_id,
         short_caption=str(data.get("short_caption", "")),
         detailed_description=str(data.get("detailed_description", "")),
         objects=tuple(data.get("objects") or ()),
@@ -70,6 +69,11 @@ def describe_image(image: ImageRef, plugin: VisionPlugin) -> VisionRecord:
         data_values=tuple(data.get("data_values") or ()),
         image_type=data.get("image_type"),
     )
+
+
+def describe_image(image: ImageRef, plugin: VisionPlugin) -> VisionRecord:
+    """Call the injected vision plugin and shape its output into a `VisionRecord`."""
+    return record_from_mapping(image.image_id, _as_mapping(plugin.describe(image)))
 
 
 class FakeVision(VisionPlugin):

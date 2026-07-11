@@ -134,29 +134,33 @@ ruled/aligned tables via `page.find_tables()`
 and CSV/PPTX/HTML/XLSX each have their own table path. A tabular cell stays
 citable by page + bbox like any other unit.
 
-**Image-to-text via a vision model** — the description → citable-EU half is
-real and end-to-end: `vision/describe.py`'s `describe_image()` calls the
-injected `VisionPlugin` and shapes its output into a `VisionRecord` (caption,
-description, detected objects/relationships, any OCR text read out of the
-image); `vision/units.py`'s `build_vision_units()` turns each
-`(ImageRef, VisionRecord)` pair into a real `EvidenceUnit(type=figure)`, cited
-by page + bbox exactly like any other unit. `vision/client.py`'s
-`OpenAICompatibleVision` is the concrete client — base64-encodes image bytes
-into an OpenAI-style `image_url` data URI and posts to any OpenAI-compatible
-`/chat/completions` vision endpoint (Gemini's OpenAI-compat endpoint, GPT-4o,
-a local VL server). Enable it by passing `vision=` to the client (see the
-scaling ladder above). The two gaps that used to make this **inert on real
+**Image-to-text via a vision model** — figures are described through a
+**two-phase, host-fulfilled seam** (ADR-0005) so the polyglot core never holds
+the API key or opens a socket: the core **emits** model-ready
+`PendingVisionRequest`s (a base64 `image_url` data URI + prompt + the figure's
+`source_ref`), the host **fulfills** them with its own transport, and the core
+**assembles** the descriptions into `EvidenceUnit(type=figure)`s cited by
+page + bbox like any other unit. `ingest/pipeline.py`'s `_emit_vision_requests()`
+runs the §9 gate and builds the requests; `vision/fulfill.py`'s
+`fulfill_vision_requests()` is the reference fulfiller (wrapping the injected
+`VisionPlugin`, its own auth/concurrency); `vision/units.py`'s
+`build_vision_units()` is the assemble half (join on `request_id`).
+`vision/client.py`'s `OpenAICompatibleVision` is the concrete client — posts the
+payload to any OpenAI-compatible `/chat/completions` vision endpoint (Gemini's
+OpenAI-compat endpoint, GPT-4o, a local VL server). **Public API is unchanged**:
+pass `vision=` and `ingest()` drives emit → fulfill → assemble internally (see
+the scaling ladder above). The two gaps that used to make this **inert on real
 docs are now closed**:
 1. **Image bytes are persisted at ingest.** Extractors emit `doc.image_bytes`;
    `ingest/pipeline.py`'s `_persist_image_bytes()` stores each via
-   `StorageBackend.put_bytes` and stamps `blob_key`, so `_vision_units()` loads
+   `StorageBackend.put_bytes` and stamps `blob_key`, so the emit phase loads
    them back and vision fires on real PDF/DOCX/PPTX images (not just
    manually-injected test bytes).
-2. **The §9 pre-filter is wired in.** `_vision_units()` calls
+2. **The §9 pre-filter is wired in.** The emit phase calls
    `vision/prefilter.py`'s `decide()` per image — the deterministic router
    (text / ocr / vision / skip, gated on area ratio + aspect ratio +
    OCR-density) — so decorative images are skipped and only figures that
-   warrant it reach a model call.
+   warrant it become requests.
 
 **`citenexus verify`** — a standalone CLI for the faithfulness gate, useful
 outside a running `CiteNexus` instance (e.g. a CI gate on someone else's RAG

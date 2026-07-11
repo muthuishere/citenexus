@@ -5,9 +5,10 @@ from __future__ import annotations
 import hashlib
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol
 
 from citenexus.config.signals import Signal, requires_slow_path, resolve_signals
+from citenexus.domain.vision import PendingVisionRequest
 from citenexus.evidence.builder import build_evidence_units
 from citenexus.evidence.chunked_builder import Contextualizer, build_chunked_units
 from citenexus.evidence.structure import build_structure
@@ -20,8 +21,10 @@ from citenexus.storage.lance_store import LanceVectorStore, StorageOptions
 from citenexus.storage.manifest import EtagManifest, load_manifest, save_manifest
 from citenexus.storage.paths import Layer, layer_prefix, leaf_vector_uri, partition_segment
 from citenexus.telemetry.events import Stage, StageEvent
-from citenexus.vision.describe import describe_image
+from citenexus.vision.client import _VISION_PROMPT
+from citenexus.vision.fulfill import fulfill_vision_requests
 from citenexus.vision.prefilter import VisionDecision, VisionPrefilterConfig, decide
+from citenexus.vision.requests import build_pending_request
 from citenexus.vision.units import build_vision_units
 
 if TYPE_CHECKING:
@@ -29,12 +32,10 @@ if TYPE_CHECKING:
 
     from citenexus.domain.partition import PartitionPath
     from citenexus.evidence.unit import EvidenceUnit
-    from citenexus.extract.types import ImageRef
-    from citenexus.plugins.base import LanguageDetectorPlugin, VisionPlugin
+    from citenexus.plugins.base import LanguageDetectorPlugin
     from citenexus.storage.backend import StorageBackend
     from citenexus.storage.protocols import VectorStore
     from citenexus.telemetry.sinks import TelemetrySink
-    from citenexus.vision.describe import VisionRecord
     from citenexus.worker.queue import DurableQueue
 
 
@@ -50,21 +51,6 @@ class VisionDescriber(Protocol):
     """
 
     def describe(self, image_region: Any) -> Any: ...
-
-
-class _BytesImage:
-    """Carries an ``ImageRef``'s metadata plus its loaded bytes for the VL plugin.
-
-    ``describe_image`` reads ``.image_id``; a real vision client reads ``.data``.
-    This adapter satisfies both so the same call works for ``FakeVision`` (ignores
-    bytes) and ``OpenAICompatibleVision`` (needs them).
-    """
-
-    def __init__(self, image: Any, data: bytes) -> None:
-        self.image_id = getattr(image, "image_id", "img")
-        self.page = getattr(image, "page", None)
-        self.bbox = getattr(image, "bbox", None)
-        self.data = data
 
 
 def _raw_bytes(source: Any, text: str | None) -> bytes:
@@ -266,25 +252,24 @@ class IngestPipeline:
             updated.append(image.model_copy(update={"blob_key": blob_key}))
         return doc.model_copy(update={"images": tuple(updated)})
 
-    def _vision_units(
-        self, doc: Any, *, doc_id: str, language: str, acl: Any
-    ) -> list[EvidenceUnit]:
-        """Describe the doc's images into figure EUs — text-level only if unable.
+    def _emit_vision_requests(self, doc: Any, *, doc_id: str) -> tuple[PendingVisionRequest, ...]:
+        """Emit phase (§9): parse + §9-gate the doc's images into pending requests.
 
-        Guarded degradation (per design): with no vision plugin, or images that
-        carry no retrievable bytes, this returns ``[]`` and ingest proceeds at
-        text level. A per-image failure never fails the whole ingest.
+        Pure of any model call: for each image that clears the §9 pre-filter and
+        has retrievable bytes, build the model-ready payload (base64 ``image_url``
+        data URI + prompt) and the citation ``source_ref`` (page + bbox). The
+        host fulfills these; the core never opens a socket here. An image with no
+        bytes, or routed to ``text``/``ocr``/``skip``, emits no request.
         """
-        vision = self._vision
-        if vision is None or not getattr(doc, "images", ()):
-            return []
+        if not getattr(doc, "images", ()):
+            return ()
         page_areas: dict[str, float] = getattr(doc, "image_page_area", None) or {}
-        described: list[tuple[ImageRef, VisionRecord]] = []
+        source_uri = getattr(doc, "source_uri", None)
+        requests: list[PendingVisionRequest] = []
         for image in doc.images:
-            # §9 pre-filter: route by real page/image geometry when the
-            # extractor supplied a page area (currently PDF only — docx/pptx
-            # have no fixed page geometry, so they fall through to vision
-            # unconditionally, preserving prior behavior for those formats).
+            # §9 pre-filter: route by real page/image geometry when the extractor
+            # supplied a page area (PDF only — docx/pptx have no fixed page
+            # geometry, so they fall through to vision unconditionally).
             page_area = page_areas.get(image.image_id)
             if page_area is not None:
                 decision = decide(
@@ -298,23 +283,43 @@ class IngestPipeline:
             data = self._image_bytes(image)
             if data is None:
                 continue
-            try:
-                record = describe_image(
-                    cast("ImageRef", _BytesImage(image, data)),
-                    cast("VisionPlugin", vision),
+            requests.append(
+                build_pending_request(
+                    document_id=doc_id,
+                    image_id=image.image_id,
+                    data=data,
+                    prompt=_VISION_PROMPT,
+                    page=image.page,
+                    bbox=image.bbox,
+                    source_uri=source_uri,
                 )
-            except Exception:
-                continue
-            described.append((image, record))
-        if not described:
+            )
+        return tuple(requests)
+
+    def _vision_units(
+        self, doc: Any, *, doc_id: str, language: str, acl: Any
+    ) -> list[EvidenceUnit]:
+        """Drive the two-phase seam internally: emit → fulfill → assemble (§9).
+
+        The public ingest path fulfills automatically via the injected ``vision``
+        plugin, so caller behavior is unchanged. Guarded degradation (per design):
+        with no vision plugin, no emitted requests, or images that carry no
+        retrievable bytes, this returns ``[]`` and ingest proceeds at text level.
+        A per-request failure is isolated in the fulfiller and never fails ingest.
+        """
+        vision = self._vision
+        if vision is None:
             return []
+        requests = self._emit_vision_requests(doc, doc_id=doc_id)
+        if not requests:
+            return []
+        fulfilled = fulfill_vision_requests(requests, vision)
         return build_vision_units(
-            described,
-            document_id=doc_id,
+            requests,
+            fulfilled,
             partition=self._partition,
             language=language,
             acl=acl,
-            source_uri=getattr(doc, "source_uri", None),
         )
 
     def _image_bytes(self, image: Any) -> bytes | None:

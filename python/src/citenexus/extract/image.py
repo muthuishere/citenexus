@@ -15,6 +15,7 @@ import base64
 from pathlib import Path
 from typing import Any
 
+from citenexus.extract.mime import sniff_image_subtype
 from citenexus.extract.plain import open_binary
 from citenexus.extract.types import (
     BlockKind,
@@ -37,19 +38,6 @@ def _read_bytes(opened: Any) -> bytes:
     return data if isinstance(data, bytes) else bytes(data)
 
 
-def _sniff_mime(data: bytes) -> str | None:
-    """Recognize the image type from its magic bytes → the ``image/<mime>`` subtype."""
-    if data.startswith(b"\x89PNG\r\n\x1a\n"):
-        return "png"
-    if data.startswith(b"\xff\xd8\xff"):
-        return "jpeg"
-    if data.startswith((b"GIF87a", b"GIF89a")):
-        return "gif"
-    if len(data) >= 12 and data[0:4] == b"RIFF" and data[8:12] == b"WEBP":
-        return "webp"
-    return None
-
-
 class ImageExtractor(ExtractorPlugin):
     """A single image → one image block: a base64 data-URI, or an empty
     placeholder when the format is unrecognized or exceeds the inline cap."""
@@ -62,7 +50,7 @@ class ImageExtractor(ExtractorPlugin):
     def extract(self, source: Any) -> ExtractedDoc:
         opened, doc_id, source_uri = open_binary(source, self.document_id)
         data = _read_bytes(opened)
-        mime = _sniff_mime(data)
+        mime = sniff_image_subtype(data)
         if mime is not None and len(data) <= MAX_INLINE_BYTES:
             encoded = base64.b64encode(data).decode("ascii")
             text = f"![image](data:image/{mime};base64,{encoded})"

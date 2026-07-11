@@ -1,0 +1,184 @@
+{
+  "document_id": "annual-report",
+  "source_uri": "raw/annual-report.pdf",
+  "language": "en",
+  "images": [
+    {
+      "image_id": "page1-fig0",
+      "bytes_b64": "iVBORw0KGgogY2l0ZW5leHVzIGNvbmZvcm1hbmNlIHBuZyBmaWd1cmU="
+    },
+    {
+      "image_id": "page2-fig1",
+      "bytes_b64": "/9j/4CBjaXRlbmV4dXMgY29uZm9ybWFuY2UganBlZyBmaWd1cmU="
+    }
+  ],
+  "emit": [
+    {
+      "request_id": "annual-report::img::page1-fig0",
+      "payload": {
+        "prompt": "Describe this image for a document search index, covering every aspect so a later question about the image can be answered from your description alone. Reply with ONLY a JSON object with keys: short_caption (string), detailed_description (string — if the image is a chart/diagram/table, describe its layout and structure, every visible number/label/axis value, the colors used and what they encode if there is a legend, and the spatial relationships between elements), objects (array of strings), relationships (array of strings), ocr_text (string of any text visible in the image, verbatim), data_values (array of objects {label, value} for any numeric/tabular values shown in a chart, graph, or table-as-image; empty array if none), image_type (one of: photo, chart, diagram, screenshot, table, handwriting, logo, other). Do not add prose outside the JSON.",
+        "image_url": "data:image/png;base64,iVBORw0KGgogY2l0ZW5leHVzIGNvbmZvcm1hbmNlIHBuZyBmaWd1cmU="
+      },
+      "source_ref": {
+        "document": "annual-report",
+        "page": 1,
+        "bbox": [
+          10.0,
+          20.0,
+          110.0,
+          220.0
+        ],
+        "source_uri": "raw/annual-report.pdf"
+      }
+    },
+    {
+      "request_id": "annual-report::img::page2-fig1",
+      "payload": {
+        "prompt": "Describe this image for a document search index, covering every aspect so a later question about the image can be answered from your description alone. Reply with ONLY a JSON object with keys: short_caption (string), detailed_description (string — if the image is a chart/diagram/table, describe its layout and structure, every visible number/label/axis value, the colors used and what they encode if there is a legend, and the spatial relationships between elements), objects (array of strings), relationships (array of strings), ocr_text (string of any text visible in the image, verbatim), data_values (array of objects {label, value} for any numeric/tabular values shown in a chart, graph, or table-as-image; empty array if none), image_type (one of: photo, chart, diagram, screenshot, table, handwriting, logo, other). Do not add prose outside the JSON.",
+        "image_url": "data:image/jpeg;base64,/9j/4CBjaXRlbmV4dXMgY29uZm9ybWFuY2UganBlZyBmaWd1cmU="
+      },
+      "source_ref": {
+        "document": "annual-report",
+        "page": 2,
+        "bbox": [
+          0.0,
+          0.0,
+          50.0,
+          50.0
+        ],
+        "source_uri": "raw/annual-report.pdf"
+      }
+    }
+  ],
+  "fulfilled": {
+    "annual-report::img::page1-fig0": {
+      "image_id": "page1-fig0",
+      "short_caption": "Figure page1-fig0",
+      "detailed_description": "A deterministic description of figure page1-fig0 for offline tests.",
+      "objects": [
+        "axis",
+        "line",
+        "legend"
+      ],
+      "relationships": [
+        "the line trends upward along the axis"
+      ],
+      "ocr_text": "label: page1-fig0",
+      "data_values": [],
+      "image_type": null
+    },
+    "annual-report::img::page2-fig1": {
+      "image_id": "page2-fig1",
+      "short_caption": "Figure page2-fig1",
+      "detailed_description": "A deterministic description of figure page2-fig1 for offline tests.",
+      "objects": [
+        "axis",
+        "line",
+        "legend"
+      ],
+      "relationships": [
+        "the line trends upward along the axis"
+      ],
+      "ocr_text": "label: page2-fig1",
+      "data_values": [],
+      "image_type": null
+    }
+  },
+  "assembled_eus": [
+    {
+      "eu_id": "annual-report::img::page1-fig0",
+      "partition": {
+        "levels": [
+          {
+            "level": "workspace",
+            "value": "default"
+          }
+        ]
+      },
+      "document_id": "annual-report",
+      "type": "figure",
+      "language": "en",
+      "text": "Figure page1-fig0\nA deterministic description of figure page1-fig0 for offline tests.\naxis, line, legend\nthe line trends upward along the axis\nlabel: page1-fig0",
+      "citation": {
+        "passage": "Figure page1-fig0\nA deterministic description of figure page1-fig0 for offline tests.\naxis, line, legend\nthe line trends upward along the axis\nlabel: page1-fig0",
+        "page": 1,
+        "bbox": [
+          10.0,
+          20.0,
+          110.0,
+          220.0
+        ]
+      },
+      "page": 1,
+      "section": null,
+      "source_uri": "raw/annual-report.pdf",
+      "entities": [],
+      "structure_path": null,
+      "document_metadata": null,
+      "acl": null,
+      "dense_vector": null,
+      "sparse_vector": null,
+      "checksum": null,
+      "source_checksum": null
+    },
+    {
+      "eu_id": "annual-report::img::page2-fig1",
+      "partition": {
+        "levels": [
+          {
+            "level": "workspace",
+            "value": "default"
+          }
+        ]
+      },
+      "document_id": "annual-report",
+      "type": "figure",
+      "language": "en",
+      "text": "Figure page2-fig1\nA deterministic description of figure page2-fig1 for offline tests.\naxis, line, legend\nthe line trends upward along the axis\nlabel: page2-fig1",
+      "citation": {
+        "passage": "Figure page2-fig1\nA deterministic description of figure page2-fig1 for offline tests.\naxis, line, legend\nthe line trends upward along the axis\nlabel: page2-fig1",
+        "page": 2,
+        "bbox": [
+          0.0,
+          0.0,
+          50.0,
+          50.0
+        ]
+      },
+      "page": 2,
+      "section": null,
+      "source_uri": "raw/annual-report.pdf",
+      "entities": [],
+      "structure_path": null,
+      "document_metadata": null,
+      "acl": null,
+      "dense_vector": null,
+      "sparse_vector": null,
+      "checksum": null,
+      "source_checksum": null
+    }
+  ],
+  "degrade": {
+    "fulfilled": {
+      "annual-report::img::page2-fig1": {
+        "image_id": "page2-fig1",
+        "short_caption": "Figure page2-fig1",
+        "detailed_description": "A deterministic description of figure page2-fig1 for offline tests.",
+        "objects": [
+          "axis",
+          "line",
+          "legend"
+        ],
+        "relationships": [
+          "the line trends upward along the axis"
+        ],
+        "ocr_text": "label: page2-fig1",
+        "data_values": [],
+        "image_type": null
+      }
+    },
+    "assembled_eu_ids": [
+      "annual-report::img::page2-fig1"
+    ]
+  }
+}

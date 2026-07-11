@@ -22,6 +22,7 @@ eu_ids, byte-identical prompts.
 | `cases/chunker.json` | recursive paragraph→line→sentence→word chunker with overlap tail (§4) |
 | `cases/language.json` | the §11a answer-language fallback chain, one case per rung |
 | `cases/eu_ids.json` | eu_id formats for the block builder (`doc::{order}`) and chunked builder (`doc::{order}::{i}`), plus a SHA-256 raw-checksum example (§3, §4) |
+| `cases/vision_orchestration.json` | the two-phase vision seam (ADR-0005, §9): the ordered `emit` list of `PendingVisionRequest`s (data-URI + prompt + source_ref; the payload MIME is sniffed from the bytes — PNG vs JPEG pinned), the `fulfilled` records, the `assembled` figure EUs, and a `degrade` join where an unfulfilled request yields no EU — only the raw model call between emit and fulfill may differ per port |
 
 Not yet generated (spec §10 lists them; they land with the port work):
 `cases/result_roundtrip.json` and `cases/e2e_hermetic.json`.
