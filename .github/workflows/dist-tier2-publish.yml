@@ -1,0 +1,85 @@
+# DESIGN SKELETON (dispatch-only, dry-run default) for the Tier-2 per-language
+# REPACKAGE + PUBLISH pipeline. Tier-1 = native-libs.yml (already green): on a
+# core release it cross-builds citenexus-core and uploads per-platform libs +
+# .sha256 to a durable GitHub Release. Tier-2 (here) is cheap: download those
+# prebuilts (SHA256-verified), repackage per language, publish via OIDC.
+#
+# Kept workflow_dispatch-only with dry_run=true so it never publishes by
+# accident from the spike branch. AT MERGE: (1) change trigger to `on: push:
+# tags: ["v*"]`, (2) SHA-pin all `uses:`, (3) set dry_run default false, (4)
+# wire the real OIDC publish steps (commented below).
+name: dist-tier2-publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      core_version:
+        description: "native-libs Release tag to repackage from (e.g. v0.7.0)"
+        default: "v0.7.0"
+      dry_run:
+        description: "build + smoke-test only; do not publish"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write # OIDC for PyPI / npm trusted publishing
+
+jobs:
+  # ---- Python: one platform wheel per target, bundling the Release cdylib ----
+  python-wheels:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-14,         key: darwin-aarch64 }
+          - { os: ubuntu-latest,    key: linux-x86_64 }
+          - { os: ubuntu-24.04-arm, key: linux-aarch64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Repackage + smoke-test the platform wheel
+        # downloads the matching native-libs asset (SHA256-verified), bundles it
+        # into citenexus/_lib/, retags to a platform wheel, installs into a clean
+        # venv and loads via citenexus._native — the exact proof in the spike.
+        run: bash spikes/dist-consume/python/repackage_and_prove.sh
+      # - name: Publish to PyPI (OIDC trusted publishing)
+      #   if: ${{ !inputs.dry_run }}
+      #   uses: pypa/gh-action-pypi-publish@<sha>
+      #   with: { packages-dir: spikes/dist-consume/python/.build/dist_plat }
+
+  # ---- TS/JS: main pkg + per-platform pkgs (os/cpu), npm OIDC provenance ----
+  npm-platform-packages:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-14,         key: darwin-aarch64 }
+          - { os: ubuntu-latest,    key: linux-x86_64 }
+          - { os: ubuntu-24.04-arm, key: linux-aarch64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", registry-url: "https://registry.npmjs.org" }
+      - name: Pack + smoke-test the platform package
+        run: bash spikes/dist-consume/js/pack_and_prove.sh
+      # - name: Publish platform pkg (npm provenance/OIDC)
+      #   if: ${{ !inputs.dry_run }}
+      #   run: cd spikes/dist-consume/js/.build/platform-* && npm publish --provenance --access public
+      #   env: { NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }} }
+      # NOTE: the main pkg (with the 4 optionalDependencies) is published ONCE,
+      # not per-matrix — a small separate job after all platform pkgs are live.
+
+  # ---- Go: no artifact to publish — a module version is just a tag. The
+  #      consume path fetches the Release lib at runtime (SHA256-verified). ----
+  go-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.23" }
+      - name: Fetch + verify + load smoke test
+        run: cd spikes/dist-consume/go && go run .

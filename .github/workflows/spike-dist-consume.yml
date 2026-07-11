@@ -1,0 +1,62 @@
+# SPIKE: prove the CONSUME side — install-and-it-just-works, NO toolchain — for
+# Python (platform wheel) / TS (npm optionalDependencies) / Go (runtime fetch),
+# each pulling the prebuilt citenexus-core from the Tier-1 native-libs Release
+# (v0.7.0), never rebuilding it. Fast: no protoc, no cargo.
+#
+# Not production CI — action tags would be SHA-pinned before any merge.
+name: spike-dist-consume
+
+on:
+  push:
+    branches: ["spike/dist-consume**"]
+    paths:
+      - "spikes/dist-consume/**"
+      - "python/src/citenexus/_native.py"
+      - "python/src/citenexus/lang/detect.py"
+      - ".github/workflows/spike-dist-consume.yml"
+  workflow_dispatch:
+
+jobs:
+  consume:
+    name: ${{ matrix.key }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest,    key: linux-x86_64 }
+          - { os: ubuntu-24.04-arm, key: linux-aarch64 }
+          - { os: macos-14,         key: darwin-aarch64 }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: spikes/dist-consume
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.23" }
+
+      # GO — fetch prebuilt core from the Release, SHA256-verify, purego-load.
+      - name: Go consume proof (fetch + verify + load)
+        shell: bash
+        run: |
+          cd go && go run . && cd ..
+
+      # PYTHON — Tier-2 repackage: download Release asset, bundle into a platform
+      # wheel, pip install --no-deps into a fresh venv, load via ctypes seam.
+      - name: Python consume proof (platform wheel, no toolchain)
+        shell: bash
+        run: bash python/repackage_and_prove.sh
+
+      # TS/JS — npm optionalDependencies + os/cpu; koffi-load bundled cdylib.
+      - name: JS consume proof (npm pack + koffi)
+        shell: bash
+        run: bash js/pack_and_prove.sh
+
+      # MODEL — shared SHA256-verified fetch-cache self-test.
+      - name: Model fetch checksum gate
+        shell: bash
+        run: python3 model/model_fetch.py

@@ -1,0 +1,20 @@
+# Minimal wheel that BUNDLES a prebuilt citenexus-core cdylib and loads it via
+# ctypes at import time — NO Rust toolchain needed to install or import.
+#
+# The cdylib is copied into src/citenexus_core_probe/_lib/ by build.sh before
+# `python -m build`; hatchling packages it as data. The wheel is then retagged
+# to a platform tag (build.sh) because it carries a native binary.
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "citenexus-core-probe"
+version = "0.6.0"
+description = "Spike: pip-installable wheel bundling the prebuilt citenexus-core cdylib, loaded via ctypes (no toolchain)."
+requires-python = ">=3.11"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/citenexus_core_probe"]
+# ensure the native lib ships inside the wheel
+artifacts = ["src/citenexus_core_probe/_lib/*"]

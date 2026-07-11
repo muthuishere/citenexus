@@ -1,0 +1,9 @@
+{
+  "name": "@muthuishere/citenexus-core-dist-spike-darwin-arm64",
+  "version": "0.7.0",
+  "description": "Prebuilt citenexus-core cdylib for darwin-arm64. Installed automatically on matching os/cpu.",
+  "license": "Apache-2.0",
+  "os": ["darwin"],
+  "cpu": ["arm64"],
+  "files": ["libcitenexus_core.dylib"]
+}

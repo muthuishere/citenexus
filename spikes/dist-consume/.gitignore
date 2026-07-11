@@ -1,0 +1,10 @@
+# transient build/proof outputs and staged native libs — never commit binaries
+**/.build/
+go/**/citenexus-cache/
+js/platform-*/lib*citenexus_core*
+js/platform-*/*.dll
+*.whl
+*.tgz
+*.so
+*.dylib
+*.dll

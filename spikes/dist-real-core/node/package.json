@@ -1,0 +1,8 @@
+{
+  "name": "citenexus-dist-real-core-check",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "koffi": "^2.9.0"
+  }
+}

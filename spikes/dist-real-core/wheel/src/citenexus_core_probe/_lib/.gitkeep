@@ -1,0 +1,2 @@
+# The platform cdylib (libcitenexus_core.{so,dylib} / citenexus_core.dll) is
+# copied here by build.sh before packaging. Not committed — it's a build input.

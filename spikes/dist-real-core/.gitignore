@@ -1,0 +1,7 @@
+# build inputs/outputs — never commit the native lib or transient build dirs
+wheel/src/citenexus_core_probe/_lib/*.so
+wheel/src/citenexus_core_probe/_lib/*.dylib
+wheel/src/citenexus_core_probe/_lib/*.dll
+wheel/.build/
+node/node_modules/
+node/package-lock.json

@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import hashlib
 import socket
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
 from citenexus.lang import FastTextDetector, HeuristicDetector, LanguageResult
+from citenexus.lang.detect import _ensure_model
 from citenexus.plugins import LanguageDetectorPlugin
 
 
@@ -70,6 +73,47 @@ def test_fasttext_detector_is_a_plugin_without_loading() -> None:
     det = FastTextDetector()
     assert isinstance(det, LanguageDetectorPlugin)
     assert det.plugin_version
+
+
+def test_ensure_model_verifies_sha256_and_caches(tmp_path: Path) -> None:
+    # A local "model" served over file:// so the fetch-cache logic is hermetic.
+    payload = b"pretend fasttext model bytes"
+    digest = hashlib.sha256(payload).hexdigest()
+    src = tmp_path / "src.ftz"
+    src.write_bytes(payload)
+    dst = tmp_path / "cache" / "lid.176.ftz"
+
+    # fresh fetch + verify
+    out = _ensure_model(dst, src.as_uri(), digest)
+    assert out == dst and dst.read_bytes() == payload
+    # cache hit returns without re-fetching
+    assert _ensure_model(dst, src.as_uri(), digest) == dst
+
+
+def test_ensure_model_rejects_sha256_mismatch(tmp_path: Path) -> None:
+    payload = b"pretend fasttext model bytes"
+    src = tmp_path / "src.ftz"
+    src.write_bytes(payload)
+    dst = tmp_path / "cache" / "lid.176.ftz"
+    wrong = "0" * 64
+
+    with pytest.raises(ValueError, match="SHA256 mismatch"):
+        _ensure_model(dst, src.as_uri(), wrong)
+    # a failed-verification download must NOT leave a model in place
+    assert not dst.exists()
+
+
+def test_ensure_model_refetches_corrupt_cache(tmp_path: Path) -> None:
+    payload = b"pretend fasttext model bytes"
+    digest = hashlib.sha256(payload).hexdigest()
+    src = tmp_path / "src.ftz"
+    src.write_bytes(payload)
+    dst = tmp_path / "cache" / "lid.176.ftz"
+    dst.parent.mkdir(parents=True)
+    dst.write_bytes(b"corrupted")  # wrong bytes already cached
+
+    out = _ensure_model(dst, src.as_uri(), digest)
+    assert out == dst and dst.read_bytes() == payload  # re-fetched good bytes
 
 
 def _online() -> bool:

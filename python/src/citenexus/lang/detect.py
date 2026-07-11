@@ -19,6 +19,7 @@ see `fallback.py`).
 
 from __future__ import annotations
 
+import hashlib
 import threading
 import unicodedata
 import urllib.request
@@ -35,6 +36,9 @@ DEFAULT_THRESHOLD = 0.50
 # Published fastText compressed language-id model (lid.176).
 _MODEL_URL = "https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.ftz"
 _MODEL_FILENAME = "lid.176.ftz"
+# Pinned SHA256 of lid.176.ftz — a fetched model is only trusted if its bytes
+# hash to this. Protects the fetch-cache against corruption or a swapped file.
+_MODEL_SHA256 = "8f3472cfe8738a7b6099e8e999c3cbfae0dcd15696aac7d7738a8039db603e83"
 
 # `assets/models/` at the repo root (gitignored). Resolved relative to this file:
 # src/citenexus/lang/detect.py -> repo root is three parents up from `src`.
@@ -67,13 +71,35 @@ class LanguageResult(BaseModel):
         )
 
 
-def _ensure_model(path: Path, url: str) -> Path:
-    """Download the model to ``path`` if absent (atomic-ish); return ``path``."""
+def _sha256_file(path: Path, chunk: int = 1 << 20) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for block in iter(lambda: f.read(chunk), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+def _ensure_model(path: Path, url: str, sha256: str | None = _MODEL_SHA256) -> Path:
+    """Download the model to ``path`` if absent, verifying its SHA256.
+
+    A cached file is re-verified on every load; a corrupt/swapped entry is
+    discarded and re-fetched. A fresh download that fails verification is deleted
+    and raises — a mismatched model is never loaded.
+    """
     if path.exists():
-        return path
+        if sha256 is None or _sha256_file(path) == sha256:
+            return path
+        path.unlink()  # corrupt/stale cache — re-fetch
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".part")
     urllib.request.urlretrieve(url, tmp)
+    if sha256 is not None:
+        got = _sha256_file(tmp)
+        if got != sha256:
+            tmp.unlink(missing_ok=True)
+            raise ValueError(
+                f"lid.176 model SHA256 mismatch: got {got}, expected {sha256}"
+            )
     tmp.replace(path)
     return path
 
@@ -110,10 +136,12 @@ class FastTextDetector(LanguageDetectorPlugin):
         threshold: float = DEFAULT_THRESHOLD,
         model_dir: Path | None = None,
         model_url: str = _MODEL_URL,
+        model_sha256: str | None = _MODEL_SHA256,
     ) -> None:
         self.threshold = threshold
         self._model_path = (model_dir or _ASSETS_DIR) / _MODEL_FILENAME
         self._model_url = model_url
+        self._model_sha256 = model_sha256
         self._model: object | None = None
         self._lock = threading.Lock()
 
@@ -123,7 +151,9 @@ class FastTextDetector(LanguageDetectorPlugin):
                 if self._model is None:
                     import fasttext  # local import: heavy, optional at import time
 
-                    path = _ensure_model(self._model_path, self._model_url)
+                    path = _ensure_model(
+                        self._model_path, self._model_url, self._model_sha256
+                    )
                     self._model = fasttext.load_model(str(path))
         return self._model
 
