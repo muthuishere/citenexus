@@ -60,3 +60,21 @@ jobs:
       - name: Model fetch checksum gate
         shell: bash
         run: python3 model/model_fetch.py
+
+  # Runtime-prove Go on a REAL Windows runner — the one cell the unix matrix
+  # couldn't cover. Exercises open_windows.go (syscall.LoadLibrary, not the
+  # Unix-only purego.Dlopen) end-to-end: fetch citenexus_core-windows-amd64.dll
+  # from the Release, SHA256-verify, load, call citenexus_core_version().
+  go-windows:
+    name: go-windows-x64
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: spikes/dist-consume
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.23" }
+      - name: Go consume proof on Windows (fetch + verify + LoadLibrary)
+        shell: bash
+        run: cd go && go run .
