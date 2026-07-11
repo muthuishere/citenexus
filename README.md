@@ -119,22 +119,20 @@ pointing at `retrieve()` — search-only deployments are first-class, not a cras
 **Extractors** (`python/src/citenexus/extract/`) — one plugin per file type,
 routed by `dispatch.py`: PDF (`pdf.py`, via `pdfplumber` — per-page text + word
 bboxes), DOCX (`docx.py`, via `python-docx` — heading tree + paragraphs), PPTX
-(`pptx.py` — one block per slide), HTML (`html.py`), Markdown (`md.py`), CSV
-(`csv.py`), plain text (`txt.py`), and an unknown-type fallback (`plain.py`).
+(`pptx.py` — one block per slide), XLSX (`xlsx.py`), HTML (`html.py`), Markdown
+(`md.py`), CSV (`csv.py`), plain text (`txt.py`), and an unknown-type fallback
+(`plain.py`).
 Anything not on the list falls through to plain-text rather than failing
 ingest.
 
-**Tables** — real, structured table extraction ships **for CSV only**.
-`CsvExtractor.extract` (`extract/csv.py`) treats the header row as schema and
-renders every data row as a `BlockKind.table` evidence block (`"col: value"`
-pairs, `structure_path` = header) — a genuine table-aware evidence type, not
-just flattened text. **Honest gap:** PDF, DOCX, PPTX, and HTML tables are
-**not** detected as tables today — `PdfExtractor` calls
-`page.extract_text()` (never `page.extract_tables()`), and `DocxExtractor`
-iterates `document.paragraphs` only (never `document.tables`), so a table in a
-PDF or Word doc is ingested as ordinary paragraph text, not a structured
-`table` block. If your evidence is tabular and lives in a PDF/DOCX, treat it
-as prose for now.
+**Tables** — real, structured table extraction ships across **CSV, PDF, DOCX,
+PPTX, HTML, and XLSX**. Each renders a table's rows as `EUType.table` evidence
+(header row as schema, `"col: value"` pairs, `structure_path` = header) — a
+genuine table-aware evidence type, not flattened text. `PdfExtractor` locates
+ruled/aligned tables via `page.find_tables()`
+(`extract/pdf.py::_extract_tables`), `DocxExtractor` iterates `document.tables`,
+and CSV/PPTX/HTML/XLSX each have their own table path. A tabular cell stays
+citable by page + bbox like any other unit.
 
 **Image-to-text via a vision model** — the description → citable-EU half is
 real and end-to-end: `vision/describe.py`'s `describe_image()` calls the
@@ -147,22 +145,18 @@ by page + bbox exactly like any other unit. `vision/client.py`'s
 into an OpenAI-style `image_url` data URI and posts to any OpenAI-compatible
 `/chat/completions` vision endpoint (Gemini's OpenAI-compat endpoint, GPT-4o,
 a local VL server). Enable it by passing `vision=` to the client (see the
-scaling ladder above). **Two honest gaps, not one:**
-1. `vision/prefilter.py`'s `decide()` — the deterministic §9 router (text /
-   ocr / vision / skip, gated on area ratio + aspect ratio + OCR-density) — is
-   a real, tested, pure function, but **it is never called from the ingest
-   pipeline** (`ingest/pipeline.py`). Every image that reaches vision today
-   goes straight to a model call; nothing currently skips decoration or
-   routes scanned text to OCR instead. The routing logic exists but isn't
-   wired up yet.
-2. `PdfExtractor`/`DocxExtractor`/`PptxExtractor` build `ImageRef`s with
-   `blob_key=None` (bytes are never persisted). `ingest/pipeline.py`'s
-   `_image_bytes()` fetches bytes via `image.blob_key` and returns `None` if
-   it's unset — which it always is for real documents — so `_vision_units()`
-   silently skips every image and vision never fires on a real PDF/DOCX/PPTX
-   today. The full pipeline (bytes → describe → cite) is proven only with
-   manually-injected bytes (tests) or a caller who persists blobs and sets
-   `blob_key` themselves.
+scaling ladder above). The two gaps that used to make this **inert on real
+docs are now closed**:
+1. **Image bytes are persisted at ingest.** Extractors emit `doc.image_bytes`;
+   `ingest/pipeline.py`'s `_persist_image_bytes()` stores each via
+   `StorageBackend.put_bytes` and stamps `blob_key`, so `_vision_units()` loads
+   them back and vision fires on real PDF/DOCX/PPTX images (not just
+   manually-injected test bytes).
+2. **The §9 pre-filter is wired in.** `_vision_units()` calls
+   `vision/prefilter.py`'s `decide()` per image — the deterministic router
+   (text / ocr / vision / skip, gated on area ratio + aspect ratio +
+   OCR-density) — so decorative images are skipped and only figures that
+   warrant it reach a model call.
 
 **`citenexus verify`** — a standalone CLI for the faithfulness gate, useful
 outside a running `CiteNexus` instance (e.g. a CI gate on someone else's RAG
@@ -184,11 +178,12 @@ grounded in (`wiki/distill.py`), stored as a Markdown tree in S3 (`pages/*.md` +
 wikis is the **navigate-not-cite invariant**: a page is never a citation target —
 every hit resolves down to bbox-cited Evidence Units, and any `eu_ref` the model
 invents is sanitized out, so distilled navigation can never become an ungrounded
-claim. **Honest gaps (it's a grounded *skeleton*, not yet a deep Karpathy wiki):**
-the distiller is a single whole-corpus call (`_MAX_CORPUS_CHARS = 24_000`, each EU
+claim. **Honest gap (it's a grounded *skeleton*, not yet a deep Karpathy wiki):** the
+distiller is a single whole-corpus call (`_MAX_CORPUS_CHARS = 24_000`, each EU
 truncated to 500 chars) — a shallow stand-in, not deep per-document/per-community
-distillation; and the incremental `integrate_document()` writes a *deterministic*
-page, not a distilled one (the LLM path runs only on a full `build_from_store`).
+distillation. The incremental `integrate_document()` now runs the injected
+distiller on each new document (degrading to a deterministic page only when no
+distiller is configured), so the compounding path is no longer deterministic-only.
 
 **Language detection** — real, not a stub. `lang/detect.py`'s
 `FastTextDetector` lazily downloads Facebook's `lid.176.ftz` model on first use
@@ -203,20 +198,16 @@ network, no extra dep) is the offline/test default.
 | text (BM25) · structure · graph · wiki · vector · RRF fusion | ✅ shipped, zero-model tier included |
 | ask/stream/evaluate with per-claim faithfulness gate | ✅ shipped (generator required) |
 | `citenexus verify` — standalone faithfulness-gate CLI + CI Action | ✅ shipped, Python only |
-| Table extraction (structured `table` evidence blocks) | ✅ shipped for **CSV only** — PDF/DOCX/PPTX/HTML tables fall through as plain paragraph text |
-| Image-to-text via injected vision model (describe → citable figure EU) | ✅ shipped, but **inert on real docs** — no extractor persists image bytes, and the §9 `decide()` pre-filter isn't wired into ingest yet |
+| Table extraction (structured `table` evidence blocks) | ✅ shipped for **CSV, PDF, DOCX, PPTX, HTML, XLSX** — ruled/aligned tables become citable `EUType.table` rows |
+| Image-to-text via injected vision model (describe → citable figure EU) | ✅ shipped end-to-end — extractors persist image bytes at ingest and the §9 `decide()` pre-filter routes each image (skip / ocr / vision) |
 | Real lid.176 language detection (`FastTextDetector`) | ✅ shipped (`detector=`), `HeuristicDetector` is the no-network default |
-| LLM wiki distillation — grounded, navigate-not-cite (concept pages, `[[links]]`, S3 Markdown tree) | ⚠️ shipped but **shallow** (`wiki_distiller=`) — one 24k-char whole-corpus call; the incremental `integrate_document()` writes deterministic (non-distilled) pages. Deep per-doc distill + incremental distill = not yet |
+| LLM wiki distillation — grounded, navigate-not-cite (concept pages, `[[links]]`, S3 Markdown tree) | ⚠️ shipped but **shallow** (`wiki_distiller=`) — one 24k-char whole-corpus call; incremental `integrate_document()` now distils per new doc. Deep per-doc/per-community distill = not yet |
 | Contextual chunking · dual-query RRF · hooks · telemetry · web crawl · Postgres backend | ✅ shipped |
 | **LLM graph extraction** (entity/relation model behind the graph signal) | ⏳ not yet — graph is deterministic co-mention; the `GraphExtractorPlugin` seam exists, no LLM impl |
 | Leiden community clustering | ⏳ not yet (community signal rides the graph retriever) |
 | True BGE-M3 sparse lexical | ⏳ BM25-lite stands in (needs a sparse-capable endpoint) |
-| Image bytes from real PDFs for vision | ⏳ extractors don't persist rasters yet (vision path proven with injected bytes) |
-| §9 vision pre-filter wired into ingest | ⏳ `vision/prefilter.py::decide()` exists and is tested, but `ingest/pipeline.py` never calls it |
-| Lists (bullet/numbered) as structured evidence | ❌ not captured at all in HTML/Markdown (content dropped, not flattened); DOCX list text survives as plain paragraph text, structure lost |
-| Code blocks as structured evidence | ❌ `BlockKind.code`/`EUType.code_block` are defined but no extractor ever produces them |
-| Footnotes / captions | ❌ no extractor or evidence concept for either |
-| Document metadata (title, author, date, page count) | ❌ not captured — `ExtractedDoc` carries no metadata fields |
+| Lists · code blocks · captions · document metadata as evidence | ✅ shipped — HTML/DOCX/MD `<li>` reach the store; fenced/indented code + HTML `<pre>` → `EUType.code_block`; HTML `<caption>`/`<figcaption>`; title/author/created (+ PDF page count) via `DocumentMetadata` |
+| Footnotes as structured evidence | ❌ no extractor or evidence concept yet |
 | LLM-as-judge · MCP server | ⏳ later (config sections reserved) |
 
 Full block-by-block trace (captured → carried as a typed unit → actually
