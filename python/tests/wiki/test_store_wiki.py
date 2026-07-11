@@ -92,6 +92,31 @@ def test_failing_distiller_degrades_to_deterministic_pages(tmp_path: Path) -> No
     assert pages[0].links == ()
 
 
+def test_integrate_document_distills_when_a_distiller_is_present(tmp_path: Path) -> None:
+    """The incremental path DISTILS the new doc — not a deterministic stand-in."""
+    backend = LocalFsBackend(tmp_path)
+    distiller = FakeDistiller(_DISTILLED)
+    store = WikiStore(backend, _PARTITION, distiller=distiller)
+    page = store.integrate_document("nda", FakeLeafStore(_rows()))
+    # the distiller ran on JUST that document's units
+    assert list(distiller.calls[0]) == ["nda"]
+    assert distiller.calls[0]["nda"] == (("nda::0", "No disclosure of secrets."),)
+    # a distilled page is returned + upserted — not the deterministic "wiki:nda"
+    assert page.page_id == _DISTILLED[0].page_id
+    assert {e["page_id"] for e in backend.get_json(store.index_json_key)} == {
+        p.page_id for p in _DISTILLED
+    }
+
+
+def test_integrate_document_degrades_to_deterministic_on_distiller_failure(
+    tmp_path: Path,
+) -> None:
+    backend = LocalFsBackend(tmp_path)
+    store = WikiStore(backend, _PARTITION, distiller=FakeDistiller(None))
+    page = store.integrate_document("nda", FakeLeafStore(_rows()))
+    assert page.page_id == "wiki:nda"  # deterministic stand-in, distiller returned None
+
+
 def test_markdown_tree_written_alongside_manifest(tmp_path: Path) -> None:
     backend = LocalFsBackend(tmp_path)
     store = WikiStore(backend, _PARTITION, distiller=FakeDistiller(_DISTILLED))

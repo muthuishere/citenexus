@@ -156,14 +156,27 @@ class WikiStore:
 
     # ---------------------------------------------------------------- builds
     def integrate_document(self, document_id: str, store: VectorStore) -> WikiPage:
-        """Incrementally upsert ONE document's page — no full-wiki rebuild.
+        """Incrementally distil ONE document's page — no full-wiki rebuild.
 
-        The Karpathy compounding move at library scale: an ingest touches its
-        own page + the light index + the log, never the whole wiki.
+        The Karpathy compounding move at library scale: an ingest distils (or,
+        with no distiller, deterministically summarizes) just its own page +
+        the light index + the log, never the whole wiki.
         """
         rows = [
             row for row in store.scan() if str(row.get("document_id", row["eu_id"])) == document_id
         ]
+        # LLM distillation for this one document when a distiller is injected —
+        # enhancement-only, so any failure (None/empty) degrades to the
+        # deterministic page below (same contract as build_from_store).
+        if self._distiller is not None:
+            pages_input = {
+                document_id: tuple((str(row["eu_id"]), str(row.get("text", ""))) for row in rows)
+            }
+            distilled = self._distiller.distill(pages_input)
+            if distilled:
+                self._upsert_pages(distilled)
+                self._log(f"ingest | distilled {document_id}")
+                return distilled[0]
         page = _deterministic_page(document_id, rows)
         self._upsert_pages((page,))
         self._log(f"ingest | {document_id}")
