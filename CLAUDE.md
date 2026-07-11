@@ -12,6 +12,65 @@ behavior ships. This file is *how we build it*; the spec is *what we build*.
 
 ---
 
+## What CiteNexus is — and is not
+
+Keep this boundary sharp so the library grows in focus instead of sprawling.
+
+**Is:** an evidence-first, multilingual, S3-native **RAG library** (Python is the
+reference; Go / JS / Rust ports at parity). It ingests *artifacts* — PDF, docx,
+pptx, html, md, txt, csv, and images-into-evidence — and answers **only** from
+retrieved, cited evidence, abstaining when evidence is weak, missing, or
+conflicting. Graph + wiki are **navigation over evidence** (navigate-not-cite):
+every hit resolves down to a bbox / `file:line`-cited EvidenceUnit before an
+answer is generated. Models are **injected** OpenAI-compatible endpoints;
+CiteNexus owns orchestration, storage, retrieval, fusion, grounding, evaluation.
+Downstream **products consume it** — a CLI, an Action, a dashboard are thin
+surfaces *on top of* the library, not the library itself.
+
+**Is not:**
+- **Not a code-comprehension / code-graph tool.** Code ingestion, call/dependency
+  graphs, god-nodes belong to **graphify or a competitor product**, not this core.
+  *Evaluated and declined 2026-07-11:* the only valuable part of code is a
+  **precise** call graph; tree-sitter's name-based resolution can't be trusted (a
+  spike produced ~3× more guessed than reliable edges), and shipping guesses would
+  betray cite-or-abstain. Symbol search alone is half a feature. If a precise
+  LSP/SCIP producer ever makes it worth revisiting, it's a *separate product* that
+  consumes CiteNexus — not an addition to the core.
+- **Not a memory / "brain."** That moved out to its own Go repo (`../brain`);
+  CiteNexus stays pure RAG.
+- **Not a model host.** No bundled embedding / LLM / reranker / vision — all
+  injected.
+- **Not an end-user app.** It's a library (+ optional thin CLIs). Dashboards,
+  agent skills, and product UX live in separate repos built on it.
+
+### Where a new feature goes — run this on every feature ask
+
+A capability lands **in CiteNexus core** only if it passes **both** gates:
+
+1. **Artifact-or-grounding gate** — does it ingest an artifact, or improve
+   grounded retrieval / evaluation of evidence? (A UI, a workflow, a network
+   service, or a domain app is *not* this.)
+2. **Cite-or-abstain gate** — can its output be held to **"no ungrounded
+   claim"**? If it must assert guesses to be useful, it fails.
+
+**Passes both → in:** propose an OpenSpec change here.
+**Fails either → out:** it's a **separate product / repo** that *consumes*
+CiteNexus through its public API (`ingest` / `retrieve` / `ask` / `evaluate`).
+**If unsure → out.** The core stays small on purpose: you can always pull a
+proven external capability in later, but scope is hard to un-ship.
+
+Worked examples:
+
+| Feature | Gate 1 | Gate 2 | Verdict |
+|---|---|---|---|
+| New extractor (audio→transcript, epub, xlsx) | ✅ artifact | ✅ citable | **in** |
+| Better fusion / reranker / new eval metric | ✅ grounding | ✅ | **in** |
+| Code call-graph / god-nodes | ✅ artifact | ❌ guessed edges | **out** |
+| CLI / dashboard / agent skill / MCP UX | ❌ a surface | — | **out** |
+| "Chat with your repo" app, graphify competitor | ❌ product | — | **out** |
+
+---
+
 ## How we work
 
 - **Spec-driven, via OpenSpec.** OpenSpec is initialized (`openspec/`, `.claude/`).
