@@ -133,16 +133,16 @@ suite — see the full Python setup in the [Quickstart](/citenexus/quickstart/).
 		question → the pinned refusal string.
 	</Card>
 	<Card title="Any document" icon="open-book">
-		PDF, DOCX, PPTX, XLSX, HTML, Markdown, CSV, and images (OCR + vision).
-		Idempotent by content hash, S3-native.
+		PDF, DOCX, PPTX, XLSX, HTML, Markdown, CSV, plain text, or a URL — plus
+		figures via an injected vision model. Idempotent by content hash, S3-native.
 	</Card>
 	<Card title="Your models" icon="setting">
 		Embedding, LLM, reranker, and vision are injected OpenAI-compatible
 		endpoints. Nothing bundled; the key never leaves your config.
 	</Card>
 	<Card title="Prove it" icon="bars">
-		`evaluate()` scores groundedness, citation, and refusal — per language —
-		against a golden set, with an append-only audit trail.
+		`evaluate()` scores groundedness, citation, and expected-support against a
+		golden CSV — so a model that answers when it should refuse scores worse.
 	</Card>
 </CardGrid>
 

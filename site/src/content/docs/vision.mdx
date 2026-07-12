@@ -1,0 +1,133 @@
+---
+title: Vision — figures as cited evidence
+description: Inject a vision model and figures inside your documents become cited figure Evidence Units. A two-phase, host-fulfilled seam keeps your API key out of the core. No OCR engine is bundled.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+A chart or diagram carries evidence too. Inject a vision model and CiteNexus
+turns figures inside your documents into **figure Evidence Units** — searchable
+text cited back to the image's page and bbox, exactly like a text passage. The
+citation stays honest: *"this came from the figure at page 12, described by a
+model,"* never a verbatim source quote.
+
+## The simple path
+
+Inject a `vision` describer. During ingest, qualifying figures are described and
+assembled into cited figure units automatically.
+
+```python
+from citenexus import CiteNexus
+from citenexus.vision import OpenAICompatibleVision
+
+rag = CiteNexus(
+    "./citenexus-data",
+    embedder=..., generator=...,
+    vision=OpenAICompatibleVision(base_url="http://localhost:11434/v1", model="qwen2.5-vl"),
+)
+
+rag.ingest("annual-report.pdf")   # figures on the pages → cited figure Evidence Units
+```
+
+`OpenAICompatibleVision` POSTs to `{base_url}/chat/completions`. Its constructor
+is keyword-only:
+
+```python
+OpenAICompatibleVision(
+    *, base_url, model,
+    temperature=0.0, max_tokens=8192,
+    mime_type="image/png", transport=None,
+)
+```
+
+## When a figure actually spends a vision call
+
+Vision is the most expensive step, so a pre-filter routes each image four ways
+before any model is called:
+
+| Decision | When | Result |
+|---|---|---|
+| `text` | born-digital text layer (no raster) | use the text as-is |
+| `skip` | area share `< 5%`, or aspect ratio outside `0.125–8.0` (banners, rules) | ignored |
+| `ocr` | dense scanned-text raster | classified as text-like; no figure unit |
+| `vision` | clears the area/aspect guards, not text-dense | **the one case that calls the model** |
+
+The thresholds live in `VisionPrefilterConfig` (`min_area_ratio=0.05`,
+`min_aspect_ratio=0.125`, `max_aspect_ratio=8.0`, `skip_if_ocr_dense=True`).
+
+<Aside type="caution" title="Two honest limits">
+- **No OCR engine is bundled.** `ocr` is a *routing label*, not a text-extraction
+  pipeline — CiteNexus does not ship OCR. Text inside a scanned image is only
+  recovered if your injected **vision** model returns it (as the `ocr_text` field
+  of its description).
+- The pre-filter's area/aspect routing runs for **PDF** images (which carry page
+  geometry). Images inside **DOCX/PPTX** have no fixed page area, so they route to
+  the vision model unconditionally when a describer is injected.
+</Aside>
+
+## The two-phase seam (advanced / ports)
+
+Under the hood — and for any host or non-Python port that wants to own the model
+call — vision is a three-step, credential-free seam: **emit → fulfill →
+assemble.** The core shapes plain data; the *host* makes the HTTP call. The wire
+types are frozen and carry **no credential field**, so your API key never enters
+the core.
+
+<Steps>
+
+1. **Emit** — the core turns each image into a `PendingVisionRequest` (a prompt +
+   a base64 `data:` URI + a `source_ref` with page/bbox). No socket is opened.
+
+   ```python
+   from citenexus.vision.requests import build_pending_request
+
+   requests = [
+       build_pending_request(
+           document_id="annual-report-2025",
+           image_id="fig-3",
+           data=open("figure-3.png", "rb").read(),
+           prompt="Describe this image for a document search index. Reply with ONLY a "
+                  "JSON object with keys short_caption, detailed_description, objects, "
+                  "relationships, ocr_text, data_values, image_type.",
+           page=12,
+           bbox=(72.0, 130.0, 520.0, 410.0),
+       )
+   ]
+   ```
+
+2. **Fulfill** — the host runs the requests against its vision plugin. The API
+   key rides on the transport the host injects; it never touches `requests`.
+
+   ```python
+   from citenexus.vision import OpenAICompatibleVision
+   from citenexus.vision.fulfill import fulfill_vision_requests
+
+   vision = OpenAICompatibleVision(base_url="…/v1", model="qwen2.5-vl")
+   fulfilled = fulfill_vision_requests(requests, vision)   # {request_id: VisionRecord}
+   ```
+
+   A request whose call fails is **dropped** (per-request isolation — one bad
+   image degrades to no figure unit, never a crash).
+
+3. **Assemble** — the core joins descriptions back into cited figure Evidence
+   Units.
+
+   ```python
+   from citenexus.domain.partition import PartitionPath
+   from citenexus.vision.units import build_vision_units
+
+   units = build_vision_units(
+       requests, fulfilled,
+       partition=PartitionPath.of(("workspace", "default")),
+       language="en",
+   )
+   # each unit: eu_id == "annual-report-2025::img::fig-3", type == figure,
+   #            citation.page == 12, citation.bbox == (72.0, 130.0, 520.0, 410.0)
+   ```
+
+</Steps>
+
+`VisionRecord` (what a fulfiller returns) carries `image_id`, `short_caption`,
+`detailed_description`, `objects`, `relationships`, `ocr_text`, `data_values`, and
+`image_type`. For a fully offline run, swap the fulfiller for `FakeVision`
+(`from citenexus.vision import FakeVision`) — deterministic, no network.

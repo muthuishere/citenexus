@@ -1,0 +1,51 @@
+---
+title: Signals & capabilities
+description: The signals you declare decide which indexes are built at ingest and which retrievers run at query time. Omit them and all six are active. Gating builds and queries — it never rejects a call.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`signals` is CiteNexus's capability gate. It decides **which indexes are built**
+when you ingest and **which retrievers run** when you ask. Declaring fewer signals
+is how you keep ingest cheap and retrieval fast — you only build what you'll use.
+
+```python
+from citenexus import CiteNexus
+
+# Dense + lexical only. No graph, community, structure, or wiki index is built or queried.
+rag = CiteNexus("./citenexus-data", embedder=..., generator=..., signals=["embedding", "text"])
+```
+
+## The six signals
+
+`Signal` is a closed set (`from citenexus.config.signals import Signal`):
+
+| Signal | Builds at ingest | Enables retriever |
+|---|---|---|
+| `embedding` | vectors in the vector store | Vector (dense) — *also needs an embedder* |
+| `text` | lexical / BM25 index | Lexical (BM25 / full-text) |
+| `structure` | the structure index | Structure |
+| `graph` | the entity graph *(slow path)* | Graph |
+| `community` | graph communities *(slow path)* | Graph |
+| `wiki` | the distilled wiki *(slow path)* | Wiki |
+
+<Aside type="note" title="Gating builds and queries — it never rejects">
+An absent signal simply **skips its build and its retriever**. Ingest still runs
+and stores the raw blob + Evidence Units; `ask()` still answers from whatever
+retrievers are active. Declaring `signals` does not raise or block a call — it
+narrows what work happens. Omit `signals` entirely and all six are built and
+queried.
+</Aside>
+
+## Fast path vs. slow path
+
+`embedding`, `text`, and `structure` are computed inline during `ingest()`. The
+**slow-path** signals — `graph`, `community`, `wiki` — require distillation and
+are enqueued on a durable queue if one is configured, then rebuilt incrementally.
+Declare them only when you want graph/wiki navigation over your evidence.
+
+<Aside type="caution" title="Vector retrieval needs an embedder">
+The `embedding` signal only produces a working vector retriever when an
+`embedder` is also injected. With the signal but no embedder, retrieval falls
+back to lexical.
+</Aside>

@@ -1,0 +1,59 @@
+---
+title: Languages & multilingual
+description: Answers come back in the question's language; cited passages stay verbatim in the source language, with any translation additive. Language is detected by fastText lid.176 (or an offline heuristic detector).
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+CiteNexus is multilingual by design. Ask in French over an English corpus and the
+**answer** comes back in French — but the **citation** stays verbatim in English,
+because a translated quote is no longer the evidence. Any translation is additive
+and clearly marked.
+
+## The answer-language rule
+
+The language of the answer is resolved by an ordered fallback chain:
+
+1. the reliably-detected language of the **question**;
+2. an explicit `answer_language=` override on `ask()`;
+3. the language of the ongoing conversation, if any;
+4. the dominant language among the retrieved evidence;
+5. the client's `default_answer_language` (`"en"` by default).
+
+```python
+answer = rag.ask("Quelle est la durée de conservation ?")          # answered in French
+answer = rag.ask("What is the retention period?", answer_language="de")  # forced to German
+```
+
+On the `Result`, `answer_language` is the guaranteed answer language, and each
+`SourceRef` keeps `passage` verbatim with its own `passage_language`; an optional
+`translation` field is additive and never replaces the passage.
+
+<Aside type="note" title="Honest scope of the invariant">
+The answer is produced in `answer_language` and citations are never rewritten.
+There is **no** re-generation loop today: if the generated answer fails the
+faithfulness gate (or the language can't be honored), the flow **refuses** rather
+than silently retrying. Abstention over an ungrounded or off-language answer is
+the intended behavior.
+</Aside>
+
+## Detecting language
+
+Two detectors implement the same plugin; inject one via `detector=` (or let
+`from_config` pick `FastTextDetector`):
+
+- **`FastTextDetector`** — the real fastText `lid.176` model, lazily downloaded
+  and cached on first use. `FastTextDetector(*, threshold=0.50, model_dir=None)`.
+  Requires the optional `fasttext` package.
+- **`HeuristicDetector`** — a network-free Unicode-script detector, the offline /
+  test default. `HeuristicDetector(*, threshold=0.50, default_language="en")`.
+
+```python
+from citenexus.lang.detect import HeuristicDetector
+
+rag = CiteNexus("./citenexus-data", embedder=..., generator=..., detector=HeuristicDetector())
+```
+
+Both return a `LanguageResult` (`language`, `confidence`, `is_reliable`); a
+detection below the `0.50` threshold is treated as unreliable and falls through
+the chain above.

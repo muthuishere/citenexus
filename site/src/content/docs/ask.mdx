@@ -1,9 +1,9 @@
 ---
 title: Ask & abstain
-description: Strict by default — answers are generated only from retrieved passages, quoted verbatim, and every claim is checked against its citation. When nothing supports the question, CiteNexus refuses.
+description: ask() answers only from retrieved passages, quoted verbatim, with every claim checked against its citation — or refuses. Strict by default; trust modes, per-call top_k, forced answer language, and conversation memory.
 ---
 
-import { Tabs, TabItem } from '@astrojs/starlight/components';
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
 Strict by default: the answer is generated **only** from retrieved passages,
 quoted verbatim in the source language, and every claim is checked against its
@@ -11,24 +11,60 @@ citation. When nothing supports the question, CiteNexus refuses instead of
 guessing.
 
 ```python
+from citenexus.answer.result import Decision
+
 answer = rag.ask("Can the employee disclose this?")   # mode=strict by default
 
-if answer.evidence.decision.value == "answered":
+if answer.evidence.decision is Decision.answered:
     src = answer.sources[0]
     print(answer.answer, "—", src.document, "p.", src.page, src.bbox)
 else:
-    print("abstained:", answer.answer)          # refused, not fabricated
+    print("abstained:", answer.answer)          # the pinned refusal, not a fabrication
 ```
 
-## The Result
+## Options
 
-`ask()` returns a structured `Result`, identical in shape across every port:
+`ask(question, *, mode=TrustMode.strict, k=None, answer_language=None, conversation_id=None)`
 
-- `answer` — the verbatim grounded text, or the pinned refusal string.
-- `answer_language` — the language the answer was produced in (matches the query).
-- `evidence.decision` — `answered`, `refused`, or `partial`.
-- `sources[]` — each a `SourceRef` with the document, page, bbox, and passage.
-- `missing_evidence[]` — why it abstained, when it did.
+- **`mode`** — the trust mode (below). Default `TrustMode.strict`.
+- **`k`** — per-call `top_k` override; falls back to the client's `top_k`.
+- **`answer_language`** — force the answer's language (see [Languages](/citenexus/languages/)).
+- **`conversation_id`** — thread turns together (see below).
+
+Today the flow emits `answered` or `refused` (`partial` is a reserved `Decision`
+value). See [The Result object](/citenexus/result/) for the full return shape.
+
+## Trust modes
+
+Import: `from citenexus.domain.trust import TrustMode`
+
+| Mode | Behavior |
+|---|---|
+| `strict` *(default)* | minimum-sources enforced, citations mandatory, refuse on low evidence |
+| `normal` | citations preferred |
+| `exploratory` | weak evidence may be summarized, with any speculation labeled |
+
+```python
+from citenexus.domain.trust import TrustMode
+
+answer = rag.ask("Summarize the risk factors.", mode=TrustMode.exploratory)
+```
+
+<Aside type="note" title="The guarantee lives in strict">
+"No ungrounded claim" is the strict-mode contract. `normal` and `exploratory`
+trade strictness for coverage — use them deliberately, not as the default for a
+legal or medical surface.
+</Aside>
+
+## Conversation memory
+
+Pass a `conversation_id` and prior turns are folded into the retrieval query, and
+the new turn is remembered (bounded by `memory_max_turns`, default 20):
+
+```python
+rag.ask("What notice does termination require?", conversation_id="thread-42")
+rag.ask("And for a fixed-term contract?", conversation_id="thread-42")  # follow-up in context
+```
 
 ## The core, in Go and JavaScript
 

@@ -1,0 +1,96 @@
+---
+title: Reranking & retrieval
+description: How CiteNexus retrieves — dense vector, lexical BM25, and structure retrievers fused with Reciprocal Rank Fusion (k=60), then optionally reranked by an injected cross-encoder. Control top_k per call.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Retrieval in CiteNexus is a fixed, auditable pipeline: several retrievers each
+produce a ranked list, the lists are merged with **Reciprocal Rank Fusion**, and
+the fused head is optionally **reranked** by a cross-encoder you inject. Fusion
+lives in the core, so no plugin can bypass it — every candidate that reaches the
+grounding gate went through the same deterministic path.
+
+## The pipeline
+
+1. **Retrieve.** Each enabled retriever runs against the query and returns a
+   ranked candidate list.
+2. **Fuse.** All lists are combined with RRF (`k = 60`): a candidate at
+   zero-based `rank` contributes `1 / (k + rank + 1)`, merged by Evidence-Unit id.
+3. **Rerank.** The fused head is reordered by the injected reranker against the
+   original query (a no-op passthrough if you inject none).
+4. **Cut.** The top `top_k` survive to grounding.
+
+## Retrievers and the signals that enable them
+
+Which retrievers run is gated by the `signals` you declare on the client. Omit
+`signals` and all of them are built and queried.
+
+| Retriever | Enabled by signal | What it does |
+|---|---|---|
+| Vector (dense) | `embedding` *(and an embedder is set)* | nearest-neighbour over the vector store |
+| Lexical (BM25) | `text` | BM25 / full-text search (Postgres `tsvector` or the in-core BM25) |
+| Structure | `structure` | matches query terms to structure-node labels |
+| Graph | `graph` / `community` | graph traversal (slow path) |
+| Wiki | `wiki` | distilled-wiki navigation (slow path) |
+
+```python
+from citenexus import CiteNexus
+
+# Lexical + vector only — no graph/wiki/structure built or queried.
+rag = CiteNexus("./citenexus-data", embedder=..., generator=..., signals=["embedding", "text"])
+```
+
+<Aside type="note" title="Vector retrieval needs an embedder">
+The vector retriever only runs when the `embedding` signal is declared **and** an
+`embedder` is provided. With no embedder, the client is lexical-only.
+</Aside>
+
+## Injecting a reranker
+
+By default CiteNexus applies an identity passthrough (fusion order is kept).
+Inject `OpenAICompatibleReranker` to reorder the fused head with a cross-encoder.
+It POSTs `{model, query, documents}` to `{base_url}/rerank` and reads the
+Cohere/Jina-shape `results[]` (`relevance_score` + `index`).
+
+```python
+from citenexus import CiteNexus
+from citenexus.retrieve import OpenAICompatibleReranker
+
+reranker = OpenAICompatibleReranker(
+    base_url="http://localhost:11434/v1",   # any endpoint exposing POST {base_url}/rerank
+    model="bge-reranker-v2-m3",
+)
+
+rag = CiteNexus(
+    "./citenexus-data",
+    embedder=..., generator=...,
+    reranker=reranker,                       # replaces the default identity passthrough
+    top_k=5,
+)
+```
+
+## Controlling `top_k`
+
+`top_k` is how many candidates survive to grounding. Set a default on the client,
+or override it per call:
+
+```python
+rag = CiteNexus("./citenexus-data", embedder=..., generator=..., top_k=5)  # default
+
+answer = rag.ask("What notice does termination require?", k=8)  # override for this call
+docs   = rag.retrieve("termination notice", k=20)               # retrieval only, no generation
+```
+
+`retrieve()` returns the ranked candidates without generating an answer — the
+engine under `ask()`, and the escape hatch for wiring your own small model.
+
+## RRF, directly
+
+The fusion function is public and pure, if you fuse ranked lists yourself:
+
+```python
+from citenexus.retrieve import rrf_fuse
+
+fused = rrf_fuse([list_a, list_b], k=60)   # merged by eu_id, descending fused score
+```

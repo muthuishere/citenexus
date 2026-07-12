@@ -1,0 +1,95 @@
+---
+title: The Result object
+description: Every ask() returns a structured Result — the answer, the decision, per-claim verification, cited sources with page and bbox, and a provenance chain. No scalar confidence; structured signals instead.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`ask()` returns a `Result` — the same shape whether it answered or abstained.
+There is no scalar "confidence"; instead you get **structured signals** you can
+branch on and audit.
+
+```python
+from citenexus.answer.result import Result, Decision
+
+result = rag.ask("What is the retention period?")
+
+if result.evidence.decision is Decision.answered:
+    print(result.answer, "→", result.answer_language)
+    for src in result.sources:
+        print(src.document, src.page, src.passage_language, src.passage)
+    for claim in result.claims:
+        print(claim.claim, claim.supported, claim.sources)   # sources = Evidence-Unit ids
+else:  # Decision.refused
+    print("refused:", result.missing_evidence)
+```
+
+## `Result`
+
+Import: `from citenexus.answer.result import Result, EvidenceSignals, SourceRef, Claim, ProvenanceEntry, Decision`
+
+| field | type | meaning |
+|---|---|---|
+| `answer` | `str` | the grounded text, or the pinned refusal |
+| `answer_language` | `str` | the query's language — guaranteed, independent of evidence language |
+| `mode` | `TrustMode` | the trust mode the answer was produced under |
+| `evidence` | `EvidenceSignals` | the structured retrieval + verification signals (below) |
+| `claims` | `tuple[Claim, …]` | per-claim verification |
+| `sources` | `tuple[SourceRef, …]` | the cited passages |
+| `missing_evidence` | `tuple[str, …]` | why it abstained, when it did |
+| `conflicts` | `tuple[str, …]` | reserved — see the note below |
+| `provenance` | `tuple[ProvenanceEntry, …]` | the full reproducibility chain |
+
+## `Decision`
+
+`answered`, `refused`, `partial`.
+
+<Aside type="note" title="What the current flow emits">
+The v0.2 extractive answer flow emits only `answered` or `refused`. `partial` is
+a reserved value the enum defines but the flow does not yet produce — don't branch
+on it expecting today's behavior.
+</Aside>
+
+## `EvidenceSignals`
+
+| field | type | meaning |
+|---|---|---|
+| `decision` | `Decision` | `answered` / `refused` / `partial` |
+| `supporting_sources` | `int` | count of passages that supported the answer |
+| `distinct_documents` | `int` | how many distinct documents contributed |
+| `retrieval_score_spread` | `float` | spread across the retrieved scores |
+| `all_claims_verified` | `bool` | every claim passed the grounding gate |
+| `unsupported_claims_removed` | `int` | claims dropped for lacking support |
+| `conflicts_detected` | `int` | reserved (see below) |
+| `languages_in_evidence` | `tuple[str, …]` | languages the evidence was written in |
+
+## `SourceRef`
+
+| field | type | meaning |
+|---|---|---|
+| `document` | `str` | the source document id |
+| `passage` | `str` | the **verbatim** cited text, in its own language |
+| `passage_language` | `str` | the passage's language |
+| `page` | `int \| None` | page number, when the format has pages |
+| `bbox` | `BBox \| None` | `[x0, y0, x1, y1]` region on the page |
+| `source_uri` | `str \| None` | where the raw source lives |
+| `translation` | `str \| None` | optional, additive translation — never replaces `passage` |
+
+Evidence-Unit ids are **not** on `SourceRef` — they appear on `Claim.sources` and
+`ProvenanceEntry.evidence_unit`.
+
+## `Claim` and `ProvenanceEntry`
+
+`Claim`: `claim: str`, `supported: bool`, `sources: tuple[str, …]` (EU ids).
+
+`ProvenanceEntry`: `claim`, `evidence_unit`, `document_id`, `s3_object`,
+`checksum`, `page`, `bbox`, `produced_by` — the chain that lets you reproduce
+exactly how a claim was grounded.
+
+<Aside type="caution" title="Conflict surfacing is reserved, not yet emitted">
+`Result.conflicts` and `EvidenceSignals.conflicts_detected` are the structured
+surface for multi-source disagreement, but the current extractive flow does
+**not** populate them — today every result carries `conflicts = ()` and
+`conflicts_detected = 0`. Treat them as forward-compatible fields, not an active
+signal.
+</Aside>

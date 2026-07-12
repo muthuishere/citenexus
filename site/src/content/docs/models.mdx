@@ -13,7 +13,7 @@ locally that you didn't wire up; the key stays in your endpoint config.
 from citenexus import CiteNexus
 from citenexus.embed.client import OpenAICompatibleEmbedding
 from citenexus.answer.generator import OpenAICompatibleGenerator
-from citenexus.vision.client import OpenAICompatibleVision
+from citenexus.vision import OpenAICompatibleVision
 
 rag = CiteNexus(
     "./citenexus-data",
@@ -33,3 +33,6 @@ The vision model is called through a two-phase seam: the core emits a descriptio
 assembled back into a cited figure Evidence Unit. The core never holds your API
 key.
 </Aside>
+
+Go deeper on each: [Reranking & retrieval](/citenexus/reranking/) ·
+[Vision — figures as cited evidence](/citenexus/vision/).

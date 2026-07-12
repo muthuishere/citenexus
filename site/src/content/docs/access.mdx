@@ -1,0 +1,52 @@
+---
+title: Access & partitions
+description: CiteNexus gives you the building blocks for tenant/RBAC isolation — scope resolution, a hard partition pre-filter, and an opaque ACL predicate — that you compose. It does not enforce access automatically.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Multi-tenant and RBAC isolation is built on **partitions**. CiteNexus ships the
+composable pre-filter pieces — resolve a scope to a partition, hard-filter
+candidate partitions, apply an opaque ACL predicate — and you wire them into your
+own authorization flow.
+
+<Aside type="caution" title="Carried, not enforced">
+These helpers are a **toolkit you call** — CiteNexus does **not** enforce them
+automatically. There is no `allowed_partitions` argument on the constructor and no
+`scope` argument on `ask()`. The `acl` you pass to `ingest()` is **carried**
+alongside the evidence, never parsed or enforced by the library. Enforcement is
+the host's job — compose the helpers below before retrieval.
+</Aside>
+
+## The helpers
+
+Import: `from citenexus.access import resolve_scope, filter_partitions, allowed_partition, apply_acl_predicate`
+
+- **`resolve_scope(scope, hierarchy)`** → `PartitionPath` — turn a scope dict
+  (e.g. `{"org": "acme", "team": "legal"}`) into a contiguous-prefix partition.
+  A gap or unknown key raises `ValueError`.
+- **`allowed_partition(candidate, allowed_set)`** → `bool` — prefix match; an
+  empty allowed set makes nothing visible.
+- **`filter_partitions(candidates, allowed_set)`** → `list[PartitionPath]` — the
+  hard, order-preserving pre-filter.
+- **`apply_acl_predicate(objects, acl_of, predicate=None)`** — the opaque second
+  stage: your `predicate` decides; the library never interprets the ACL. `None` =
+  keep all.
+
+## The pattern
+
+```python
+from citenexus.access import resolve_scope, filter_partitions
+
+# 1. Resolve the caller's scope to the partition they're allowed to see.
+allowed = {resolve_scope({"org": "acme", "team": "legal"}, hierarchy=["org", "team"])}
+
+# 2. Hard pre-filter your candidate partitions to that set BEFORE retrieval.
+visible = filter_partitions(candidate_partitions, allowed)
+
+# 3. Ingest tenant data under its partition, carrying an opaque acl.
+rag.ingest("contracts/nda.pdf", acl={"role": "legal"})   # acl is carried, not enforced
+```
+
+The design keeps CiteNexus out of your identity system: it gives you a hard
+partition boundary and an ACL hook, and lets your host own who-can-see-what.

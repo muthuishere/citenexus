@@ -1,27 +1,49 @@
 ---
 title: Evaluate
-description: Score a corpus against a golden set — groundedness, citation, and refusal metrics, per language, with an append-only audit trail.
+description: Score a corpus against a golden CSV — answered/refused counts plus groundedness, citation, and expected-support rates. Returns an in-memory EvaluationReport.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-Prove the guarantee holds on *your* corpus. `evaluate()` scores a golden set —
-groundedness, citation, and refusal metrics, per language — with an append-only
-audit trail.
+Prove the guarantee holds on *your* corpus. `evaluate()` runs each row of a golden
+CSV through `ask()` and returns an `EvaluationReport`.
 
 ```python
-report = rag.evaluate("golden.csv")          # question,expected_document,… rows
-print(report)                                # grounded / cited / refused rates
+from citenexus.evaluate import EvaluationReport
+
+report: EvaluationReport = rag.evaluate("golden.csv")
+print(report.total, report.answered, report.refused)
+print(report.groundedness_rate, report.citation_rate, report.expected_support_rate)
 ```
 
-The golden CSV pairs each question with the document (and optionally the passage)
-that should ground it, including questions that *should* be refused — so a model
-that answers when it shouldn't scores worse, not better. Abstention is a correct
-outcome, and the metrics reward it.
+## The golden CSV
+
+The CSV needs a **`question`** column (`query` is also accepted) and an optional
+**`expected`** column:
+
+```csv
+question,expected
+"Can the employee disclose confidential information?","shall not disclose"
+"What is the capital of France?",
+```
+
+- A row with an `expected` value counts as *expected-supported* when that text's
+  content tokens are a subset of the answer's — a lightweight grounding check.
+- A row with an **empty** `expected` is treated as one that *should* be refused;
+  answering it does not earn expected-support. That's how abstention is rewarded,
+  not penalized.
+
+<Aside type="note" title="What the report contains">
+`EvaluationReport` carries counts — `total`, `answered`, `refused`, `grounded`
+(answered rows where all claims verified), `cited` (answered rows with sources),
+`expected_supported` — and derived rates: `groundedness_rate`, `citation_rate`,
+`expected_support_rate`. It is returned **in memory**; `evaluate()` writes nothing
+to disk or S3. Compute a refusal rate yourself as `report.refused / report.total`.
+</Aside>
 
 <Aside type="tip" title="Run the real thing">
 The runnable multilingual example in the
 [repository](https://github.com/muthuishere/citenexus) ingests a real corpus over
-MinIO + Ollama end to end — `ingest → ask → evaluate` — and prints the grounded
+MinIO + Ollama end to end — ingest → ask → evaluate — and prints the grounded
 answer, its bbox sources, and the score.
 </Aside>

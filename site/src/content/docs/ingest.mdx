@@ -1,27 +1,68 @@
 ---
 title: Ingest anything
-description: A file, raw text, a URL, or a whole bucket — all idempotent by content hash, so re-ingesting unchanged content is a no-op.
+description: Ingest a file, raw text, or a URL — each idempotent by content hash. Every source becomes cited Evidence Units. A crawl() helper walks a site same-domain.
 ---
 
-A file, raw text, a URL, or a whole bucket — one `ingest()` handles them all.
-Every intake is idempotent by content hash, so re-ingesting unchanged content
-does no work.
+import { Aside } from '@astrojs/starlight/components';
+
+Ingest a file, raw text, or a URL. Each call returns an `IngestResult` and is
+idempotent by content hash — re-ingesting an unchanged `document_id` does no work.
 
 ```python
-rag.ingest("report.pdf")                     # a file
-rag.ingest(text="Clause 4: …", document_id="c4")  # raw text
-rag.ingest("https://example.com/policy")     # a URL → fetched as HTML
-rag.ingest()                                 # everything in the bucket / directory
+from citenexus.extract.types import SourceType
+
+rag.ingest("report.pdf")                          # a file → extractor picked by extension
+rag.ingest(text="Clause 4: 90 days notice.", document_id="c4")   # raw text (plain)
+rag.ingest("https://example.com/policy")          # a URL → fetched, HTML-extracted
+rag.ingest(image_bytes, source_type=SourceType.image, document_id="fig-1")  # an image
 ```
 
-## Supported artifacts
+Each `ingest()` returns an `IngestResult`:
 
-PDF, DOCX, PPTX, XLSX, HTML, Markdown, CSV, plain text, and images (OCR + a
-vision model for figures). An unknown type falls back to plain-text extraction
-rather than failing — best-effort, never a hard stop.
+```python
+r = rag.ingest("report.pdf")
+print(r.status, r.n_units)     # "ingested" 42   (or "unchanged" 0 on a re-ingest)
+print(r.document_id, r.eu_ids) # the id and the Evidence-Unit ids created
+```
 
-Each artifact is extracted into cited Evidence Units: a text block keeps its
-`file:line` or page + bbox, a table becomes GFM Markdown, and a figure becomes a
-[vision-described](/citenexus/models/) unit cited to its image region. Extraction
-runs in the shared Rust core, so a PDF or XLSX extracts byte-identically whether
-you call from Go, JavaScript, or Python.
+<Aside type="note" title="One source at a time">
+`ingest()` takes a single source. It does **not** walk a directory and there is
+**no** no-argument "ingest the whole bucket/folder" call — pass each file, URL, or
+text yourself. For whole-site intake, use `crawl()` below.
+</Aside>
+
+## Crawl a site
+
+`crawl()` does a same-domain breadth-first walk, ingesting each page as HTML:
+
+```python
+results = rag.crawl("https://docs.example.com", max_pages=50, max_depth=3)
+print(len(results), "pages ingested")
+```
+
+## Supported formats
+
+Extraction dispatches by explicit `source_type` first, then file extension, then
+falls back to plain text:
+
+| Extension | Extractor |
+|---|---|
+| `.pdf` | PDF (text + figures, with page/bbox) |
+| `.docx` `.pptx` `.xlsx` | Office (OOXML); tables become GFM Markdown |
+| `.html` `.htm` | HTML |
+| `.md` `.markdown` | Markdown |
+| `.csv` | CSV |
+| `.txt` | Plain text |
+| *anything else* | Plain-text fallback — never a hard failure |
+
+<Aside type="caution" title="Images and OCR — the honest version">
+Standalone image files are **not** routed by extension (`.png`/`.jpg` fall through
+to plain text). To ingest an image, pass `source_type=SourceType.image` explicitly.
+Figures *inside* PDFs/DOCX/PPTX are handled by the injected [vision](/citenexus/vision/)
+model during ingest. CiteNexus ships **no OCR engine** — text inside a scanned
+image is only recovered if your vision model returns it.
+</Aside>
+
+Extraction runs in the shared Rust core, so a PDF or XLSX extracts byte-identically
+whether you call from Go, JavaScript, or Python. Which indexes get built from the
+extracted units is governed by the [signals](/citenexus/signals/) you declared.

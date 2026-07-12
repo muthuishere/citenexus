@@ -16,7 +16,8 @@ rag = CiteNexus(
     embedder=..., generator=...,
 )
 
-rag.ingest()                                 # ingest everything already in the bucket
+rag.ingest("contracts/nda.pdf")              # sources are ingested individually
+rag.ingest("https://example.com/policy")     # a URL is fetched and ingested
 answer = rag.ask("What notice does termination require?")
 ```
 
@@ -26,7 +27,9 @@ environment — CiteNexus never takes a credential as an argument, and no secret
 value crosses an API boundary.
 </Aside>
 
-Calling `ingest()` with no argument ingests the whole bucket; content-hash
-idempotency means re-running only processes what changed. The local
+The S3 bucket is CiteNexus's **store** — where it writes vectors, manifests, and
+provenance — not a pile of documents it auto-scans. You ingest each source
+(a file, a URL, or raw text) individually; content-hash idempotency means
+re-ingesting an unchanged `document_id` is a no-op. The local
 [MinIO compose file](https://github.com/muthuishere/citenexus) in the repo brings
 up an S3 endpoint on `:19000` for development.
