@@ -1,11 +1,9 @@
 name: release
 
-# Tag-triggered publish:
-#   - PyPI  → project "citenexus" (environment "pypi") — OIDC trusted publishing
-#   - npm   → "@muthuishere/citenexus-core" — OIDC trusted publishing
-#   - crates.io → "citenexus-core" — CARGO_REGISTRY_TOKEN secret (crates.io has no
-#     OIDC path here yet; the token is the only holder of the credential)
-# All gated on the test job. The Go tag + native libs are separate
+# Tag-triggered publish via OIDC trusted publishing (no API tokens):
+#   - PyPI  → project "citenexus" (environment "pypi")
+#   - npm   → "@muthuishere/citenexus-core" (trusted publisher: this repo + release.yml)
+# Both gated on the test job. Crates.io + the Go tag + native libs are separate
 # (native-libs.yml builds the cross-platform Rust cdylibs on the same tag).
 on:
   push:
@@ -69,22 +67,3 @@ jobs:
         run: |
           npm ci
           npm publish --access public
-
-  publish-crates:
-    needs: test
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - name: Install protoc (lance's build.rs needs it via prost-build)
-        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
-      # Reads the token from the environment (never the command line), so its
-      # value never appears in logs. Set repo secret CARGO_REGISTRY_TOKEN to a
-      # crates.io API token scoped to publish-update for `citenexus-core`.
-      - name: Publish to crates.io
-        working-directory: rust
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish
