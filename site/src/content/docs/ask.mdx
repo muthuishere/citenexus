@@ -66,9 +66,11 @@ rag.ask("What notice does termination require?", conversation_id="thread-42")
 rag.ask("And for a fixed-term contract?", conversation_id="thread-42")  # follow-up in context
 ```
 
-## The core, in Go and JavaScript
+## Asking, in each language
 
-The same cite-or-abstain flow over an in-memory corpus:
+The same cite-or-abstain flow in all three ports. Python's `ask` is the
+store-backed facade (the corpus was ingested first with `rag.ingest(...)`); Go and
+JavaScript take the corpus inline.
 
 <Tabs syncKey="lang">
 <TabItem label="Go">
@@ -89,6 +91,16 @@ if (r.evidence.decision === "answered") {
 } else {
   console.log("abstained:", r.answer)       // the pinned refusal
 }
+```
+</TabItem>
+<TabItem label="Python">
+```python
+# the store-backed facade — corpus already ingested via rag.ingest(...)
+r = rag.ask("Can the employee disclose confidential information?")
+if r.evidence.decision is Decision.answered:
+    print(r.answer, "—", r.sources[0].passage)
+else:
+    print("abstained:", r.answer)           # the pinned refusal
 ```
 </TabItem>
 </Tabs>
