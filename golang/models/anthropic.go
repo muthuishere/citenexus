@@ -20,11 +20,13 @@ type AnthropicGenerator struct {
 	temperature float64
 	maxTokens   int
 	transport   Transport
+	headers     map[string]string
 }
 
 // NewAnthropicGenerator builds an Anthropic generator. An empty baseURL defaults
-// to https://api.anthropic.com; trailing "/" is stripped.
-func NewAnthropicGenerator(baseURL, model string, temperature float64, maxTokens int, transport Transport) *AnthropicGenerator {
+// to https://api.anthropic.com; trailing "/" is stripped. Pass WithHeaders(...)
+// for first-class ${ENV} auth headers (e.g. {"x-api-key": "${ANTHROPIC_API_KEY}"}).
+func NewAnthropicGenerator(baseURL, model string, temperature float64, maxTokens int, transport Transport, opts ...Option) *AnthropicGenerator {
 	if baseURL == "" {
 		baseURL = DefaultAnthropicBaseURL
 	}
@@ -34,6 +36,7 @@ func NewAnthropicGenerator(baseURL, model string, temperature float64, maxTokens
 		temperature: temperature,
 		maxTokens:   maxTokens,
 		transport:   transport,
+		headers:     applyOptions(opts),
 	}
 }
 
@@ -57,7 +60,7 @@ func (g *AnthropicGenerator) Answer(question, passage, answerLanguage string) (s
 	if err != nil {
 		return "", err
 	}
-	raw, err := g.transport(g.endpoint(), body, jsonHeaders())
+	raw, err := g.transport(g.endpoint(), body, wireHeaders(g.headers))
 	if err != nil {
 		return "", err
 	}

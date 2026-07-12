@@ -6,13 +6,15 @@
 // headers are ALWAYS just {"Content-Type":"application/json"} — no key/secret
 // ever touches a header or the request body.
 
+import { wireHeaders } from "../http.js";
 import type { Transport } from "./openai.js";
-
-const JSON_HEADERS: Record<string, string> = { "Content-Type": "application/json" };
 
 export interface OpenAIEmbedConfig {
   base_url: string;
   model: string;
+  /** First-class auth/provider headers as ${ENV} templates (expanded by the
+   *  transport at call time, never held as a value). */
+  headers?: Record<string, string>;
 }
 
 /** Dense embeddings over an OpenAI-compatible `/embeddings` endpoint. */
@@ -20,11 +22,13 @@ export class OpenAIEmbedder {
   private readonly baseUrl: string;
   private readonly model: string;
   private readonly transport: Transport;
+  private readonly headers: Record<string, string> | undefined;
 
   constructor(config: OpenAIEmbedConfig, transport: Transport) {
     this.baseUrl = config.base_url.replace(/\/+$/, "");
     this.model = config.model;
     this.transport = transport;
+    this.headers = config.headers;
   }
 
   /** Embed `texts` into dense vectors, preserving input order. */
@@ -33,7 +37,7 @@ export class OpenAIEmbedder {
     const raw = this.transport(
       `${this.baseUrl}/embeddings`,
       JSON.stringify(request),
-      { ...JSON_HEADERS },
+      wireHeaders(this.headers),
     );
     const payload = JSON.parse(raw) as { data: { embedding: number[] }[] };
     return payload.data.map((item) => item.embedding.map((x) => Number(x)));

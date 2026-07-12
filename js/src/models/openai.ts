@@ -34,7 +34,7 @@ export function userMessage(question: string, passage: string, answerLanguage: s
   );
 }
 
-const JSON_HEADERS: Record<string, string> = { "Content-Type": "application/json" };
+import { wireHeaders } from "../http.js";
 
 export interface OpenAIChatConfig {
   base_url: string;
@@ -43,6 +43,10 @@ export interface OpenAIChatConfig {
   temperature?: number;
   /** Sent only when non-null. */
   max_tokens?: number | null;
+  /** First-class auth/provider headers as ${ENV} templates, e.g.
+   *  `{ Authorization: "Bearer ${OPENAI_API_KEY}" }` — expanded by the transport
+   *  at call time, never held as a value. */
+  headers?: Record<string, string>;
 }
 
 /** Grounded answers over an OpenAI-compatible `/chat/completions` endpoint. */
@@ -52,6 +56,7 @@ export class OpenAIChatGenerator {
   private readonly temperature: number;
   private readonly maxTokens: number | null;
   private readonly transport: Transport;
+  private readonly headers: Record<string, string> | undefined;
 
   constructor(config: OpenAIChatConfig, transport: Transport) {
     this.baseUrl = config.base_url.replace(/\/+$/, "");
@@ -59,6 +64,7 @@ export class OpenAIChatGenerator {
     this.temperature = config.temperature ?? 0.0;
     this.maxTokens = config.max_tokens ?? null;
     this.transport = transport;
+    this.headers = config.headers;
   }
 
   answer(question: string, passage: string, answerLanguage = "en"): string {
@@ -77,7 +83,7 @@ export class OpenAIChatGenerator {
     const raw = this.transport(
       `${this.baseUrl}/chat/completions`,
       JSON.stringify(request),
-      { ...JSON_HEADERS },
+      wireHeaders(this.headers),
     );
     const payload = JSON.parse(raw) as {
       choices: { message: { content: string } }[];

@@ -108,6 +108,34 @@ config = CiteNexusConfig(
 rag = CiteNexus.from_config(config)   # each client resolves ${ENV} headers at the edge
 ```
 
+## The same in every port
+
+`${ENV}` header auth is uniform across the Python, Go, and JavaScript clients — the
+value is always resolved by the HTTP client at the request boundary, never held on
+the client.
+
+```go
+// Go — first-class headers via a functional option; HTTPClient expands ${ENV}.
+import "github.com/muthuishere/citenexus/golang/models"
+
+http := models.NewHTTPClient(nil, 0) // real net/http transport, expands ${ENV} at call time
+embed := models.NewOpenAIEmbedding("https://api.jina.ai/v1", "jina-embeddings-v3",
+    http.Transport(),
+    models.WithHeaders(map[string]string{"Authorization": "Bearer ${JINA_API_KEY}"}))
+```
+
+```ts
+// JavaScript — headers on the client config; HttpClient.resolveHeaders expands ${ENV}.
+import { OpenAIEmbedder, HttpClient } from "@muthuishere/citenexus";
+
+const http = new HttpClient();
+const embed = new OpenAIEmbedder(
+  { base_url: "https://api.jina.ai/v1", model: "jina-embeddings-v3",
+    headers: { Authorization: "Bearer ${JINA_API_KEY}" } },
+  (url, body, headers) => /* your transport calls */ http.send(url, body, headers) as any,
+);
+```
+
 <Aside type="note" title="Legacy: api_key on HttpEndpoint">
 `HttpEndpoint(api_key=SecretStr(...), auth_header=..., auth_scheme=...)` still works
 for backward compatibility and materializes the value into the endpoint object.

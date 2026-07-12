@@ -26,12 +26,6 @@ const SystemPrompt = "You are a strict, evidence-first assistant. Answer the que
 	"matches the requested ISO code; otherwise still prefer the passage's exact " +
 	"wording."
 
-// jsonHeaders is the only header set these wire clients speak. Auth + provider
-// headers belong to the endpoint layer, never here.
-func jsonHeaders() map[string]string {
-	return map[string]string{"Content-Type": "application/json"}
-}
-
 // buildUserPrompt is the shared user message for both generators.
 func buildUserPrompt(question, passage, answerLanguage string) string {
 	return "Answer language (ISO code): " + answerLanguage + "\n\n" +
@@ -48,17 +42,20 @@ type OpenAIChatGenerator struct {
 	temperature float64
 	maxTokens   *int
 	transport   Transport
+	headers     map[string]string
 }
 
 // NewOpenAIChatGenerator builds a chat generator. Trailing "/" is stripped from
-// baseURL; maxTokens is nil to omit it from the request body.
-func NewOpenAIChatGenerator(baseURL, model string, temperature float64, maxTokens *int, transport Transport) *OpenAIChatGenerator {
+// baseURL; maxTokens is nil to omit it from the request body. Pass
+// WithHeaders(...) for first-class ${ENV} auth headers.
+func NewOpenAIChatGenerator(baseURL, model string, temperature float64, maxTokens *int, transport Transport, opts ...Option) *OpenAIChatGenerator {
 	return &OpenAIChatGenerator{
 		baseURL:     strings.TrimRight(baseURL, "/"),
 		model:       model,
 		temperature: temperature,
 		maxTokens:   maxTokens,
 		transport:   transport,
+		headers:     applyOptions(opts),
 	}
 }
 
@@ -84,7 +81,7 @@ func (g *OpenAIChatGenerator) Answer(question, passage, answerLanguage string) (
 	if err != nil {
 		return "", err
 	}
-	raw, err := g.transport(g.endpoint(), body, jsonHeaders())
+	raw, err := g.transport(g.endpoint(), body, wireHeaders(g.headers))
 	if err != nil {
 		return "", err
 	}

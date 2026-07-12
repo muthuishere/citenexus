@@ -23,3 +23,5 @@ export * from "./fakes/fakes.js";
 // Postgres store imports `pg` lazily at first connection, so this root entry
 // stays dependency-free (parity with Python's citenexus.storage).
 export * from "./storage/index.js";
+// The shared HTTP layer: ${ENV}-header auth expanded at the request boundary.
+export * from "./http.js";

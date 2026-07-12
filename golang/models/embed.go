@@ -11,14 +11,17 @@ type OpenAIEmbedding struct {
 	baseURL   string
 	model     string
 	transport Transport
+	headers   map[string]string
 }
 
-// NewOpenAIEmbedding builds an embedding client. Trailing "/" is stripped.
-func NewOpenAIEmbedding(baseURL, model string, transport Transport) *OpenAIEmbedding {
+// NewOpenAIEmbedding builds an embedding client. Trailing "/" is stripped. Pass
+// WithHeaders(...) for first-class ${ENV} auth headers.
+func NewOpenAIEmbedding(baseURL, model string, transport Transport, opts ...Option) *OpenAIEmbedding {
 	return &OpenAIEmbedding{
 		baseURL:   strings.TrimRight(baseURL, "/"),
 		model:     model,
 		transport: transport,
+		headers:   applyOptions(opts),
 	}
 }
 
@@ -35,7 +38,7 @@ func (e *OpenAIEmbedding) Embed(texts []string) ([][]float64, error) {
 	if err != nil {
 		return nil, err
 	}
-	raw, err := e.transport(e.endpoint(), body, jsonHeaders())
+	raw, err := e.transport(e.endpoint(), body, wireHeaders(e.headers))
 	if err != nil {
 		return nil, err
 	}

@@ -7,12 +7,11 @@
 // are ALWAYS just {"Content-Type":"application/json"} (auth is the endpoint
 // layer's job), and temperature is always sent (default 0.0 — deterministic).
 
+import { wireHeaders } from "../http.js";
 import { SYSTEM_PROMPT, userMessage, type Transport } from "./openai.js";
 
 /** Anthropic requires max_tokens; use a sane default when the caller gives none. */
 const DEFAULT_MAX_TOKENS = 1024;
-
-const JSON_HEADERS: Record<string, string> = { "Content-Type": "application/json" };
 
 export interface AnthropicConfig {
   /** Defaults to Anthropic's public API base. */
@@ -21,6 +20,9 @@ export interface AnthropicConfig {
   temperature?: number;
   /** Required by the API; defaults to 1024. */
   max_tokens?: number;
+  /** First-class auth/provider headers as ${ENV} templates, e.g.
+   *  `{ "x-api-key": "${ANTHROPIC_API_KEY}" }` — expanded at call time. */
+  headers?: Record<string, string>;
 }
 
 /** Grounded answers over Anthropic's native `/v1/messages` endpoint. */
@@ -30,6 +32,7 @@ export class AnthropicGenerator {
   private readonly temperature: number;
   private readonly maxTokens: number;
   private readonly transport: Transport;
+  private readonly headers: Record<string, string> | undefined;
 
   constructor(config: AnthropicConfig, transport: Transport) {
     this.baseUrl = (config.base_url ?? "https://api.anthropic.com").replace(/\/+$/, "");
@@ -37,6 +40,7 @@ export class AnthropicGenerator {
     this.temperature = config.temperature ?? 0.0;
     this.maxTokens = config.max_tokens ?? DEFAULT_MAX_TOKENS;
     this.transport = transport;
+    this.headers = config.headers;
   }
 
   answer(question: string, passage: string, answerLanguage = "en"): string {
@@ -53,7 +57,7 @@ export class AnthropicGenerator {
     const raw = this.transport(
       `${this.baseUrl}/v1/messages`,
       JSON.stringify(request),
-      { ...JSON_HEADERS },
+      wireHeaders(this.headers),
     );
     const payload = JSON.parse(raw) as {
       content?: { type?: string; text?: string }[];
