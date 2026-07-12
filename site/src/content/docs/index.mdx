@@ -90,31 +90,29 @@ console.log(r.evidence.decision) // "answered" | "refused"
 <TabItem label="Python">
 ```python
 from citenexus import CiteNexus
-from citenexus.embed.client import OpenAICompatibleEmbedding
-from citenexus.answer.generator import OpenAICompatibleGenerator
 
-rag = CiteNexus(
-    "./citenexus-data",
-    embedder=OpenAICompatibleEmbedding(base_url="http://localhost:11434/v1", model="bge-m3"),
-    generator=OpenAICompatibleGenerator(base_url="http://localhost:11434/v1", model="qwen2.5"),
-)
+rag = CiteNexus("./citenexus-data", embedder=..., generator=...)  # your OpenAI-compatible models
 
-rag.ingest("employee-nda.pdf")
-answer = rag.ask("Can the employee disclose confidential information?")
-print(answer.answer)             # the verbatim quote — or the pinned refusal
-print(answer.evidence.decision)  # "answered" | "refused"
+rag.ingest(text="The employee shall not disclose confidential information.", document_id="employee-nda")
+
+r = rag.ask("Can the employee disclose confidential information?")
+print(r.answer)             # the verbatim quote — or the pinned refusal
+print(r.evidence.decision)  # "answered" | "refused"
 ```
 </TabItem>
 </Tabs>
 
-<Aside type="note" title="Reference facade vs. core">
-Go and JavaScript expose the deterministic **cite-or-abstain core** — `ask` over
-an in-memory corpus, plus extraction, language detection, chunking, BM25 + RRF
-fusion, and the grounding gate. **Python** adds the batteries-included facade:
-model injection, S3-native storage, and the `ingest` / `ask` / `evaluate` verbs.
-Same guarantee, byte-for-byte identical decisions — pinned by the shared
+<Aside type="note" title="Same decision, different surface">
+All three answer the same question from the same passage and print the same
+decision. The difference is the surface: **Go and JavaScript** expose the
+hermetic cite-or-abstain **core** — `ask` over an in-memory corpus, plus
+extraction, language detection, chunking, BM25 + RRF fusion, and the grounding
+gate. **Python** is the batteries-included library: your injected models,
+S3-native storage, and the `ingest` / `ask` / `evaluate` verbs (there is no
+`CiteNexus` facade in Go/JS yet). The deterministic decision is byte-for-byte
+identical, pinned by the shared
 [`conformance/`](https://github.com/muthuishere/citenexus/tree/main/conformance)
-suite.
+suite — see the full Python setup in the [Quickstart](/citenexus/quickstart/).
 </Aside>
 
 <p class="cn-statement">If it can't <em>cite</em> it, it won't <em>say</em> it.</p>
