@@ -1,0 +1,35 @@
+---
+title: Bring your own models
+description: Every model is an injected, OpenAI-compatible endpoint — embedding, LLM, and optionally a reranker and vision. Nothing is bundled.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+CiteNexus bundles **no models**. Embedding, LLM, and optionally a reranker and a
+vision model for figures are injected OpenAI-compatible endpoints. Nothing runs
+locally that you didn't wire up; the key stays in your endpoint config.
+
+```python
+from citenexus import CiteNexus
+from citenexus.embed.client import OpenAICompatibleEmbedding
+from citenexus.answer.generator import OpenAICompatibleGenerator
+from citenexus.vision.client import OpenAICompatibleVision
+
+rag = CiteNexus(
+    "./citenexus-data",
+    embedder=OpenAICompatibleEmbedding(base_url="…/v1", model="bge-m3"),
+    generator=OpenAICompatibleGenerator(base_url="…/v1", model="qwen2.5"),
+    vision=OpenAICompatibleVision(base_url="…/v1", model="qwen2.5-vl"),   # figures → cited evidence
+)
+```
+
+Any endpoint that speaks the OpenAI API works — Ollama, OpenAI, a local vLLM or
+llama.cpp server, or Gemini's OpenAI-compatibility endpoint. The reference
+example runs entirely on local Ollama (`bge-m3` + `qwen2.5` + `bge-reranker-v2-m3`).
+
+<Aside type="note" title="Vision is host-fulfilled">
+The vision model is called through a two-phase seam: the core emits a description
+*request*, your host fulfills it against the endpoint, and the description is
+assembled back into a cited figure Evidence Unit. The core never holds your API
+key.
+</Aside>

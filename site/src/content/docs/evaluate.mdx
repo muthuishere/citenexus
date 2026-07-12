@@ -1,0 +1,27 @@
+---
+title: Evaluate
+description: Score a corpus against a golden set — groundedness, citation, and refusal metrics, per language, with an append-only audit trail.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Prove the guarantee holds on *your* corpus. `evaluate()` scores a golden set —
+groundedness, citation, and refusal metrics, per language — with an append-only
+audit trail.
+
+```python
+report = rag.evaluate("golden.csv")          # question,expected_document,… rows
+print(report)                                # grounded / cited / refused rates
+```
+
+The golden CSV pairs each question with the document (and optionally the passage)
+that should ground it, including questions that *should* be refused — so a model
+that answers when it shouldn't scores worse, not better. Abstention is a correct
+outcome, and the metrics reward it.
+
+<Aside type="tip" title="Run the real thing">
+The runnable multilingual example in the
+[repository](https://github.com/muthuishere/citenexus) ingests a real corpus over
+MinIO + Ollama end to end — `ingest → ask → evaluate` — and prints the grounded
+answer, its bbox sources, and the score.
+</Aside>

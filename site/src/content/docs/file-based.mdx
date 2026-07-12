@@ -1,0 +1,22 @@
+---
+title: File-based storage
+description: Use a local directory as the CiteNexus store. Ingest individual files, a folder of them, or raw text.
+---
+
+Pass a local path as the store. CiteNexus keeps its index (vectors, manifests,
+provenance) under that directory. Ingest individual files, a folder of them, or
+raw text.
+
+```python
+from citenexus import CiteNexus
+
+rag = CiteNexus("./citenexus-data", embedder=..., generator=...)
+
+rag.ingest("contracts/nda.pdf")              # PDF, DOCX, PPTX, XLSX, HTML, MD, CSV, images
+rag.ingest(text="Clause 4: 90 days notice.", document_id="clause-4")
+```
+
+The store is content-addressed: re-ingesting an unchanged file is a no-op, so you
+can point `ingest()` at a folder repeatedly and only new or changed documents do
+work. See [Ingest anything](/citenexus/ingest/) for the full intake surface, or
+switch to [S3-native storage](/citenexus/s3/) for a shared bucket.

@@ -1,0 +1,156 @@
+---
+title: CiteNexus
+description: Evidence-first, multilingual, S3-native RAG for Go, JavaScript and Python. It answers only from cited evidence — the exact quote, page and bbox — and abstains when the evidence isn't there. The guarantee is "no ungrounded claim."
+template: splash
+head:
+  - tag: title
+    content: CiteNexus — answers you can defend
+hero:
+  tagline: A RAG library that answers only from your documents — with the exact quote and page — and tells you straight when the evidence isn't there.
+  actions:
+    - text: Quickstart
+      link: /citenexus/quickstart/
+      icon: right-arrow
+    - text: How it holds the line
+      link: /citenexus/concepts/
+      icon: right-arrow
+      variant: minimal
+    - text: GitHub
+      link: https://github.com/muthuishere/citenexus
+      icon: external
+      variant: minimal
+---
+
+import { Tabs, TabItem, Card, CardGrid, Aside } from '@astrojs/starlight/components';
+
+<div class="cn-cards">
+	<div class="cn-card">
+		<div class="cn-card__top"><span>employee-nda.pdf</span><span class="cn-state cn-state--ok">Answered</span></div>
+		<div class="cn-card__body">
+			<p class="cn-q">Can the employee disclose confidential information?</p>
+			<div class="cn-quote">“The employee shall not disclose confidential information.”</div>
+			<p class="cn-note">Verbatim from the source. Every word verifiable.</p>
+			<div class="cn-cite"><span>cited to</span><b>employee-nda.pdf</b><span>·</span><b>page 3</b><span>·</span><b>bbox [72,144,540,166]</b></div>
+		</div>
+	</div>
+	<div class="cn-card">
+		<div class="cn-card__top"><span>employee-nda.pdf</span><span class="cn-state cn-state--no">Abstained</span></div>
+		<div class="cn-card__body">
+			<p class="cn-q">What is the capital of France?</p>
+			<div class="cn-quote cn-quote--no">“I can't answer that from the available evidence.”</div>
+			<p class="cn-note">No passage supports it — so it refuses rather than guesses.</p>
+			<div class="cn-cite"><span class="cn-cite--no">no grounding found · refused, not fabricated</span></div>
+		</div>
+	</div>
+</div>
+
+## Answer only from evidence. Otherwise abstain.
+
+In law, medicine, and compliance, a confidently wrong answer isn't the model's
+mistake — it's yours, and you're the one who has to defend it. CiteNexus answers
+**only** from retrieved evidence, quotes it verbatim with a page and bbox, and
+**abstains** when the evidence is weak, missing, or conflicting. The same
+guarantee, in every language:
+
+<Tabs syncKey="lang">
+<TabItem label="Go">
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/muthuishere/citenexus/golang/answer"
+)
+
+func main() {
+	corpus := []answer.Doc{
+		{DocumentID: "employee-nda", Text: "The employee shall not disclose confidential information."},
+	}
+
+	res := answer.Ask(corpus, "Can the employee disclose confidential information?", answer.DefaultTopK)
+	fmt.Println(res.Answer)            // the verbatim quote — or the pinned refusal
+	fmt.Println(res.Evidence.Decision) // "answered" | "refused"
+}
+```
+</TabItem>
+<TabItem label="JavaScript">
+```ts
+import { ask } from "@muthuishere/citenexus"
+
+const corpus = [
+  { document_id: "employee-nda", text: "The employee shall not disclose confidential information." },
+]
+
+const r = ask(corpus, "Can the employee disclose confidential information?")
+console.log(r.answer)            // the verbatim quote — or the pinned refusal
+console.log(r.evidence.decision) // "answered" | "refused"
+```
+</TabItem>
+<TabItem label="Python">
+```python
+from citenexus import CiteNexus
+from citenexus.embed.client import OpenAICompatibleEmbedding
+from citenexus.answer.generator import OpenAICompatibleGenerator
+
+rag = CiteNexus(
+    "./citenexus-data",
+    embedder=OpenAICompatibleEmbedding(base_url="http://localhost:11434/v1", model="bge-m3"),
+    generator=OpenAICompatibleGenerator(base_url="http://localhost:11434/v1", model="qwen2.5"),
+)
+
+rag.ingest("employee-nda.pdf")
+answer = rag.ask("Can the employee disclose confidential information?")
+print(answer.answer)             # the verbatim quote — or the pinned refusal
+print(answer.evidence.decision)  # "answered" | "refused"
+```
+</TabItem>
+</Tabs>
+
+<Aside type="note" title="Reference facade vs. core">
+Go and JavaScript expose the deterministic **cite-or-abstain core** — `ask` over
+an in-memory corpus, plus extraction, language detection, chunking, BM25 + RRF
+fusion, and the grounding gate. **Python** adds the batteries-included facade:
+model injection, S3-native storage, and the `ingest` / `ask` / `evaluate` verbs.
+Same guarantee, byte-for-byte identical decisions — pinned by the shared
+[`conformance/`](https://github.com/muthuishere/citenexus/tree/main/conformance)
+suite.
+</Aside>
+
+<p class="cn-statement">If it can't <em>cite</em> it, it won't <em>say</em> it.</p>
+
+## What you get
+
+<CardGrid>
+	<Card title="Ground" icon="approve-check">
+		Temperature-0 answers from retrieved passages only, quoted verbatim in the
+		question's own language.
+	</Card>
+	<Card title="Verify" icon="error">
+		A per-claim grounding gate drops any word not in the cited passage.
+		Unsupported claims never reach you.
+	</Card>
+	<Card title="Cite or abstain" icon="document">
+		Every claim resolves to a document, page, and bbox. No support for the
+		question → the pinned refusal string.
+	</Card>
+	<Card title="Any document" icon="open-book">
+		PDF, DOCX, PPTX, XLSX, HTML, Markdown, CSV, and images (OCR + vision).
+		Idempotent by content hash, S3-native.
+	</Card>
+	<Card title="Your models" icon="setting">
+		Embedding, LLM, reranker, and vision are injected OpenAI-compatible
+		endpoints. Nothing bundled; the key never leaves your config.
+	</Card>
+	<Card title="Prove it" icon="bars">
+		`evaluate()` scores groundedness, citation, and refusal — per language —
+		against a golden set, with an append-only audit trail.
+	</Card>
+</CardGrid>
+
+## Polyglot, at parity
+
+Not a wrapper: every deterministic decision is byte-for-byte identical across
+Go, JavaScript, and Python, pinned by a shared conformance suite. Install for
+yours on the [install page](/citenexus/install/), then walk the
+[quickstart](/citenexus/quickstart/).

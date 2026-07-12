@@ -1,0 +1,27 @@
+---
+title: Ingest anything
+description: A file, raw text, a URL, or a whole bucket — all idempotent by content hash, so re-ingesting unchanged content is a no-op.
+---
+
+A file, raw text, a URL, or a whole bucket — one `ingest()` handles them all.
+Every intake is idempotent by content hash, so re-ingesting unchanged content
+does no work.
+
+```python
+rag.ingest("report.pdf")                     # a file
+rag.ingest(text="Clause 4: …", document_id="c4")  # raw text
+rag.ingest("https://example.com/policy")     # a URL → fetched as HTML
+rag.ingest()                                 # everything in the bucket / directory
+```
+
+## Supported artifacts
+
+PDF, DOCX, PPTX, XLSX, HTML, Markdown, CSV, plain text, and images (OCR + a
+vision model for figures). An unknown type falls back to plain-text extraction
+rather than failing — best-effort, never a hard stop.
+
+Each artifact is extracted into cited Evidence Units: a text block keeps its
+`file:line` or page + bbox, a table becomes GFM Markdown, and a figure becomes a
+[vision-described](/citenexus/models/) unit cited to its image region. Extraction
+runs in the shared Rust core, so a PDF or XLSX extracts byte-identically whether
+you call from Go, JavaScript, or Python.

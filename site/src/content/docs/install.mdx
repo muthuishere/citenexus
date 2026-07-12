@@ -1,0 +1,42 @@
+---
+title: Install — Go, JS, Python
+description: Install CiteNexus in Go, JavaScript or Python. Same deterministic core, published from the same release at the same version.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+All three ports are published from the same release and carry the same version.
+
+<Tabs syncKey="lang">
+<TabItem label="Go">
+```sh
+go get github.com/muthuishere/citenexus/golang
+```
+Go 1.23 · [pkg.go.dev](https://pkg.go.dev/github.com/muthuishere/citenexus/golang) · the deterministic core + `ask` over a corpus, via cgo over the shared Rust engine.
+</TabItem>
+<TabItem label="JavaScript">
+```sh
+npm install @muthuishere/citenexus
+```
+Node ≥ 20 · [npm · @muthuishere/citenexus](https://www.npmjs.com/package/@muthuishere/citenexus) · pure-JS core; native extraction/detection/store load lazily via `koffi`.
+</TabItem>
+<TabItem label="Python">
+```sh
+pip install citenexus
+```
+Python ≥ 3.11 · [PyPI · citenexus](https://pypi.org/project/citenexus/) · the batteries-included reference facade: model injection, S3, `ingest` / `ask` / `evaluate`.
+</TabItem>
+</Tabs>
+
+## What each port gives you today
+
+- **Python** — the reference facade. Inject any OpenAI-compatible embedding + LLM
+  (+ optional reranker and vision), point it at a local folder or an S3 bucket,
+  and call `ingest` / `ask` / `evaluate`.
+- **Go & JavaScript** — the deterministic cite-or-abstain **core** at byte-for-byte
+  parity: extraction (PDF/DOCX/PPTX/XLSX/HTML/MD/CSV/txt), language detection,
+  chunking, BM25 + RRF fusion, the grounding gate, and `ask` over a corpus.
+
+Every deterministic decision is pinned by the shared
+[`conformance/`](https://github.com/muthuishere/citenexus/tree/main/conformance)
+suite. Head to the [Quickstart](/citenexus/quickstart/) next.

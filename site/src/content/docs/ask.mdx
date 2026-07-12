@@ -1,0 +1,58 @@
+---
+title: Ask & abstain
+description: Strict by default — answers are generated only from retrieved passages, quoted verbatim, and every claim is checked against its citation. When nothing supports the question, CiteNexus refuses.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+Strict by default: the answer is generated **only** from retrieved passages,
+quoted verbatim in the source language, and every claim is checked against its
+citation. When nothing supports the question, CiteNexus refuses instead of
+guessing.
+
+```python
+answer = rag.ask("Can the employee disclose this?")   # mode=strict by default
+
+if answer.evidence.decision.value == "answered":
+    src = answer.sources[0]
+    print(answer.answer, "—", src.document, "p.", src.page, src.bbox)
+else:
+    print("abstained:", answer.answer)          # refused, not fabricated
+```
+
+## The Result
+
+`ask()` returns a structured `Result`, identical in shape across every port:
+
+- `answer` — the verbatim grounded text, or the pinned refusal string.
+- `answer_language` — the language the answer was produced in (matches the query).
+- `evidence.decision` — `answered`, `refused`, or `partial`.
+- `sources[]` — each a `SourceRef` with the document, page, bbox, and passage.
+- `missing_evidence[]` — why it abstained, when it did.
+
+## The core, in Go and JavaScript
+
+The same cite-or-abstain flow over an in-memory corpus:
+
+<Tabs syncKey="lang">
+<TabItem label="Go">
+```go
+res := answer.Ask(corpus, "Can the employee disclose confidential information?", answer.DefaultTopK)
+if res.Evidence.Decision == result.DecisionAnswered {
+	fmt.Println(res.Answer, "—", res.Sources[0].Passage)
+} else {
+	fmt.Println("abstained:", res.Answer)   // the pinned refusal
+}
+```
+</TabItem>
+<TabItem label="JavaScript">
+```ts
+const r = ask(corpus, "Can the employee disclose confidential information?")
+if (r.evidence.decision === "answered") {
+  console.log(r.answer, "—", r.sources[0].passage)
+} else {
+  console.log("abstained:", r.answer)       // the pinned refusal
+}
+```
+</TabItem>
+</Tabs>

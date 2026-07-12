@@ -1,0 +1,33 @@
+---
+title: Scope — is / is not
+description: What CiteNexus is and isn't. An evidence-first RAG library you build products on — not a model host, not a memory, not an end-user app.
+---
+
+We promise **"no ungrounded claim"** — not "zero hallucination." We won't pretend
+the model never errs; we guarantee it never asserts what the evidence doesn't
+support. That honesty is why the core stays small.
+
+## It is
+
+- An evidence-first RAG library you build products on.
+- An ingest engine that resolves every hit to a cited Evidence Unit.
+- Model-agnostic — your embeddings, LLM, reranker, and vision.
+- S3-native, with reproducible, auditable provenance.
+- Polyglot at parity — Go, JavaScript, Python, one shared conformance suite.
+
+## It is not
+
+- **Not a model host** — nothing bundled; every model is injected.
+- **Not a code-comprehension tool** — guessed call-graph edges would betray
+  cite-or-abstain, so code graphs live elsewhere.
+- **Not a memory / "brain"** and **not an end-user app** — those are built *on
+  top of* the library, in their own repos.
+- **Not a promise of zero hallucination** — a promise of nothing ungrounded.
+
+## Where a feature lands
+
+A capability ships in the core only if it both **ingests an artifact or improves
+grounded retrieval/evaluation** *and* can be held to "no ungrounded claim." A UI,
+a workflow, or a domain app is a separate product that *consumes* CiteNexus
+through its public API. The core stays small on purpose — proven capabilities can
+always be pulled in later; scope is hard to un-ship.

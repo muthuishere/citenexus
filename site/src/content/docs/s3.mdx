@@ -1,0 +1,32 @@
+---
+title: S3-native storage
+description: Point CiteNexus at an S3 (or MinIO) bucket. Credentials come from the standard AWS environment variables — never as an argument.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Point CiteNexus at a bucket with the `S3` location. `endpoint_url` targets MinIO
+or any S3-compatible store; omit it for AWS.
+
+```python
+from citenexus import CiteNexus, S3
+
+rag = CiteNexus(
+    S3(bucket="my-docs", endpoint_url="http://localhost:19000"),
+    embedder=..., generator=...,
+)
+
+rag.ingest()                                 # ingest everything already in the bucket
+answer = rag.ask("What notice does termination require?")
+```
+
+<Aside type="caution" title="Credentials stay in the environment">
+`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` (and region) are read from the
+environment — CiteNexus never takes a credential as an argument, and no secret
+value crosses an API boundary.
+</Aside>
+
+Calling `ingest()` with no argument ingests the whole bucket; content-hash
+idempotency means re-running only processes what changed. The local
+[MinIO compose file](https://github.com/muthuishere/citenexus) in the repo brings
+up an S3 endpoint on `:19000` for development.

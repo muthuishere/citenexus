@@ -1,0 +1,77 @@
+---
+title: Quickstart
+description: Ingest a document, ask a question, read the cited answer — or the refusal. Install in Go, JavaScript or Python; the batteries-included flow shown in Python.
+---
+
+import { Tabs, TabItem, Steps, Aside } from '@astrojs/starlight/components';
+
+Point CiteNexus at your documents, bring your own models, and get answers that
+cite their source — or abstain. The batteries-included flow (models + storage +
+`ingest`/`ask`/`evaluate`) is shown in Python, the reference facade; Go and
+JavaScript ship the same deterministic core (see the [concepts](/citenexus/concepts/)).
+
+<Steps>
+
+1. **Install the package.**
+
+   <Tabs syncKey="lang">
+   <TabItem label="Go">
+   ```sh
+   go get github.com/muthuishere/citenexus/golang
+   ```
+   </TabItem>
+   <TabItem label="JavaScript">
+   ```sh
+   npm install @muthuishere/citenexus
+   ```
+   </TabItem>
+   <TabItem label="Python">
+   ```sh
+   pip install citenexus
+   ```
+   </TabItem>
+   </Tabs>
+
+2. **Create the RAG over a local directory, with your models injected.** Nothing
+   is bundled — point the embedder and generator at any OpenAI-compatible endpoint
+   (Ollama, OpenAI, a local vLLM, Gemini's compat endpoint).
+
+   ```python
+   from citenexus import CiteNexus
+   from citenexus.embed.client import OpenAICompatibleEmbedding
+   from citenexus.answer.generator import OpenAICompatibleGenerator
+
+   rag = CiteNexus(
+       "./citenexus-data",                       # a local directory (or an S3 bucket)
+       embedder=OpenAICompatibleEmbedding(
+           base_url="http://localhost:11434/v1", model="bge-m3"),
+       generator=OpenAICompatibleGenerator(
+           base_url="http://localhost:11434/v1", model="qwen2.5"),
+   )
+   ```
+
+3. **Ingest a document, ask, and read the cited answer.**
+
+   ```python
+   rag.ingest("employee-nda.pdf")               # a file on disk
+
+   answer = rag.ask("Can the employee disclose confidential information?")
+
+   print(answer.answer)                         # the verbatim quote — or a refusal
+   print(answer.sources[0].document, answer.sources[0].page)
+   ```
+
+</Steps>
+
+<Aside type="tip" title="The refusal is the feature">
+If the evidence doesn't support the question, `answer.evidence.decision` is
+`refused` and no source is fabricated. That's the guarantee — read more under
+[Ask & abstain](/citenexus/ask/).
+</Aside>
+
+## Next
+
+- Store your corpus on [S3 / MinIO](/citenexus/s3/) instead of a local folder.
+- [Bring your own models](/citenexus/models/) — embedding, LLM, reranker, vision.
+- [Ingest anything](/citenexus/ingest/) — files, raw text, a URL, or a whole bucket.
+- [Prove it](/citenexus/evaluate/) with `evaluate()` against a golden set.

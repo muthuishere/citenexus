@@ -1,0 +1,87 @@
+---
+title: How it holds the line
+description: The cite-or-abstain guarantee — ground, verify, then cite or refuse. What "no ungrounded claim" means, and how the same deterministic core stays byte-for-byte identical across Go, JavaScript and Python.
+---
+
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+CiteNexus makes one promise: **no ungrounded claim.** Not "zero hallucination" —
+we won't pretend the model never errs. We guarantee it never *asserts what the
+evidence doesn't support*. Three steps stand between a question and an answer you
+can defend.
+
+## Ground → verify → cite or abstain
+
+1. **Ground.** The answer is generated at temperature 0 from retrieved passages
+   only, quoted verbatim, in the question's own language.
+2. **Verify.** A per-claim grounding gate checks every word of the answer against
+   its cited passage. Anything unsupported is dropped before it reaches you.
+3. **Cite or abstain.** A surviving claim resolves to a document, page, and bbox.
+   If nothing supports the question, CiteNexus emits the single **pinned refusal
+   string** — identical in every port — rather than guessing.
+
+<Aside type="note" title="The pinned refusal">
+Every port emits the exact same sentence when it abstains:
+*"I can't answer that from the available evidence."* It is a fixed constant, not
+a generated apology — so a refusal is always recognizable and never a stealth
+hallucination.
+</Aside>
+
+## The core is byte-for-byte identical
+
+The cite-or-abstain flow isn't re-implemented per language and hoped to match —
+it's pinned by a shared [`conformance/`](https://github.com/muthuishere/citenexus/tree/main/conformance)
+suite. The same corpus and questions produce the same decision, answer, and
+cited passage in Go, JavaScript, and Python. Here is that flow, over the
+conformance corpus:
+
+<Tabs syncKey="lang">
+<TabItem label="Go">
+```go
+corpus := []answer.Doc{
+	{DocumentID: "nda", Text: "The employee shall not disclose confidential information."},
+	{DocumentID: "leave", Text: "Employees are entitled to thirty days of annual leave."},
+	{DocumentID: "termination", Text: "The contract termination clause requires ninety days written notice."},
+}
+
+// Grounded → answered, cited to "nda".
+answered := answer.Ask(corpus, "Can the employee disclose confidential information?", answer.DefaultTopK)
+
+// Unsupported → the pinned refusal.
+refused := answer.Ask(corpus, "What is the capital of France?", answer.DefaultTopK)
+```
+</TabItem>
+<TabItem label="JavaScript">
+```ts
+const corpus = [
+  { document_id: "nda", text: "The employee shall not disclose confidential information." },
+  { document_id: "leave", text: "Employees are entitled to thirty days of annual leave." },
+  { document_id: "termination", text: "The contract termination clause requires ninety days written notice." },
+]
+
+// Grounded → answered, cited to "nda".
+const answered = ask(corpus, "Can the employee disclose confidential information?")
+
+// Unsupported → the pinned refusal.
+const refused = ask(corpus, "What is the capital of France?")
+```
+</TabItem>
+<TabItem label="Python">
+```python
+answer = rag.ask("Can the employee disclose confidential information?")
+
+if answer.evidence.decision.value == "answered":
+    src = answer.sources[0]
+    print(answer.answer, "—", src.document, "p.", src.page, src.bbox)
+else:
+    print("abstained:", answer.answer)     # the pinned refusal, not a fabrication
+```
+</TabItem>
+</Tabs>
+
+## Navigate, don't cite
+
+Higher-level structure — graph and wiki — is **navigation over evidence**, never
+a citation itself. Every hit resolves *down* to a bbox- or `file:line`-cited
+Evidence Unit before an answer is generated. You can browse the map, but the
+answer is always anchored to a real passage.
