@@ -1,0 +1,78 @@
+---
+title: "Build a domain RAG (legal, medical)"
+description: The recipe for a high-stakes domain — curate authoritative sources, keep strict mode, inject your models, and prove it with a golden set that includes must-refuse questions. Where a wrong answer is worse than none.
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+CiteNexus is built for domains where a **wrong answer is worse than no answer** —
+legal, medical, finance, compliance. The recipe is the same across them: cite or
+abstain, and prove it on a golden set that rewards abstention.
+
+<Steps>
+
+1. **Curate authoritative sources.** Ingest the documents you'd actually cite — a
+   statute, a clinical guideline, a policy PDF — not the open web. Idempotent
+   ingest ([bulk](/citenexus/bulk-ingest/)) means you can re-run as the corpus grows.
+
+   ```python
+   for path in guideline_pdfs:
+       rag.ingest(str(path), document_id=path.stem)
+   ```
+
+2. **Keep strict mode.** It's the default, and it's the guarantee — the answer is
+   generated only from retrieved passages and every claim is verified against its
+   citation. For a regulated surface, do **not** drop to `normal`/`exploratory`.
+
+   ```python
+   answer = rag.ask("What is the maximum pediatric dose of drug X?")  # strict
+   if answer.evidence.decision.value == "answered":
+       src = answer.sources[0]
+       print(answer.answer, "—", src.document, "p.", src.page)   # cite the exact passage
+   else:
+       print("abstained:", answer.answer)   # no dosage invented
+   ```
+
+3. **Inject your models.** Any OpenAI-compatible embedding + LLM (+ reranker, +
+   vision for figures). Keep it local (Ollama) for data-residency, or use a hosted
+   endpoint — see [custom endpoints & auth](/citenexus/custom-endpoints/).
+
+4. **Prove it with a golden set — including must-refuse rows.** Write questions the
+   corpus *can't* answer (out-of-jurisdiction, not-in-guideline) with an empty
+   `expected`, so a model that answers when it should refuse scores worse. Then
+   [`evaluate()`](/citenexus/evaluate/).
+
+   ```csv
+   question,expected
+   "What notice must a CA landlord give a >1yr month-to-month tenant?","60"
+   "What is the maximum security deposit under this statute?",
+   ```
+
+</Steps>
+
+## A real, measured example: law
+
+The [law worked example](/citenexus/benchmark-law/) is exactly this recipe on
+California landlord–tenant law, run live against Jina + Gemini: **100% groundedness
+and citation, zero fabricated answers** across an 11-question golden set — versus
+the 17–33% hallucination rate reported for generic legal RAG (Stanford RegLab,
+2024, cited as context). It also shows the honest failure mode to watch for.
+
+<Aside type="caution" title="Know the authority gap before you ship">
+CiteNexus ranks by relevance, not **authority** — it has no jurisdiction /
+precedence / source-credibility weighting. In a corpus mixing a controlling
+statute with a blog or another jurisdiction, a low-authority source that repeats
+the query vocabulary can win the citation. For legal/medical corpora, either keep
+sources single-authority per topic, or add your own authority filter before
+retrieval. This is architectural, not a tuning knob — see the
+[benchmark](/citenexus/benchmark-law/).
+</Aside>
+
+## Medical, specifically
+
+The same shape applies: ingest the guideline / formulary / label, keep strict mode
+so a dose or contraindication is only ever quoted from the source (never
+synthesized), cite the exact page, and put "not in the guideline" questions in the
+golden set so abstention is measured. Multilingual answers come back in the
+clinician's language while the citation stays verbatim — see
+[languages](/citenexus/languages/).

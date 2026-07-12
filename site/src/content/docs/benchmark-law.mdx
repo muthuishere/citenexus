@@ -1,0 +1,102 @@
+---
+title: "Worked example: law (a live benchmark)"
+description: A real, runnable stress-test of CiteNexus on California landlord–tenant law — Jina embeddings + reranker, Gemini generation, nothing mocked. 100% groundedness and citation, zero fabricated answers, plus an honest look at the authority gap.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+This is a real run — **Jina** embeddings + reranker, **Gemini 2.5-flash**
+generation, LanceDB storage, nothing mocked. It stress-tests CiteNexus on a
+high-stakes domain (California landlord–tenant notice law) and reports actual
+numbers, including where the library falls short.
+
+## The corpus — one topic, deliberately varied authority
+
+Six real, public documents, built as a trap: **four** say "30 days" for a
+month-to-month tenancy and repeat *month-to-month / notice / terminate* densely.
+Only the two highest-authority California sources carry the correct **60-day**
+rule for a long-term tenant — in denser, less repetitive prose.
+
+| document | authority |
+|---|---|
+| Cal. Civ. Code § 1946.1 — controlling residential statute (60 days if ≥ 1 yr) | HIGH (binding statute) |
+| Mak v. City of Berkeley (Cal. Ct. App. 2015) — applies the 60-day rule | HIGH (binding appellate) |
+| Cal. Civ. Code § 1946.2 — just cause after 12 months | HIGH (binding statute) |
+| Cal. Civ. Code § 1946 — older general rule (30 days) | MEDIUM (superseded for residential) |
+| Nolo self-help blog — "most states … 30-day notice" | LOW (non-binding secondary) |
+| Fla. Stat. § 83.57 — 30 days | WRONG JURISDICTION for a CA question |
+
+## Headline numbers (11-question golden set)
+
+| metric | value | meaning |
+|---|---|---|
+| answered / refused | **5 / 6** | strict mode is the default |
+| **groundedness_rate** | **100%** (5/5) | every answered question is fully verified against its cited passage |
+| **citation_rate** | **100%** (5/5) | every answer carries a source citation |
+| answer-when-grounded | 50% (4/8) | of the 8 the corpus can ground, 4 were answered |
+| abstain-when-no-evidence | 67% (2/3) | of the 3 it should refuse, 2 were refused |
+| library `evaluate()` | groundedness 100%, citation 100%, expected-support 45% | — |
+
+**The thesis holds on the metric that matters for a regulated domain: zero
+ungrounded, zero fabricated answers.** Every claim CiteNexus emitted traced to a
+real passage it cited.
+
+<Aside type="note" title="External context, not reproduced here">
+Stanford RegLab (Magesh et al., *Hallucination-Free? Assessing the Reliability of
+Leading AI Legal Research Tools*, 2024) reported a **17–33% hallucination rate**
+for leading generic legal-RAG tools. We cite that as context — we did **not**
+re-run a generic-RAG baseline. CiteNexus's failure mode is not hallucination; it
+is over-refusal and wrong-authority citation (below).
+</Aside>
+
+## What it got right
+
+```text
+Q: In what manner must a California termination notice be served?
+A: "…served pursuant to Section 1162 of the Code of Civil Procedure."
+   cited → 01-ca-civ-1946_1-statute  (controlling statute)  ✓
+
+Q: Can a California landlord charge a fee for delivering a termination notice?
+A: "A landlord or its agent shall not charge a tenant a fee for serving … any notice…"
+   cited → 01-ca-civ-1946_1-statute  (controlling statute)  ✓
+
+Q: What is the maximum security deposit a California landlord may collect?
+A: "I can't answer that from the available evidence."   (no such statute in corpus)  ✓ refused
+```
+
+## The authority gap — where it falls short, honestly
+
+CiteNexus ranks by **token/semantic relevance only** — it has *no* authority,
+precedence, or jurisdiction weighting. The run surfaces three concrete failures,
+and the harness flags each automatically:
+
+1. **Wrong-authority citation.** *"…month-to-month, resided less than one year?"* →
+   answered "30 days" but cited the **Florida** statute, not the controlling
+   California § 1946.1(c) that says the same thing. `CITED-WRONG-AUTHORITY`.
+2. **Should-abstain, answered instead.** *"Notice period in **Texas**?"* — Texas
+   isn't in the corpus, so the correct move is to refuse. Instead the Florida
+   statute token-matched and answered. `SHOULD-ABSTAIN-BUT-ANSWERED`.
+3. **Correct answer suppressed → refusal.** *"…lived there more than one year?"* →
+   **refused.** The correct 60-day passage (§ 1946.1(b) + Mak) exists but was
+   out-ranked out of the top-k by the repetitive 30-day text, so the faithfulness
+   gate couldn't verify a 60-day answer.
+
+<Aside type="caution" title="This is an architectural gap, not a tuning miss">
+`SPEC-v6` deliberately does **not** adopt in-loop conflict weighing; the conflict
+model *detects/reports*, it does not resolve by source rank. Closing the authority
+gap needs a new per-document authority signal fed into fusion/rerank — tracked as
+future work, not a knob you can turn today.
+</Aside>
+
+## Reproduce it
+
+```bash
+cd python && . .venv/bin/activate        # or: uv run
+export JINA_API_KEY=...                   # referenced by name; never printed
+export GEMINI_API_KEY=...
+export CITENEXUS_BASE_URI=/tmp/law-data && rm -rf "$CITENEXUS_BASE_URI"
+python ../examples/law-authority/run.py   # writes results.json
+```
+
+The corpus, golden set, and `run.py` live under
+[`examples/law-authority/`](https://github.com/muthuishere/citenexus/tree/main/examples/law-authority).

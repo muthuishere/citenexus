@@ -1,0 +1,50 @@
+---
+title: Graph (GraphRAG)
+description: Build an entity graph over your evidence and retrieve through it — grounded, navigate-not-cite. Co-mention by default, LLM-distilled entities and relations when you inject a graph distiller.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+CiteNexus can build an **entity graph** over your corpus and retrieve through it —
+but the graph is *navigation over evidence*, never a citation itself. Every graph
+hit resolves back **down** to a cited Evidence Unit before an answer is generated.
+
+## Enable it
+
+Declare the `graph` signal. The graph is built during ingest and queried by a
+graph retriever at ask time.
+
+```python
+rag = CiteNexus("./citenexus-data", embedder=..., generator=...,
+                signals=["embedding", "text", "graph"])
+rag.ingest("annual-report.pdf")
+answer = rag.ask("How is the CFO connected to the audit committee?")
+```
+
+## How the graph is built
+
+- **Co-mention (default, deterministic).** Nodes and edges are derived from tokens
+  that co-occur across Evidence Units — no model needed, fully reproducible.
+- **LLM-distilled (when injected).** Provide a graph distiller (via `from_config`,
+  `config.graph_distill`) and `LLMGraphDistiller` extracts grounded entities and
+  typed relations, each carrying an `eu_ref` back to its source unit; it degrades
+  to the co-mention graph if distillation fails.
+
+`GraphRetriever` matches query tokens to node labels and returns the nodes'
+underlying Evidence Units as candidates (retrieval signal `graph`), which then go
+through the same fusion → grounding path as every other retriever. Import the
+pieces from `citenexus.graph` (`GraphStore`, `GraphRetriever`, `LLMGraphDistiller`).
+
+<Aside type="caution" title="What's implemented — and what isn't yet">
+The grounded graph **retrieval** path works end-to-end. Two commonly-expected
+GraphRAG features are **not implemented yet**:
+
+- **Community detection (Leiden/Louvain).** `config.graph.community_algorithm`
+  exists but has no implementation; the `community` signal currently reuses the
+  same graph retriever.
+- **Multi-hop traversal.** Edges are built and stored but not walked at query time
+  (`max_hops` is unused) — retrieval is a single node-label → Evidence-Unit lookup.
+
+Declare `graph` for grounded entity retrieval today; treat community summarization
+and hop-expansion as roadmap.
+</Aside>

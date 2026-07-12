@@ -50,6 +50,7 @@ export default defineConfig({
 					label: 'Ingest',
 					items: [
 						{ label: 'Ingest anything', slug: 'ingest' },
+						{ label: 'Bulk & batch ingest', slug: 'bulk-ingest' },
 						{ label: 'Signals & capabilities', slug: 'signals' },
 						{ label: 'Vision — figures as evidence', slug: 'vision' },
 					],
@@ -58,6 +59,7 @@ export default defineConfig({
 					label: 'Retrieve & answer',
 					items: [
 						{ label: 'Bring your own models', slug: 'models' },
+						{ label: 'Custom endpoints & auth', slug: 'custom-endpoints' },
 						{ label: 'Reranking & retrieval', slug: 'reranking' },
 						{ label: 'Ask & abstain', slug: 'ask' },
 						{ label: 'The Result object', slug: 'result' },
@@ -65,8 +67,19 @@ export default defineConfig({
 					],
 				},
 				{
-					label: 'Evaluate',
-					items: [{ label: 'Evaluate', slug: 'evaluate' }],
+					label: 'Beyond retrieval',
+					items: [
+						{ label: 'Graph (GraphRAG)', slug: 'graph' },
+						{ label: 'Wiki (navigate-not-cite)', slug: 'wiki' },
+					],
+				},
+				{
+					label: 'Scenarios & benchmarks',
+					items: [
+						{ label: 'Build a domain RAG', slug: 'domain-rag' },
+						{ label: 'Worked example: law', slug: 'benchmark-law' },
+						{ label: 'Evaluate', slug: 'evaluate' },
+					],
 				},
 				{
 					label: 'Reference',

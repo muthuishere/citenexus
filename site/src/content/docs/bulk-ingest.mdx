@@ -1,0 +1,54 @@
+---
+title: Bulk & batch ingest
+description: How to ingest many documents today — an idempotent, resumable loop keyed by content hash — and where CiteNexus is heading on job-based batch ingest with a durable queue.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`ingest()` handles one source at a time. To bring in a whole corpus today, loop —
+and because every ingest is **idempotent by content hash**, the loop is safe to
+re-run: unchanged documents return `status="unchanged"` and do no work, so a
+crashed or interrupted bulk run just resumes where it left off.
+
+```python
+from pathlib import Path
+
+sources = list(Path("corpus").rglob("*.pdf")) + list(Path("corpus").rglob("*.docx"))
+
+ingested = skipped = 0
+for path in sources:
+    r = rag.ingest(str(path), document_id=path.stem)
+    if r.status == "ingested":
+        ingested += 1
+    else:                       # "unchanged" — content hash matched, no work done
+        skipped += 1
+print(f"{ingested} ingested, {skipped} unchanged")
+```
+
+This is the "resumable by construction" pattern: content-hash idempotency is the
+same mechanism a job queue would use for dedup, so re-running the loop is your
+retry.
+
+## Web pages in bulk
+
+For a site, `crawl()` does a same-domain breadth-first walk, ingesting each page:
+
+```python
+results = rag.crawl("https://docs.example.com", max_pages=200, max_depth=4)
+```
+
+## Where batch ingest is heading
+
+<Aside type="note" title="The durable queue exists as a primitive — not yet wired to the client">
+CiteNexus ships a tested durable-worker subsystem (`citenexus.worker`:
+`DurableQueue`, `Executor`, `RetryPolicy`, dead-letter queue, `resume`) — SQLite,
+content-hash-idempotent, with exponential backoff and dead-lettering. It's how the
+"submit a job → workers process → poll status → DLQ on repeated failure" pattern
+is meant to work.
+
+Today it is a **standalone** subsystem: the public `CiteNexus` client runs
+ingest (and slow-path graph/wiki work) **inline**, and does not yet enqueue onto or
+drain the queue. A first-class, job-based `ingest_batch(...) → job id → poll` API
+that wires the client to this queue is on the roadmap — until then, the idempotent
+loop above is the supported bulk path.
+</Aside>

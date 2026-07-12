@@ -1,0 +1,84 @@
+---
+title: Custom endpoints & auth
+description: Point CiteNexus at any provider with a base URL, API key, custom auth header/scheme, and arbitrary headers — via typed HttpEndpoint objects. Your app owns the key; the library reads no env and never logs it.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Every model in CiteNexus is an endpoint you configure — **base URL, API key,
+auth header/scheme, and custom headers** — through a typed `HttpEndpoint`. Your
+application owns the key (it reads its own environment and passes the value); the
+library holds it as a `SecretStr`, reads no env vars itself, and never logs it.
+
+## Provider endpoints
+
+```python
+from citenexus import (
+    OpenAIHttpEndpoint, GeminiHttpEndpoint, AnthropicHttpEndpoint,
+    OpenRouterHttpEndpoint, OllamaHttpEndpoint,
+)
+import os
+
+openai = OpenAIHttpEndpoint(base_url="https://api.openai.com/v1", api_key=os.environ["OPENAI_API_KEY"])
+gemini = GeminiHttpEndpoint(api_key=os.environ["GEMINI_API_KEY"])
+claude = AnthropicHttpEndpoint(api_key=os.environ["ANTHROPIC_API_KEY"])  # sends x-api-key, no Bearer
+local  = OllamaHttpEndpoint(base_url="http://localhost:11434/v1")        # no key
+```
+
+## Any endpoint: URL, token, custom headers, custom scheme
+
+`HttpEndpoint` is the general case — a private gateway, a bearer or bare token, and
+arbitrary per-call headers:
+
+```python
+from citenexus import HttpEndpoint
+import os
+
+endpoint = HttpEndpoint(
+    base_url="https://llm.internal.acme/v1",
+    api_key=os.environ["ACME_TOKEN"],
+    auth_header="Authorization",              # default; use e.g. "x-api-key"
+    auth_scheme="Bearer",                     # default; set None for a bare token
+    headers={"X-Tenant": "legal", "X-Env": "prod"},   # sent on every request
+    timeout_s=60,
+)
+```
+
+## Wiring endpoints into the client
+
+Endpoints are applied through `from_config` — CiteNexus builds each model client
+with an authenticated transport:
+
+```python
+from citenexus import CiteNexus, GeminiHttpEndpoint, OpenAIHttpEndpoint
+from citenexus.config.schema import (
+    CiteNexusConfig, EmbeddingConfig, LLMConfig, RerankerConfig, StorageConfig,
+)
+from citenexus.config.signals import Signal
+import os
+
+config = CiteNexusConfig(
+    storage=StorageConfig(bucket="./citenexus-data"),
+    embedding=EmbeddingConfig(
+        endpoint=OpenAIHttpEndpoint(base_url="https://api.jina.ai/v1", api_key=os.environ["JINA_API_KEY"]),
+        model="jina-embeddings-v3",
+    ),
+    reranker=RerankerConfig(
+        endpoint=OpenAIHttpEndpoint(base_url="https://api.jina.ai/v1", api_key=os.environ["JINA_API_KEY"]),
+        model="jina-reranker-v2-base-multilingual",
+    ),
+    llm=LLMConfig(endpoint=GeminiHttpEndpoint(api_key=os.environ["GEMINI_API_KEY"]), model="gemini-2.5-flash"),
+    signals=(Signal.embedding, Signal.text),
+)
+
+rag = CiteNexus.from_config(config)   # each client gets a styled, authenticated transport
+```
+
+<Aside type="note" title="Auth is on the endpoint, not (yet) the direct client">
+The direct client constructors — `OpenAICompatibleEmbedding`, `OpenAICompatibleGenerator`,
+`OpenAICompatibleVision`, `OpenAICompatibleReranker` — currently take only
+`base_url` / `model` / `transport` and send just `Content-Type`. First-class
+`api_key` / custom-headers **on those constructors** is a small planned
+enhancement; today, get authenticated custom endpoints through `HttpEndpoint` +
+`from_config` (above), which covers URL, token, scheme, and arbitrary headers.
+</Aside>

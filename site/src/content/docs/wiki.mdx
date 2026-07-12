@@ -1,0 +1,46 @@
+---
+title: Wiki (navigate-not-cite)
+description: A distilled, cross-linked wiki over your corpus that you navigate to find evidence — pages never become citations; every hit resolves down to a cited Evidence Unit. Incremental on ingest, with a lint pass.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+The wiki is a distilled, `[[cross-linked]]` map of your corpus that you *navigate*
+to find evidence. It is the strongest expression of **navigate-not-cite**: a wiki
+page is never itself a citation — matching a page resolves **down** to the real
+Evidence Units it points at, and only those are cited.
+
+## Enable it
+
+Declare the `wiki` signal. Pages are integrated per-document as you ingest
+(Karpathy-style incremental upsert) and fully rebuilt on a slow-path refresh.
+
+```python
+rag = CiteNexus("./citenexus-data", embedder=..., generator=...,
+                signals=["embedding", "text", "wiki"])
+rag.ingest("handbook.pdf")
+answer = rag.ask("What's our policy on remote work?")
+```
+
+## How it works
+
+- **Distillation.** With an injected wiki distiller (`from_config`,
+  `config.wiki_distill`), `LLMWikiDistiller` produces cross-referenced pages —
+  per-document summaries plus cross-document concept pages — each with `[[links]]`
+  and sanitized `eu_refs` back to source units. Without a distiller, pages are
+  deterministic truncation-summaries + keyword lists.
+- **Retrieval.** `WikiRetriever` matches a light page index and follows one
+  `[[link]]` hop (at reduced score), then resolves matched pages down to their
+  citable Evidence Units (retrieval signal `wiki`).
+- **Maintenance.** A `lint()` pass reports `dangling_link`, `orphan_page`, and
+  `missing_eu` issues so the map stays honest as the corpus changes.
+
+Import from `citenexus.wiki` (`WikiStore`, `WikiRetriever`, `LLMWikiDistiller`).
+
+<Aside type="caution" title="It's a single-pass wiki, not a deep DeepWiki">
+Distillation is **one** small-model call over a capped (~24k-char) corpus block,
+producing a **flat** set of pages with **one-hop** links. There is no multi-level
+hierarchy, no iterative refinement, and no page-tree depth beyond that single hop.
+It's a genuine navigate-not-cite layer — just don't expect a deep, multi-level
+knowledge base yet.
+</Aside>
