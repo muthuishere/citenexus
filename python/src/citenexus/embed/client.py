@@ -18,7 +18,7 @@ over stored EU text) — this plugin never fakes a sparse vector.
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from citenexus.http import DEFAULT_TRANSPORT, Transport
 from citenexus.plugins.base import EmbeddingPlugin
@@ -38,19 +38,24 @@ class OpenAICompatibleEmbedding(EmbeddingPlugin):
         base_url: str,
         model: str,
         transport: Transport | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._model = model
         self._transport: Transport = transport or DEFAULT_TRANSPORT
+        # First-class auth/provider headers (toolnexus style): put
+        # ``{"Authorization": "Bearer ${API_KEY}"}`` here — the ``${ENV}`` value
+        # is expanded at the request boundary, never held on this object.
+        self._extra_headers = dict(headers or {})
 
     @property
     def _endpoint(self) -> str:
         return f"{self._base_url}/embeddings"
 
     def _headers(self) -> dict[str, str]:
-        # Auth + provider headers are the ENDPOINT layer's job (HttpEndpoint
-        # transport); wire clients only speak JSON.
-        return {"Content-Type": "application/json"}
+        # Wire clients speak JSON + any caller-supplied auth/provider headers
+        # (``${ENV}`` templates, resolved by the transport at call time).
+        return {"Content-Type": "application/json", **self._extra_headers}
 
     def embed(self, texts: Sequence[str]) -> list[list[float]]:
         """Embed ``texts`` into dense vectors, preserving input order."""

@@ -23,6 +23,8 @@ passed wherever a ``transport=`` is accepted.
 
 from __future__ import annotations
 
+import os
+import re
 import urllib.request
 from collections.abc import Callable, Mapping
 from typing import Literal
@@ -35,6 +37,18 @@ Transport = Callable[[str, bytes, dict[str, str]], bytes]
 
 _USER_AGENT = "citenexus"
 _DEFAULT_TIMEOUT_S = 60.0
+
+# ``${ENV_VAR}`` in a header value — resolved from the process environment at the
+# request boundary (toolnexus style), so a secret's VALUE never lives in a client
+# object, a config, a repr, or a log; only the ``${NAME}`` template does.
+_ENV_RE = re.compile(r"\$\{([A-Za-z0-9_]+)\}")
+
+
+def expand_env(value: str) -> str:
+    """Expand every ``${ENV_VAR}`` in ``value`` from ``os.environ`` (a missing
+    var expands to ``""``). Called only at the moment a request is sent — the
+    resolved value is used for that one request and never stored."""
+    return _ENV_RE.sub(lambda m: os.environ.get(m.group(1), ""), value)
 
 
 class HttpClient:
@@ -53,9 +67,15 @@ class HttpClient:
         """Merge order: User-Agent < client defaults < per-call (auth wins)."""
         return {"User-Agent": _USER_AGENT, **self._headers, **call_headers}
 
+    def resolve_headers(self, call_headers: Mapping[str, str]) -> dict[str, str]:
+        """Merge, then expand ``${ENV_VAR}`` in every value at call time. This is
+        the ONLY place a secret referenced by a header template is materialized —
+        for one request, never stored back on any object and never logged."""
+        return {key: expand_env(value) for key, value in self.build_headers(call_headers).items()}
+
     def __call__(self, url: str, body: bytes, headers: dict[str, str]) -> bytes:
         request = urllib.request.Request(
-            url, data=body, headers=self.build_headers(headers), method="POST"
+            url, data=body, headers=self.resolve_headers(headers), method="POST"
         )
         with urllib.request.urlopen(request, timeout=self.timeout_s) as response:
             data: bytes = response.read()
@@ -78,19 +98,23 @@ ResponseHook = Callable[[str, bytes], "bytes | None"]
 
 
 class HttpEndpoint(BaseModel):
-    """A provider connection declared ONCE: url + headers + key + hooks.
+    """A provider connection declared ONCE: url + headers + hooks.
 
-    THE LIBRARY READS NO ENVIRONMENT: the application resolves its own secrets
-    and passes the key VALUE here — held as a pydantic ``SecretStr``, so an
-    endpoint is still safe to repr/log. Reusable across config sections (one
-    ``gemini`` object can serve ``llm``, ``reformulation``, ``context_model``…).
+    PREFERRED (toolnexus style): put auth in ``headers`` as an ``${ENV_VAR}``
+    template — the value is expanded from the environment at the request boundary
+    (``HttpClient``), so the secret's VALUE never enters this object, a repr, a
+    config file, or a log. Only the ``${NAME}`` placeholder is ever held.
 
-        import os
-        from citenexus import GeminiHttpEndpoint, OpenAIHttpEndpoint
+        from citenexus import OpenAIHttpEndpoint
 
-        gemini = GeminiHttpEndpoint(api_key=os.environ["GEMINI_API_KEY"])
-        jina = OpenAIHttpEndpoint(base_url="https://api.jina.ai/v1",
-                                  api_key=os.environ["JINA_API_KEY"])
+        jina = OpenAIHttpEndpoint(
+            base_url="https://api.jina.ai/v1",
+            headers={"Authorization": "Bearer ${JINA_API_KEY}"},  # expands at call time
+        )
+
+    ``api_key`` (a ``SecretStr``) is the LEGACY path — it materializes the key
+    value into the object; prefer an ``${ENV}`` header instead. Reusable across
+    config sections (one ``gemini`` object can serve ``llm``, ``reformulation``…).
 
     ``pre``/``post`` hooks run around every request (signing, tracing,
     logging); a pre-hook may rewrite (url, body, headers), a post-hook may
