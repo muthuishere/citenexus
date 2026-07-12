@@ -3,167 +3,186 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>CiteNexus — evidence-first RAG</title>
-<meta name="description" content="An evidence-first, multilingual, S3-native RAG library. Answers only from retrieved, cited evidence — and abstains when the evidence is weak, missing, or conflicting. Python reference, with Go / JS / Rust ports at parity." />
+<title>CiteNexus — answers you can defend</title>
+<meta name="description" content="An evidence-first RAG library for Python, JS, and Go. It answers only from cited evidence — with the exact quote and page — and tells you when the evidence isn't there. No invented citations. Nothing you can't trace back." />
 <style>
 :root{
-  --paper:#F4F5F3; --surface:#FBFBFA; --raise:#FFFFFF;
-  --ink:#191C1B; --ink-soft:#4B524F; --ink-faint:#727975;
-  --rule:#DBDED9; --rule-soft:#E7E9E5;
+  --paper:#F4F5F3; --surface:#FBFBFA; --raise:#FFFFFF; --band:#ECEDE9;
+  --ink:#14201E; --ink-70:#14201Eb3; --ink-55:#14201E8c; --ink-40:#14201E66;
+  --rule:#14201E1f; --rule-soft:#14201E12;
   --accent:#1C6E68; --accent-ink:#12514C; --accent-wash:#E3EEEB;
-  --abstain:#A65D3F; --abstain-wash:#F1E4DE;
-  --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
-  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --clay:#A65D3F; --clay-ink:#8A4A31; --clay-wash:#F1E4DE;
+
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua","URW Palladio L",Georgia,serif;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
-  --measure:64ch;
+
+  --fs-hero:clamp(2.7rem,6.2vw,4.75rem);
+  --fs-h2:clamp(1.85rem,3.4vw,2.7rem);
+  --fs-lead:clamp(1.12rem,1.6vw,1.32rem);
+
+  --lh-display:1.06; --lh-body:1.62; --lh-lead:1.5;
+  --measure:62ch; --measure-lead:42ch; --measure-tight:22ch;
+
+  --s-1:.5rem; --s-2:.75rem; --s-3:1rem; --s-4:1.5rem; --s-5:2.5rem; --s-6:4rem; --s-7:7rem;
+  --pad-x:clamp(1.25rem,5vw,3.25rem);
 }
 @media (prefers-color-scheme:dark){
   :root{
-    --paper:#111413; --surface:#171B1A; --raise:#1C2120;
-    --ink:#ECEEEB; --ink-soft:#A6AEAA; --ink-faint:#7C847F;
-    --rule:#2A302E; --rule-soft:#232827;
-    --accent:#61B9AF; --accent-ink:#8FD2C9; --accent-wash:#152C29;
-    --abstain:#D6906F; --abstain-wash:#2C201A;
+    --paper:#121817; --surface:#181E1D; --raise:#1D2423; --band:#0D1211;
+    --ink:#E9ECE8; --ink-70:#E9ECE8b3; --ink-55:#E9ECE88c; --ink-40:#E9ECE85c;
+    --rule:#E9ECE81f; --rule-soft:#E9ECE812;
+    --accent:#63BAB0; --accent-ink:#8FD2C9; --accent-wash:#16302C;
+    --clay:#D89272; --clay-ink:#E6A587; --clay-wash:#2C201A;
   }
 }
 :root[data-theme="light"]{
-  --paper:#F4F5F3; --surface:#FBFBFA; --raise:#FFFFFF;
-  --ink:#191C1B; --ink-soft:#4B524F; --ink-faint:#727975;
-  --rule:#DBDED9; --rule-soft:#E7E9E5;
+  --paper:#F4F5F3; --surface:#FBFBFA; --raise:#FFFFFF; --band:#ECEDE9;
+  --ink:#14201E; --ink-70:#14201Eb3; --ink-55:#14201E8c; --ink-40:#14201E66;
+  --rule:#14201E1f; --rule-soft:#14201E12;
   --accent:#1C6E68; --accent-ink:#12514C; --accent-wash:#E3EEEB;
-  --abstain:#A65D3F; --abstain-wash:#F1E4DE;
+  --clay:#A65D3F; --clay-ink:#8A4A31; --clay-wash:#F1E4DE;
 }
 :root[data-theme="dark"]{
-  --paper:#111413; --surface:#171B1A; --raise:#1C2120;
-  --ink:#ECEEEB; --ink-soft:#A6AEAA; --ink-faint:#7C847F;
-  --rule:#2A302E; --rule-soft:#232827;
-  --accent:#61B9AF; --accent-ink:#8FD2C9; --accent-wash:#152C29;
-  --abstain:#D6906F; --abstain-wash:#2C201A;
+  --paper:#121817; --surface:#181E1D; --raise:#1D2423; --band:#0D1211;
+  --ink:#E9ECE8; --ink-70:#E9ECE8b3; --ink-55:#E9ECE88c; --ink-40:#E9ECE85c;
+  --rule:#E9ECE81f; --rule-soft:#E9ECE812;
+  --accent:#63BAB0; --accent-ink:#8FD2C9; --accent-wash:#16302C;
+  --clay:#D89272; --clay-ink:#E6A587; --clay-wash:#2C201A;
 }
 
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
-body{
-  margin:0; background:var(--paper); color:var(--ink);
-  font-family:var(--sans); font-size:17px; line-height:1.65;
-  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
-}
-h1,h2,h3{font-family:var(--serif); font-weight:600; text-wrap:balance; letter-spacing:-.01em; line-height:1.12; margin:0}
+body{margin:0; background:var(--paper); color:var(--ink);
+  font-family:var(--sans); font-size:17px; line-height:var(--lh-body);
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;}
+h1,h2,h3{font-family:var(--serif); font-weight:600; line-height:var(--lh-display);
+  letter-spacing:-.015em; text-wrap:balance; margin:0}
 p{margin:0}
-a{color:var(--accent-ink); text-decoration-color:color-mix(in srgb,var(--accent) 45%,transparent); text-underline-offset:3px}
+a{color:var(--accent-ink); text-decoration-color:color-mix(in srgb,var(--accent) 40%,transparent); text-underline-offset:3px}
 a:hover{text-decoration-color:var(--accent)}
 :focus-visible{outline:2px solid var(--accent); outline-offset:3px; border-radius:3px}
-code,kbd{font-family:var(--mono); font-size:.86em}
+code{font-family:var(--mono); font-size:.86em}
 
-.wrap{max-width:74rem; margin:0 auto; padding:0 clamp(20px,5vw,52px)}
-.eyebrow{
-  font-family:var(--mono); font-size:12px; letter-spacing:.14em; text-transform:uppercase;
-  color:var(--accent-ink); display:inline-flex; gap:.6em; align-items:center;
-}
-.eyebrow::before{content:""; width:1.6em; height:1px; background:var(--accent); opacity:.7}
+.wrap{max-width:74rem; margin:0 auto; padding:0 var(--pad-x)}
+.eyebrow{font-family:var(--mono); font-size:.8rem; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--accent-ink); display:inline-flex; gap:.7em; align-items:center}
+.eyebrow::before{content:""; width:1.7em; height:1px; background:var(--accent); opacity:.75}
 
-/* ---- top bar ---- */
-.bar{position:sticky; top:0; z-index:20; background:color-mix(in srgb,var(--paper) 86%,transparent); backdrop-filter:blur(10px); border-bottom:1px solid var(--rule-soft)}
-.bar-in{max-width:74rem; margin:0 auto; padding:14px clamp(20px,5vw,52px); display:flex; align-items:center; gap:18px}
-.mark{font-family:var(--serif); font-weight:600; font-size:19px; letter-spacing:-.02em; display:flex; align-items:center; gap:9px}
+/* top bar */
+.bar{position:sticky; top:0; z-index:20; background:color-mix(in srgb,var(--paper) 85%,transparent);
+  backdrop-filter:blur(10px); border-bottom:1px solid var(--rule-soft)}
+.bar-in{max-width:74rem; margin:0 auto; padding:15px var(--pad-x); display:flex; align-items:center; gap:18px}
+.mark{font-family:var(--serif); font-weight:600; font-size:1.2rem; letter-spacing:-.02em; display:flex; align-items:center; gap:9px}
 .mark .glyph{font-family:var(--mono); color:var(--accent); font-weight:700}
-.tag{font-family:var(--mono); font-size:11px; letter-spacing:.08em; color:var(--ink-faint); border:1px solid var(--rule); border-radius:999px; padding:3px 9px}
-.bar nav{margin-left:auto; display:flex; gap:22px; align-items:center}
-.bar nav a{font-size:14px; color:var(--ink-soft); text-decoration:none}
+.tag{font-family:var(--mono); font-size:.68rem; letter-spacing:.08em; color:var(--ink-40); border:1px solid var(--rule); border-radius:999px; padding:3px 9px}
+.bar nav{margin-left:auto; display:flex; gap:24px; align-items:center}
+.bar nav a{font-size:.9rem; color:var(--ink-70); text-decoration:none}
 .bar nav a:hover{color:var(--ink)}
-.bar .ghlink{font-family:var(--mono); font-size:13px; border:1px solid var(--rule); border-radius:8px; padding:7px 12px; color:var(--ink)}
-@media(max-width:720px){.bar nav a:not(.ghlink){display:none}}
+.bar .ghlink{font-family:var(--mono); font-size:.82rem; border:1px solid var(--rule); border-radius:8px; padding:7px 13px; color:var(--ink)}
+@media(max-width:760px){.bar nav a:not(.ghlink){display:none}}
 
-/* ---- section rhythm ---- */
-section{padding:clamp(56px,9vw,104px) 0; border-top:1px solid var(--rule-soft)}
+/* section rhythm */
+section{padding:clamp(4.5rem,10vw,7rem) 0; border-top:1px solid var(--rule-soft)}
 section:first-of-type{border-top:0}
+.band{background:var(--band); border-top:1px solid var(--rule-soft); border-bottom:1px solid var(--rule-soft)}
 .lead{max-width:var(--measure)}
-.kicker{margin:0 0 18px}
-.section-h{font-size:clamp(26px,3.6vw,38px); margin-bottom:16px}
-.section-sub{color:var(--ink-soft); max-width:56ch; margin-top:10px}
+.section-h{font-size:var(--fs-h2); margin-bottom:1.1rem}
+.section-h em{font-style:normal; color:var(--accent-ink)}
+.section-sub{color:var(--ink-70); max-width:var(--measure-lead); font-size:1.06rem; margin-top:1rem}
 
-/* ---- hero ---- */
-.hero{padding-top:clamp(48px,7vw,84px)}
-.hero-grid{display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(28px,4vw,60px); align-items:start}
-@media(max-width:920px){.hero-grid{grid-template-columns:1fr}}
-.h1{font-size:clamp(44px,7.4vw,84px); line-height:.98; letter-spacing:-.03em}
+/* hero */
+.hero{padding-top:clamp(3.5rem,6vw,6rem); padding-bottom:clamp(4.5rem,9vw,7rem)}
+.hero-grid{display:grid; grid-template-columns:1.02fr .98fr; gap:clamp(2rem,4.5vw,4.5rem); align-items:center}
+@media(max-width:940px){.hero-grid{grid-template-columns:1fr; gap:3rem}}
+.h1{font-size:var(--fs-hero); letter-spacing:-.03em}
 .h1 em{font-style:normal; color:var(--accent-ink)}
-.hero p.dek{font-size:clamp(18px,2.2vw,21px); color:var(--ink-soft); margin-top:22px; max-width:46ch}
-.hero .cta-row{display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-top:30px}
-.btn{font:600 15px/1 var(--sans); padding:13px 20px; border-radius:10px; text-decoration:none; display:inline-flex; align-items:center; gap:8px; border:1px solid transparent}
-.btn.primary{background:var(--accent); color:#fff}
-:root[data-theme="dark"] .btn.primary,@media(prefers-color-scheme:dark){.btn.primary{color:#0b1211}}
-.btn.primary:hover{background:var(--accent-ink)}
+.hero .dek{font-size:var(--fs-lead); line-height:var(--lh-lead); color:var(--ink-70); margin-top:var(--s-4); max-width:var(--measure-lead)}
+.hero .cta-row{display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-top:var(--s-5)}
+.btn{font:600 .95rem/1 var(--sans); padding:13px 21px; border-radius:10px; text-decoration:none; display:inline-flex; align-items:center; gap:8px; border:1px solid transparent}
+.btn.primary{background:var(--accent); color:#08110F}
+.btn.primary:hover{background:var(--accent-ink); color:#fff}
 .btn.ghost{border-color:var(--rule); color:var(--ink)}
 .btn.ghost:hover{border-color:var(--accent); color:var(--accent-ink)}
-.install{font-family:var(--mono); font-size:14px; color:var(--ink); background:var(--surface); border:1px solid var(--rule); border-radius:10px; padding:12px 15px; display:inline-flex; gap:12px; align-items:center; margin-top:18px}
-.install .p{color:var(--accent)}
-.install .cmd{user-select:all}
+.install{font-family:var(--mono); font-size:.86rem; color:var(--ink); background:var(--surface); border:1px solid var(--rule); border-radius:10px; padding:12px 15px; display:inline-flex; gap:12px; align-items:center; margin-top:var(--s-4)}
+.install .p{color:var(--accent)} .install .cmd{user-select:all}
 
-/* ---- evidence demo cards ---- */
-.evidence{display:flex; flex-direction:column; gap:16px}
-.doc{
-  background:var(--surface); border:1px solid var(--rule); border-radius:14px; overflow:hidden;
-  box-shadow:0 1px 0 var(--rule-soft), 0 18px 40px -30px rgba(0,0,0,.4);
-}
-.doc-top{display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--rule-soft); font-family:var(--mono); font-size:12px; letter-spacing:.04em; color:var(--ink-faint)}
-.state{margin-left:auto; font-weight:700; letter-spacing:.1em; text-transform:uppercase; font-size:11px; padding:3px 9px; border-radius:999px}
+/* evidence demo cards */
+.evidence{display:flex; flex-direction:column; gap:var(--s-4)}
+.doc{background:var(--surface); border:1px solid var(--rule); border-radius:14px; overflow:hidden;
+  box-shadow:0 1px 0 var(--rule-soft),0 22px 48px -34px rgba(0,0,0,.45)}
+.doc.offset{margin-left:clamp(0px,3vw,34px)}
+.doc-top{display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--rule-soft);
+  font-family:var(--mono); font-size:.74rem; letter-spacing:.03em; color:var(--ink-40)}
+.state{margin-left:auto; font-family:var(--mono); font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+  font-size:.66rem; padding:3px 9px; border-radius:999px}
 .state.ok{color:var(--accent-ink); background:var(--accent-wash)}
-.state.no{color:var(--abstain); background:var(--abstain-wash)}
-.doc-body{padding:16px 18px 18px}
-.q{font-family:var(--serif); font-size:18px; margin-bottom:12px}
-.q::before{content:"Q "; font-family:var(--mono); font-size:12px; color:var(--ink-faint); letter-spacing:.1em}
-.ans{font-size:15.5px; line-height:1.6}
-.quote{border-left:2px solid var(--accent); background:linear-gradient(0deg,var(--accent-wash),var(--accent-wash)); padding:10px 14px; border-radius:0 8px 8px 0; margin:4px 0 12px; font-family:var(--serif); font-size:16px}
-.quote.no{border-left-color:var(--abstain); background:var(--abstain-wash)}
-.cite{font-family:var(--mono); font-size:12.5px; color:var(--ink-faint); display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; border-top:1px dashed var(--rule); padding-top:11px; margin-top:12px}
-.cite b{color:var(--accent-ink); font-weight:600}
-.cite .no{color:var(--abstain)}
+.state.no{color:var(--clay-ink); background:var(--clay-wash)}
+.doc-body{padding:var(--s-4) 1.3rem 1.3rem}
+.q{font-family:var(--serif); font-size:1.12rem; margin-bottom:var(--s-2)}
+.q::before{content:"Q "; font-family:var(--mono); font-size:.72rem; color:var(--ink-40); letter-spacing:.1em}
+.quote{border-left:2px solid var(--accent); background:var(--accent-wash); padding:11px 15px; border-radius:0 8px 8px 0;
+  margin:var(--s-1) 0 var(--s-3); font-family:var(--serif); font-size:1.02rem}
+.quote.no{border-left-color:var(--clay); background:var(--clay-wash)}
+.ans{font-size:.95rem; color:var(--ink-55)}
+.cite{font-family:var(--mono); font-size:.76rem; color:var(--ink-40); display:flex; flex-wrap:wrap; gap:6px 14px;
+  align-items:center; border-top:1px dashed var(--rule); padding-top:.7rem; margin-top:var(--s-3)}
+.cite b{color:var(--accent-ink); font-weight:600} .cite .no{color:var(--clay-ink)}
 
-/* ---- generic content ---- */
-.grid{display:grid; gap:20px}
+/* the quiet statement beat */
+.statement{text-align:center}
+.statement .big{font-family:var(--serif); font-size:clamp(2rem,4.6vw,3.4rem); letter-spacing:-.02em;
+  max-width:20ch; margin:1.4rem auto 0; line-height:1.12}
+.statement .big em{font-style:normal; color:var(--accent-ink)}
+.statement .foot{color:var(--ink-55); margin-top:var(--s-4); max-width:46ch; margin-left:auto; margin-right:auto; font-size:1.02rem}
+
+/* the problem beat */
+.problem .big{font-family:var(--serif); font-size:clamp(1.7rem,3.6vw,2.6rem); letter-spacing:-.015em;
+  max-width:26ch; line-height:1.18; margin-top:1.2rem}
+.problem .big .cl{color:var(--clay-ink)}
+.problem .foot{color:var(--ink-70); margin-top:var(--s-4); max-width:50ch; font-size:1.06rem}
+
+/* grids + cards */
+.grid{display:grid; gap:1.75rem}
 .cols-3{grid-template-columns:repeat(3,1fr)}
 .cols-2{grid-template-columns:repeat(2,1fr)}
 .cols-4{grid-template-columns:repeat(4,1fr)}
 @media(max-width:900px){.cols-3,.cols-4{grid-template-columns:1fr 1fr}}
 @media(max-width:620px){.cols-2,.cols-3,.cols-4{grid-template-columns:1fr}}
-.card{background:var(--surface); border:1px solid var(--rule); border-radius:14px; padding:22px}
-.card h3{font-size:19px; margin-bottom:8px}
-.card p{color:var(--ink-soft); font-size:15px}
-.card .n{font-family:var(--mono); font-size:12px; color:var(--accent-ink); letter-spacing:.1em; display:block; margin-bottom:12px}
+.card{background:var(--surface); border:1px solid var(--rule); border-radius:14px; padding:1.75rem 1.85rem}
+.card h3{font-size:1.18rem; margin-bottom:.6rem}
+.card p{color:var(--ink-55); font-size:.95rem}
+.card .n{font-family:var(--mono); font-size:.72rem; color:var(--accent-ink); letter-spacing:.1em; display:block; margin-bottom:.9rem; text-transform:uppercase}
 
-/* code block */
+/* code */
 .code{background:var(--raise); border:1px solid var(--rule); border-radius:14px; overflow:hidden}
-.code-top{display:flex; gap:8px; padding:11px 15px; border-bottom:1px solid var(--rule-soft); font-family:var(--mono); font-size:12px; color:var(--ink-faint)}
+.code-top{display:flex; gap:8px; padding:11px 16px; border-bottom:1px solid var(--rule-soft); font-family:var(--mono); font-size:.74rem; color:var(--ink-40); align-items:center}
 .dot{width:9px; height:9px; border-radius:50%; background:var(--rule)}
-pre{margin:0; padding:18px 18px; overflow-x:auto; font-family:var(--mono); font-size:13.5px; line-height:1.7; color:var(--ink)}
-pre .c{color:var(--ink-faint)}
-pre .k{color:var(--accent-ink); font-weight:600}
-pre .s{color:var(--abstain)}
+pre{margin:0; padding:1.15rem 1.15rem; overflow-x:auto; font-family:var(--mono); font-size:.84rem; line-height:1.75; color:var(--ink)}
+pre .c{color:var(--ink-40)} pre .k{color:var(--accent-ink); font-weight:600} pre .s{color:var(--clay-ink)}
 
-/* polyglot install rows */
-.reg{display:flex; align-items:center; gap:14px; padding:15px 18px; border:1px solid var(--rule); border-radius:12px; background:var(--surface)}
-.reg .lang{font-family:var(--serif); font-weight:600; font-size:16px; min-width:78px}
-.reg .pkg{font-family:var(--mono); font-size:13px; color:var(--ink); overflow-x:auto; white-space:nowrap}
-.reg .badge{margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--accent-ink); background:var(--accent-wash); padding:3px 8px; border-radius:999px; white-space:nowrap}
+/* ports */
+.reg{display:flex; align-items:center; gap:14px; padding:1.05rem 1.25rem; border:1px solid var(--rule); border-radius:12px; background:var(--surface)}
+.reg .lang{font-family:var(--serif); font-weight:600; font-size:1rem; min-width:82px}
+.reg .pkg{font-family:var(--mono); font-size:.82rem; color:var(--ink); overflow-x:auto; white-space:nowrap}
+.reg .badge{margin-left:auto; font-family:var(--mono); font-size:.68rem; color:var(--accent-ink); background:var(--accent-wash); padding:3px 8px; border-radius:999px; white-space:nowrap}
 
-/* is / is not */
-.split{display:grid; grid-template-columns:1fr 1fr; gap:20px}
+/* scope */
+.split{display:grid; grid-template-columns:1fr 1fr; gap:1.75rem}
 @media(max-width:720px){.split{grid-template-columns:1fr}}
-.panel{border:1px solid var(--rule); border-radius:14px; padding:22px; background:var(--surface)}
-.panel h3{font-size:18px; display:flex; align-items:center; gap:9px; margin-bottom:14px}
-.panel ul{margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:11px}
-.panel li{font-size:15px; color:var(--ink-soft); padding-left:22px; position:relative; line-height:1.5}
+.panel{border:1px solid var(--rule); border-radius:14px; padding:1.75rem; background:var(--surface)}
+.panel h3{font-size:1.1rem; margin-bottom:1rem}
+.panel ul{margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:.9rem}
+.panel li{font-size:.95rem; color:var(--ink-55); padding-left:1.4rem; position:relative; line-height:1.5}
 .panel.is li::before{content:"§"; position:absolute; left:0; color:var(--accent); font-family:var(--mono); font-weight:700}
-.panel.isnot li::before{content:"—"; position:absolute; left:0; color:var(--abstain); font-family:var(--mono)}
+.panel.isnot li::before{content:"—"; position:absolute; left:0; color:var(--clay-ink); font-family:var(--mono)}
 
 /* footer */
-footer{border-top:1px solid var(--rule); padding:44px 0 60px; color:var(--ink-soft); font-size:14px}
-.foot-grid{display:flex; flex-wrap:wrap; gap:24px 40px; align-items:baseline}
-footer a{color:var(--ink-soft); text-decoration:none}
-footer a:hover{color:var(--accent-ink)}
-.foot-links{display:flex; gap:20px; flex-wrap:wrap; font-family:var(--mono); font-size:13px}
-.foot-note{margin-left:auto; font-family:var(--mono); font-size:12px; color:var(--ink-faint)}
+footer{border-top:1px solid var(--rule); padding:3rem 0 4rem; color:var(--ink-55); font-size:.9rem}
+.foot-grid{display:flex; flex-wrap:wrap; gap:1.5rem 2.5rem; align-items:baseline}
+footer a{color:var(--ink-55); text-decoration:none} footer a:hover{color:var(--accent-ink)}
+.foot-links{display:flex; gap:1.25rem; flex-wrap:wrap; font-family:var(--mono); font-size:.82rem}
+.foot-note{margin-left:auto; font-family:var(--mono); font-size:.74rem; color:var(--ink-40)}
 
 .reveal{opacity:0; transform:translateY(14px); transition:opacity .7s ease, transform .7s ease}
 .reveal.in{opacity:1; transform:none}
@@ -177,9 +196,9 @@ footer a:hover{color:var(--accent-ink)}
     <span class="mark"><span class="glyph">§</span>CiteNexus</span>
     <span class="tag">v0.9.0 · alpha</span>
     <nav>
-      <a href="#guarantee">Guarantee</a>
-      <a href="#api">API</a>
-      <a href="#ports">Ports</a>
+      <a href="#problem">Why</a>
+      <a href="#how">How</a>
+      <a href="#ports">Languages</a>
       <a href="#scope">Scope</a>
       <a class="ghlink" href="https://github.com/muthuishere/citenexus">GitHub ↗</a>
     </nav>
@@ -187,15 +206,16 @@ footer a:hover{color:var(--accent-ink)}
 </header>
 
 <main>
+  <!-- HERO — outcome, not mechanism -->
   <section class="hero wrap">
     <div class="hero-grid">
       <div>
-        <p class="eyebrow">Evidence-first RAG · multilingual · S3-native</p>
-        <h1 class="h1" style="margin-top:18px">No <em>ungrounded</em> claim.</h1>
-        <p class="dek">CiteNexus answers <strong>only</strong> from retrieved, cited evidence — and abstains when the evidence is weak, missing, or conflicting. Built for legal, medical, and compliance work, where a wrong answer is worse than no answer.</p>
+        <p class="eyebrow">Evidence-first RAG · Python · JS · Go</p>
+        <h1 class="h1" style="margin-top:1.1rem">Answers you can <em>defend</em>.</h1>
+        <p class="dek">A RAG library that answers only from your documents — with the exact quote and page — and tells you straight when the evidence isn't there.</p>
         <div class="cta-row">
-          <a class="btn primary" href="#api">Read the API</a>
-          <a class="btn ghost" href="https://github.com/muthuishere/citenexus">View source ↗</a>
+          <a class="btn primary" href="#how">See how it works</a>
+          <a class="btn ghost" href="https://github.com/muthuishere/citenexus">Read the source ↗</a>
         </div>
         <div class="install"><span class="p">$</span><span class="cmd">pip install citenexus</span></div>
       </div>
@@ -206,17 +226,16 @@ footer a:hover{color:var(--accent-ink)}
           <div class="doc-body">
             <p class="q">Can the employee disclose confidential information?</p>
             <div class="quote">“The employee shall not disclose confidential information.”</div>
-            <p class="ans" style="color:var(--ink-soft)">Answered verbatim from the source — no paraphrase, every word verifiable.</p>
+            <p class="ans">Verbatim from the source. Every word verifiable.</p>
             <div class="cite"><span>cited to</span><b>employee-nda.pdf</b><span>·</span><b>page 3</b><span>·</span><b>bbox&nbsp;[72,144,540,166]</b></div>
           </div>
         </article>
-
-        <article class="doc reveal">
+        <article class="doc offset reveal">
           <div class="doc-top"><span>employee-nda.pdf</span><span class="state no">Abstained</span></div>
           <div class="doc-body">
             <p class="q">What is the capital of France?</p>
             <div class="quote no">“I can't answer that from the available evidence.”</div>
-            <p class="ans" style="color:var(--ink-soft)">No passage supports the question, so CiteNexus refuses rather than guesses.</p>
+            <p class="ans">No passage supports it — so it refuses rather than guesses.</p>
             <div class="cite"><span class="no">no grounding found · refused, not fabricated</span></div>
           </div>
         </article>
@@ -224,95 +243,101 @@ footer a:hover{color:var(--accent-ink)}
     </div>
   </section>
 
-  <section id="guarantee" class="wrap">
-    <div class="lead">
-      <p class="eyebrow kicker">The guarantee</p>
-      <h2 class="section-h">The achievable promise is <em>“no ungrounded claim,”</em> not “zero hallucination.”</h2>
-      <p class="section-sub">Every answer is checked, per claim, against the evidence it cites. A claim the evidence doesn't support is removed; when nothing supports the question, the system says so. Confidence is expressed as structured signals — supporting sources, conflicts, languages in evidence — never an uncalibrated score.</p>
-    </div>
-    <div class="grid cols-3" style="margin-top:36px">
-      <div class="card"><span class="n">01 · Ground</span><h3>Cite or abstain</h3><p>Answers are generated at temperature 0 from retrieved passages only, quoting verbatim in the source language. Weak, missing, or conflicting evidence → an honest refusal.</p></div>
-      <div class="card"><span class="n">02 · Verify</span><h3>Per-claim faithfulness</h3><p>A grounding gate rejects any answer word not present in the cited passage. Unsupported claims are dropped before the answer is returned; conflicts are surfaced, not hidden.</p></div>
-      <div class="card"><span class="n">03 · Trace</span><h3>Provenance to the pixel</h3><p>Each Evidence Unit carries a bbox-level citation — document, page, region — so a claim resolves back to the exact spot on the page it came from.</p></div>
+  <!-- PROBLEM felt -->
+  <section id="problem" class="wrap problem">
+    <p class="eyebrow">The answer that fooled you</p>
+    <p class="big">A citation that isn't in the source. A dosage that was invented. A page that <span class="cl">doesn't say what the answer claimed</span> — in a document with your name on it.</p>
+    <p class="foot">In law, medicine, and compliance, a confidently wrong answer isn't the model's mistake. It's yours — and you're the one who has to defend it.</p>
+  </section>
+
+  <!-- THE SHIFT — quiet, high contrast -->
+  <section class="band">
+    <div class="wrap statement">
+      <p class="eyebrow" style="justify-content:center">What if it just refused?</p>
+      <p class="big">If it can't <em>cite</em> it, it won't <em>say</em> it.</p>
+      <p class="foot">CiteNexus answers only from retrieved evidence — and abstains when that evidence is weak, missing, or conflicting. The refusal is the feature.</p>
     </div>
   </section>
 
-  <section id="api" class="wrap">
+  <!-- HOW — the mechanism, earned -->
+  <section id="how" class="wrap">
     <div class="lead">
-      <p class="eyebrow kicker">The library</p>
-      <h2 class="section-h">Three verbs. Models are yours.</h2>
-      <p class="section-sub">CiteNexus bundles no models — embedding, LLM, reranker, and vision are injected OpenAI-compatible endpoints. The library owns orchestration, storage, retrieval, fusion, grounding, and evaluation.</p>
+      <p class="eyebrow">Grounded, verified, or silent</p>
+      <h2 class="section-h">How it holds the line.</h2>
+      <p class="section-sub">Three steps between a question and an answer you can trust. Bring your own LLM and embeddings — CiteNexus owns the grounding.</p>
     </div>
-    <div class="grid cols-2" style="margin-top:34px; align-items:start">
+    <div class="grid cols-3" style="margin-top:2.75rem">
+      <div class="card"><span class="n">01 · Ground</span><h3>Answer from evidence</h3><p>Temperature-0 answers from retrieved passages only, quoted verbatim in the source language.</p></div>
+      <div class="card"><span class="n">02 · Verify</span><h3>Check every claim</h3><p>A grounding gate drops any word not in the cited passage. Unsupported claims never reach you.</p></div>
+      <div class="card"><span class="n">03 · Cite or abstain</span><h3>Trace it, or refuse</h3><p>Every claim resolves to a document, page, and bbox. No support for the question → an honest refusal.</p></div>
+    </div>
+  </section>
+
+  <!-- API — the three verbs -->
+  <section class="wrap">
+    <div class="lead">
+      <p class="eyebrow">Three verbs, your models</p>
+      <h2 class="section-h">A library, not a black box.</h2>
+      <p class="section-sub">Point it at your documents on S3. Ingest, ask, evaluate — models are injected, orchestration is yours.</p>
+    </div>
+    <div class="grid cols-2" style="margin-top:2.75rem; align-items:start">
       <div class="code">
         <div class="code-top"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span style="margin-left:6px">quickstart.py</span></div>
-<pre><span class="c"># ingest → ask → evaluate, over your own S3 bucket</span>
-<span class="k">from</span> citenexus <span class="k">import</span> CiteNexus
+<pre><span class="k">from</span> citenexus <span class="k">import</span> CiteNexus
 
 rag = CiteNexus(<span class="s">"s3://my-bucket"</span>, signals=[<span class="s">"embedding"</span>, <span class="s">"text"</span>])
 
-rag.ingest()                        <span class="c"># any artifact type; sync or async</span>
+rag.ingest()                        <span class="c"># any document type</span>
 answer = rag.ask(<span class="s">"Can the employee disclose this?"</span>)
 score  = rag.evaluate(<span class="s">"golden.csv"</span>)   <span class="c"># scored + audited</span>
 </pre>
       </div>
-      <div class="grid" style="gap:16px">
-        <div class="card"><span class="n">ingest()</span><h3>Any artifact → cited evidence</h3><p>PDF, DOCX, PPTX, XLSX, HTML, Markdown, CSV, images-into-evidence. Idempotent by content hash, signal-gated, S3-native.</p></div>
-        <div class="card"><span class="n">ask()</span><h3>Grounded, in the query's language</h3><p>Strict by default. The answer is guaranteed to be in the language you asked in, cited to the evidence it rests on.</p></div>
-        <div class="card"><span class="n">evaluate()</span><h3>Prove it, per language</h3><p>Groundedness, citation, and refusal metrics against a golden set — append-only audit, offline judge baseline.</p></div>
+      <div class="grid" style="gap:1.25rem">
+        <div class="card"><span class="n">ingest()</span><h3>Any document → cited evidence</h3><p>PDF, DOCX, PPTX, XLSX, HTML, Markdown, CSV, images. Idempotent by content hash, S3-native.</p></div>
+        <div class="card"><span class="n">ask()</span><h3>Grounded, in your language</h3><p>Strict by default. Answers come back in the question's language, cited to the evidence.</p></div>
+        <div class="card"><span class="n">evaluate()</span><h3>Prove it, per language</h3><p>Groundedness, citation, and refusal metrics against a golden set — append-only audit.</p></div>
       </div>
     </div>
   </section>
 
+  <!-- PORTS -->
   <section id="ports" class="wrap">
     <div class="lead">
-      <p class="eyebrow kicker">Polyglot by default · ports at parity</p>
-      <h2 class="section-h">Built where you build.</h2>
-      <p class="section-sub">CiteNexus runs in Python, JavaScript, and Go — the same library, not a wrapper. Every deterministic decision is byte-for-byte identical across languages, pinned by a shared conformance suite.</p>
+      <p class="eyebrow">Polyglot, at parity</p>
+      <h2 class="section-h">The same library, three languages.</h2>
+      <p class="section-sub">Not a wrapper — every deterministic decision is byte-for-byte identical, pinned by a shared conformance suite.</p>
     </div>
-    <div class="grid" style="gap:12px; margin-top:32px">
+    <div class="grid" style="gap:.9rem; margin-top:2.5rem">
       <div class="reg"><span class="lang">Python</span><span class="pkg">pip install citenexus</span><span class="badge">PyPI</span></div>
       <div class="reg"><span class="lang">JS / TS</span><span class="pkg">npm i @muthuishere/citenexus</span><span class="badge">npm</span></div>
       <div class="reg"><span class="lang">Go</span><span class="pkg">go get github.com/muthuishere/citenexus/golang</span><span class="badge">module</span></div>
     </div>
   </section>
 
-  <section id="how" class="wrap">
-    <div class="lead">
-      <p class="eyebrow kicker">How it holds the line</p>
-      <h2 class="section-h">Navigate freely — cite precisely.</h2>
-    </div>
-    <div class="grid cols-4" style="margin-top:32px">
-      <div class="card"><h3>Conditional vision</h3><p>A pre-filter routes each image to text, OCR, vision, or skip — so decorative art never burns a model call, and real figures become citable evidence.</p></div>
-      <div class="card"><h3>Graph &amp; wiki</h3><p>Navigation over evidence, not a second source of truth: every graph hop and wiki hit resolves down to a bbox-cited Evidence Unit before an answer is formed.</p></div>
-      <div class="card"><h3>Multilingual</h3><p>Passages stay verbatim in their own language; any translation is additive and marked. The answer comes back in the language of the question.</p></div>
-      <div class="card"><h3>Access-scoped</h3><p>Scope resolves to a hard partition pre-filter before retrieval — evidence outside the caller's scope is never even a candidate.</p></div>
-    </div>
-  </section>
-
+  <!-- HONEST LIMITS + SCOPE -->
   <section id="scope" class="wrap">
     <div class="lead">
-      <p class="eyebrow kicker">Honest boundaries</p>
-      <h2 class="section-h">A small core, on purpose.</h2>
-      <p class="section-sub">The discipline that makes the guarantee credible is knowing what to leave out. Everything here is a deliberate line, not a missing feature.</p>
+      <p class="eyebrow">What we actually promise</p>
+      <h2 class="section-h"><em>“No ungrounded claim”</em> — not “zero hallucination.”</h2>
+      <p class="section-sub">We won't pretend the model never errs. We guarantee it never asserts what the evidence doesn't support. That honesty is the point — and it's why the core stays small.</p>
     </div>
-    <div class="split" style="margin-top:34px">
+    <div class="split" style="margin-top:2.75rem">
       <div class="panel is">
         <h3>It is</h3>
         <ul>
-          <li>An evidence-first RAG <em>library</em> — a reference you build products on.</li>
-          <li>An ingest engine for real artifacts, resolving every hit to a cited Evidence Unit.</li>
-          <li>Model-agnostic: bring your own embedding, LLM, reranker, and vision endpoints.</li>
-          <li>S3-native storage with reproducible, auditable provenance.</li>
+          <li>An evidence-first RAG library you build products on.</li>
+          <li>An ingest engine that resolves every hit to a cited Evidence Unit.</li>
+          <li>Model-agnostic — your embeddings, LLM, reranker, and vision.</li>
+          <li>S3-native, with reproducible, auditable provenance.</li>
         </ul>
       </div>
       <div class="panel isnot">
         <h3>It is not</h3>
         <ul>
-          <li>Not a model host — nothing is bundled; every model is injected.</li>
-          <li>Not a code-comprehension or call-graph tool — guessed edges would betray cite-or-abstain.</li>
-          <li>Not a memory or “brain,” and not an end-user app — those are separate repos built on top.</li>
-          <li>Not a promise of zero hallucination — a promise of no <em>ungrounded</em> claim.</li>
+          <li>Not a model host — nothing bundled; every model is injected.</li>
+          <li>Not a code-comprehension tool — guessed edges betray cite-or-abstain.</li>
+          <li>Not a memory, and not an end-user app — those live on top.</li>
+          <li>Not a promise of zero hallucination — a promise of nothing ungrounded.</li>
         </ul>
       </div>
     </div>
