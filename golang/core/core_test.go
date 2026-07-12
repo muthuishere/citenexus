@@ -116,6 +116,48 @@ func TestStoreRoundTrip(t *testing.T) {
 	}
 }
 
+// TestStoreDeleteDocument exercises the row-level inverse of upsert used by
+// document-revoke: it removes only the named document's rows and is a no-op on
+// an unknown id / a leaf with no table yet (mirrors the Python reference).
+func TestStoreDeleteDocument(t *testing.T) {
+	dir := t.TempDir()
+	store, err := Open(dir, "")
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	// Delete before any table exists must be a no-op.
+	if out := store.DeleteDocument("nda"); strings.Contains(out, `"error"`) {
+		t.Fatalf("delete on empty leaf errored: %s", out)
+	}
+
+	rows := []any{
+		map[string]any{"eu_id": "nda::0", "vector": []float64{1, 0, 0, 0}, "text": "secret", "document_id": "nda"},
+		map[string]any{"eu_id": "leave::0", "vector": []float64{0, 1, 0, 0}, "text": "leave", "document_id": "leave"},
+	}
+	rowsJSON, _ := json.Marshal(rows)
+	if out := store.Upsert(string(rowsJSON)); strings.Contains(out, `"error"`) {
+		t.Fatalf("upsert error: %s", out)
+	}
+
+	if out := store.DeleteDocument("nda"); strings.Contains(out, `"error"`) {
+		t.Fatalf("delete error: %s", out)
+	}
+	var remaining []map[string]any
+	if err := json.Unmarshal([]byte(store.Scan(-1)), &remaining); err != nil {
+		t.Fatalf("scan output not JSON: %v", err)
+	}
+	if len(remaining) != 1 || remaining[0]["document_id"] != "leave" {
+		t.Fatalf("delete_document did not remove only nda: %v", remaining)
+	}
+
+	// Unknown id is a no-op.
+	if out := store.DeleteDocument("ghost"); strings.Contains(out, `"error"`) {
+		t.Fatalf("delete unknown errored: %s", out)
+	}
+}
+
 // TestDetect exercises the real lid.176 detector when the model is present, and
 // skips otherwise (the binding still compiled — that's the point). Set
 // CITENEXUS_LID176_PATH to the model file to run it.

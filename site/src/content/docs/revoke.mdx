@@ -1,0 +1,106 @@
+---
+title: Revoke a document
+description: delete() / revoke() surgically removes one ingested document and everything derived from it — rows, structure, images, the guarded raw blob, graph and wiki — idempotently. Corrections, retractions, and right-to-be-forgotten, first-class.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Evidence changes. A contract is superseded, a source is retracted, a data
+subject asks to be forgotten. `delete()` (alias `revoke()`) is the exact inverse
+of `ingest()`: it removes **one** document and every artifact derived from it, so
+the document is no longer retrievable and no longer citable by `ask()` — while
+every other document stays intact and answerable.
+
+```python
+rag.ingest(text="The employee shall not disclose…", document_id="nda-2021")
+rag.ingest(text="Employees accrue twenty days of leave…", document_id="leave")
+
+result = rag.delete("nda-2021")     # or rag.revoke("nda-2021")
+print(result.status, result.n_units)   # "deleted" 3
+
+# nda-2021 is gone — not retrieved, not citable
+rag.ask("Can the employee disclose confidential information?")
+#   → "I can't answer that from the available evidence."   (nda-2021 was the only source)
+
+rag.ask("How many days of annual leave?")   # every other document still answers
+```
+
+`delete()` returns a `DeleteResult` with a `status` and the purged Evidence-Unit
+ids:
+
+```python
+DeleteResult(document_id="nda-2021", status="deleted", removed_eu_ids=("nda-2021::0", …))
+```
+
+## What gets removed
+
+A single `ingest()` writes several artifacts; `delete()` unwinds all of them for
+that `document_id`:
+
+| Artifact | Removed |
+|---|---|
+| Vector rows (the retrievable Evidence Units) | ✅ all rows carrying the `document_id` |
+| Structure index (`knowledge/…/structure/{id}.json`) | ✅ |
+| Per-document image blobs (`raw/…/images/{id}/`) | ✅ |
+| Content-addressed raw blob (`raw/…/{checksum}`) | ✅ **only if no other document shares those bytes** |
+| Graph (`graph/…/graph.json`) | ✅ rebuilt to contain nothing derived from the doc — when the `graph` signal is on |
+| Wiki page + index entry | ✅ page dropped, index rewritten — when the `wiki` signal is on |
+| Etag-manifest entry | ✅ removed **last** (the commit point) |
+
+The lexical (BM25) index needs no separate step — it is derived from the vector
+rows and stops matching the document the moment its rows are gone.
+
+<Aside type="tip" title="Shared bytes are reference-guarded">
+Raw blobs are **content-addressed**: two documents ingested from identical bytes
+share one physical blob. A revoke deletes that blob **only when it was the last
+owner** — an identical twin keeps the blob, and its `raw_uri` stays intact and
+answerable. No document ever loses evidence because a byte-identical sibling was
+revoked.
+</Aside>
+
+## Idempotent and resumable
+
+`delete()` is safe to call twice and safe to interrupt:
+
+```python
+rag.delete("nda-2021").status   # "deleted"  — existed, removed
+rag.delete("nda-2021").status   # "absent"   — nothing left to do, no error
+rag.delete("never-ingested")    # "absent"
+```
+
+The etag-manifest entry is written **last**. While it is present the document is
+considered logically present, so a revoke interrupted after some artifacts are
+removed but before the manifest entry is forgotten simply re-runs cleanly — it
+finishes removing what remains and forgets the entry, with no orphaned,
+still-retrievable evidence.
+
+## Observe it
+
+A revoke fires the `on_delete` lifecycle hook (the mirror of `on_ingest`),
+observe-only and never fatal — the same contract as every other hook:
+
+```python
+from citenexus import CiteNexus, Hooks
+
+rag = CiteNexus(store, embedder=…, generator=…,
+                hooks=Hooks(on_delete=lambda r: audit_log(r.document_id, r.status)))
+```
+
+## Across the ports
+
+Revocation reaches down to the storage seam in every port at parity. The Python
+facade (`CiteNexus.delete` / `revoke`) orchestrates the full unwind; the Go, JS,
+and Rust cores expose the row-level primitive the facade is built on:
+
+| Port | Surface |
+|---|---|
+| Python | `rag.delete(document_id)` / `rag.revoke(document_id)` — full orchestration |
+| Rust core | `LanceStore::delete_document(&self, document_id)` (C-ABI `citenexus_store_delete_document`) |
+| Go | `VectorStore.DeleteDocument(documentID string) error` |
+| JavaScript | `VectorStore.deleteDocument(documentId): Promise<void>` |
+
+<Aside type="note" title="Partition scope">
+`delete()` operates within the client's partition, exactly like `ingest()`. To
+revoke a document in another partition, construct the client for that partition
+and call `delete()` there.
+</Aside>

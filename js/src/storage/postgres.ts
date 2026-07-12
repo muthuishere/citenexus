@@ -210,6 +210,18 @@ export class PostgresVectorStore implements VectorStore, TextSearch {
     }
     return this.select(sql, params);
   }
+
+  /** Remove every row for `documentId` (parameterized; no-op on a missing
+   *  table — an empty leaf, not a bug). Mirrors `delete_document`. */
+  async deleteDocument(documentId: string): Promise<void> {
+    const conn = await this.connection();
+    try {
+      await conn.query(`DELETE FROM ${this.table} WHERE document_id = $1`, [documentId]);
+    } catch (error) {
+      if (isMissingTable(error)) return;
+      throw error;
+    }
+  }
 }
 
 /** The text-search half of the Postgres backend pairing.

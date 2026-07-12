@@ -41,6 +41,14 @@ class VectorStore(Protocol):
         """All rows in this leaf — the corpus for lexical/structure signals."""
         ...
 
+    def delete_document(self, document_id: str) -> None:
+        """Remove every EU row carrying ``document_id`` — the inverse of the
+        rows an ``ingest`` wrote (spec: document-revoke). A no-op (never an
+        error) when no rows match or the leaf has no table yet. No separate
+        text-search deletion is needed: the lexical index is derived from these
+        same rows and reflects the removal once they are gone."""
+        ...
+
 
 @runtime_checkable
 class TextSearch(Protocol):

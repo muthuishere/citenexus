@@ -158,6 +158,24 @@ class PostgresVectorStore:
         )
         return [dict(zip((*_COLUMNS, "_text_score"), row, strict=True)) for row in rows]
 
+    def delete_document(self, document_id: str) -> None:
+        """Remove every row for ``document_id`` (parameterized; no-op on a
+        missing table — an empty leaf, not a bug). Mirrors the LanceDB seam."""
+        conn = self._connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"DELETE FROM {self._table} WHERE document_id = %s", (document_id,)
+                )
+            conn.commit()
+        except Exception as error:
+            if _is_missing_table(error):
+                rollback = getattr(conn, "rollback", None)
+                if callable(rollback):
+                    rollback()
+                return
+            raise
+
     def scan(self, limit: int | None = None) -> list[dict[str, Any]]:
         """All rows in this leaf — the corpus for lexical/structure signals."""
         sql = f"SELECT {', '.join(_COLUMNS)} FROM {self._table}"

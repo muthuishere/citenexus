@@ -51,6 +51,7 @@ export default defineConfig({
 					items: [
 						{ label: 'Ingest anything', slug: 'ingest' },
 						{ label: 'Bulk & batch ingest', slug: 'bulk-ingest' },
+						{ label: 'Revoke a document', slug: 'revoke' },
 						{ label: 'Signals & capabilities', slug: 'signals' },
 						{ label: 'Vision — figures as evidence', slug: 'vision' },
 					],

@@ -52,6 +52,11 @@ export interface VectorStore {
 
   /** All rows in this leaf — the corpus for lexical/structure signals. */
   scan(limit?: number | null): Promise<Record<string, unknown>[]>;
+
+  /** Remove every row carrying `documentId` — the row-level inverse of an
+   *  ingest (document-revoke). A no-op when nothing matches or the leaf has no
+   *  table yet. Mirrors python `VectorStore.delete_document`. */
+  deleteDocument(documentId: string): Promise<void>;
 }
 
 /** Native lexical ranking, when the backend can do it itself. */

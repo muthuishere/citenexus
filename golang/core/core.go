@@ -29,6 +29,7 @@ LanceStore* citenexus_store_open(const char* uri, const char* storage_options_js
 char* citenexus_store_upsert(LanceStore* handle, const char* rows_json);
 char* citenexus_store_search(LanceStore* handle, const char* vector_json, size_t limit);
 char* citenexus_store_scan(LanceStore* handle, int64_t limit);
+char* citenexus_store_delete_document(LanceStore* handle, const char* document_id);
 char* citenexus_store_drop(LanceStore* handle);
 void citenexus_store_close(LanceStore* handle);
 */
@@ -154,6 +155,18 @@ func (s *Store) Search(vecJSON string, limit int) string {
 // `{"error":...}`.
 func (s *Store) Scan(limit int) string {
 	out := C.citenexus_store_scan(s.handle, C.int64_t(limit))
+	defer C.citenexus_free_string(out)
+	return C.GoString(out)
+}
+
+// DeleteDocument removes every row for documentID (no-op when absent) — the
+// row-level inverse of Upsert used by document-revoke. Returns `{"ok":true}` or
+// `{"error":...}`.
+func (s *Store) DeleteDocument(documentID string) string {
+	cID := C.CString(documentID)
+	defer C.free(unsafe.Pointer(cID))
+
+	out := C.citenexus_store_delete_document(s.handle, cID)
 	defer C.citenexus_free_string(out)
 	return C.GoString(out)
 }

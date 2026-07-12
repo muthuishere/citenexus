@@ -169,6 +169,29 @@ impl LanceStore {
         batches_to_json(&batches)
     }
 
+    /// Remove every row for `document_id` — the row-level inverse of `upsert`
+    /// (document-revoke). No-op when the leaf has no table yet. Single quotes in
+    /// the id are doubled so the SQL-like predicate can't be broken.
+    pub fn delete_document(&self, document_id: &str) -> Result<(), String> {
+        if !self.table_exists()? {
+            return Ok(());
+        }
+        let escaped = document_id.replace('\'', "''");
+        self.runtime.block_on(async {
+            let table = self
+                .db
+                .open_table(TABLE)
+                .execute()
+                .await
+                .map_err(|e| e.to_string())?;
+            table
+                .delete(&format!("document_id = '{escaped}'"))
+                .await
+                .map(|_| ())
+                .map_err(|e| e.to_string())
+        })
+    }
+
     /// Drop this leaf's table (the leaf becomes empty). No-op when absent.
     pub fn drop_table(&self) -> Result<(), String> {
         if !self.table_exists()? {

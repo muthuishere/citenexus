@@ -29,6 +29,35 @@ def test_new_or_changed_checksum_is_dirty() -> None:
     assert m.is_changed("doc1", "sha256:DIFFERENT")
 
 
+def test_forget_removes_entry_and_is_idempotent() -> None:
+    m = EtagManifest()
+    m.record("doc1", "sha256:abc")
+    m.record("doc2", "sha256:def")
+    m.forget("doc1")
+    assert m.is_changed("doc1", "sha256:abc")  # gone → dirty again
+    assert not m.is_changed("doc2", "sha256:def")  # neighbor untouched
+    m.forget("doc1")  # second forget: no error (idempotent commit point)
+
+
+def test_owners_of_is_the_shared_blob_refcount() -> None:
+    m = EtagManifest()
+    m.record("doc1", "shaSHARED")
+    m.record("doc2", "shaSHARED")  # identical bytes
+    m.record("doc3", "shaUNIQUE")
+    # doc1 is not the last owner of the shared checksum
+    assert m.owners_of("shaSHARED", excluding="doc1") == ["doc2"]
+    # doc3 is the sole owner of its checksum
+    assert m.owners_of("shaUNIQUE", excluding="doc3") == []
+
+
+def test_processing_manifest_clear_status_is_idempotent() -> None:
+    m = ProcessingManifest()
+    m.set_status("shaX", "done")
+    m.clear_status("shaX")
+    assert m.get_status("shaX") is None
+    m.clear_status("shaX")  # absent → no error
+
+
 def test_etag_manifest_persists_via_backend(tmp_path: Path) -> None:
     backend = LocalFsBackend(tmp_path)
     part = _partition()

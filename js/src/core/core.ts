@@ -56,6 +56,7 @@ interface Symbols {
   storeUpsert: Sym;
   storeSearch: Sym;
   storeScan: Sym;
+  storeDeleteDocument: Sym;
   storeDrop: Sym;
   storeClose: Sym;
 }
@@ -99,6 +100,10 @@ function symbols(): Symbols {
       "size_t",
     ]),
     storeScan: lib.func("citenexus_store_scan", "void*", [LanceStorePtr, "int64_t"]),
+    storeDeleteDocument: lib.func("citenexus_store_delete_document", "void*", [
+      LanceStorePtr,
+      "const char*",
+    ]),
     storeDrop: lib.func("citenexus_store_drop", "void*", [LanceStorePtr]),
     storeClose: lib.func("citenexus_store_close", "void", [LanceStorePtr]),
   };
@@ -287,6 +292,14 @@ export class Store {
     const handle = this.assertOpen();
     const raw = takeString(this.sym.storeScan(handle, limit), this.sym);
     return parseJson<Record<string, unknown>[]>(raw);
+  }
+
+  /** Remove every row for `documentId` (no-op when absent) — the row-level
+   *  inverse of `upsert` used by document-revoke. */
+  deleteDocument(documentId: string): void {
+    const handle = this.assertOpen();
+    const raw = takeString(this.sym.storeDeleteDocument(handle, documentId), this.sym);
+    parseJson<{ ok: true }>(raw);
   }
 
   /** Drop the evidence_units table (the leaf becomes empty). */

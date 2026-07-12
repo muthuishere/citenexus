@@ -241,6 +241,32 @@ pub unsafe extern "C" fn citenexus_store_scan(handle: *mut LanceStore, limit: i6
     to_c_string(payload)
 }
 
+/// Remove every row for `document_id` (no-op when absent) — the row-level
+/// inverse of upsert used by document-revoke. Returns `{"ok":true}` or
+/// `{"error": ...}`.
+///
+/// # Safety
+/// `handle` must be a live pointer from `citenexus_store_open`; `document_id`
+/// must be a valid NUL-terminated UTF-8 C string.
+#[no_mangle]
+pub unsafe extern "C" fn citenexus_store_delete_document(
+    handle: *mut LanceStore,
+    document_id: *const c_char,
+) -> *mut c_char {
+    if handle.is_null() {
+        return to_c_string(error_json("null store handle"));
+    }
+    let document_id = match utf8_arg(document_id, "document_id") {
+        Ok(raw) => raw,
+        Err(msg) => return to_c_string(error_json(&msg)),
+    };
+    let payload = match (*handle).delete_document(document_id) {
+        Ok(()) => r#"{"ok":true}"#.to_string(),
+        Err(message) => error_json(&message),
+    };
+    to_c_string(payload)
+}
+
 /// Drop the `evidence_units` table (no-op when absent). Returns `{"ok":true}`
 /// or `{"error": ...}`.
 ///

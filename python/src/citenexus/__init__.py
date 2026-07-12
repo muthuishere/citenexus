@@ -6,6 +6,7 @@ typed plugin protocols so nothing in the pipeline is hardwired.
 """
 
 from citenexus.client import CiteNexus
+from citenexus.delete import DeleteResult
 from citenexus.hooks import Hooks
 from citenexus.http import (
     AnthropicHttpEndpoint,
@@ -24,6 +25,7 @@ __all__ = [
     "S3",
     "AnthropicHttpEndpoint",
     "CiteNexus",
+    "DeleteResult",
     "GeminiHttpEndpoint",
     "Hooks",
     "HttpClient",

@@ -90,6 +90,32 @@ describe("citenexus-core FFI", () => {
     }
   });
 
+  it("Store.deleteDocument removes only that document's rows (document-revoke)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "citenexus-delete-"));
+    tmpDirs.push(dir);
+    const store = Store.open(dir);
+    try {
+      // Delete before any table exists is a no-op.
+      store.deleteDocument("nda");
+
+      store.upsert([
+        { eu_id: "nda::0", text: "secret", vector: [1, 0, 0, 0], document_id: "nda" },
+        { eu_id: "leave::0", text: "leave", vector: [0, 1, 0, 0], document_id: "leave" },
+      ]);
+
+      store.deleteDocument("nda");
+      const remaining = store.scan();
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0]!["document_id"]).toBe("leave");
+
+      // Unknown id is a no-op.
+      store.deleteDocument("ghost");
+      expect(store.scan()).toHaveLength(1);
+    } finally {
+      store.close();
+    }
+  });
+
   it("detect() identifies language (skips if lid.176 model absent)", () => {
     if (!existsSync(MODEL_PATH)) {
       // The 126MB model is a vendored asset; skip cleanly when not present.

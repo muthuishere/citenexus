@@ -93,6 +93,12 @@ func decodeRows(raw string) ([]Row, error) {
 	return rows, nil
 }
 
+// DeleteDocument removes every row for documentID (no-op when absent) — the
+// row-level inverse of Upsert used by document-revoke.
+func (l *LanceVectorStore) DeleteDocument(documentID string) error {
+	return checkErr(l.store.DeleteDocument(documentID))
+}
+
 // Drop drops the leaf (isolation = drop a table, mirroring the pg peer).
 func (l *LanceVectorStore) Drop() error { return checkErr(l.store.Drop()) }
 

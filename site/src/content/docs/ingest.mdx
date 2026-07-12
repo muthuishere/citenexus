@@ -31,6 +31,10 @@ print(r.document_id, r.eu_ids) # the id and the Evidence-Unit ids created
 text yourself. For whole-site intake, use `crawl()` below.
 </Aside>
 
+Ingest has an inverse: [`rag.delete(document_id)`](/citenexus/revoke/) (alias
+`revoke`) surgically removes one document and everything derived from it —
+idempotently, and guarding raw blobs shared by identical bytes.
+
 ## Crawl a site
 
 `crawl()` does a same-domain breadth-first walk, ingesting each page as HTML:

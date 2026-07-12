@@ -263,6 +263,25 @@ func (s *PostgresVectorStore) Scan(limit *int) ([]Row, error) {
 	return zipRows(raw, euColumns), nil
 }
 
+// DeleteDocument removes every row for documentID (parameterized; no-op on a
+// missing table — an empty leaf, not a bug). Mirrors
+// PostgresVectorStore.delete_document.
+func (s *PostgresVectorStore) DeleteDocument(documentID string) error {
+	ctx := context.Background()
+	conn, err := s.connection(ctx)
+	if err != nil {
+		return err
+	}
+	sql := fmt.Sprintf("DELETE FROM %s WHERE document_id = $1", s.table)
+	if _, err := conn.Exec(ctx, sql, documentID); err != nil {
+		if isMissingTable(err) {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
 // zipRows pairs each result tuple with the column names into a Row map.
 func zipRows(raw [][]any, cols []string) []Row {
 	out := make([]Row, 0, len(raw))

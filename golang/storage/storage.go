@@ -42,6 +42,11 @@ type VectorStore interface {
 	// Scan returns all rows in this leaf — the corpus for lexical/structure
 	// signals. A nil limit means no limit.
 	Scan(limit *int) ([]Row, error)
+	// DeleteDocument removes every row carrying documentID — the row-level
+	// inverse of an ingest (document-revoke). A no-op (nil error) when nothing
+	// matches or the leaf has no table yet. Mirrors
+	// python storage.protocols.VectorStore.delete_document.
+	DeleteDocument(documentID string) error
 }
 
 // TextSearch is native lexical ranking, when the backend can do it itself.

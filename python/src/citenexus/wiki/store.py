@@ -182,6 +182,23 @@ class WikiStore:
         self._log(f"ingest | {document_id}")
         return page
 
+    def remove_document(self, document_id: str) -> None:
+        """Delete a revoked document's page and drop it from the light index.
+
+        The inverse of ``integrate_document``: removes the page ``.json``/``.md``
+        for the document's deterministic slug and rewrites ``index.json``/
+        ``index.md`` from the surviving entries — no LLM re-distillation over the
+        corpus. Idempotent: an absent page just leaves the index unchanged. Only
+        the deterministic per-document page id (``wiki:{document_id}``) is
+        removed; a full rebuild re-derives any cross-document distiller pages."""
+        page_id = f"wiki:{document_id}"
+        self._backend.delete_prefix(self.page_json_key(page_id))
+        self._backend.delete_prefix(self.page_key(page_id))
+        survivors = [entry for entry in self.load_index() if entry.get("page_id") != page_id]
+        self._backend.put_json(self.index_json_key, survivors)
+        self._backend.put_bytes(self.index_key, _index_markdown(survivors))
+        self._log(f"delete | {document_id}")
+
     def build_from_store(self, store: VectorStore) -> tuple[WikiPage, ...]:
         """Full (re)build — the distiller path, and the crawl/bulk entry point."""
         rows_by_doc: dict[str, list[dict[str, object]]] = {}

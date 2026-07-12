@@ -12,6 +12,7 @@ from citenexus.answer.generator import OpenAICompatibleGenerator
 from citenexus.answer.result import Decision, Result
 from citenexus.config.schema import CiteNexusConfig
 from citenexus.config.signals import Signal, resolve_signals
+from citenexus.delete import DeleteResult
 from citenexus.domain.partition import PartitionPath
 from citenexus.domain.trust import TrustMode
 from citenexus.embed import OpenAICompatibleEmbedding, embed_in_batches
@@ -39,7 +40,8 @@ from citenexus.retrieve.vector import QueryEmbedder, VectorRetriever
 from citenexus.storage.backend import LocalFsBackend, S3Backend, StorageBackend
 from citenexus.storage.lance_store import LanceVectorStore, StorageOptions
 from citenexus.storage.location import S3
-from citenexus.storage.paths import leaf_vector_uri, partition_segment
+from citenexus.storage.manifest import EtagManifest, load_manifest, save_manifest
+from citenexus.storage.paths import Layer, layer_prefix, leaf_vector_uri, partition_segment
 from citenexus.storage.postgres_store import PostgresVectorStore, table_name_for
 from citenexus.storage.protocols import TextSearch, VectorStore
 from citenexus.stream import stream_result
@@ -418,6 +420,68 @@ class CiteNexus:
             self._graph_store.build_from_store(self._store)
         if Signal.wiki in self.signals:
             self._wiki_store.integrate_document(document_id, self._store)
+
+    def revoke(self, document_id: str) -> DeleteResult:
+        """Alias of :meth:`delete` — retract one document and all it produced."""
+        return self.delete(document_id)
+
+    def delete(self, document_id: str) -> DeleteResult:
+        """Surgically revoke one ingested document — the inverse of ``ingest``.
+
+        Removes the document's vector rows, structure index, and per-document
+        image blobs, and — guarded by the shared-checksum reference rule — its
+        content-addressed raw blob, then rebuilds the graph and drops its wiki
+        page when those signals are declared. The etag-manifest entry is removed
+        LAST (the commit point), so a revoke interrupted before that write leaves
+        the document logically present and a re-run completes cleanly.
+
+        Idempotent: an absent or already-revoked id returns status ``"absent"``
+        and changes nothing; a document that existed returns ``"deleted"`` with
+        the purged Evidence-Unit ids. After a successful revoke the document is
+        neither retrievable nor citable by ``ask()``; every other document is
+        untouched.
+        """
+        etag_name = IngestPipeline.ETAG
+        manifest = load_manifest(self._backend, self.partition, etag_name, EtagManifest)
+        assert isinstance(manifest, EtagManifest)
+        if document_id not in manifest.etags:
+            return DeleteResult(document_id=document_id, status="absent")
+        checksum = manifest.etags[document_id]
+
+        # Capture what will be purged before the rows are gone.
+        removed = tuple(
+            str(row["eu_id"])
+            for row in self._store.scan()
+            if str(row.get("document_id", row.get("eu_id"))) == document_id
+        )
+
+        # Derived artifacts first (resumable order): rows → structure → images.
+        self._store.delete_document(document_id)
+        knowledge_prefix = layer_prefix(Layer.knowledge, self.partition)
+        self._backend.delete_prefix(f"{knowledge_prefix}/structure/{document_id}.json")
+        raw_prefix = layer_prefix(Layer.raw, self.partition)
+        self._backend.delete_prefix(f"{raw_prefix}/images/{document_id}/")
+
+        # The raw blob is content-addressed and shared by identical bytes — delete
+        # it ONLY when no other document still owns the checksum (§1).
+        if not manifest.owners_of(checksum, excluding=document_id):
+            self._backend.delete_prefix(f"{raw_prefix}/{checksum}")
+
+        # Navigation must not point at revoked evidence.
+        if Signal.graph in self.signals or Signal.community in self.signals:
+            self._graph_store.build_from_store(self._store)
+        if Signal.wiki in self.signals:
+            self._wiki_store.remove_document(document_id)
+
+        # Commit point LAST: while the entry is present the doc is logically present.
+        manifest.forget(document_id)
+        save_manifest(self._backend, self.partition, etag_name, manifest)
+
+        result = DeleteResult(
+            document_id=document_id, status="deleted", removed_eu_ids=removed
+        )
+        self._hooks.fire("on_delete", result)
+        return result
 
     def _ingest_url(self, url: str, *, document_id: str | None, acl: Any) -> IngestResult:
         """Fetch a URL and ingest its body via the content-appropriate extractor."""

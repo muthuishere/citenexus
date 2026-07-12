@@ -3,6 +3,7 @@
 ``Hooks`` gives operators callbacks at the moments that matter, toolnexus-style:
 
 - ``on_ingest(result)``        — a document finished ingesting
+- ``on_delete(result)``        — a document was revoked (delete/revoke)
 - ``on_retrieve(query, cands)``— fused candidates for a query
 - ``on_answer(result)``        — a grounded answer was produced
 - ``on_refuse(result)``        — the strict gate refused
@@ -27,6 +28,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from citenexus.answer.result import Result
+    from citenexus.delete import DeleteResult
     from citenexus.ingest.result import IngestResult
     from citenexus.retrieve.types import Candidate
 
@@ -36,6 +38,7 @@ class Hooks:
     """Optional lifecycle callbacks; any subset may be provided."""
 
     on_ingest: Callable[[IngestResult], Any] | None = None
+    on_delete: Callable[[DeleteResult], Any] | None = None
     on_retrieve: Callable[[str, list[Candidate]], Any] | None = None
     on_answer: Callable[[Result], Any] | None = None
     on_refuse: Callable[[Result], Any] | None = None

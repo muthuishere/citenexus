@@ -73,6 +73,19 @@ class LanceVectorStore:
         rows: list[dict[str, Any]] = tbl.to_arrow().to_pylist()
         return rows if limit is None else rows[:limit]
 
+    def delete_document(self, document_id: str) -> None:
+        """Remove every row for ``document_id`` — the inverse of ingest's upsert.
+
+        No-op if the leaf has no table yet or nothing matches. Single quotes in
+        the id are doubled so the predicate can't be broken (Lance filters are
+        SQL-like); ``delete_document`` is the only narrow mutation the seam
+        exposes — no raw predicate crosses the boundary."""
+        if self.TABLE not in self._tables():
+            return
+        tbl = self._db.open_table(self.TABLE)
+        escaped = document_id.replace("'", "''")
+        tbl.delete(f"document_id = '{escaped}'")
+
     def drop(self) -> None:
         """Drop this leaf's table (the leaf becomes empty)."""
         if self.TABLE in self._tables():

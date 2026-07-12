@@ -146,6 +146,33 @@ fn scan_respects_limit() {
 }
 
 #[test]
+fn delete_document_removes_only_that_documents_rows() {
+    let (_dir, store) = open_store();
+    store.upsert(&rows()).unwrap(); // three rows, all document_id "doc"
+    store
+        .upsert(&json!([{
+            "eu_id": "other::0",
+            "vector": [0.0, 0.0, 0.0, 1.0],
+            "text": "A different document.",
+            "document_id": "other",
+            "language": "en",
+            "page": 1,
+            "checksum": "c9",
+            "raw_uri": "s3://bucket/raw/other"
+        }]))
+        .unwrap();
+
+    store.delete_document("doc").unwrap();
+    assert_eq!(eu_ids(&store.scan(None).unwrap()), vec!["other::0"]);
+
+    // Unknown id and a missing table are both no-ops (mirror Python).
+    store.delete_document("does-not-exist").unwrap();
+    let (_dir2, empty) = open_store();
+    empty.delete_document("doc").unwrap();
+    assert_eq!(empty.scan(None).unwrap(), json!([]));
+}
+
+#[test]
 fn drop_table_empties_the_leaf_and_is_idempotent() {
     let (_dir, store) = open_store();
     store.upsert(&rows()).unwrap();
