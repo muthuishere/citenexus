@@ -1,0 +1,159 @@
+name: cli-release
+
+# The CLI's OWN custom release. On a `cli-v*` tag (decoupled from the core's `v*`
+# releases), build the self-contained `citenexus` CLI (Go binary static-linked
+# with the Rust core) for every platform, attach them + a SHA256SUMS file to the
+# GitHub Release, then publish the @muthuishere/citenexuscli npm launcher whose
+# version equals the tag (minus the `cli-v` prefix). The npm package downloads the
+# matching binary from this release at install / first run and verifies it against
+# SHA256SUMS.
+on:
+  push:
+    tags: ["cli-v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "CLI release tag to build/attach (e.g. cli-v0.9.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14        # Apple silicon
+            asset: citenexus-darwin-arm64
+          - os: macos-13        # Intel mac
+            asset: citenexus-darwin-x64
+          - os: ubuntu-latest
+            asset: citenexus-linux-x64
+          - os: ubuntu-24.04-arm
+            asset: citenexus-linux-arm64
+          - os: windows-latest
+            asset: citenexus-win-x64.exe
+            windows: true
+    runs-on: ${{ matrix.os }}
+    # Windows static-linking of the Rust core through cgo is a documented
+    # follow-up (msvc/mingw ABI); attempt it but don't fail the release.
+    continue-on-error: ${{ matrix.windows == true }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: golang/go.mod
+
+      - name: Install protoc (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Install protoc (macOS)
+        if: runner.os == 'macOS'
+        run: brew install protobuf
+      - name: Install protoc (Windows)
+        if: runner.os == 'Windows'
+        run: choco install protoc -y
+
+      - name: Build Rust staticlib
+        working-directory: rust
+        run: cargo build --release
+
+      - name: Build static-linked CLI (unix)
+        if: runner.os != 'Windows'
+        working-directory: golang
+        env:
+          CGO_ENABLED: "1"
+        run: |
+          go build -tags "citenexus_ffi citenexus_static" -o "../${{ matrix.asset }}" ./cmd/citenexus
+          "../${{ matrix.asset }}" version
+
+      - name: Build static-linked CLI (windows)
+        if: runner.os == 'Windows'
+        working-directory: golang
+        shell: bash
+        env:
+          CGO_ENABLED: "1"
+        run: |
+          go build -tags "citenexus_ffi citenexus_static" -o "../${{ matrix.asset }}" ./cmd/citenexus
+          "../${{ matrix.asset }}" version
+
+      - name: Checksum (unix)
+        if: runner.os != 'Windows'
+        run: shasum -a 256 "${{ matrix.asset }}" > "${{ matrix.asset }}.sha256"
+      - name: Checksum (windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: sha256sum "${{ matrix.asset }}" > "${{ matrix.asset }}.sha256"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ matrix.asset }}
+          path: |
+            ${{ matrix.asset }}
+            ${{ matrix.asset }}.sha256
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Assemble SHA256SUMS
+        working-directory: dist
+        run: cat *.sha256 > SHA256SUMS
+      - name: Publish assets to the Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+            || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --generate-notes
+          cd dist
+          gh release upload "$TAG" citenexus-* SHA256SUMS --repo "$GITHUB_REPOSITORY" --clobber
+
+  # Publishes via npm Trusted Publishing (OIDC) — no NPM_TOKEN.
+  # ONE-TIME BOOTSTRAP (a trusted publisher can only attach to a package that
+  # already exists on the registry):
+  #   1. Cut the `cli-v<version>` tag so the `build`+`release` jobs create the GH
+  #      Release with the binaries + SHA256SUMS.
+  #   2. Publish the package once by hand:  cd cli && npm publish --access public
+  #   3. On npmjs.com → @muthuishere/citenexuscli → Settings → Trusted Publisher,
+  #      add: GitHub Actions · repo muthuishere/citenexus · workflow cli-release.yml
+  # After that, every `cli-v*` tag publishes here automatically with provenance.
+  publish-npm:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm Trusted Publishing (OIDC) + provenance
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+      - name: Upgrade npm (Trusted Publishing needs npm >= 11.5.1)
+        run: npm install -g npm@latest
+      - name: Verify package version equals the release tag
+        working-directory: cli
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "cli-v$PKG_VERSION" != "$TAG" ]; then
+            echo "cli/package.json version ($PKG_VERSION) → expected tag cli-v$PKG_VERSION, got $TAG" >&2
+            exit 1
+          fi
+      - name: Test the launcher
+        working-directory: cli
+        run: node --test "test/**/*.test.mjs"
+      - name: Publish (OIDC trusted publishing + provenance)
+        working-directory: cli
+        run: npm publish --provenance --access public

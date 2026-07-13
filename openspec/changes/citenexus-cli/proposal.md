@@ -29,12 +29,14 @@ skill (`skill` mode, the generalized two-phase pattern).
   request edge — a config is always safe to commit.
 - **`api` LLM mode** wired through the Go `models` clients (the `${ENV}` header
   auth already shipped).
-- **npm distribution**: ONE package `@muthuishere/citenexus` = a `bin` launcher
+- **npm distribution**: ONE package `@muthuishere/citenexuscli` = a `bin` launcher
   shim + a `postinstall` downloader that pulls the platform binary from **GitHub
   Releases** and caches it. Safeguards: **SHA256 checksum verify**, **lazy
   first-run download** (survives `--ignore-scripts`/offline install), cache in
   `~/.cache/citenexus/<version>/<platform>`, env overrides (`CITENEXUS_BINARY`,
-  mirror base URL), `HTTPS_PROXY` respected. npm version ↔ GH release tag, 1:1.
+  mirror base URL), `HTTPS_PROXY` respected. Its OWN custom release, tagged
+  `cli-v<version>` (separate from the core's `v*` releases); npm version ↔ that
+  tag, 1:1.
 - **CI release matrix** (darwin arm64/x64, linux x64/arm64, win x64) → GH Release
   with `SHA256SUMS`.
 

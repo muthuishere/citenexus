@@ -1,0 +1,132 @@
+---
+title: CLI — one binary, drivable by an agent
+description: Install the CiteNexus CLI with one npm command, configure it per-folder with a commit-safe YAML (secrets by ${ENV} reference), and drive ingest / retrieve / ask from a shell — or let an agent skill drive it for you.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+CiteNexus is a library, but you adopt a **tool**. The `citenexus` CLI is one
+self-contained binary — a Go front end static-linked with the Rust engine — that
+exposes the evidence-first core from a shell and is **drivable headless by an
+agent skill**. It answers only from retrieved, cited evidence and abstains when
+evidence is weak, missing, or conflicting.
+
+## Install
+
+```sh
+npm i -g @muthuishere/citenexuscli
+```
+
+One npm package downloads the correct platform binary from the CLI's **own
+GitHub Release** (its dedicated `cli-v*` tag, separate from the core's `v*`
+releases) and **verifies it against a published SHA256** before it ever runs. It
+works even when install scripts are disabled (`--ignore-scripts`, offline, CI):
+the launcher lazily downloads and verifies on first invocation. A cached binary
+re-runs with no network.
+
+| Env var | Effect |
+|---|---|
+| `CITENEXUS_BINARY` | absolute path to a binary — used as-is, skips download entirely (air-gapped / dev) |
+| `CITENEXUS_DOWNLOAD_BASE` | mirror base URL for the release assets |
+| `HTTPS_PROXY` | honored for the download (best-effort) |
+
+Platforms: darwin arm64/x64, linux x64/arm64. Windows x64 is a documented
+follow-up (see [Roadmap](#roadmap)).
+
+## Let an agent drive it
+
+```sh
+citenexus install --skills
+```
+
+One command writes the bundled agent skill (`SKILL.md` + `references/`) into
+**both** `~/.claude/skills/citenexus/` and `~/.agents/skills/citenexus/`,
+idempotently. After that, an agent can drive the CLI — ingest a folder, then ask
+grounded, cite-or-abstain questions over it — with no further setup.
+
+## Configure — dual-level, secrets by reference
+
+`citenexus init` scaffolds a **commit-safe** `citenexus.yaml`:
+
+```sh
+citenexus init
+```
+
+Configuration resolves with precedence **environment → project
+`./citenexus.yaml` → global `~/.config/citenexus/config.yaml` → built-in
+defaults**, discovering the nearest project file by walking up from the working
+directory (git-style). Edit the global file with `citenexus config get|set`.
+
+```yaml
+# citenexus.yaml — always safe to commit (holds no secrets)
+storage: { backend: local, path: ./.citenexus }
+signals: [embedding, text]
+mode: api                       # api | skill
+models:
+  embedding:
+    base_url: https://api.openai.com/v1
+    model: text-embedding-3-small
+    headers:
+      Authorization: "Bearer ${OPENAI_API_KEY}"
+  llm:
+    base_url: https://api.openai.com/v1
+    model: gpt-4o-mini
+    headers:
+      Authorization: "Bearer ${OPENAI_API_KEY}"
+```
+
+**Secrets are `${ENV}` header templates only.** The `${OPENAI_API_KEY}` value is
+read from the environment and materialized *only* in the outgoing HTTP request —
+never written to the config, a log, or the skill. That is why a `citenexus.yaml`
+is always safe to commit.
+
+## Commands
+
+| Command | Does | Needs a model? |
+|---|---|---|
+| `citenexus init [dir]` | scaffold `citenexus.yaml` | no |
+| `citenexus config get \| set` | read / write the global config | no |
+| `citenexus ingest <path>` | extract → chunk → embed → store | embedding (optional; lexical without) |
+| `citenexus retrieve "<q>"` | fused candidates, cite-only | no |
+| `citenexus ask "<q>"` | grounded answer or refusal | llm (required) |
+| `citenexus install --skills` | install the agent skill into `~/.claude` and `~/.agents` | no |
+
+All commands accept the global flags `--config <path>`, `--json`, and
+`--partition <name>`. `ingest` and `retrieve` (lexical BM25) work with **no model
+configured**; `ask` requires an `llm` model.
+
+```sh
+citenexus init
+citenexus ingest ./contracts/nda.pdf
+citenexus retrieve "confidentiality term" --json
+citenexus ask "Can the employee disclose this after leaving?" --json
+```
+
+`ask --json` returns the pinned [`Result`](/result/) shape: an `answer` with
+verbatim `sources[]`, or `evidence.decision: "refused"` when the corpus lacks the
+evidence. Relay the refusal honestly — that is the guarantee working.
+
+## LLM modes
+
+- **`api`** (default, shipping): the CLI calls models directly through its HTTP
+  clients using `${ENV}` header auth. Self-contained.
+- **`skill`** (reserved, follow-on): the CLI emits durable model requests for an
+  external fulfiller — the agent skill — to answer and resume, so the CLI holds
+  no credential. This generalizes the two-phase vision pattern to every model
+  call. Not wired yet — don't assume it.
+
+## Roadmap
+
+The CLI is a **surface** on top of the library; it starts small on purpose and
+grows as sequenced follow-on changes. Not yet shipped, so the page doesn't
+overclaim:
+
+- **Windows x64** static binary (msvc/mingw ABI for the cgo static link).
+- **`okf`** — grounded OKF emit + pull from evidence units.
+- **`status` / `dashboard`** — a TUI over the corpus, telemetry, and jobs.
+- **`skill` LLM mode** — the CLI emits model requests; the Python skill fulfills
+  and resumes (backed by the durable worker queue).
+- **`citenexus-skill`** — the full Python agent-skill driver (this change ships
+  the install mechanism + a minimal bundled skill).
+- **Go feature parity** for the remaining facade capabilities (evaluate, graph,
+  wiki, vision, revoke), each conformance-pinned.

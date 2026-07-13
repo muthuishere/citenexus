@@ -85,6 +85,7 @@ export default defineConfig({
 				{
 					label: 'Reference',
 					items: [
+						{ label: 'CLI — one binary', slug: 'cli' },
 						{ label: 'Install — Go, JS, Python', slug: 'install' },
 						{ label: 'Scope — is / is not', slug: 'scope' },
 					],

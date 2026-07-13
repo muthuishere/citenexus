@@ -10,8 +10,10 @@ wrong for npm tarballs, right for GH Releases. So:
   `.a`, producing ONE self-contained binary per platform.
 - **CI:** a release matrix builds `citenexus-<os>-<arch>` for darwin arm64/x64,
   linux x64/arm64, win x64, and publishes them to a GH Release with a
-  `SHA256SUMS` file. The npm package version equals the release tag.
-- **npm `@muthuishere/citenexus`:** contains only
+  `SHA256SUMS` file. The CLI ships as its OWN custom release, tagged
+  `cli-v<version>` (decoupled from the core's `v*` releases); the npm package
+  version equals that tag minus the `cli-v` prefix (`0.9.0` ↔ `cli-v0.9.0`).
+- **npm `@muthuishere/citenexuscli`:** contains only
   - `bin/citenexus.mjs` — a launcher shim: resolve the cached binary for this
     `{version, platform}`; if absent, download+verify, then `exec` it.
   - `scripts/postinstall.mjs` — pre-fetch the binary (best-effort; a failure is
@@ -67,7 +69,7 @@ models:
 The skill install follows the `windowctl`/`playwright-cli` pattern: the `SKILL.md`
 (+ a `references/` dir) is embedded in the Go binary (`embed.FS`) and written,
 idempotently, into **both** `~/.claude/skills/citenexus/` and
-`~/.agents/skills/citenexus/`. So `npm i -g @muthuishere/citenexus &&
+`~/.agents/skills/citenexus/`. So `npm i -g @muthuishere/citenexuscli &&
 citenexus install --skills` and the agent can immediately drive the CLI.
 
 All commands take `--config`, `--json`, `--partition`. `ask` needs an `llm` model

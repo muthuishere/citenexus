@@ -11,7 +11,8 @@
 package core
 
 /*
-#cgo LDFLAGS: -L${SRCDIR}/../../rust/target/release -lcitenexus_core -Wl,-rpath,${SRCDIR}/../../rust/target/release
+// Link flags live in build-tagged files (link_dynamic.go / link_static.go) so a
+// self-contained CLI can static-link the .a while the FFI ports keep the dylib.
 #include <stdlib.h>
 #include <stdint.h>
 char* citenexus_extract(const uint8_t* bytes, size_t len, const char* source_type, const char* document_id);

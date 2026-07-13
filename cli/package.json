@@ -1,0 +1,28 @@
+{
+  "name": "@muthuishere/citenexuscli",
+  "version": "0.9.0",
+  "description": "CiteNexus CLI — evidence-first, multilingual RAG from your shell. Ingests artifacts and answers ONLY from retrieved, cited evidence, abstaining when evidence is weak, missing, or conflicting. A self-contained Go+Rust binary, fetched per platform from a dedicated GitHub Release (cli-v* tag).",
+  "type": "module",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/muthuishere/citenexus.git",
+    "directory": "cli"
+  },
+  "keywords": ["rag", "retrieval", "cli", "evidence", "citations", "grounded", "abstain"],
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "citenexus": "bin/citenexus.mjs"
+  },
+  "files": [
+    "bin",
+    "scripts",
+    "lib"
+  ],
+  "scripts": {
+    "postinstall": "node scripts/postinstall.mjs",
+    "test": "node --test \"test/**/*.test.mjs\""
+  }
+}

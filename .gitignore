@@ -56,3 +56,10 @@ golang/**/*.test
 
 # personal corpus (bank/card statements, private docs) — never commit
 corpus/
+
+# CiteNexus CLI: built Go binary + local store data (runtime, not source)
+/golang/citenexus
+/golang/cmd/citenexus/citenexus
+.citenexus/
+# npm launcher: no build output, but ignore installed deps if any appear
+/cli/node_modules/
