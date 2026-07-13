@@ -14,6 +14,19 @@ model configured (lexical); `ask` SHALL require a configured LLM model.
 - **WHEN** a user runs `citenexus init`, `citenexus ingest <source>`, and `citenexus retrieve "<q>"` in a folder
 - **THEN** the retrieved candidates include the ingested document, and `citenexus ask "<q>"` returns a grounded answer or a refusal — with no separate library install
 
+### Requirement: The CLI self-installs its agent skill
+
+The CLI SHALL provide a single `citenexus install --skills` command that writes the
+bundled agent skill (`SKILL.md` and its `references/`) into both
+`~/.claude/skills/citenexus/` and `~/.agents/skills/citenexus/`. The operation
+SHALL be idempotent — re-running it overwrites in place and never errors — so an
+agent can drive the CLI immediately after install.
+
+#### Scenario: install --skills places the skill in both locations
+
+- **WHEN** a user runs `citenexus install --skills`
+- **THEN** the bundled `SKILL.md` (and `references/`) exists under both `~/.claude/skills/citenexus/` and `~/.agents/skills/citenexus/`, and running the command again leaves them unchanged with no error
+
 ### Requirement: Distribution is one npm package that fetches a verified binary
 
 The CLI SHALL be installable via a single npm package that downloads the correct

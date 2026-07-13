@@ -62,6 +62,13 @@ models:
 | `citenexus ingest <path\|url>` | extract → store (Rust core) | `golang/ingest` + `core` |
 | `citenexus ask "<q>"` | retrieve + grounded answer | `golang/answer` + `models` (api mode) |
 | `citenexus retrieve "<q>"` | fused candidates, cite-only | `golang/retrieve`/rrf/bm25 |
+| `citenexus install --skills` | copy bundled `SKILL.md`+`references/` into `~/.claude/skills/citenexus/` **and** `~/.agents/skills/citenexus/` | embedded skill assets |
+
+The skill install follows the `windowctl`/`playwright-cli` pattern: the `SKILL.md`
+(+ a `references/` dir) is embedded in the Go binary (`embed.FS`) and written,
+idempotently, into **both** `~/.claude/skills/citenexus/` and
+`~/.agents/skills/citenexus/`. So `npm i -g @muthuishere/citenexus &&
+citenexus install --skills` and the agent can immediately drive the CLI.
 
 All commands take `--config`, `--json`, `--partition`. `ask` needs an `llm` model
 configured; `retrieve`/`ingest` (lexical) work with none.

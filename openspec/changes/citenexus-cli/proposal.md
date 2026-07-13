@@ -16,6 +16,12 @@ skill (`skill` mode, the generalized two-phase pattern).
   platform — no dylib to ship or find at runtime.
 - **`cmd/citenexus` Go binary** with the first, Go-ready command set:
   `init`, `config`, `ingest`, `ask`, `retrieve` — plus `--json` output.
+- **`citenexus install --skills`** — one command (the `windowctl`/`playwright-cli`
+  pattern): copy the bundled `SKILL.md` (+ `references/`) into **both**
+  `~/.claude/skills/citenexus/` and `~/.agents/skills/citenexus/`, idempotent. So
+  `install --skills` then "the agent drives the CLI" is one step. (The skill's
+  Python driver is fleshed out in the `citenexus-skill` follow-on; this change
+  ships the install mechanism + a minimal bundled skill.)
 - **Dual-level config**: global `~/.config/citenexus/config.yaml` ← project
   `./citenexus.yaml` ← environment. `citenexus init` scaffolds the project file;
   `citenexus config get|set` edits global. **Secrets are `${ENV}` templates only**
