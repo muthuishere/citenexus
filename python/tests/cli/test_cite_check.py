@@ -71,6 +71,28 @@ def test_strict_verdict_matches_is_supported(tmp_path: Path) -> None:
     assert (report.verdict == "CITED") == is_supported(claim, passage)
 
 
+def test_known_limitation_bag_of_tokens_cannot_detect_negation(tmp_path: Path) -> None:
+    """Documented weakness (huddle 2026-07-13): the gate is bag-of-tokens.
+
+    A passage containing every token of the claim in a *different order* — even
+    one that means the opposite — CITES. Extractive token-containment is a
+    lexical lower bound on AIS full-support; it cannot model word order or
+    negation scope. This is accepted for v0.1 because the bias is toward
+    false-CITED only on adversarially-ordered evidence the caller controls; a
+    reranker/NLI seam is the documented upgrade path. This test PINS the
+    limitation so it can't silently change without a decision.
+    """
+    # Passage has all of the claim's tokens ("not", "disclose", ...) but asserts
+    # the opposite intent by ordering.
+    evidence = _dir_with(
+        tmp_path,
+        {"h.txt": "Disclose freely: the employee may, and is not confidential information."},
+    )
+    report = cite_check("The employee may not disclose confidential information.", evidence)
+    # Bag-of-tokens containment holds → CITED, despite opposite meaning.
+    assert report.verdict == "CITED"
+
+
 def test_partial_support_abstains_under_strict_default(tmp_path: Path) -> None:
     evidence = _dir_with(tmp_path, {"h.txt": "The employee may not disclose information."})
     # "confidential" is absent from the passage → not full support.

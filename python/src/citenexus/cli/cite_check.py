@@ -105,6 +105,11 @@ def cite_check(claim: str, evidence_dir: Path, *, min_coverage: float = 1.0) -> 
     """
     claim_content = frozenset(content_tokens(claim))
     passages = _iter_passages(evidence_dir)
+    # At the strict default (1.0) we use `is_supported` — full token containment,
+    # stopwords included — so the strictest setting is provably the library's own
+    # gate. Any `min_coverage < 1.0` switches to a content-token ratio (stopwords
+    # excluded), which is deliberately looser; 1.0 is therefore stricter than
+    # 0.999, a benign discontinuity that keeps the default fail-safe.
     strict = min_coverage >= 1.0
 
     best: _Passage | None = None
