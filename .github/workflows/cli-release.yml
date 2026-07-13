@@ -25,10 +25,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14        # Apple silicon
+          - os: macos-14        # Apple silicon (Intel mac intentionally not supported)
             asset: citenexus-darwin-arm64
-          - os: macos-13        # Intel mac
-            asset: citenexus-darwin-x64
           - os: ubuntu-latest
             asset: citenexus-linux-x64
           - os: ubuntu-24.04-arm

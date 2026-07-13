@@ -123,6 +123,8 @@ test("releaseTag defaults to the CLI's custom cli-v<version> tag", () => {
 
 test("platformKey rejects unsupported platforms", () => {
   assert.throws(() => platformKey("sunos", "sparc"), /unsupported platform/);
+  assert.throws(() => platformKey("darwin", "x64"), /Intel macOS/); // Apple silicon only
   assert.equal(platformKey("darwin", "arm64"), "darwin-arm64");
+  assert.equal(platformKey("linux", "x64"), "linux-x64");
   assert.equal(assetName("win-x64"), "citenexus-win-x64.exe");
 });

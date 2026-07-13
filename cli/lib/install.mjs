@@ -40,7 +40,12 @@ export function platformKey(platform = process.platform, arch = process.arch) {
   if (!os || !cpu) {
     throw new Error(`citenexus: unsupported platform ${platform}/${arch}`);
   }
-  return `${os}-${cpu}`;
+  const key = `${os}-${cpu}`;
+  // Intel macOS is intentionally not built — Apple silicon only.
+  if (key === "darwin-x64") {
+    throw new Error("citenexus: Intel macOS (darwin-x64) is not supported — Apple silicon only");
+  }
+  return key;
 }
 
 // assetName is the release asset for a platform key: citenexus-<os>-<arch>(.exe).
