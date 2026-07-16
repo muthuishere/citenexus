@@ -2,6 +2,8 @@
 
 > Multilingual RAG that answers only when the evidence is strong.
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/muthuishere/citenexus/golang.svg)](https://pkg.go.dev/github.com/muthuishere/citenexus/golang)
+
 ## Repository layout (polyglot)
 
 One repo, one language per top-level folder, shared contract in the middle:
@@ -18,7 +20,7 @@ docs/  openspec/  .github/   design, specs, and CI shared across all languages
 Each language folder is self-contained (its own build file + tests) but versioned
 together (one version across all). Install the Go port with
 `go get github.com/muthuishere/citenexus/golang` (monorepo submodule, tagged
-`golang/vX.Y.Z`).
+`golang/vX.Y.Z`). Docs: [pkg.go.dev/github.com/muthuishere/citenexus/golang](https://pkg.go.dev/github.com/muthuishere/citenexus/golang).
 
 ### Native core & distribution (roadmap)
 
