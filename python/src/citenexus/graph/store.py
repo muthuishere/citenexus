@@ -27,6 +27,7 @@ if True:  # TYPE_CHECKING-safe forward ref for the distiller protocol
 from citenexus.storage.protocols import VectorStore
 
 _GRAPH_FILE = "graph.json"
+_DIRTY_FILE = "graph.dirty"
 _MIN_TOKEN_LEN = 4
 
 
@@ -92,6 +93,30 @@ class GraphStore:
     def key(self) -> str:
         return f"{layer_prefix(Layer.graph, self._partition)}/{_GRAPH_FILE}"
 
+    @property
+    def _dirty_key(self) -> str:
+        return f"{layer_prefix(Layer.graph, self._partition)}/{_DIRTY_FILE}"
+
+    def mark_dirty(self) -> None:
+        """Flag the leaf graph as stale — a single ``ingest()`` calls this instead
+        of a full rebuild. The read path (``ensure_current``) rebuilds lazily. The
+        marker is persisted so a fresh process still knows to rebuild."""
+        self._backend.put_json(self._dirty_key, {"dirty": True})
+
+    def _is_dirty(self) -> bool:
+        return bool(self._backend.exists(self._dirty_key)) and bool(
+            self._backend.get_json(self._dirty_key).get("dirty", False)
+        )
+
+    def _mark_clean(self) -> None:
+        self._backend.put_json(self._dirty_key, {"dirty": False})
+
+    def ensure_current(self, store: VectorStore) -> None:
+        """Rebuild the graph if it was marked dirty — called before any graph read
+        so an ``ask()`` always sees a graph consistent with all committed ingests."""
+        if self._is_dirty():
+            self.build_from_store(store)
+
     def build_from_store(self, store: VectorStore) -> GraphIndex:
         rows = store.scan()
         # LLM distillation first (when injected) — enhancement-only; None
@@ -104,9 +129,11 @@ class GraphStore:
             distilled = self._distiller.distill({d: tuple(u) for d, u in sorted(by_doc.items())})
             if distilled is not None:
                 self.save(distilled)
+                self._mark_clean()
                 return distilled
         index = build_comention_graph(rows)
         self.save(index)
+        self._mark_clean()
         return index
 
     def save(self, index: GraphIndex) -> None:

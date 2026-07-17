@@ -64,6 +64,8 @@ def build_tools(rag: CiteNexus) -> list[ToolSpec]:
         return None
 
     def graph_neighbors(entity: str) -> dict[str, Any]:
+        # Deferred rebuild: rebuild lazily if a prior ingest only marked dirty.
+        rag._graph_store.ensure_current(rag._store)
         index = rag._graph_store.load()
         if index is None:
             return {"node": None, "neighbors": []}
