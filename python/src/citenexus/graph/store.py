@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Iterable, Mapping
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
@@ -39,6 +40,14 @@ class GraphNode(BaseModel):
     eu_refs: tuple[str, ...]
 
 
+class EdgeConfidence(StrEnum):
+    """How a structural producer knows an edge (§structural-code-graph)."""
+
+    extracted = "extracted"  # deterministic from a parse (contains/imports/FK/$ref)
+    inferred = "inferred"  # name-resolved, may be wrong (a code `calls` edge)
+    ambiguous = "ambiguous"  # multiple plausible resolutions
+
+
 class GraphEdge(BaseModel):
     """An edge between graph nodes — co-mention, or LLM-typed when distilled."""
 
@@ -50,6 +59,10 @@ class GraphEdge(BaseModel):
     # The typed relation an LLM distiller extracted ("bound_by", "owns", ...).
     # None for deterministic co-mention edges; default keeps old graph.json loading.
     relation: str | None = None
+    # How the edge was derived. None for co-mention edges; serialized as `null` when
+    # None, matching the `relation` convention so the artifact is byte-stable with the
+    # Go (`*string`, no omitempty) and JS (`| null`) ports — see structural-code-graph.
+    confidence: EdgeConfidence | None = None
 
 
 class GraphIndex(BaseModel):
