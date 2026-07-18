@@ -8,6 +8,7 @@
 pub mod detect;
 pub mod emit;
 pub mod extract;
+pub mod rrf;
 pub mod store;
 pub mod types;
 
@@ -17,5 +18,6 @@ pub mod ffi;
 pub use detect::{Detection, Detector};
 pub use emit::markdown::to_markdown;
 pub use extract::{extract, source_type_for_extension};
+pub use rrf::rrf;
 pub use store::LanceStore;
 pub use types::*;

@@ -122,13 +122,24 @@ with JSON in/out:
    schema is ingested only as an artifact (a `.sql` dump, an `openapi.json`).
 3. **detect** — fastText **lid.176 via the pure-Rust `fasttext` crate** —
    the exact spec model, so detection is byte-identical with Python.
+4. **rrf** — `citenexus_rrf(lists_json, k) -> fused eu_id order`. Reciprocal-rank
+   fusion is *pure* rank arithmetic (no tokenization, no Unicode, no key), so
+   ADR-0006 moves it into the core: every SDK's fusion is a thin binding, and the
+   old per-language `rrf` helpers are **deprecated, not removed** (kept as the
+   native-toolchain-free path, pinned by `cases/rrf.json`).
 
-Nothing else crosses the boundary: retrieval logic, RRF, gates, chunking,
-orchestration stay in Go. One bridge to maintain instead of five parser
-dependencies, and extraction output is identical across Python and Go by
-construction. TS MAY adopt the same crate via napi-rs in a later rev for
-extraction parity; ports-v1 allows TS to use its native libs (conformance
-fixtures are the arbiter either way).
+The boundary is cut by **what the code is** (ADR-0006): only pure, text-free
+computation moves in. The cite-or-abstain **gate**, **BM25**, **chunker**, and
+the **tokenizer** stay per host language — they must stay hackable without a Rust
+toolchain, and relocating their Unicode-sensitive case-folding would silently
+diverge on exactly the non-Latin languages CiteNexus targets. Their drift is
+killed instead by the shared conformance-vector suite (§10), which now carries a
+**multilingual/Unicode-edge corpus** (`cases/multilingual.json`: Turkish
+dotless-ı, German ß, NFC vs NFD, CJK, combining marks) that every port runs. One
+bridge to maintain instead of five parser dependencies, and extraction/fusion
+output is identical across Python and Go by construction. TS MAY adopt the same
+crate via napi-rs in a later rev; ports-v1 allows TS to use its native libs
+(conformance fixtures are the arbiter either way).
 
 ## 4. Deterministic algorithm contract
 
@@ -230,9 +241,11 @@ every language — the pydantic-v2 / tokenizers / lancedb playbook:
 ```
                      citenexus-core (Rust)
    v1: store (lance) · extract (pdf/docx/pptx/html/md) · detect (lid.176)
-   v2: + the pinned deterministic algorithms (§4): chunker · BM25 · RRF ·
-        token gates — they are frozen contracts, so one implementation
-        replaces cross-language conformance for them
+   v2: + rrf (pure rank arithmetic — no tokenizer, no Unicode: safe to move,
+        ADR-0006). The gate · BM25 · chunker · tokenizer STAY per host language
+        (Unicode-sensitive + must stay hackable without a Rust toolchain); their
+        drift is killed by the shared conformance vectors — incl. the
+        multilingual/Unicode corpus — NOT by relocation
              /                |                  \
         cgo C-ABI          napi-rs              pyo3
            Go             TypeScript            Python
@@ -277,9 +290,15 @@ A `conformance/` directory in this repo, versioned with the spec:
 - `stopwords.json`, `prompts.json` — pinned data (§4, §5).
 - `cases/tokenize.json` — text → tokens.
 - `cases/bm25.json` — rows+query → ordered (eu_id, score rounded 1e-6).
-- `cases/rrf.json` — ranked lists → fused order.
+- `cases/rrf.json` — ranked lists → fused order (also the byte-parity oracle for
+  the core `citenexus_rrf`, ADR-0006).
 - `cases/faithful.json` — (answer, passage) → supported bool.
 - `cases/chunker.json` — text+params → chunks.
+- `cases/multilingual.json` — the ADR-0006 anti-drift corpus: `tokenize` / `bm25`
+  / `chunker` / `gate` vectors over a Unicode-edge corpus (Turkish dotless-ı,
+  German ß, NFC vs NFD, CJK, combining marks). Pins the per-host gate/BM25/chunker
+  — which STAY per language — against the tokenizer divergence that an ASCII-only
+  suite would miss. Every port (Python/Go/JS) runs it.
 - `cases/eu_ids.json` — doc blocks → eu_id list + checksum.
 - `cases/language.json` — fallback-chain inputs → answer language.
 - `cases/result_roundtrip.json` — Result JSON canonical serialization.
