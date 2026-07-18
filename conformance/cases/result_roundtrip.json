@@ -15,7 +15,8 @@
         "conflicts_detected": 0,
         "languages_in_evidence": [
           "en"
-        ]
+        ],
+        "loop": null
       },
       "claims": [
         {
@@ -69,7 +70,8 @@
         "all_claims_verified": false,
         "unsupported_claims_removed": 0,
         "conflicts_detected": 0,
-        "languages_in_evidence": []
+        "languages_in_evidence": [],
+        "loop": null
       },
       "claims": [],
       "sources": [],

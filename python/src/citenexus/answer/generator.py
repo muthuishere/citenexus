@@ -104,6 +104,27 @@ class OpenAICompatibleGenerator:
         content: str = payload["choices"][0]["message"]["content"]
         return content
 
+    def complete(self, prompt: str) -> str:
+        """Raw single-prompt completion — the deep-ask structured-decision seam.
+
+        A plain ``/chat/completions`` call with one user message; the caller
+        (`answer/decision.py`) parses a JSON decision from the reply. NOT provider
+        tool/function-calling — the model never owns the loop's control flow.
+        """
+        request: dict[str, object] = {
+            "model": self._model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": self._temperature,
+        }
+        if self._max_tokens is not None:
+            request["max_tokens"] = self._max_tokens
+        body = json.dumps(request).encode("utf-8")
+        raw = self._transport(self._endpoint, body, self._headers())
+        payload = json.loads(raw)
+        self.last_usage = _usage_of(payload)
+        content: str = payload["choices"][0]["message"]["content"]
+        return content
+
 
 def _usage_of(payload: dict[str, object]) -> TokenUsage | None:
     """Parse the OpenAI ``usage`` block into a ``TokenUsage`` (None if absent)."""

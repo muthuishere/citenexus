@@ -79,6 +79,25 @@ class AnthropicGenerator:
         self.last_usage = _usage_of(payload)
         return _text_of(payload)
 
+    def complete(self, prompt: str) -> str:
+        """Raw single-prompt completion — the deep-ask structured-decision seam.
+
+        The same ``/v1/messages`` transport with one user message; the caller
+        (`answer/decision.py`) parses a JSON decision from the reply. NOT provider
+        tool/function-calling — the model never owns the loop's control flow.
+        """
+        request: dict[str, object] = {
+            "model": self._model,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": self._max_tokens,
+            "temperature": self._temperature,
+        }
+        body = json.dumps(request).encode("utf-8")
+        raw = self._transport(self._endpoint, body, self._headers())
+        payload = json.loads(raw)
+        self.last_usage = _usage_of(payload)
+        return _text_of(payload)
+
 
 def _text_of(payload: dict[str, object]) -> str:
     """Concatenate the text blocks of an Anthropic message response."""
