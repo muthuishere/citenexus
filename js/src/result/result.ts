@@ -20,6 +20,15 @@ export enum Decision {
   partial = "partial",
 }
 
+/** Deep-ask loop accounting (signals.loop); Python-only today. JS carries the type
+ * for wire parity and always emits null on the strict flow. */
+export interface LoopSignals {
+  stop_reason: string;
+  hops: number;
+  tool_calls: number;
+  evidence_units: number;
+}
+
 export interface EvidenceSignals {
   decision: Decision;
   supporting_sources: number;
@@ -29,6 +38,8 @@ export interface EvidenceSignals {
   unsupported_claims_removed: number;
   conflicts_detected: number;
   languages_in_evidence: string[];
+  /** null on the strict flow (deep-ask is Python-only) — present for wire parity. */
+  loop: LoopSignals | null;
 }
 
 export interface SourceRef {
@@ -89,6 +100,7 @@ export function evidenceSignals(opts: {
     unsupported_claims_removed: opts.unsupportedClaimsRemoved ?? 0,
     conflicts_detected: opts.conflictsDetected ?? 0,
     languages_in_evidence: opts.languagesInEvidence ?? [],
+    loop: null,
   };
 }
 
