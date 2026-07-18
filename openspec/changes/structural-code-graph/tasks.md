@@ -33,26 +33,26 @@
 
 ## 3. GraphEdge.confidence
 
-- [ ] 3.1 Add the `confidence` enum (`extracted`/`inferred`/`ambiguous`) + optional
+- [x] 3.1 Add the `confidence` enum (`extracted`/`inferred`/`ambiguous`) + optional
       field (default absent/`None`, pinned **absent when None** — never `null`) to
       `GraphEdge`/`Edge` in `python/.../graph/store.py`, `golang/graph/graph.go`,
       `js/src/graph/graph.ts`. Python's graph layer uses it; Go/JS get the field
       (their graph seam is unwired — see group 6).
-- [ ] 3.2 Red→green (Python): an old `graph.json` (no key) loads with every edge
+- [x] 3.2 Red→green (Python): an old `graph.json` (no key) loads with every edge
       `confidence=None`; co-mention build leaves it `None`; a producer-emitted index
       round-trips `confidence`.
-- [ ] 3.3 Cross-language byte-parity: all three serialize an unset `confidence` to
+- [x] 3.3 Cross-language byte-parity: all three serialize an unset `confidence` to
       the SAME on-disk form (key absent), a set one identically.
 
 ## 4. Deferred single-`ingest()` rebuild — Python
 
-- [ ] 4.1 Change `_refresh_incremental` so a single `ingest()` marks the leaf graph
+- [x] 4.1 Change `_refresh_incremental` so a single `ingest()` marks the leaf graph
       dirty instead of full-rebuilding (design decision 5a). Python only (the wired
       layer); batch already amortizes via `refresh_slow_path()`.
-- [ ] 4.2 Rebuild lazily before any graph-reading `ask()`; keep the explicit full
+- [x] 4.2 Rebuild lazily before any graph-reading `ask()`; keep the explicit full
       rebuild in `refresh_slow_path()`; persist the dirty marker so a fresh process
       still rebuilds.
-- [ ] 4.3 Red→green: a sequence of single `ingest()` calls does not full-rebuild each
+- [x] 4.3 Red→green: a sequence of single `ingest()` calls does not full-rebuild each
       time; a graph-using `ask()` after ingests observes a graph consistent with all
       committed ingests.
 
