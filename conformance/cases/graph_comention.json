@@ -93,199 +93,232 @@
             "source": "node:cannot",
             "target": "node:confidential",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:cannot",
             "target": "node:disclose",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:cannot",
             "target": "node:employee",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:cannot",
             "target": "node:information",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:cannot",
             "target": "node:salary",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:confidential",
             "target": "node:disclose",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:confidential",
             "target": "node:employee",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:confidential",
             "target": "node:information",
             "weight": 2,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:confidential",
             "target": "node:policy",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:confidential",
             "target": "node:private",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:confidential",
             "target": "node:salary",
             "weight": 2,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:confidential",
             "target": "node:stays",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:confidential",
             "target": "node:under",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:disclose",
             "target": "node:employee",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:disclose",
             "target": "node:information",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:disclose",
             "target": "node:salary",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:employee",
             "target": "node:information",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:employee",
             "target": "node:salary",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:information",
             "target": "node:policy",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:information",
             "target": "node:private",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:information",
             "target": "node:salary",
             "weight": 2,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:information",
             "target": "node:stays",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:information",
             "target": "node:under",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:policy",
             "target": "node:private",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:policy",
             "target": "node:salary",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:policy",
             "target": "node:stays",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:policy",
             "target": "node:under",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:private",
             "target": "node:salary",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:private",
             "target": "node:stays",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:private",
             "target": "node:under",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:salary",
             "target": "node:stays",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:salary",
             "target": "node:under",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:stays",
             "target": "node:under",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           }
         ]
       }
@@ -340,19 +373,22 @@
             "source": "node:bitcoin",
             "target": "node:funding",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:bitcoin",
             "target": "node:spike",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           },
           {
             "source": "node:funding",
             "target": "node:spike",
             "weight": 1,
-            "relation": null
+            "relation": null,
+            "confidence": null
           }
         ]
       }

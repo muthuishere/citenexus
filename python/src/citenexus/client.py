@@ -412,12 +412,13 @@ class CiteNexus:
     def _refresh_incremental(self, document_id: str) -> None:
         """Per-document slow-path refresh — scales to very large corpora.
 
-        The wiki upserts ONE page (Karpathy-style compounding); the graph still
-        rebuilds (co-mention edges are corpus-wide). A full wiki rebuild —
+        The graph is only marked dirty here (co-mention edges are corpus-wide, so a
+        per-ingest full rebuild does not scale); the read path rebuilds it lazily.
+        The wiki upserts ONE page (Karpathy-style compounding). A full rebuild —
         including LLM distillation — happens via refresh_slow_path().
         """
         if Signal.graph in self.signals or Signal.community in self.signals:
-            self._graph_store.build_from_store(self._store)
+            self._graph_store.mark_dirty()
         if Signal.wiki in self.signals:
             self._wiki_store.integrate_document(document_id, self._store)
 

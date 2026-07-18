@@ -35,6 +35,10 @@ type Edge struct {
 	Target   string  `json:"target"`
 	Weight   int     `json:"weight"`
 	Relation *string `json:"relation"`
+	// Confidence is how a structural producer derived the edge
+	// (extracted|inferred|ambiguous); nil for co-mention edges. Python emits
+	// confidence: null — no omitempty, to stay byte-stable. See structural-code-graph.
+	Confidence *string `json:"confidence"`
 }
 
 // Index is the graph artifact for one leaf partition.
@@ -137,10 +141,11 @@ func BuildComentionGraph(rows []Row) Index {
 			continue
 		}
 		edges = append(edges, Edge{
-			Source:   nodeID(p.left),
-			Target:   nodeID(p.right),
-			Weight:   w,
-			Relation: nil,
+			Source:     nodeID(p.left),
+			Target:     nodeID(p.right),
+			Weight:     w,
+			Relation:   nil,
+			Confidence: nil,
 		})
 	}
 
