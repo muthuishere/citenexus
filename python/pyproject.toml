@@ -69,6 +69,12 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "C4", "PTH", "RUF"]
 
+[tool.ruff.lint.per-file-ignores]
+# The conformance generator intentionally embeds a multilingual/Unicode-edge
+# corpus (Turkish dotless-ı, German ß, NFC vs NFD, …) as reference test data, so
+# the ambiguous-character lints (RUF001/002/003) do not apply to it (ADR-0006).
+"scripts/gen_conformance.py" = ["RUF001", "RUF002", "RUF003"]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true

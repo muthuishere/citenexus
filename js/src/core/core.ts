@@ -48,6 +48,7 @@ interface Symbols {
   version: Sym;
   extract: Sym;
   toMarkdown: Sym;
+  rrf: Sym;
   freeString: Sym;
   detectorOpen: Sym;
   detect: Sym;
@@ -85,6 +86,7 @@ function symbols(): Symbols {
       "size_t",
       "const char*",
     ]),
+    rrf: lib.func("citenexus_rrf", "void*", ["const char*", "int64_t"]),
     freeString: lib.func("citenexus_free_string", "void", ["void*"]),
     detectorOpen: lib.func("citenexus_detector_open", DetectorPtr, ["const char*"]),
     detect: lib.func("citenexus_detect", "void*", [DetectorPtr, "const char*"]),
@@ -194,6 +196,22 @@ export function toMarkdown(bytes: Uint8Array, sourceType: string): string {
   const buf = bytes.length > 0 ? bytes : new Uint8Array(0);
   const raw = takeString(sym.toMarkdown(buf, buf.length, sourceType), sym);
   return parseJson<{ markdown: string }>(raw).markdown;
+}
+
+// ---- rrf --------------------------------------------------------------------
+
+/**
+ * Reciprocal-rank-fuse ranked `eu_id` lists through the shared Rust core
+ * (ADR-0006: rrf is pure rank arithmetic and lives once in the core). `k` is the
+ * RRF constant (60 is standard). Returns the fused `eu_id` order — byte-identical
+ * to the Python reference and to every other SDK's core-backed fusion. This is
+ * the canonical fusion path; the pure `rrfFuse` helper is deprecated in its
+ * favor. Throws on a core-reported error.
+ */
+export function rrf(lists: string[][], k = 60): string[] {
+  const sym = symbols();
+  const raw = takeString(sym.rrf(JSON.stringify(lists), k), sym);
+  return parseJson<string[]>(raw);
 }
 
 // ---- detect ----------------------------------------------------------------

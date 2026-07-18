@@ -13,6 +13,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -910,6 +911,166 @@ def _structure_cases() -> dict[str, Any]:
     return {"cases": cases}
 
 
+# --------------------------------------------------------------------------- #
+# cases/multilingual.json — the ADR-0006 anti-drift corpus. The gate, bm25, and
+# chunker STAY per host language (not in the Rust core); this Unicode-edge suite
+# is what pins them against drift where it actually happens — the tokenizer's
+# case-folding and Unicode boundaries. Every case's expected output is computed
+# from the SAME reference functions the runtime uses (tokenize / Bm25TextSearch
+# / chunk_text / is_supported / has_relevance_overlap), so a port whose
+# tokenization diverges on Turkish dotless-I, German ß, NFC vs NFD, CJK, or a
+# combining mark FAILS the vector instead of passing silently on ASCII.
+# --------------------------------------------------------------------------- #
+
+
+def _nfc(text: str) -> str:
+    return unicodedata.normalize("NFC", text)
+
+
+def _nfd(text: str) -> str:
+    return unicodedata.normalize("NFD", text)
+
+
+# Turkish dotted capital İ (U+0130) is THE canonical trap: Python/JS full case
+# mapping lowers it to "i" + combining dot above (U+0307), splitting the ASCII
+# run; a simple 1:1 lowercase (e.g. Go's strings.ToLower) drops the dot and
+# yields a single "istanbul". These inputs make that divergence observable.
+_ML_TOKENIZE_INPUTS: list[str] = [
+    "İstanbul Büyükşehir Belediyesi",  # dotted capital I -> "i" + "stanbul"
+    "ISPARTA ve Iğdır",  # ASCII I stays "i"; dotless-related caps
+    "ıstanbul kışın",  # dotless lowercase i produces no leading token
+    "Straße Grüße Weiß",  # German ß is lowercase already, non-ASCII -> splits
+    "GROSSE STRASSE ist frei",  # uppercase ss round-trips to "strasse"
+    _nfc("Café Résumé Déjà"),  # precomposed accents -> non-ASCII, split tokens
+    _nfd("Café Résumé Déjà"),  # decomposed: base ASCII letter survives the mark
+    "東京タワー Tokyo Tower 2024",  # CJK yields no tokens; latin/digits do
+    _nfd("e") + "́clair na" + "̈" + "ive",  # leading/mid combining marks
+    "Αθήνα Athens Ελλάδα",  # Greek script contributes no ASCII tokens
+]
+
+
+def _ml_tokenize_cases() -> list[dict[str, Any]]:
+    return [{"input": text, "tokens": tokenize(text)} for text in _ML_TOKENIZE_INPUTS]
+
+
+_ML_BM25_CASES: list[dict[str, Any]] = [
+    {
+        "name": "turkish dotted-I: query 'İstanbul' -> tokens i + stanbul",
+        "rows": [
+            {"eu_id": "tr::0", "text": "İstanbul Büyükşehir Belediyesi kararı"},
+            {"eu_id": "tr::1", "text": "Ankara başkenttir ve merkezdir"},
+        ],
+        "query": "İstanbul",
+    },
+    {
+        "name": "german ß: query 'Straße' -> tokens stra + e",
+        "rows": [
+            {"eu_id": "de::0", "text": "Die große Straße ist heute gesperrt"},
+            {"eu_id": "de::1", "text": "Eine kleine Gasse ohne jede Sperrung"},
+        ],
+        "query": "Straße",
+    },
+    {
+        "name": "cjk text ranks only by its embedded latin/digit tokens",
+        "rows": [
+            {"eu_id": "cjk::0", "text": "東京 Tokyo 2024 annual report"},
+            {"eu_id": "cjk::1", "text": "大阪 Osaka quarterly summary"},
+        ],
+        "query": "Tokyo 2024",
+    },
+]
+
+
+def _ml_bm25_cases() -> list[dict[str, Any]]:
+    cases = []
+    for case in _ML_BM25_CASES:
+        search = Bm25TextSearch(_StubStore(case["rows"]))  # type: ignore[arg-type]
+        results = search.search_text(case["query"], limit=10)
+        cases.append(
+            {
+                "name": case["name"],
+                "rows": case["rows"],
+                "query": case["query"],
+                "expected": [
+                    {"eu_id": row["eu_id"], "score": round(row["_text_score"], 6)}
+                    for row in results
+                ],
+            }
+        )
+    return cases
+
+
+_ML_CHUNKER_INPUTS: list[dict[str, Any]] = [
+    # paragraph boundaries with multilingual content; word counting is
+    # Unicode-whitespace aware and must agree across ports.
+    {
+        "text": "Straße eins zwei\n\nGrüße drei vier\n\n東京 大阪 名古屋\n\nAthens final",
+        "max_tokens": 3,
+        "overlap": 1,
+    },
+    # ideographic spaces (U+3000) are whitespace: three CJK "words" then a hard cap.
+    {"text": "東京　大阪　名古屋　福岡　札幌", "max_tokens": 2, "overlap": 0},
+]
+
+
+def _ml_chunker_cases() -> list[dict[str, Any]]:
+    return [
+        {
+            **case,
+            "chunks": chunk_text(
+                case["text"], max_tokens=case["max_tokens"], overlap=case["overlap"]
+            ),
+        }
+        for case in _ML_CHUNKER_INPUTS
+    ]
+
+
+# The gate compares token SETS across answer/passage (and query/passage), so it
+# diverges when the two sides tokenize a shared Unicode form differently from
+# the reference. An ASCII answer against a Turkish-İ passage is the sharp case:
+# the reference splits İ into "i"+"stanbul" so a bare "istanbul" is NOT present.
+_ML_SUPPORTED_INPUTS: list[tuple[str, str]] = [
+    # reference: passage tokens = {i, stanbul, ...}; ASCII "istanbul" absent -> unsupported
+    ("Istanbul is the city", "İstanbul is a coastal city"),
+    # decomposed accent: base letter survives, so ASCII faithfulness holds
+    (_nfd("Résumé received"), _nfd("The résumé was received on time")),
+    # German ß both sides -> supported (identical tokenization on each side)
+    ("Große Straße", "Die große Straße wurde gesperrt"),
+]
+
+_ML_RELEVANCE_INPUTS: list[tuple[str, str]] = [
+    # 'i' is a stopword; İstanbul -> {stanbul,...}; ASCII query 'Istanbul' -> {istanbul}
+    # so the reference finds NO overlap, while a dot-dropping tokenizer would.
+    ("Istanbul plans", "İstanbul Belediyesi duyurusu"),
+    # CJK query shares its latin token with the passage
+    ("Tokyo report", "東京 Tokyo annual report"),
+    # German ß shared content token 'stra'
+    ("Straße update", "Die Straße wurde erneuert"),
+]
+
+
+def _ml_gate_cases() -> dict[str, list[dict[str, Any]]]:
+    return {
+        "supported": [
+            {"answer": answer, "passage": passage, "supported": is_supported(answer, passage)}
+            for answer, passage in _ML_SUPPORTED_INPUTS
+        ],
+        "relevance": [
+            {"query": query, "passage": passage, "relevant": has_relevance_overlap(query, passage)}
+            for query, passage in _ML_RELEVANCE_INPUTS
+        ],
+    }
+
+
+def _multilingual_cases() -> dict[str, Any]:
+    return {
+        "tokenize": _ml_tokenize_cases(),
+        "bm25": _ml_bm25_cases(),
+        "chunker": _ml_chunker_cases(),
+        "gate": _ml_gate_cases(),
+    }
+
+
 def generate() -> dict[str, str]:
     """All fixtures as {relative path under conformance/: rendered JSON text}."""
     return {
@@ -928,6 +1089,7 @@ def generate() -> dict[str, str]:
         "cases/graph_comention.json": _render(_graph_comention_cases()),
         "cases/structure.json": _render(_structure_cases()),
         "cases/vision_orchestration.json": _render(_vision_orchestration_cases()),
+        "cases/multilingual.json": _render(_multilingual_cases()),
     }
 
 

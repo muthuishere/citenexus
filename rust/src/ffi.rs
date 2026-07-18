@@ -99,6 +99,32 @@ pub unsafe extern "C" fn citenexus_to_markdown(
     to_c_string(payload)
 }
 
+/// Reciprocal-rank-fuse the ranked `eu_id` lists in `lists_json` (a JSON array
+/// of arrays of strings) with constant `k`. Returns malloc'd JSON: a JSON array
+/// of fused `eu_id`s (descending fused score, ascending `eu_id` tie-break), or
+/// `{"error": ...}`. Pure rank arithmetic — no tokenization, no key (ADR-0006).
+///
+/// # Safety
+/// `lists_json` must be a valid NUL-terminated UTF-8 C string.
+#[no_mangle]
+pub unsafe extern "C" fn citenexus_rrf(lists_json: *const c_char, k: i64) -> *mut c_char {
+    if lists_json.is_null() {
+        return to_c_string(error_json("null argument"));
+    }
+    let raw = match CStr::from_ptr(lists_json).to_str() {
+        Ok(s) => s,
+        Err(_) => return to_c_string(error_json("lists_json is not UTF-8")),
+    };
+    let lists: Vec<Vec<String>> = match serde_json::from_str(raw) {
+        Ok(v) => v,
+        Err(e) => return to_c_string(error_json(&format!("lists_json: {e}"))),
+    };
+    let fused = crate::rrf::rrf(&lists, k);
+    let payload =
+        serde_json::to_string(&fused).unwrap_or_else(|e| error_json(&e.to_string()));
+    to_c_string(payload)
+}
+
 /// Release a string returned by any `citenexus_*` call.
 ///
 /// # Safety

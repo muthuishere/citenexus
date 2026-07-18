@@ -1,0 +1,217 @@
+{
+  "tokenize": [
+    {
+      "input": "İstanbul Büyükşehir Belediyesi",
+      "tokens": [
+        "i",
+        "stanbul",
+        "b",
+        "y",
+        "k",
+        "ehir",
+        "belediyesi"
+      ]
+    },
+    {
+      "input": "ISPARTA ve Iğdır",
+      "tokens": [
+        "isparta",
+        "ve",
+        "i",
+        "d",
+        "r"
+      ]
+    },
+    {
+      "input": "ıstanbul kışın",
+      "tokens": [
+        "stanbul",
+        "k",
+        "n"
+      ]
+    },
+    {
+      "input": "Straße Grüße Weiß",
+      "tokens": [
+        "stra",
+        "e",
+        "gr",
+        "e",
+        "wei"
+      ]
+    },
+    {
+      "input": "GROSSE STRASSE ist frei",
+      "tokens": [
+        "grosse",
+        "strasse",
+        "ist",
+        "frei"
+      ]
+    },
+    {
+      "input": "Café Résumé Déjà",
+      "tokens": [
+        "caf",
+        "r",
+        "sum",
+        "d",
+        "j"
+      ]
+    },
+    {
+      "input": "Café Résumé Déjà",
+      "tokens": [
+        "cafe",
+        "re",
+        "sume",
+        "de",
+        "ja"
+      ]
+    },
+    {
+      "input": "東京タワー Tokyo Tower 2024",
+      "tokens": [
+        "tokyo",
+        "tower",
+        "2024"
+      ]
+    },
+    {
+      "input": "éclair näive",
+      "tokens": [
+        "e",
+        "clair",
+        "na",
+        "ive"
+      ]
+    },
+    {
+      "input": "Αθήνα Athens Ελλάδα",
+      "tokens": [
+        "athens"
+      ]
+    }
+  ],
+  "bm25": [
+    {
+      "name": "turkish dotted-I: query 'İstanbul' -> tokens i + stanbul",
+      "rows": [
+        {
+          "eu_id": "tr::0",
+          "text": "İstanbul Büyükşehir Belediyesi kararı"
+        },
+        {
+          "eu_id": "tr::1",
+          "text": "Ankara başkenttir ve merkezdir"
+        }
+      ],
+      "query": "İstanbul",
+      "expected": [
+        {
+          "eu_id": "tr::0",
+          "score": 1.255876
+        }
+      ]
+    },
+    {
+      "name": "german ß: query 'Straße' -> tokens stra + e",
+      "rows": [
+        {
+          "eu_id": "de::0",
+          "text": "Die große Straße ist heute gesperrt"
+        },
+        {
+          "eu_id": "de::1",
+          "text": "Eine kleine Gasse ohne jede Sperrung"
+        }
+      ],
+      "query": "Straße",
+      "expected": [
+        {
+          "eu_id": "de::0",
+          "score": 1.598017
+        }
+      ]
+    },
+    {
+      "name": "cjk text ranks only by its embedded latin/digit tokens",
+      "rows": [
+        {
+          "eu_id": "cjk::0",
+          "text": "東京 Tokyo 2024 annual report"
+        },
+        {
+          "eu_id": "cjk::1",
+          "text": "大阪 Osaka quarterly summary"
+        }
+      ],
+      "query": "Tokyo 2024",
+      "expected": [
+        {
+          "eu_id": "cjk::0",
+          "score": 1.302558
+        }
+      ]
+    }
+  ],
+  "chunker": [
+    {
+      "text": "Straße eins zwei\n\nGrüße drei vier\n\n東京 大阪 名古屋\n\nAthens final",
+      "max_tokens": 3,
+      "overlap": 1,
+      "chunks": [
+        "Straße eins zwei",
+        "Grüße drei vier",
+        "東京 大阪 名古屋",
+        "Athens final"
+      ]
+    },
+    {
+      "text": "東京　大阪　名古屋　福岡　札幌",
+      "max_tokens": 2,
+      "overlap": 0,
+      "chunks": [
+        "東京\n大阪",
+        "名古屋\n福岡",
+        "札幌"
+      ]
+    }
+  ],
+  "gate": {
+    "supported": [
+      {
+        "answer": "Istanbul is the city",
+        "passage": "İstanbul is a coastal city",
+        "supported": false
+      },
+      {
+        "answer": "Résumé received",
+        "passage": "The résumé was received on time",
+        "supported": true
+      },
+      {
+        "answer": "Große Straße",
+        "passage": "Die große Straße wurde gesperrt",
+        "supported": true
+      }
+    ],
+    "relevance": [
+      {
+        "query": "Istanbul plans",
+        "passage": "İstanbul Belediyesi duyurusu",
+        "relevant": false
+      },
+      {
+        "query": "Tokyo report",
+        "passage": "東京 Tokyo annual report",
+        "relevant": true
+      },
+      {
+        "query": "Straße update",
+        "passage": "Die Straße wurde erneuert",
+        "relevant": true
+      }
+    ]
+  }
+}
