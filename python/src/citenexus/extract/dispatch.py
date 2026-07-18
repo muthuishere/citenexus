@@ -11,6 +11,7 @@ from __future__ import annotations
 from pathlib import PurePath
 from typing import Any, Protocol
 
+from citenexus.extract.code import CodeExtractor
 from citenexus.extract.csv import CsvExtractor
 from citenexus.extract.docx import DocxExtractor
 from citenexus.extract.html import HtmlExtractor
@@ -39,6 +40,8 @@ _BY_EXTENSION: dict[str, _ExtractorFactory] = {
     ".csv": CsvExtractor,
     ".html": HtmlExtractor,
     ".htm": HtmlExtractor,
+    ".py": CodeExtractor,
+    ".go": CodeExtractor,
     ".docx": DocxExtractor,
     ".pptx": PptxExtractor,
     ".xlsx": XlsxExtractor,
@@ -52,6 +55,7 @@ _BY_SOURCE_TYPE: dict[SourceType, _ExtractorFactory] = {
     SourceType.md: MdExtractor,
     SourceType.csv: CsvExtractor,
     SourceType.html: HtmlExtractor,
+    SourceType.code: CodeExtractor,
     SourceType.docx: DocxExtractor,
     SourceType.pptx: PptxExtractor,
     SourceType.xlsx: XlsxExtractor,

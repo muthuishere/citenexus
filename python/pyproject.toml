@@ -28,6 +28,14 @@ dependencies = [
 [project.optional-dependencies]
 # Postgres/pgvector VectorStore backend (LanceDB is the zero-infra default).
 postgres = ["psycopg[binary]>=3.2"]
+# Symbol-aware code extraction (rag.code.ingest_from). tree-sitter grammars are
+# MIT; pinned to the SAME grammar version (0.25) the Rust core uses so the
+# extraction is byte-identical across ports.
+code = [
+    "tree-sitter>=0.25,<0.27",
+    "tree-sitter-python>=0.25,<0.26",
+    "tree-sitter-go>=0.25,<0.26",
+]
 
 [project.scripts]
 citenexus = "citenexus.cli:main"
@@ -40,6 +48,10 @@ dev = [
     "mypy>=1.11",
     "types-pyyaml>=6.0.12.20260518",
     "types-boto3>=1.43.36",
+    # code extraction (rag.code) — needed for the parity + facade tests.
+    "tree-sitter>=0.25,<0.27",
+    "tree-sitter-python>=0.25,<0.26",
+    "tree-sitter-go>=0.25,<0.26",
 ]
 
 [build-system]
@@ -74,6 +86,8 @@ module = [
     "bs4", "bs4.*",
     "markdown_it", "markdown_it.*",
     "openpyxl", "openpyxl.*",
+    "tree_sitter", "tree_sitter.*",
+    "tree_sitter_python", "tree_sitter_go",
 ]
 ignore_missing_imports = true
 

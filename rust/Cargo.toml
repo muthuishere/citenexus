@@ -42,6 +42,9 @@ arrow-json = "58"
 # upstream binary format, dense + quantized). Exact spec model — parity with
 # Python.
 fasttext = "0.8"
+tree-sitter = "0.26"
+tree-sitter-python = "0.25"
+tree-sitter-go = "0.25"
 
 [features]
 default = []

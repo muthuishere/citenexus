@@ -113,6 +113,8 @@ pub fn extract(text: &str, document_id: &str, source_uri: Option<String>) -> Ext
                     page: None,
                     bbox: None,
                     level: None,
+                    start_line: None,
+                    end_line: None,
                     structure_path,
                     cells: vec![],
                 });
@@ -138,6 +140,8 @@ pub fn extract(text: &str, document_id: &str, source_uri: Option<String>) -> Ext
                     page: None,
                     bbox: None,
                     level: Some(level),
+                    start_line: None,
+                    end_line: None,
                     structure_path,
                     cells: vec![],
                 });
@@ -154,6 +158,8 @@ pub fn extract(text: &str, document_id: &str, source_uri: Option<String>) -> Ext
             page: None,
             bbox: None,
             level: None,
+            start_line: None,
+            end_line: None,
             structure_path,
             cells: vec![],
         });

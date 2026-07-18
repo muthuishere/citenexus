@@ -76,6 +76,27 @@ relocation:
 - `structural-code-graph` and `schema-extractors` keep their per-language graph
   work premised on "graph-build stays per-host" — which this ADR upholds.
 
+### Update (structural-code-graph landed)
+
+The `structural-code-graph` change shipped consistent with this ADR:
+
+- The **code extractor** is a deterministic `extract` op, so it lives **once in
+  the Rust core** (`rust/src/extract/code.rs`, tree-sitter python+go, MIT) behind
+  `citenexus_extract`; every SDK consumes it over the C ABI. Python keeps
+  `extract/code.py` as the **byte-parity oracle** (same grammar version 0.25) and
+  its runtime extractor. `SourceType::Code` + `start_line`/`end_line` are additive.
+- The **call-graph producer** (the guessed `calls` edges) stays an **injected**
+  distiller shipped as example code (`python/example/code_graph/`), never core —
+  upholding "the code-graph product is out."
+- **graph-build stays per-host** (Python-only wired today); only the extractor and
+  the `GraphEdge.confidence` field are cross-SDK.
+- **Honesty boundary:** navigate-not-cite protects **content** grounding, NOT
+  **topology**. A wrong `inferred` edge can mis-attribute a "who calls X" answer,
+  and the token-subset gate cannot see it. So `confidence` MUST become
+  **load-bearing** in the answer path for topology questions (down-weight /
+  attribute / abstain on `inferred`) — a **follow-on** change, not claimed here.
+  This change only guarantees the `inferred` signal is present and not swallowed.
+
 ## Alternatives considered
 
 - **Move the gate to Rust (original `rust-first-core`).** Rejected: reverses an

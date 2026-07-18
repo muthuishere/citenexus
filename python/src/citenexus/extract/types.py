@@ -28,6 +28,7 @@ class SourceType(StrEnum):
     txt = "txt"
     csv = "csv"
     image = "image"
+    code = "code"
     plain = "plain"
 
 
@@ -82,6 +83,11 @@ class ExtractedBlock(BaseModel):
     bbox: BBox | None = None
     # Heading depth / slide index / table row — meaning depends on structure_type.
     level: int | None = None
+    # 1-based source line range, when the extractor knows it — the code extractor
+    # carries it so a symbol EU cites ``file:Lx-Ly``. None for extractors with no
+    # line geometry; like ``page``/``level`` it defaults to None, never dropped.
+    start_line: int | None = None
+    end_line: int | None = None
     # Path of ancestor headings/sections, if known (feeds EvidenceUnit.structure_path).
     structure_path: tuple[str, ...] = ()
     # Raw cell values for ``table`` blocks, aligned to the header on

@@ -55,6 +55,8 @@ pub fn extract(
             page: Some(page),
             bbox: None,
             level: Some(1),
+            start_line: None,
+            end_line: None,
             structure_path: vec![],
             cells: vec![],
         });
@@ -93,6 +95,8 @@ pub fn extract(
                 page: Some(page),
                 bbox: None,
                 level: Some(row_index),
+                start_line: None,
+                end_line: None,
                 structure_path: header.clone(),
                 cells,
             });

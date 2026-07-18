@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from citenexus.answer.anthropic import AnthropicGenerator
 from citenexus.answer.flow import AnswerFlow, Generator
@@ -49,6 +49,9 @@ from citenexus.telemetry.events import Outcome, Stage, StageEvent, UnitCount
 from citenexus.telemetry.sinks import TelemetrySink
 from citenexus.vision import OpenAICompatibleVision
 from citenexus.wiki import LLMWikiDistiller, WikiDistiller, WikiRetriever, WikiStore
+
+if TYPE_CHECKING:
+    from citenexus.code import CodeFacade
 
 
 class _IdentityReranker(RerankerPlugin):
@@ -421,6 +424,19 @@ class CiteNexus:
             self._graph_store.mark_dirty()
         if Signal.wiki in self.signals:
             self._wiki_store.integrate_document(document_id, self._store)
+
+    @property
+    def code(self) -> CodeFacade:
+        """The ``rag.code`` sub-facade — typed intake for source-code corpora.
+
+        ``rag.code.ingest_from(folder | git)`` acquires and ingests a code corpus
+        as symbol Evidence Units, then rebuilds the structural graph. It reads the
+        existing ``signals`` contract (raising if ``graph``/``community`` is not
+        declared) and the shared stores — no new constructor surface.
+        """
+        from citenexus.code import CodeFacade
+
+        return CodeFacade(self)
 
     def revoke(self, document_id: str) -> DeleteResult:
         """Alias of :meth:`delete` — retract one document and all it produced."""

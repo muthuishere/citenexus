@@ -11,6 +11,7 @@ real C ABI.
 | Area | Status |
 |---|---|
 | **extract** — txt · csv · md · html · docx · pptx (OOXML-direct) · xlsx (calamine) | ✅ implemented, parity-tested |
+| **extract** — code (tree-sitter: python · go) — one verbatim `code` EU per top-level symbol, `structure_type=code_ast`, line range carried; unknown language → plain | ✅ implemented, parity-tested (`tests/core/test_rust_code_parity.py`) |
 | **extract** — pdf (pdfium, runtime-bound) | behind the `pdf` feature |
 | **emit** — any supported format → markdown (`citenexus_to_markdown`), deterministic, byte-identical with the Python reference | ✅ implemented, parity-tested |
 | **store** — Lance (`upsert/search/scan/drop`, merge-insert by `eu_id`) | ✅ implemented; `tests/core/test_rust_store_parity.py` proves Rust-written tables are read (scan + search) by Python's `LanceVectorStore` and vice versa — same URI, same bytes |
