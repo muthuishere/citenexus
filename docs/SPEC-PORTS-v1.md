@@ -110,7 +110,16 @@ with JSON in/out:
 1. **store** — the Lance `VectorStore` calls: `upsert / search / scan / drop`.
 2. **extract** — `extract(bytes, source_type) -> ExtractedDoc JSON` (blocks +
    images + structure) for pdf (`pdfium-render`), docx/pptx (OOXML-direct via
-   `quick-xml` + zip), html (`scraper`/html5ever), md (`pulldown-cmark`).
+   `quick-xml` + zip), html (`scraper`/html5ever), md (`pulldown-cmark`). The
+   structural source types — `code` (symbol EUs), and the schema **artifact**
+   extractors `schema_sql` (SQL DDL → one verbatim EU per table) and
+   `schema_openapi` (OpenAPI/JSON-Schema → one verbatim EU per endpoint/component,
+   both reusing `table_schema`) — are deterministic byte-parity twins of their
+   Python references. They emit **EUs only, no edges** (`ExtractedDoc` has no edge
+   channel); structural edges (code `calls`, schema FK/`$ref`) come from an
+   *injected* distiller through the `graph_distiller=` seam, never the core
+   extractor. Live-database connectors and sampled shapes are **out of core** — a
+   schema is ingested only as an artifact (a `.sql` dump, an `openapi.json`).
 3. **detect** — fastText **lid.176 via the pure-Rust `fasttext` crate** —
    the exact spec model, so detection is byte-identical with Python.
 

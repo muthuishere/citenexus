@@ -37,6 +37,8 @@ pub enum SourceType {
     Csv,
     Image,
     Code,
+    SchemaSql,
+    SchemaOpenapi,
     Plain,
 }
 

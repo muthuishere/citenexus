@@ -29,6 +29,8 @@ class SourceType(StrEnum):
     csv = "csv"
     image = "image"
     code = "code"
+    schema_sql = "schema_sql"
+    schema_openapi = "schema_openapi"
     plain = "plain"
 
 

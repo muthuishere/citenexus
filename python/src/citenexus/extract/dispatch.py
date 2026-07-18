@@ -20,6 +20,8 @@ from citenexus.extract.md import MdExtractor
 from citenexus.extract.pdf import PdfExtractor
 from citenexus.extract.plain import PlainExtractor
 from citenexus.extract.pptx import PptxExtractor
+from citenexus.extract.schema_openapi import SchemaOpenapiExtractor
+from citenexus.extract.schema_sql import SchemaSqlExtractor
 from citenexus.extract.txt import TxtExtractor
 from citenexus.extract.types import ExtractedDoc, SourceType
 from citenexus.extract.xlsx import XlsxExtractor
@@ -42,6 +44,7 @@ _BY_EXTENSION: dict[str, _ExtractorFactory] = {
     ".htm": HtmlExtractor,
     ".py": CodeExtractor,
     ".go": CodeExtractor,
+    ".sql": SchemaSqlExtractor,
     ".docx": DocxExtractor,
     ".pptx": PptxExtractor,
     ".xlsx": XlsxExtractor,
@@ -56,6 +59,8 @@ _BY_SOURCE_TYPE: dict[SourceType, _ExtractorFactory] = {
     SourceType.csv: CsvExtractor,
     SourceType.html: HtmlExtractor,
     SourceType.code: CodeExtractor,
+    SourceType.schema_sql: SchemaSqlExtractor,
+    SourceType.schema_openapi: SchemaOpenapiExtractor,
     SourceType.docx: DocxExtractor,
     SourceType.pptx: PptxExtractor,
     SourceType.xlsx: XlsxExtractor,

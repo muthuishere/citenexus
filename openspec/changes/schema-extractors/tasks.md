@@ -1,43 +1,43 @@
 ## 1. Schema-object extractors — Rust core (EU-only, no edges)
 
-- [ ] 1.1 Implement `rust/src/extract/schema_sql.rs` (DDL): one verbatim EU per
+- [x] 1.1 Implement `rust/src/extract/schema_sql.rs` (DDL): one verbatim EU per
       table (+columns), `structure_type = table_schema` (reuse existing; do NOT add
       `db_schema`/`api_schema`).
-- [ ] 1.2 Implement `rust/src/extract/schema_openapi.rs`: one EU per endpoint /
+- [x] 1.2 Implement `rust/src/extract/schema_openapi.rs`: one EU per endpoint /
       component, verbatim.
-- [ ] 1.3 Wire both into `citenexus_extract` dispatch; recognise `.sql` /
+- [x] 1.3 Wire both into `citenexus_extract` dispatch; recognise `.sql` /
       `openapi.json|yaml`; unknown → plain fallback.
-- [ ] 1.4 Python reference impl + red→green parity test: table EU; OpenAPI endpoint
+- [x] 1.4 Python reference impl + red→green parity test: table EU; OpenAPI endpoint
       EU. Extractor emits NO edges.
 
 ## 2. Injected schema distiller (edges) — Python
 
-- [ ] 2.1 Implement a schema distiller (injected via `graph_distiller=`, like the
+- [x] 2.1 Implement a schema distiller (injected via `graph_distiller=`, like the
       code structural distiller) that reads the DDL/OpenAPI and emits FK / `$ref` /
       type-reference edges as `confidence=extracted`.
-- [ ] 2.2 Red→green: a DDL FK → an `extracted` edge between the right table EUs; an
+- [x] 2.2 Red→green: a DDL FK → an `extracted` edge between the right table EUs; an
       OpenAPI `$ref` → an `extracted` edge; every edge endpoint resolves to a real
       schema EU.
 
 ## 3. `rag.schema.ingest_from(file|doc)` verb — Python
 
-- [ ] 3.1 Add the `rag.schema` namespace + `ingest_from(source)` verb: accept a DDL
+- [x] 3.1 Add the `rag.schema` namespace + `ingest_from(source)` verb: accept a DDL
       file or OpenAPI/JSON-Schema doc (path or bytes). Lazy sub-facade, no new
       constructor surface.
-- [ ] 3.2 Fail-loud: raise if no `graph`/`community` signal — name it, ingest
+- [x] 3.2 Fail-loud: raise if no `graph`/`community` signal — name it, ingest
       nothing. Test it.
-- [ ] 3.3 Drive extractor + injected distiller + graph build (Python-wired).
-- [ ] 3.4 Red→green: DDL file → schema EUs + extracted FK edges; a connection URL is
+- [x] 3.3 Drive extractor + injected distiller + graph build (Python-wired).
+- [x] 3.4 Red→green: DDL file → schema EUs + extracted FK edges; a connection URL is
       NOT treated as an in-core connector; unknown source degrades to plain.
 
 ## 4. Integration & guardrails
 
-- [ ] 4.1 End-to-end: ingest a DDL + an OpenAPI doc, ask "which tables reference X" /
+- [x] 4.1 End-to-end: ingest a DDL + an OpenAPI doc, ask "which tables reference X" /
       "what does POST /orders accept" → cited schema EUs; FK/`$ref` edges route.
-- [ ] 4.2 Confirm dependency on `structural-code-graph` (confidence + injected-
+- [x] 4.2 Confirm dependency on `structural-code-graph` (confidence + injected-
       distiller pattern + `table_schema`) is satisfied first.
-- [ ] 4.3 `cargo test` (core + parity), Python `task lint`/`typecheck`/`test` green.
-- [ ] 4.4 Update `docs/SPEC-v6.md` / `docs/SPEC-PORTS-v1.md`: schema **artifact**
+- [x] 4.3 `cargo test` (core + parity), Python `task lint`/`typecheck`/`test` green.
+- [x] 4.4 Update `docs/SPEC-v6.md` / `docs/SPEC-PORTS-v1.md`: schema **artifact**
       extractors in core (EU-only); edges via injected distiller; live connectors +
       sampled shapes explicitly OUT (separate change/consumer).
 

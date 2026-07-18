@@ -54,6 +54,7 @@ from citenexus.wiki import LLMWikiDistiller, WikiDistiller, WikiRetriever, WikiS
 
 if TYPE_CHECKING:
     from citenexus.code import CodeFacade
+    from citenexus.schema import SchemaFacade
 
 
 class _SingleHopDecider:
@@ -469,6 +470,21 @@ class CiteNexus:
         from citenexus.code import CodeFacade
 
         return CodeFacade(self)
+
+    @property
+    def schema(self) -> SchemaFacade:
+        """The ``rag.schema`` sub-facade — typed intake for schema artifacts.
+
+        ``rag.schema.ingest_from(file | doc)`` ingests a SQL DDL file or an
+        OpenAPI/JSON-Schema document (a path or bytes — never a live connection
+        URL) into verbatim schema Evidence Units, then rebuilds the structural
+        graph so the injected schema distiller can emit FK / ``$ref`` edges. It
+        reads the existing ``signals`` contract (raising if ``graph``/``community``
+        is not declared) and the shared stores — no new constructor surface.
+        """
+        from citenexus.schema import SchemaFacade
+
+        return SchemaFacade(self)
 
     def revoke(self, document_id: str) -> DeleteResult:
         """Alias of :meth:`delete` — retract one document and all it produced."""
