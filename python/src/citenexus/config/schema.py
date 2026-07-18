@@ -183,6 +183,24 @@ class GraphConfig(_Section):
     max_hops: int = 2
 
 
+class AgenticConfig(_Section):
+    """Deep-ask: the bounded, library-scripted answer loop (``strategy="deep"``).
+
+    Off by default — ``strategy="strict"`` stays the unchanged single-passage path.
+    The hop cap is NOT here: it is honored from :attr:`GraphConfig.max_hops` so the
+    declared graph-traversal depth governs the loop. ``timeout_s`` is a whole-loop
+    wall clock (bounds every tool call and the final generate, not just the
+    between-hop check).
+    """
+
+    enabled: bool = False
+    max_tool_calls: int = 10
+    max_evidence_units: int = 40
+    timeout_s: float = 60.0
+    stop_when: str = "no_new_evidence"
+    search_k: int = 5
+
+
 class RetrievalConfig(_Section):
     """Fusion + retrieval knobs (§10)."""
 
@@ -291,6 +309,7 @@ class CiteNexusConfig(BaseModel):
     context_model: ContextModelConfig = Field(default_factory=ContextModelConfig)
     vector_store: VectorStoreConfig = Field(default_factory=VectorStoreConfig)
     graph: GraphConfig = Field(default_factory=GraphConfig)
+    agentic: AgenticConfig = Field(default_factory=AgenticConfig)
     retrieval: RetrievalConfig = Field(default_factory=RetrievalConfig)
     trust: TrustConfig = Field(default_factory=TrustConfig)
     multilingual: MultilingualConfig = Field(default_factory=MultilingualConfig)

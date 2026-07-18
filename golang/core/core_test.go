@@ -5,8 +5,11 @@ package core
 import (
 	"encoding/json"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/muthuishere/citenexus/golang/rrf"
 )
 
 func TestVersion(t *testing.T) {
@@ -15,6 +18,47 @@ func TestVersion(t *testing.T) {
 		t.Fatal("empty core version")
 	}
 	t.Logf("citenexus-core version: %s", v)
+}
+
+// TestFuse drives the core-backed reciprocal-rank fusion (ADR-0006: rrf lives
+// once in the Rust core) and proves it is byte-identical to BOTH the committed
+// Python-generated fixture AND the deprecated pure golang/rrf.Fuse helper.
+func TestFuse(t *testing.T) {
+	raw, err := os.ReadFile("../../conformance/cases/rrf.json")
+	if err != nil {
+		t.Fatalf("read rrf fixture: %v", err)
+	}
+	var cases []struct {
+		Lists [][]string `json:"lists"`
+		K     int        `json:"k"`
+		Fused []string   `json:"fused"`
+	}
+	if err := json.Unmarshal(raw, &cases); err != nil {
+		t.Fatalf("parse rrf fixture: %v", err)
+	}
+	if len(cases) == 0 {
+		t.Fatal("no rrf cases")
+	}
+	for i, c := range cases {
+		got, err := Fuse(c.Lists, c.K)
+		if err != nil {
+			t.Fatalf("case %d: Fuse error: %v", i, err)
+		}
+		want := c.Fused
+		if want == nil {
+			want = []string{}
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("case %d: core.Fuse = %v, want %v", i, got, want)
+		}
+		if pure := rrf.Fuse(c.Lists, c.K); !reflect.DeepEqual(got, pure) {
+			t.Errorf("case %d: core.Fuse = %v, deprecated rrf.Fuse = %v (must match)", i, got, pure)
+		}
+	}
+
+	if _, err := Fuse([][]string{{"a", "b"}, {"b", "a"}}, 60); err != nil {
+		t.Fatalf("simple fuse errored: %v", err)
+	}
 }
 
 func TestExtractPlain(t *testing.T) {

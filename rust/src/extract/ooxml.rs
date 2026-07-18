@@ -174,6 +174,8 @@ pub fn extract_docx(
                     page: None,
                     bbox: None,
                     level: Some(level),
+                    start_line: None,
+                    end_line: None,
                     structure_path: stack.iter().map(|(_, t)| t.clone()).collect(),
                     cells: vec![],
                 });
@@ -186,6 +188,8 @@ pub fn extract_docx(
                 page: None,
                 bbox: None,
                 level: None,
+                start_line: None,
+                end_line: None,
                 structure_path: stack.iter().map(|(_, t)| t.clone()).collect(),
                 cells: vec![],
             }),
@@ -331,6 +335,8 @@ pub fn extract_pptx(
             page: Some(page),
             bbox: None,
             level: Some(index as u32),
+            start_line: None,
+            end_line: None,
             structure_path: vec![],
             cells: vec![],
         });

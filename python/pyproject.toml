@@ -28,6 +28,14 @@ dependencies = [
 [project.optional-dependencies]
 # Postgres/pgvector VectorStore backend (LanceDB is the zero-infra default).
 postgres = ["psycopg[binary]>=3.2"]
+# Symbol-aware code extraction (rag.code.ingest_from). tree-sitter grammars are
+# MIT; pinned to the SAME grammar version (0.25) the Rust core uses so the
+# extraction is byte-identical across ports.
+code = [
+    "tree-sitter>=0.25,<0.27",
+    "tree-sitter-python>=0.25,<0.26",
+    "tree-sitter-go>=0.25,<0.26",
+]
 
 [project.scripts]
 citenexus = "citenexus.cli:main"
@@ -40,6 +48,10 @@ dev = [
     "mypy>=1.11",
     "types-pyyaml>=6.0.12.20260518",
     "types-boto3>=1.43.36",
+    # code extraction (rag.code) — needed for the parity + facade tests.
+    "tree-sitter>=0.25,<0.27",
+    "tree-sitter-python>=0.25,<0.26",
+    "tree-sitter-go>=0.25,<0.26",
 ]
 
 [build-system]
@@ -56,6 +68,12 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "C4", "PTH", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+# The conformance generator intentionally embeds a multilingual/Unicode-edge
+# corpus (Turkish dotless-ı, German ß, NFC vs NFD, …) as reference test data, so
+# the ambiguous-character lints (RUF001/002/003) do not apply to it (ADR-0006).
+"scripts/gen_conformance.py" = ["RUF001", "RUF002", "RUF003"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -74,6 +92,8 @@ module = [
     "bs4", "bs4.*",
     "markdown_it", "markdown_it.*",
     "openpyxl", "openpyxl.*",
+    "tree_sitter", "tree_sitter.*",
+    "tree_sitter_python", "tree_sitter_go",
 ]
 ignore_missing_imports = true
 

@@ -13,13 +13,22 @@ from __future__ import annotations
 
 import hashlib
 import math
+from collections.abc import Sequence
 from typing import TypeVar
 
+from citenexus.answer.decision import LoopDecision
 from citenexus.tokenize import tokenize
 
 T = TypeVar("T")
 
-__all__ = ["FakeEmbedding", "FakeLLM", "FakeReranker", "tokenize"]
+__all__ = [
+    "FakeCompletion",
+    "FakeEmbedding",
+    "FakeLLM",
+    "FakeReranker",
+    "FakeToolLLM",
+    "tokenize",
+]
 
 
 class FakeEmbedding:
@@ -49,3 +58,33 @@ class FakeReranker:
 
     def rerank(self, query: str, candidates: list[T]) -> list[T]:
         return list(candidates)
+
+
+class FakeToolLLM:
+    """A scripted ``DecisionModel`` for the deep-ask loop — canned, deterministic.
+
+    Returns the queued ``LoopDecision``s in order (the last one repeats once the
+    queue drains), so a test pins the exact hop-by-hop control flow with no model.
+    """
+
+    def __init__(self, decisions: Sequence[LoopDecision]) -> None:
+        self._decisions = list(decisions) or [LoopDecision()]
+        self._index = 0
+
+    def decide(self, question: str, evidence: Sequence[str]) -> LoopDecision:
+        decision = self._decisions[min(self._index, len(self._decisions) - 1)]
+        self._index += 1
+        return decision
+
+
+class FakeCompletion:
+    """A ``Completion`` seam that replays canned raw strings deterministically."""
+
+    def __init__(self, replies: Sequence[str]) -> None:
+        self._replies = list(replies) or [""]
+        self._index = 0
+
+    def complete(self, prompt: str) -> str:
+        reply = self._replies[min(self._index, len(self._replies) - 1)]
+        self._index += 1
+        return reply

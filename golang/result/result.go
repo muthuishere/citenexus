@@ -48,6 +48,19 @@ type EvidenceSignals struct {
 	UnsupportedClaimsRemoved int      `json:"unsupported_claims_removed"`
 	ConflictsDetected        int      `json:"conflicts_detected"`
 	LanguagesInEvidence      []string `json:"languages_in_evidence"`
+	// Loop is deep-ask (agentic) loop accounting; nil (→ null) on the strict flow.
+	// Deep-ask is Python-only today, so Go always emits null — present for wire
+	// parity with the Python reference. See structural-code-graph / deep-ask.
+	Loop *LoopSignals `json:"loop"`
+}
+
+// LoopSignals is the deep-ask loop accounting (signals.loop). Present only for the
+// agentic deep strategy (Python-only today); Go carries the type for wire parity.
+type LoopSignals struct {
+	StopReason    string `json:"stop_reason"`
+	Hops          int    `json:"hops"`
+	ToolCalls     int    `json:"tool_calls"`
+	EvidenceUnits int    `json:"evidence_units"`
 }
 
 // SourceRef is a cited source: a verbatim passage in its source language, with an
