@@ -6,7 +6,9 @@ from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from citenexus.answer.agentic import AgenticAnswerFlow, LoopBudget
 from citenexus.answer.anthropic import AnthropicGenerator
+from citenexus.answer.decision import CompletionDecisionModel, DecisionModel, LoopDecision
 from citenexus.answer.flow import AnswerFlow, Generator
 from citenexus.answer.generator import OpenAICompatibleGenerator
 from citenexus.answer.result import Decision, Result
@@ -52,6 +54,19 @@ from citenexus.wiki import LLMWikiDistiller, WikiDistiller, WikiRetriever, WikiS
 
 if TYPE_CHECKING:
     from citenexus.code import CodeFacade
+
+
+class _SingleHopDecider:
+    """Fallback deep-ask decider: one gather hop, then answer from that pool.
+
+    Used when no answering model exposes a ``complete()`` decision path. Never
+    reports "sufficient" and never proposes a next query, so the loop halts on
+    ``no_new_evidence`` after the first retrieval — a bounded, deterministic
+    default that still runs the pool through the per-claim single-EU gate.
+    """
+
+    def decide(self, question: str, evidence: Sequence[str]) -> LoopDecision:
+        return LoopDecision()
 
 
 class _IdentityReranker(RerankerPlugin):
@@ -127,6 +142,8 @@ class CiteNexus:
         chunk_max_tokens: int = 450,
         chunk_overlap: int = 60,
         contextualizer: ContextualizerSeam | None = None,
+        agentic_budget: LoopBudget | None = None,
+        agentic_decider: DecisionModel | None = None,
     ) -> None:
         # A first-class S3 location carries endpoint + credential names and
         # derives BOTH storage halves; strings/paths keep the simple behavior.
@@ -195,6 +212,9 @@ class CiteNexus:
             else None
         )
         self._generator = generator
+        self._default_answer_language = default_answer_language
+        self._agentic_budget = agentic_budget
+        self._agentic_decider = agentic_decider
         self._sink = sink
         self._fetch_transport = fetch_transport
         self._reformulator = reformulator
@@ -363,12 +383,24 @@ class CiteNexus:
                 if config.storage.endpoint_url.startswith("http://"):
                     storage_options["allow_http"] = "true"
 
+        # Deep-ask budget: the hop cap is honored from GraphConfig.max_hops (the
+        # declared graph-traversal depth), the rest from AgenticConfig.
+        agentic_budget = LoopBudget(
+            max_hops=config.graph.max_hops,
+            max_tool_calls=config.agentic.max_tool_calls,
+            max_evidence_units=config.agentic.max_evidence_units,
+            timeout_s=config.agentic.timeout_s,
+            stop_when=config.agentic.stop_when,
+            search_k=config.agentic.search_k,
+        )
+
         return cls(
             config.storage.bucket,
             partition=partition,
             signals=config.signals,
             embedder=embedder,
             generator=generator,
+            agentic_budget=agentic_budget,
             reranker=reranker,
             detector=detector,
             backend=backend,
@@ -575,7 +607,24 @@ class CiteNexus:
         k: int | None = None,
         answer_language: str | None = None,
         conversation_id: str | None = None,
+        strategy: str = "strict",
     ) -> Result:
+        """Answer ``question``, cite or abstain.
+
+        ``strategy="strict"`` (default) is the unchanged single-passage flow.
+        ``strategy="deep"`` runs the bounded, library-scripted agentic loop
+        (`answer/agentic.py`): gather verbatim EUs across hops, then answer through
+        the per-claim single-EU gate. Budgets bound cost; only the gate bounds truth.
+        """
+        if strategy == "deep":
+            return self._deep_ask(
+                question,
+                mode=mode,
+                answer_language=answer_language,
+                conversation_id=conversation_id,
+            )
+        if strategy != "strict":
+            raise ValueError(f"unknown ask strategy {strategy!r} (expected 'strict' or 'deep')")
         retrieval_query = self._retrieval_query(question, conversation_id=conversation_id)
         extra_queries = self._extra_queries(question)
         # The EN reformulation also counts for the relevance gate: it is the same
@@ -602,6 +651,47 @@ class CiteNexus:
         if conversation_id is not None:
             self._memory.append(conversation_id, question, result.answer)
         return result
+
+    def _deep_ask(
+        self,
+        question: str,
+        *,
+        mode: TrustMode,
+        answer_language: str | None,
+        conversation_id: str | None,
+    ) -> Result:
+        """Run the agentic deep-ask loop over this client's tools + generator."""
+        generator = self._generator
+        if generator is None:
+            self._require_answer()  # raises the clear search-only-client error
+        decider = self._agentic_decider or self._default_decider(generator)
+        flow = AgenticAnswerFlow(
+            generator=generator,  # type: ignore[arg-type]
+            decider=decider,
+            tools=self.tools(),
+            budget=self._agentic_budget or LoopBudget(),
+            default_answer_language=self._default_answer_language,
+        )
+        result = flow.ask(question, mode=mode, answer_language=answer_language)
+        self._emit_generate(result)
+        if result.evidence.decision is Decision.answered:
+            self._hooks.fire("on_answer", result)
+        else:
+            self._hooks.fire("on_refuse", result)
+        if conversation_id is not None:
+            self._memory.append(conversation_id, question, result.answer)
+        return result
+
+    def _default_decider(self, generator: Generator | None) -> DecisionModel:
+        """The loop's decision model: parse a JSON decision off the completion path.
+
+        A generator exposing ``complete()`` drives the structured single-decision
+        (no provider tool-calling). Without one, the loop makes a single gather hop
+        (never "sufficient", never a next query) and answers from that pool.
+        """
+        if generator is not None and hasattr(generator, "complete"):
+            return CompletionDecisionModel(generator)  # type: ignore[arg-type]
+        return _SingleHopDecider()
 
     def _extra_queries(self, question: str) -> tuple[str, ...]:
         """The EN dual-query reformulation, when configured and useful.
