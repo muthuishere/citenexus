@@ -48,6 +48,7 @@ class LexicalRetriever(RetrieverPlugin):
                     signal=RetrievalSignal.lexical,
                     document_id=row.get("document_id"),
                     text=row.get("text"),
+                    passage=row.get("passage"),
                     page=_page(row.get("page")),
                     language=row.get("language"),
                     checksum=row.get("checksum"),

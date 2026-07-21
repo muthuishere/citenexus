@@ -58,6 +58,7 @@ class VectorRetriever(RetrieverPlugin):
                     signal=RetrievalSignal.vector,
                     document_id=hit.get("document_id"),
                     text=hit.get("text"),
+                    passage=hit.get("passage"),
                     page=_page(hit.get("page")),
                     language=hit.get("language"),
                     checksum=hit.get("checksum"),

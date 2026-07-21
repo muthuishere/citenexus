@@ -183,7 +183,13 @@ class IngestPipeline:
                 {
                     "eu_id": eu.eu_id,
                     "vector": vector,
+                    # `text` is what we EMBED -- under contextual retrieval it carries
+                    # the context model's blurb. `passage` is the verbatim source chunk
+                    # and is what we may quote. Persisting only `text` (the old shape)
+                    # meant retrieval had nothing but the enriched string, so the small
+                    # model's own prose got cited as the merchant's words.
                     "text": eu.text,
+                    "passage": eu.citation.passage,
                     "document_id": eu.document_id,
                     "language": eu.language,
                     "page": eu.citation.page if eu.citation.page is not None else -1,

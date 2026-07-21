@@ -100,11 +100,20 @@ class AnswerFlow:
         # token the top passage happened not to contain. The guarantee is unchanged
         # -- every returned answer still has to be is_supported() by the passage it
         # cites -- we just stop discarding the other candidates on the first miss.
+        #
+        # Note we generate from and verify against `citable_text` -- the VERBATIM
+        # chunk -- not `text`. Under contextual retrieval `text` carries the context
+        # model's situating blurb, and generating from it let that blurb be quoted
+        # back as the source's own words (Indie and Harper cited "This chunk lists
+        # the items available in the Earrings section..." to indieandharper.com; the
+        # shop never wrote that sentence). Worse, the faithfulness gate then verified
+        # the answer against text containing the model's prose, so the guard admitted
+        # its own output as evidence. Rank on the enrichment, quote only the source.
         top = None
         answer = ""
         for candidate in grounded[:_MAX_GENERATION_ATTEMPTS]:
-            attempt = self._generator.answer(question, candidate.text or "", language)
-            if is_supported(attempt, candidate.text or ""):
+            attempt = self._generator.answer(question, candidate.citable_text, language)
+            if is_supported(attempt, candidate.citable_text):
                 top, answer = candidate, attempt
                 break
         if top is None:
@@ -113,7 +122,7 @@ class AnswerFlow:
                 answer_language=language,
                 reason="generated answer failed the faithfulness gate",
             )
-        passage = top.text or ""
+        passage = top.citable_text
 
         source = SourceRef(
             document=top.document_id or top.eu_id,

@@ -80,3 +80,58 @@ def test_generation_attempts_are_bounded() -> None:
     flow.ask("Do you have earrings?", [_candidate(str(i), f"earrings {i}") for i in range(20)])
 
     assert len(generator.calls) == 5
+
+
+def test_never_quotes_the_context_models_blurb_as_the_source() -> None:
+    """The enrichment ranks; only the source's own words may be cited.
+
+    Contextual retrieval indexes ``blurb + "\\n" + chunk``. If the flow generates
+    from that, the small model's sentence gets attributed to the customer -- which
+    is what shipped: a jewellery shop "said" *This chunk lists the items available
+    in the Earrings section...*, a sentence found nowhere on their site.
+    """
+    blurb = "This chunk lists the items available in the Earrings section."
+    chunk = "Earrings section: 122 items."
+    candidate = Candidate(
+        eu_id="a",
+        score=1.0,
+        signal=RetrievalSignal.vector,
+        document_id="a",
+        text=f"{blurb}\n{chunk}",
+        passage=chunk,
+        language="en",
+        checksum="sum-a",
+    )
+    # A generator that would happily parrot the blurb if it were ever shown one.
+    generator = _PerPassageGenerator({chunk: "Earrings section: 122 items."})
+    flow = AnswerFlow(generator=generator)
+
+    result = flow.ask("Do you have earrings?", [candidate])
+
+    assert result.evidence.decision is Decision.answered
+    # The generator was handed the verbatim chunk, never the enriched text.
+    assert generator.calls == [chunk]
+    assert result.sources[0].passage == chunk
+    assert "This chunk" not in result.sources[0].passage
+    assert "This chunk" not in result.answer
+
+
+def test_falls_back_to_indexed_text_on_un_migrated_rows() -> None:
+    """Indexes written before `passage` existed still answer, just un-guaranteed."""
+    candidate = Candidate(
+        eu_id="a",
+        score=1.0,
+        signal=RetrievalSignal.vector,
+        document_id="a",
+        text="Earrings section: 122 items.",
+        passage=None,  # legacy row
+        language="en",
+        checksum="sum-a",
+    )
+    generator = _PerPassageGenerator({"Earrings section: 122 items.": "122 items."})
+    flow = AnswerFlow(generator=generator)
+
+    result = flow.ask("Do you have earrings?", [candidate])
+
+    assert result.evidence.decision is Decision.answered
+    assert result.answer == "122 items."

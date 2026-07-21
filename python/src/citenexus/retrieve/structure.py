@@ -120,6 +120,7 @@ class StructureRetriever(RetrieverPlugin):
                         signal=RetrievalSignal.structure,
                         document_id=row.get("document_id"),
                         text=row.get("text"),
+                        passage=row.get("passage"),
                         page=_page(row.get("page")),
                         language=row.get("language"),
                         checksum=row.get("checksum"),
