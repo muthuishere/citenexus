@@ -29,6 +29,12 @@ class Generator(Protocol):
     def answer(self, question: str, passage: str, answer_language: str = "en") -> str: ...
 
 
+# How many ranked passages may be offered to the generator before we abstain.
+# Bounded because each attempt is a generator call: enough to survive an unlucky
+# top passage, small enough that a genuinely unanswerable question stays cheap.
+_MAX_GENERATION_ATTEMPTS = 5
+
+
 def refusal(
     *,
     mode: TrustMode,
@@ -86,15 +92,28 @@ class AnswerFlow:
                 reason="no sufficiently relevant evidence found",
             )
 
-        top = grounded[0]
-        passage = top.text or ""
-        answer = self._generator.answer(question, passage, language)
-        if not is_supported(answer, passage):
+        # Try the best passages in rank order and keep the first answer that passes
+        # the faithfulness gate. Generating only from grounded[0] made the gate a
+        # coin flip on that one passage's phrasing: a shop with 122 earrings in the
+        # index refused "Do you have earrings?" while answering the same question
+        # lowercased, because the capital-D wording nudged the generator into one
+        # token the top passage happened not to contain. The guarantee is unchanged
+        # -- every returned answer still has to be is_supported() by the passage it
+        # cites -- we just stop discarding the other candidates on the first miss.
+        top = None
+        answer = ""
+        for candidate in grounded[:_MAX_GENERATION_ATTEMPTS]:
+            attempt = self._generator.answer(question, candidate.text or "", language)
+            if is_supported(attempt, candidate.text or ""):
+                top, answer = candidate, attempt
+                break
+        if top is None:
             return refusal(
                 mode=mode,
                 answer_language=language,
                 reason="generated answer failed the faithfulness gate",
             )
+        passage = top.text or ""
 
         source = SourceRef(
             document=top.document_id or top.eu_id,
