@@ -1,4 +1,5 @@
 # CiteNexus
+[![Discord](https://img.shields.io/badge/AgentNexus-join%20the%20community-5865F2?logo=discord&logoColor=white)](https://discord.gg/V9C2kvHC8D)
 
 > Multilingual RAG that answers only when the evidence is strong.
 
@@ -292,6 +293,11 @@ Secrets live in a [vsync](https://muthuishere.github.io/vsync/) vault
 Heavier all-local paths stay opt-in: `task local:minio:up` (real S3 backend),
 `task local:models:up` (infinity — bge-m3 embed + bge-reranker on one port), and
 `task local:ollama:up` (a local answering LLM). See [`compose.yaml`](compose.yaml).
+
+## Community
+
+Questions, ideas, or built something with this? Join **[AgentNexus](https://discord.gg/V9C2kvHC8D)** — a Discord
+for people building with AI agents and open tools. This project lives in **#citenexus**.
 
 ## License
 
