@@ -9,8 +9,9 @@ grows, so the nearest EU ranks first.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING
 
+from citenexus.contracts import EmbeddingProvider, SingleTextEmbedder, embed_one
 from citenexus.plugins.base import RetrieverPlugin
 from citenexus.retrieve.types import Candidate, RetrievalSignal
 
@@ -18,10 +19,11 @@ if TYPE_CHECKING:
     from citenexus.storage.protocols import VectorStore
 
 
-class QueryEmbedder(Protocol):
-    """The single-text embedding seam (``FakeEmbedding`` satisfies it)."""
-
-    def embed(self, text: str) -> list[float]: ...
+#: The embedding seam the vector retriever accepts. ONE definition, published in
+#: `citenexus.contracts` (ADR-0014): a batch `EmbeddingProvider` is preferred and
+#: the query is sent as a batch of one; `SingleTextEmbedder` — the deprecated
+#: shape ``FakeEmbedding`` uses — still works.
+QueryEmbedder = SingleTextEmbedder
 
 
 def _score_from_distance(distance: float) -> float:
@@ -41,12 +43,15 @@ class VectorRetriever(RetrieverPlugin):
 
     plugin_version = "vector-retriever-v1"
 
-    def __init__(self, store: VectorStore, embedder: QueryEmbedder) -> None:
+    def __init__(
+        self, store: VectorStore, embedder: EmbeddingProvider | SingleTextEmbedder
+    ) -> None:
         self._store = store
         self._embedder = embedder
 
     def retrieve(self, query: str, k: int) -> list[Candidate]:
-        vector = self._embedder.embed(query)
+        # A single text is a batch of one — the contract has no second method.
+        vector = embed_one(self._embedder, query)
         hits = self._store.search(vector, limit=k)
         candidates: list[Candidate] = []
         for hit in hits:

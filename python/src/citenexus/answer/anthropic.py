@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 
 from citenexus.answer.generator import _SYSTEM_PROMPT
+from citenexus.contracts import CompletionProvider, GeneratorProvider
 from citenexus.http import DEFAULT_TRANSPORT, Transport
 from citenexus.telemetry.events import TokenUsage
 
@@ -27,8 +28,12 @@ _ANTHROPIC_VERSION = "2023-06-01"
 _DEFAULT_MAX_TOKENS = 1024
 
 
-class AnthropicGenerator:
-    """Grounded answers over Anthropic's native ``/v1/messages`` endpoint."""
+class AnthropicGenerator(GeneratorProvider, CompletionProvider):
+    """Grounded answers over Anthropic's native ``/v1/messages`` endpoint.
+
+    Declares the same published contracts as the OpenAI-compatible generator
+    (ADR-0014 R4): one contract, idiomatic spellings, two wire protocols.
+    """
 
     plugin_version = "anthropic-generator-v1"
 

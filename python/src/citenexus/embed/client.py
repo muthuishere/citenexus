@@ -20,6 +20,8 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping, Sequence
 
+from citenexus.contracts import EmbeddingProvider, Vector
+from citenexus.embed.batcher import DEFAULT_BATCH_SIZE, embed_in_batches
 from citenexus.http import DEFAULT_TRANSPORT, Transport
 from citenexus.plugins.base import EmbeddingPlugin
 
@@ -27,8 +29,14 @@ from citenexus.plugins.base import EmbeddingPlugin
 # tests run hermetically while the default wires stdlib urllib.
 
 
-class OpenAICompatibleEmbedding(EmbeddingPlugin):
-    """Dense embeddings over an OpenAI-compatible ``/embeddings`` endpoint."""
+class OpenAICompatibleEmbedding(EmbeddingPlugin, EmbeddingProvider):
+    """Dense embeddings over an OpenAI-compatible ``/embeddings`` endpoint.
+
+    Declares the published ``EmbeddingProvider`` contract (ADR-0014): ``embed_many``
+    is the batch primitive and the method the pipeline actually calls. The
+    ``EmbeddingPlugin`` ABC stays on the class so registry-based callers keep
+    working (0.x policy: deprecated-not-removed).
+    """
 
     plugin_version = "openai-embed-v1"
 
@@ -39,9 +47,11 @@ class OpenAICompatibleEmbedding(EmbeddingPlugin):
         model: str,
         transport: Transport | None = None,
         headers: Mapping[str, str] | None = None,
+        batch_size: int = DEFAULT_BATCH_SIZE,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._model = model
+        self._batch_size = batch_size
         self._transport: Transport = transport or DEFAULT_TRANSPORT
         # First-class auth/provider headers (toolnexus style): put
         # ``{"Authorization": "Bearer ${API_KEY}"}`` here — the ``${ENV}`` value
@@ -57,13 +67,25 @@ class OpenAICompatibleEmbedding(EmbeddingPlugin):
         # (``${ENV}`` templates, resolved by the transport at call time).
         return {"Content-Type": "application/json", **self._extra_headers}
 
-    def embed(self, texts: Sequence[str]) -> list[list[float]]:
-        """Embed ``texts`` into dense vectors, preserving input order."""
+    def embed(self, texts: Sequence[str]) -> list[Vector]:
+        """ONE request for ``texts`` — the ``EmbeddingPlugin`` / `SequenceEmbedder`
+        shape. Prefer `embed_many`, which splits oversized inputs into batches."""
+        if not texts:
+            return []
         body = json.dumps({"model": self._model, "input": list(texts)}).encode("utf-8")
         raw = self._transport(self._endpoint, body, self._headers())
         payload = json.loads(raw)
         return [[float(x) for x in item["embedding"]] for item in payload["data"]]
 
-    def embed_query(self, text: str) -> list[float]:
-        """Embed a single text — the ingest ``Embedder`` convenience."""
+    def embed_many(self, texts: Sequence[str]) -> list[Vector]:
+        """The `EmbeddingProvider` contract: every text, in order, batched.
+
+        One request per ``batch_size`` texts. This is the method ingest and the
+        vector retriever call; ``embed`` is the single-request primitive it is
+        built from.
+        """
+        return embed_in_batches(self, texts, self._batch_size)
+
+    def embed_query(self, text: str) -> Vector:
+        """DEPRECATED: embed a single text. Use ``embed_many([text])[0]``."""
         return self.embed([text])[0]

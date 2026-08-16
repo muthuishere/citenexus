@@ -6,9 +6,15 @@ import hashlib
 import time
 from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any
 
 from citenexus.config.signals import Signal, requires_slow_path, resolve_signals
+from citenexus.contracts import (
+    EmbeddingProvider,
+    SingleTextEmbedder,
+    VisionProvider,
+    embed_texts,
+)
 from citenexus.domain.authority import encode_authority_meta
 from citenexus.domain.vision import PendingVisionRequest
 from citenexus.evidence.builder import build_evidence_units
@@ -46,18 +52,23 @@ if TYPE_CHECKING:
     from citenexus.worker.queue import DurableQueue
 
 
-class Embedder(Protocol):
-    def embed(self, text: str) -> list[float]: ...
+#: The embedding seam ingest accepts. `EmbeddingProvider` (batch, the contract)
+#: is preferred; `SingleTextEmbedder` is the deprecated one-at-a-time shape,
+#: still supported. Both are published in `citenexus.contracts` (ADR-0014).
+Embedder = SingleTextEmbedder
 
+#: The injected vision seam — describe an image's bytes (§9). Optional: with no
+#: describer configured, ingest is text-level only. ONE definition, published as
+#: `citenexus.contracts.VisionProvider`; satisfied by ``OpenAICompatibleVision``
+#: and ``FakeVision``.
+VisionDescriber = VisionProvider
 
-class VisionDescriber(Protocol):
-    """The injected vision seam — describe an image's bytes (§9).
-
-    Optional: with no describer configured, ingest is text-level only. Satisfied
-    by ``OpenAICompatibleVision`` and ``FakeVision``.
-    """
-
-    def describe(self, image_region: Any) -> Any: ...
+#: What goes in the vector column when the client has no embedding model at all.
+#: A lexical-only corpus still needs a value there, and it is never searched (the
+#: vector retriever is simply not constructed). Deliberately NOT modelled as a
+#: fake "zero embedder": a provider that returns constant vectors is
+#: indistinguishable from a broken one, which is the failure ADR-0014 R2 names.
+_PLACEHOLDER_VECTOR: list[float] = [0.0]
 
 
 def _raw_bytes(source: Any, text: str | None) -> bytes:
@@ -91,7 +102,7 @@ class IngestPipeline:
         backend: StorageBackend,
         base_uri: str,
         partition: PartitionPath,
-        embedder: Embedder,
+        embedder: EmbeddingProvider | SingleTextEmbedder | None = None,
         detector: LanguageDetectorPlugin | None = None,
         signals: Iterable[str | Signal] | None = None,
         storage_options: StorageOptions | None = None,
@@ -388,12 +399,18 @@ class IngestPipeline:
             return None
 
     def _embed_texts(self, texts: list[str]) -> list[list[float]]:
-        """All EU vectors — one batched call when the embedder supports it."""
-        embed_many = getattr(self._embedder, "embed_many", None)
-        if callable(embed_many) and texts:
-            result: list[list[float]] = embed_many(texts)
-            return result
-        return [self._embedder.embed(text) for text in texts]
+        """All EU vectors — one batched call when the provider offers the contract.
+
+        Batching is chosen by ``isinstance(embedder, EmbeddingProvider)``, not by
+        probing for an attribute name: ADR-0014's point is that a capability found
+        by ``getattr`` is one no provider knows to offer.
+
+        With no embedder at all, rows still need a vector column, so each EU gets
+        the placeholder that is never searched.
+        """
+        if self._embedder is None:
+            return [list(_PLACEHOLDER_VECTOR) for _ in texts]
+        return embed_texts(self._embedder, texts)
 
     def _detect_language(self, doc: Any) -> str:
         text = " ".join(block.text for block in doc.blocks)[:2000]

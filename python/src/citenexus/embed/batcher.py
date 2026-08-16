@@ -9,20 +9,17 @@ function (not a plugin method) lets it wrap *any* ``EmbeddingPlugin``.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Protocol
+
+from citenexus.contracts import SequenceEmbedder, Vector
 
 DEFAULT_BATCH_SIZE = 64
 
 
-class _BatchEmbedder(Protocol):
-    def embed(self, texts: Sequence[str]) -> list[list[float]]: ...
-
-
 def embed_in_batches(
-    plugin: _BatchEmbedder,
+    plugin: SequenceEmbedder,
     texts: Sequence[str],
     batch_size: int = DEFAULT_BATCH_SIZE,
-) -> list[list[float]]:
+) -> list[Vector]:
     """Embed ``texts`` in batches of ``batch_size``, preserving order."""
     if batch_size < 1:
         raise ValueError("batch_size must be >= 1")

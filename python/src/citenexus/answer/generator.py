@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 
+from citenexus.contracts import CompletionProvider, GeneratorProvider
 from citenexus.http import DEFAULT_TRANSPORT, Transport
 from citenexus.telemetry.events import TokenUsage
 
@@ -39,11 +40,13 @@ _SYSTEM_PROMPT = (
 )
 
 
-class OpenAICompatibleGenerator:
+class OpenAICompatibleGenerator(GeneratorProvider, CompletionProvider):
     """Grounded answers over an OpenAI-compatible ``/chat/completions`` endpoint.
 
-    Implements the ``answer/flow.Generator`` protocol so it drops straight into
-    ``AnswerFlow`` / ``CiteNexus(generator=...)``.
+    Declares the published `GeneratorProvider` contract (what ``ask()`` calls) and
+    `CompletionProvider` (the deep-ask decision seam), so it drops straight into
+    ``AnswerFlow`` / ``CiteNexus(generator=...)`` and mypy checks it against the
+    shape a third-party generator must match.
     """
 
     plugin_version = "openai-generator-v1"

@@ -14,11 +14,12 @@ from citenexus.answer.generator import OpenAICompatibleGenerator
 from citenexus.answer.result import Decision, Result
 from citenexus.config.schema import CiteNexusConfig
 from citenexus.config.signals import Signal, resolve_signals
+from citenexus.contracts import EmbeddingProvider, SingleTextEmbedder
 from citenexus.delete import DeleteResult
 from citenexus.domain.authority import AuthorityPolicy
 from citenexus.domain.partition import PartitionPath
 from citenexus.domain.trust import TrustMode
-from citenexus.embed import OpenAICompatibleEmbedding, embed_in_batches
+from citenexus.embed import OpenAICompatibleEmbedding
 from citenexus.embed import Transport as EmbedTransport
 from citenexus.evaluate import EvaluationReport, Evaluator
 from citenexus.evidence.chunked_builder import Contextualizer as ContextualizerSeam
@@ -40,7 +41,7 @@ from citenexus.retrieve.reformulate import QueryReformulator, Reformulator
 from citenexus.retrieve.rerank import OpenAICompatibleReranker
 from citenexus.retrieve.structure import StructureRetriever
 from citenexus.retrieve.types import Candidate
-from citenexus.retrieve.vector import QueryEmbedder, VectorRetriever
+from citenexus.retrieve.vector import VectorRetriever
 from citenexus.storage.backend import LocalFsBackend, S3Backend, StorageBackend
 from citenexus.storage.lance_store import LanceVectorStore, StorageOptions
 from citenexus.storage.location import S3
@@ -81,37 +82,6 @@ class _IdentityReranker(RerankerPlugin):
         return list(candidates)
 
 
-class _SingleTextEmbedder:
-    """Adapt a batch ``OpenAICompatibleEmbedding`` to the single-text seam.
-
-    Ingest and the vector retriever call ``embed(text) -> list[float]``; the
-    OpenAI-compatible plugin's ``embed`` takes a sequence. This wraps its
-    ``embed_query`` convenience so the batch plugin drops into the client.
-    """
-
-    def __init__(self, plugin: OpenAICompatibleEmbedding, batch_size: int = 32) -> None:
-        self._plugin = plugin
-        self._batch_size = batch_size
-
-    def embed(self, text: str) -> list[float]:
-        return self._plugin.embed_query(text)
-
-    def embed_many(self, texts: list[str]) -> list[list[float]]:
-        """Batched embedding — one request per ``batch_size`` texts (§10)."""
-        return embed_in_batches(self._plugin, texts, self._batch_size)
-
-
-class _ZeroEmbedder:
-    """Placeholder embedder for model-less clients (lexical-only search).
-
-    Rows still need a vector column; this writes a constant 1-dim vector that
-    is never searched — without an embedder the vector retriever is not built.
-    """
-
-    def embed(self, text: str) -> list[float]:
-        return [0.0]
-
-
 def _authority_policy(config: CiteNexusConfig) -> AuthorityPolicy:
     """Build the ADR-0004 policy from the declarative config section.
 
@@ -150,7 +120,7 @@ class CiteNexus:
         *,
         partition: PartitionPath | None = None,
         signals: Iterable[str | Signal] | None = None,
-        embedder: QueryEmbedder | None = None,
+        embedder: EmbeddingProvider | SingleTextEmbedder | None = None,
         generator: Generator | None = None,
         reranker: RerankerPlugin | None = None,
         detector: LanguageDetectorPlugin | None = None,
@@ -203,7 +173,7 @@ class CiteNexus:
             backend=self._backend,
             base_uri=self.base_uri,
             partition=self.partition,
-            embedder=embedder or _ZeroEmbedder(),
+            embedder=embedder,
             detector=detector,
             signals=self.signals,
             storage_options=storage_options,
@@ -292,14 +262,15 @@ class CiteNexus:
 
         # Every model is optional: no embedding endpoint -> lexical-only
         # search; no llm endpoint -> retrieve-only client (ask() explains).
-        embedder: QueryEmbedder | None = None
+        embedder: EmbeddingProvider | SingleTextEmbedder | None = None
         if config.embedding.endpoint is not None:
-            embedder = _SingleTextEmbedder(
-                OpenAICompatibleEmbedding(
-                    base_url=config.embedding.endpoint.base_url,
-                    model=config.embedding.model,
-                    transport=styled(config.embedding.endpoint, embed_transport),
-                ),
+            # The client goes straight to the model. It satisfies
+            # `EmbeddingProvider` itself, so there is no adapter between our own
+            # abstractions any more (ADR-0014).
+            embedder = OpenAICompatibleEmbedding(
+                base_url=config.embedding.endpoint.base_url,
+                model=config.embedding.model,
+                transport=styled(config.embedding.endpoint, embed_transport),
                 batch_size=config.embedding.batch_size,
             )
 
@@ -479,9 +450,7 @@ class CiteNexus:
         """
         # A URL is just another source: fetch it, then ingest as HTML.
         if text is None and is_url(source):
-            return self._ingest_url(
-                source, document_id=document_id, acl=acl, authority=authority
-            )
+            return self._ingest_url(source, document_id=document_id, acl=acl, authority=authority)
         result = self._ingest.ingest(
             source,
             text=text,
@@ -597,9 +566,7 @@ class CiteNexus:
         manifest.forget(document_id)
         save_manifest(self._backend, self.partition, etag_name, manifest)
 
-        result = DeleteResult(
-            document_id=document_id, status="deleted", removed_eu_ids=removed
-        )
+        result = DeleteResult(document_id=document_id, status="deleted", removed_eu_ids=removed)
         self._hooks.fire("on_delete", result)
         return result
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Protocol
 
 from citenexus.answer.authority import (
     INSUFFICIENT_AUTHORITY,
@@ -27,6 +26,7 @@ from citenexus.answer.result import (
 )
 from citenexus.answer.segment import split_claims
 from citenexus.answer.verify import has_relevance_overlap_v2, is_supported_v2
+from citenexus.contracts import GeneratorProvider
 from citenexus.domain.authority import AuthorityPolicy
 from citenexus.domain.trust import TrustMode
 from citenexus.lang.fallback import resolve_requested_answer_language
@@ -34,15 +34,10 @@ from citenexus.plugins import LanguageDetectorPlugin
 from citenexus.retrieve.types import Candidate
 from citenexus.tokenize import unsupported_scripts
 
-
-class Generator(Protocol):
-    """The LLM seam used by `ask()`.
-
-    The generator receives the already-selected passage and the required answer
-    language. It may call any endpoint, but the verifier decides what is usable.
-    """
-
-    def answer(self, question: str, passage: str, answer_language: str = "en") -> str: ...
+#: The LLM seam used by `ask()` — now ONE definition, published in
+#: `citenexus.contracts` (ADR-0014). Kept as a name here because it is the name
+#: `AnswerFlow(generator=...)` and `CiteNexus(generator=...)` are documented with.
+Generator = GeneratorProvider
 
 
 # How many ranked passages may be offered to the generator before we abstain.

@@ -18,6 +18,8 @@ from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict
 
+from citenexus.contracts import CompletionProvider
+
 _JSON_OBJECT = re.compile(r"\{.*\}", re.DOTALL)
 
 
@@ -36,15 +38,10 @@ class DecisionModel(Protocol):
     def decide(self, question: str, evidence: Sequence[str]) -> LoopDecision: ...
 
 
-class Completion(Protocol):
-    """A raw completion seam — one prompt in, one string out.
-
-    Both wire generators implement this off their existing transport, with no
-    provider tool/function-calling. Keeping it generic means the decision prompt
-    and parsing live here, not in the clients.
-    """
-
-    def complete(self, prompt: str) -> str: ...
+#: A raw completion seam — one prompt in, one string out. ONE definition, now
+#: published in `citenexus.contracts` (ADR-0014 calls this shape "already almost
+#: exactly right"); kept as a name here because that is what the loop imports.
+Completion = CompletionProvider
 
 
 _DECISION_PROMPT = (
