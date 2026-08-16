@@ -38,6 +38,16 @@ export interface EvidenceSignals {
   unsupported_claims_removed: number;
   conflicts_detected: number;
   languages_in_evidence: string[];
+  /**
+   * Scripts present in the question or the evidence that the tokenizer does not
+   * claim to support (ADR-0011). A CAPABILITY signal, never an evidence
+   * judgement: a refusal carrying a non-empty value here means "I cannot read
+   * this script", which is a different thing from "the evidence isn't there".
+   * Returning the evidence-absent refusal for a capability gap is exactly what
+   * let the ASCII-only tokenizer hide. Empty on every Latin-script Result, so
+   * existing Results serialize unchanged.
+   */
+  unsupported_scripts: string[];
   /** null on the strict flow (deep-ask is Python-only) — present for wire parity. */
   loop: LoopSignals | null;
 }
@@ -90,6 +100,7 @@ export function evidenceSignals(opts: {
   unsupportedClaimsRemoved?: number;
   conflictsDetected?: number;
   languagesInEvidence?: string[];
+  unsupportedScripts?: string[];
 }): EvidenceSignals {
   return {
     decision: opts.decision,
@@ -100,6 +111,7 @@ export function evidenceSignals(opts: {
     unsupported_claims_removed: opts.unsupportedClaimsRemoved ?? 0,
     conflicts_detected: opts.conflictsDetected ?? 0,
     languages_in_evidence: opts.languagesInEvidence ?? [],
+    unsupported_scripts: opts.unsupportedScripts ?? [],
     loop: null,
   };
 }

@@ -1,11 +1,17 @@
 // BM25-lite ranking (SPEC-PORTS-v1 §4/§10), parity with the Python reference
 // citenexus.storage.bm25.Bm25TextSearch.
 //
-// Tokenizer = the pinned §4 tokenizer. Query terms are taken as a SET. Rows with
+// Tokenizer = the Unicode tokenizer (`tokenizeV2`: case-folded, Unicode word
+// classes, character-bigram segmentation for spaceless scripts, no stemming, no
+// stopword list, §11a-safe). It was v1 until ADR-0011: v1 is ASCII only, so
+// lexical retrieval scored ZERO on every non-Latin script. v2 is identical to v1
+// on pure-ASCII text, so the pinned BM25 vectors did not move.
+//
+// Query terms are taken as a SET. Rows with
 // a total score of 0 are dropped; the survivors are sorted DESCENDING by score
 // with a stable tie-break on original input row order. Scores round to 1e-6.
 
-import { tokenize } from "../tokenize/tokenize.js";
+import { tokenizeV2 } from "../tokenize/tokenize-v2.js";
 
 const K1 = 1.5;
 const B = 0.75;
@@ -27,10 +33,10 @@ function round6(x: number): number {
 /** Rank `rows` by BM25 against `query`; ordered (eu_id, score) survivors. */
 export function bm25(rows: Bm25Row[], query: string): Bm25Result[] {
   if (rows.length === 0) return [];
-  const terms = tokenize(query);
+  const terms = tokenizeV2(query);
   if (terms.length === 0) return [];
 
-  const tokenized = rows.map((row) => tokenize(row.text ?? ""));
+  const tokenized = rows.map((row) => tokenizeV2(row.text ?? ""));
   const nDocs = rows.length;
   const totalLen = tokenized.reduce((sum, toks) => sum + toks.length, 0);
   const avgLen = totalLen / nDocs || 1.0;

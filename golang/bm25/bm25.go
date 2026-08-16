@@ -1,8 +1,12 @@
 // Package bm25 is the pinned CiteNexus BM25-lite ranking (SPEC-PORTS-v1 §4/§10).
 //
-// Definition (frozen contract): tokenize with the pinned §4 tokenizer, take the
-// SET of query terms, and score each row with classic BM25 (k1=1.5, b=0.75) over
-// a language-agnostic bag of terms. Rows scoring 0 are dropped; the rest are
+// Definition: tokenize with the Unicode tokenizer (tokenize.TokenizeV2 — case
+// folded, Unicode word classes, character-bigram segmentation for spaceless
+// scripts, no stemming, no stopword list, §11a-safe), take the SET of query
+// terms, and score each row with classic BM25 (k1=1.5, b=0.75) over a
+// language-agnostic bag of terms. It was v1 until ADR-0011: v1 is ASCII only, so
+// lexical retrieval scored ZERO on every non-Latin script. v2 is identical to v1
+// on pure-ASCII text, so the pinned BM25 conformance vectors did not move. Rows scoring 0 are dropped; the rest are
 // sorted DESCENDING by score with a stable tie-break by original input order.
 // Parity with the Python reference citenexus.storage.bm25.Bm25TextSearch.
 package bm25
@@ -38,7 +42,7 @@ func Rank(rows []Row, query string) []Result {
 	if len(rows) == 0 {
 		return []Result{}
 	}
-	terms := tokenize.Tokenize(query)
+	terms := tokenize.TokenizeV2(query)
 	if len(terms) == 0 {
 		return []Result{}
 	}
@@ -46,7 +50,7 @@ func Rank(rows []Row, query string) []Result {
 	tokenized := make([][]string, len(rows))
 	totalLen := 0
 	for i, row := range rows {
-		toks := tokenize.Tokenize(row.Text)
+		toks := tokenize.TokenizeV2(row.Text)
 		tokenized[i] = toks
 		totalLen += len(toks)
 	}

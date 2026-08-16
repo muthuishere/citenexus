@@ -5,9 +5,15 @@
 // "@muthuishere/citenexus-core/ingest" — because they load a platform-native library at
 // runtime. Importing this root entry pulls in NO native dependency.
 export * from "./tokenize/tokenize.js";
+// ADR-0011: the Unicode tokenizer that supersedes v1 on BM25 and the answer
+// path. v1 stays exported and frozen.
+export * from "./tokenize/tokenize-v2.js";
 export * from "./bm25/bm25.js";
 export * from "./rrf/rrf.js";
 export * from "./gate/gate.js";
+// ADR-0009: the ordered-containment + polarity predicate that supersedes
+// isSupported on the answer path. isSupported stays exported and frozen.
+export * from "./gate/verify-v2.js";
 export * from "./chunker/chunker.js";
 // euid re-exported explicitly: its internal chunkText helper collides with the
 // chunker's public chunkText, so we expose only euid's public builders.
@@ -16,6 +22,8 @@ export type { Block } from "./euid/euid.js";
 export * from "./lang/lang.js";
 export * from "./result/result.js";
 export * from "./answer/answer.js";
+// ADR-0009 guarded claim segmentation (tier-1 scanner over a tier-2 table).
+export * from "./answer/segment.js";
 export * from "./graph/graph.js";
 export * from "./structure/structure.js";
 export * from "./fakes/fakes.js";
