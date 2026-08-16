@@ -1,0 +1,811 @@
+{
+  "search_languages": [
+    "en",
+    "ta",
+    "te"
+  ],
+  "buckets": {
+    "Tamil-only": {
+      "n": 6,
+      "answered": 4,
+      "abstained": 2,
+      "correct_token": 4,
+      "answered_rate": 0.6666666666666666,
+      "correct_token_rate": 0.6666666666666666
+    },
+    "Telugu-only": {
+      "n": 7,
+      "answered": 7,
+      "abstained": 0,
+      "correct_token": 7,
+      "answered_rate": 1.0,
+      "correct_token_rate": 1.0
+    },
+    "English-answerable (control)": {
+      "n": 5,
+      "answered": 5,
+      "abstained": 0,
+      "correct_token": 5,
+      "answered_rate": 1.0,
+      "correct_token_rate": 1.0
+    },
+    "Ungroundable (must abstain)": {
+      "n": 4,
+      "answered": 0,
+      "abstained": 4,
+      "correct_token": 0,
+      "answered_rate": 0.0,
+      "correct_token_rate": 0.0
+    }
+  },
+  "metrics": {
+    "total": 22,
+    "answered": 16,
+    "abstained": 6,
+    "groundedness_rate": 1.0,
+    "citation_rate": 1.0,
+    "cited_right_document_rate": 1.0,
+    "answer_when_groundable": 0.8888888888888888,
+    "abstain_when_ungroundable": 1.0
+  },
+  "evidence_language_counts": {
+    "ta": 4,
+    "te": 7,
+    "en": 5
+  },
+  "library_evaluate": {
+    "total": 22,
+    "answered": 9,
+    "refused": 13,
+    "groundedness_rate": 1.0,
+    "citation_rate": 1.0,
+    "expected_support_rate": 0.22727272727272727
+  },
+  "per_question": [
+    {
+      "question": "An employee on the Chennai office rolls wants extra festival leave. How many additional festival-leave days do they get in a leave year, over and above the 18 days of earned leave?",
+      "probe": "ta_only",
+      "expect_decision": "answer",
+      "expected": "4",
+      "decision": "answered",
+      "answer": "4 நாட்கள்",
+      "answer_language": "en",
+      "cited_docs": [
+        "05-ta-chennai-leave-annexure"
+      ],
+      "top_doc": "05-ta-chennai-leave-annexure",
+      "cited_doc_languages": [
+        "ta"
+      ],
+      "cited_passage_languages": [
+        "ta"
+      ],
+      "correct_docs": [
+        "05-ta-chennai-leave-annexure"
+      ],
+      "cited_correct_doc": true,
+      "expected_token_in_answer": true,
+      "distinct_documents": 5,
+      "supporting_sources": 11,
+      "all_claims_verified": true,
+      "unsupported_claims_removed": 0,
+      "conflicts_detected": 0,
+      "languages_in_evidence": [
+        "ta",
+        "te",
+        "en"
+      ],
+      "unsupported_scripts": [],
+      "missing_evidence": []
+    },
+    {
+      "question": "How many days in advance must a Chennai employee apply for the additional festival leave?",
+      "probe": "ta_only",
+      "expect_decision": "answer",
+      "expected": "15",
+      "decision": "answered",
+      "answer": "குறைந்தபட்சம் 15 நாட்கள் முன்னதாக",
+      "answer_language": "en",
+      "cited_docs": [
+        "05-ta-chennai-leave-annexure"
+      ],
+      "top_doc": "05-ta-chennai-leave-annexure",
+      "cited_doc_languages": [
+        "ta"
+      ],
+      "cited_passage_languages": [
+        "ta"
+      ],
+      "correct_docs": [
+        "05-ta-chennai-leave-annexure"
+      ],
+      "cited_correct_doc": true,
+      "expected_token_in_answer": true,
+      "distinct_documents": 6,
+      "supporting_sources": 11,
+      "all_claims_verified": true,
+      "unsupported_claims_removed": 0,
+      "conflicts_detected": 0,
+      "languages_in_evidence": [
+        "ta",
+        "te",
+        "en"
+      ],
+      "unsupported_scripts": [],
+      "missing_evidence": []
+    },
+    {
+      "question": "How much must a confirmed employee at the Chennai office pay to buy out one unserved month of the notice period?",
+      "probe": "ta_only_exact_token",
+      "expect_decision": "answer",
+      "expected": "45,000",
+      "decision": "answered",
+      "answer": "INR 45,000",
+      "answer_language": "en",
+      "cited_docs": [
+        "06-ta-notice-buyout-annexure"
+      ],
+      "top_doc": "06-ta-notice-buyout-annexure",
+      "cited_doc_languages": [
+        "ta"
+      ],
+      "cited_passage_languages": [
+        "ta"
+      ],
+      "correct_docs": [
+        "06-ta-notice-buyout-annexure"
+      ],
+      "cited_correct_doc": true,
+      "expected_token_in_answer": true,
+      "distinct_documents": 5,
+      "supporting_sources": 11,
+      "all_claims_verified": true,
+      "unsupported_claims_removed": 0,
+      "conflicts_detected": 0,
+      "languages_in_evidence": [
+        "ta",
+        "te"
+      ],
+      "unsupported_scripts": [],
+      "missing_evidence": []
+    },
+    {
+      "question": "What is the maximum number of months of notice period that a Chennai employee is allowed to buy out?",
+      "probe": "ta_only",
+      "expect_decision": "answer",
+      "expected": "2",
+      "decision": "refused",
+      "answer": "I can't answer that from the available evidence.",
+      "answer_language": "en",
+      "cited_docs": [],
+      "top_doc": null,
+      "cited_doc_languages": [],
+      "cited_passage_languages": [],
+      "correct_docs": [
+        "06-ta-notice-buyout-annexure"
+      ],
+      "cited_correct_doc": false,
+      "expected_token_in_answer": false,
+      "distinct_documents": 0,
+      "supporting_sources": 0,
+      "all_claims_verified": false,
+      "unsupported_claims_removed": 0,
+      "conflicts_detected": 0,
+      "languages_in_evidence": [],
+      "unsupported_scripts": [],
+      "missing_evidence": [
+        "generated answer failed the faithfulness gate"
+      ]
+    },
+    {
+      "question": "How many weeks of paid maternity leave does the Chennai office grant, and how much is the monthly creche reimbursement?",
+      "probe": "ta_only_pdf",
+      "expect_decision": "answer",
+      "expected": "26",
+      "decision": "answered",
+      "answer": "26 வாரங்கள் ஊதியத்துடன் கூடிய மகப்பேறு விடுப்பு வழங்கப்படும். சிசுக் காப்பகக் கட்டணமாக மாதம் ஒன்றுக்கு INR 6,000 வரை திருப்பிச் செலுத்தப்படும்.",
+      "answer_language": "en",
+      "cited_docs": [
+        "07-ta-maternity-creche-annexure"
+      ],
+      "top_doc": "07-ta-maternity-creche-annexure",
+      "cited_doc_languages": [
+        "ta"
+      ],
+      "cited_passage_languages": [
+        "ta"
+      ],
+      "correct_docs": [
+        "07-ta-maternity-creche-annexure"
+      ],
+      "cited_correct_doc": true,
+      "expected_token_in_answer": true,
+      "distinct_documents": 7,
+      "supporting_sources": 10,
+      "all_claims_verified": true,
+      "unsupported_claims_removed": 0,
+      "conflicts_detected": 0,
+      "languages_in_evidence": [
+        "ta",
+        "te",
+        "en"
+      ],
+      "unsupported_scripts": [],
+      "missing_evidence": []
+    },
+    {
+      "question": "Within how many days of receiving a termination letter may a Chennai employee appeal to the grievance committee?",
+      "probe": "ta_only_pdf",
+      "expect_decision": "answer",
+      "expected": "21",
+      "decision": "refused",
+      "answer": "The available evidence disagrees, so I can't answer that.",
+      "answer_language": "en",
+      "cited_docs": [
+        "08-ta-termination-appeal-annexure",
+        "07-ta-maternity-creche-annexure"
+      ],
+      "top_doc": "08-ta-termination-appeal-annexure",
+      "cited_doc_languages": [
+        "ta"
+      ],
+      "cited_passage_languages": [
+        "ta"
+      ],
+      "correct_docs": [
+        "08-ta-termination-appeal-annexure"
+      ],
+      "cited_correct_doc": true,
+      "expected_token_in_answer": false,
+      "distinct_documents": 5,
+      "supporting_sources": 10,
+      "all_claims_verified": false,
+      "unsupported_claims_removed": 0,
+      "conflicts_detected": 1,
+      "languages_in_evidence": [
+        "ta",
+        "te",
+        "en"
+      ],
+      "unsupported_scripts": [],
+      "missing_evidence": [
+        "cited sources disagree and the conflict is unresolved"
+      ]
+    },
+    {
+      "question": "An employee at the Hyderabad office wants to carry unused earned leave into the next leave year. What is the maximum number of days they may carry forward?",
+      "probe": "te_only",
+      "expect_decision": "answer",
+      "expected": "5",
+      "decision": "answered",
+      "answer": "5 రోజులు",
+      "answer_language": "en",
+      "cited_docs": [
+        "09-te-hyderabad-leave-annexure"
+      ],
+      "top_doc": "09-te-hyderabad-leave-annexure",
+      "cited_doc_languages": [
+        "te"
+      ],
+      "cited_passage_languages": [
+        "te"
+      ],
+      "correct_docs": [
+        "09-te-hyderabad-leave-annexure"
+      ],
+      "cited_correct_doc": true,
+      "expected_token_in_answer": true,
+      "distinct_documents": 5,
+      "supporting_sources": 11,
+      "all_claims_verified": true,
+      "unsupported_claims_removed": 0,
+      "conflicts_detected": 0,
+      "languages_in_evidence": [
+        "te",
+        "en",
+        "ta"
+      ],
+      "unsupported_scripts": [],
+      "missing_evidence": []
+    },
+    {
+      "question": "How many additional festival-leave days does a Hyderabad employee receive for Bathukamma and Bonalu?",
+      "probe": "te_only",
+      "expect_decision": "answer",
+      "expected": "3",
+      "decision": "answered",
+      "answer": "3 రోజుల అదనపు పండుగ సెలవు",
+      "answer_language": "en",
+      "cited_docs": [
+        "09-te-hyderabad-leave-annexure"
+      ],
+      "top_doc": "09-te-hyderabad-leave-annexure",
+      "cited_doc_languages": [
+        "te"
+      ],
+      "cited_passage_languages": [
+        "te"
+      ],
+      "correct_docs": [
+        "09-te-hyderabad-leave-annexure"
+      ],
+      "cited_correct_doc": true,
+      "expected_token_in_answer": true,
+      "distinct_documents": 4,
+      "supporting_sources": 9,
+      "all_claims_verified": true,
+      "unsupported_claims_removed": 0,
+      "conflicts_detected": 0,
+      "languages_in_evidence": [
+        "te",
+        "ta",
+        "en"
+      ],
+      "unsupported_scripts": [],
+      "missing_evidence": []
+    },
+    {
+      "question": "By how many days may probation be extended, and how many times may it be extended?",
+      "probe": "te_only",
+      "expect_decision": "answer",
+      "expected": "90",
+      "decision": "answered",
+      "answer": "పరిశీలన కాలాన్ని ఒకేసారి 90 రోజుల వరకు పొడిగించవచ్చు. ఒక ఉద్యోగి పరిశీలన కాలాన్ని ఒకసారి కంటే ఎక్కువసార్లు పొడిగించకూడదు.",
+      "answer_language": "en",
+      "cited_docs": [
+        "10-te-probation-extension-annexure"
+      ],
+      "top_doc": "10-te-probation-extension-annexure",
+      "cited_doc_languages": [
+        "te"
+      ],
+      "cited_passage_languages": [
+        "te"
+      ],
+      "correct_docs": [
+        "10-te-probation-extension-annexure"
+      ],
+      "cited_correct_doc": true,
+      "expected_token_in_answer": true,
+      "distinct_documents": 5,
+      "supporting_sources": 9,
+      "all_claims_verified": true,
+      "unsupported_claims_removed": 0,
+      "conflicts_detected": 0,
+      "languages_in_evidence": [
+        "en",
+        "te",
+        "ta"
+      ],
+      "unsupported_scripts": [],
+      "missing_evidence": []
+    },
+    {
+      "question": "What monthly stipend top-up is paid to an employee during an extended probation period?",
+      "probe": "te_only_exact_token",
+      "expect_decision": "answer",
+      "expected": "12,500",
+      "decision": "answered",
+      "answer": "INR 12,500",
+      "answer_language": "en",
+      "cited_docs": [
+        "10-te-probation-extension-annexure"
+      ],
+      "top_doc": "10-te-probation-extension-annexure",
+      "cited_doc_languages": [
+        "te"
+      ],
+      "cited_passage_languages": [
+        "te"
+      ],
+      "correct_docs": [
+        "10-te-probation-extension-annexure"
+      ],
+      "cited_correct_doc": true,
+      "expected_token_in_answer": true,
+      "distinct_documents": 6,
+      "supporting_sources": 10,
+      "all_claims_verified": true,
+      "unsupported_claims_removed": 0,
+      "conflicts_detected": 0,
+      "languages_in_evidence": [
+        "te",
+        "ta",
+        "en"
+      ],
+      "unsupported_scripts": [],
+      "missing_evidence": []
+    },
+    {
+      "question": "For how many months after employment ends does the confidentiality obligation continue?",
+      "probe": "te_only",
+      "expect_decision": "answer",
+      "expected": "24",
+      "decision": "answered",
+      "answer": "24 నెలల పాటు",
+      "answer_language": "en",
+      "cited_docs": [
+        "11-te-confidentiality-annexure"
+      ],
+      "top_doc": "11-te-confidentiality-annexure",
+      "cited_doc_languages": [
+        "te"
+      ],
+      "cited_passage_languages": [
+        "te"
+      ],
+      "correct_docs": [
+        "11-te-confidentiality-annexure"
+      ],
+      "cited_correct_doc": true,
+      "expected_token_in_answer": true,
+      "distinct_documents": 5,
+      "supporting_sources": 8,
+      "all_claims_verified": true,
+      "unsupported_claims_removed": 0,
+      "conflicts_detected": 0,
+      "languages_in_evidence": [
+        "te",
+        "en",
+        "ta"
+      ],
+      "unsupported_scripts": [],
+      "missing_evidence": []
+    },
+    {
+      "question": "What are the liquidated damages payable for each breach of the confidentiality annexure?",
+      "probe": "te_only_exact_token",
+      "expect_decision": "answer",
+      "expected": "2,00,000",
+      "decision": "answered",
+      "answer": "ప్రతి ఉల్లంఘనకు INR 2,00,000 నిర్ణీత నష్టపరిహారం",
+      "answer_language": "en",
+      "cited_docs": [
+        "11-te-confidentiality-annexure"
+      ],
+      "top_doc": "11-te-confidentiality-annexure",
+      "cited_doc_languages": [
+        "te"
+      ],
+      "cited_passage_languages": [
+        "te"
+      ],
+      "correct_docs": [
+        "11-te-confidentiality-annexure"
+      ],
+      "cited_correct_doc": true,
+      "expected_token_in_answer": true,
+      "distinct_documents": 7,
+      "supporting_sources": 9,
+      "all_claims_verified": true,
+      "unsupported_claims_removed": 0,
+      "conflicts_detected": 0,
+      "languages_in_evidence": [
+        "te",
+        "en",
+        "ta"
+      ],
+      "unsupported_scripts": [],
+      "missing_evidence": []
+    },
+    {
+      "question": "What allowance is paid for each night shift, and what is the maximum number of night shifts per calendar month?",
+      "probe": "te_only",
+      "expect_decision": "answer",
+      "expected": "850",
+      "decision": "answered",
+      "answer": "ప్రతి రాత్రి షిఫ్ట్‌కు ఉద్యోగికి INR 850 చెల్లించబడుతుంది.",
+      "answer_language": "en",
+      "cited_docs": [
+        "12-te-shift-allowance-annexure"
+      ],
+      "top_doc": "12-te-shift-allowance-annexure",
+      "cited_doc_languages": [
+        "te"
+      ],
+      "cited_passage_languages": [
+        "te"
+      ],
+      "correct_docs": [
+        "12-te-shift-allowance-annexure"
+      ],
+      "cited_correct_doc": true,
+      "expected_token_in_answer": true,
+      "distinct_documents": 3,
+      "supporting_sources": 9,
+      "all_claims_verified": true,
+      "unsupported_claims_removed": 0,
+      "conflicts_detected": 0,
+      "languages_in_evidence": [
+        "te",
+        "ta"
+      ],
+      "unsupported_scripts": [],
+      "missing_evidence": []
+    },
+    {
+      "question": "How many days written notice must a confirmed employee give when resigning?",
+      "probe": "en",
+      "expect_decision": "answer",
+      "expected": "60",
+      "decision": "answered",
+      "answer": "A confirmed employee who wishes to resign shall give the Company 60 days written notice.",
+      "answer_language": "en",
+      "cited_docs": [
+        "02-en-notice-period-policy"
+      ],
+      "top_doc": "02-en-notice-period-policy",
+      "cited_doc_languages": [
+        "en"
+      ],
+      "cited_passage_languages": [
+        "en"
+      ],
+      "correct_docs": [
+        "02-en-notice-period-policy"
+      ],
+      "cited_correct_doc": true,
+      "expected_token_in_answer": true,
+      "distinct_documents": 6,
+      "supporting_sources": 11,
+      "all_claims_verified": true,
+      "unsupported_claims_removed": 0,
+      "conflicts_detected": 0,
+      "languages_in_evidence": [
+        "en",
+        "te",
+        "ta"
+      ],
+      "unsupported_scripts": [],
+      "missing_evidence": []
+    },
+    {
+      "question": "How many days of earned leave does a confirmed employee accrue per leave year?",
+      "probe": "en",
+      "expect_decision": "answer",
+      "expected": "18",
+      "decision": "answered",
+      "answer": "A confirmed employee accrues 18 days of earned leave per completed leave year.",
+      "answer_language": "en",
+      "cited_docs": [
+        "01-en-leave-policy"
+      ],
+      "top_doc": "01-en-leave-policy",
+      "cited_doc_languages": [
+        "en"
+      ],
+      "cited_passage_languages": [
+        "en"
+      ],
+      "correct_docs": [
+        "01-en-leave-policy"
+      ],
+      "cited_correct_doc": true,
+      "expected_token_in_answer": true,
+      "distinct_documents": 6,
+      "supporting_sources": 11,
+      "all_claims_verified": true,
+      "unsupported_claims_removed": 0,
+      "conflicts_detected": 0,
+      "languages_in_evidence": [
+        "en",
+        "ta",
+        "te"
+      ],
+      "unsupported_scripts": [],
+      "missing_evidence": []
+    },
+    {
+      "question": "How long is the probation period from the date of joining?",
+      "probe": "en",
+      "expect_decision": "answer",
+      "expected": "180",
+      "decision": "answered",
+      "answer": "The period of probation is 180 days from the date of joining.",
+      "answer_language": "en",
+      "cited_docs": [
+        "03-en-probation-policy"
+      ],
+      "top_doc": "03-en-probation-policy",
+      "cited_doc_languages": [
+        "en"
+      ],
+      "cited_passage_languages": [
+        "en"
+      ],
+      "correct_docs": [
+        "03-en-probation-policy"
+      ],
+      "cited_correct_doc": true,
+      "expected_token_in_answer": true,
+      "distinct_documents": 5,
+      "supporting_sources": 10,
+      "all_claims_verified": true,
+      "unsupported_claims_removed": 0,
+      "conflicts_detected": 0,
+      "languages_in_evidence": [
+        "en",
+        "ta",
+        "te"
+      ],
+      "unsupported_scripts": [],
+      "missing_evidence": []
+    },
+    {
+      "question": "How many days of sick leave is an employee entitled to per leave year?",
+      "probe": "en",
+      "expect_decision": "answer",
+      "expected": "12",
+      "decision": "answered",
+      "answer": "An employee is entitled to 12 days of sick leave per leave year.",
+      "answer_language": "en",
+      "cited_docs": [
+        "01-en-leave-policy"
+      ],
+      "top_doc": "01-en-leave-policy",
+      "cited_doc_languages": [
+        "en"
+      ],
+      "cited_passage_languages": [
+        "en"
+      ],
+      "correct_docs": [
+        "01-en-leave-policy"
+      ],
+      "cited_correct_doc": true,
+      "expected_token_in_answer": true,
+      "distinct_documents": 3,
+      "supporting_sources": 11,
+      "all_claims_verified": true,
+      "unsupported_claims_removed": 0,
+      "conflicts_detected": 0,
+      "languages_in_evidence": [
+        "en",
+        "ta",
+        "te"
+      ],
+      "unsupported_scripts": [],
+      "missing_evidence": []
+    },
+    {
+      "question": "May an employee store confidential information on a personal cloud account?",
+      "probe": "en",
+      "expect_decision": "answer",
+      "expected": "not",
+      "decision": "answered",
+      "answer": "An employee shall not store confidential information on a personal device or a personal cloud account.",
+      "answer_language": "en",
+      "cited_docs": [
+        "04-en-confidentiality-policy"
+      ],
+      "top_doc": "04-en-confidentiality-policy",
+      "cited_doc_languages": [
+        "en"
+      ],
+      "cited_passage_languages": [
+        "en"
+      ],
+      "correct_docs": [
+        "04-en-confidentiality-policy"
+      ],
+      "cited_correct_doc": true,
+      "expected_token_in_answer": true,
+      "distinct_documents": 5,
+      "supporting_sources": 10,
+      "all_claims_verified": true,
+      "unsupported_claims_removed": 0,
+      "conflicts_detected": 0,
+      "languages_in_evidence": [
+        "en",
+        "te",
+        "ta"
+      ],
+      "unsupported_scripts": [],
+      "missing_evidence": []
+    },
+    {
+      "question": "What is the employer's provident fund contribution rate?",
+      "probe": "none",
+      "expect_decision": "abstain",
+      "expected": "",
+      "decision": "refused",
+      "answer": "I can't answer that from the available evidence.",
+      "answer_language": "en",
+      "cited_docs": [],
+      "top_doc": null,
+      "cited_doc_languages": [],
+      "cited_passage_languages": [],
+      "correct_docs": [],
+      "cited_correct_doc": false,
+      "expected_token_in_answer": false,
+      "distinct_documents": 0,
+      "supporting_sources": 0,
+      "all_claims_verified": false,
+      "unsupported_claims_removed": 0,
+      "conflicts_detected": 0,
+      "languages_in_evidence": [],
+      "unsupported_scripts": [],
+      "missing_evidence": [
+        "generated answer failed the faithfulness gate"
+      ]
+    },
+    {
+      "question": "How many days of gratuity is an employee entitled to per completed year of service?",
+      "probe": "none",
+      "expect_decision": "abstain",
+      "expected": "",
+      "decision": "refused",
+      "answer": "I can't answer that from the available evidence.",
+      "answer_language": "en",
+      "cited_docs": [],
+      "top_doc": null,
+      "cited_doc_languages": [],
+      "cited_passage_languages": [],
+      "correct_docs": [],
+      "cited_correct_doc": false,
+      "expected_token_in_answer": false,
+      "distinct_documents": 0,
+      "supporting_sources": 0,
+      "all_claims_verified": false,
+      "unsupported_claims_removed": 0,
+      "conflicts_detected": 0,
+      "languages_in_evidence": [],
+      "unsupported_scripts": [],
+      "missing_evidence": [
+        "generated answer failed the faithfulness gate"
+      ]
+    },
+    {
+      "question": "What is the monthly work-from-home internet stipend?",
+      "probe": "none",
+      "expect_decision": "abstain",
+      "expected": "",
+      "decision": "refused",
+      "answer": "I can't answer that from the available evidence.",
+      "answer_language": "en",
+      "cited_docs": [],
+      "top_doc": null,
+      "cited_doc_languages": [],
+      "cited_passage_languages": [],
+      "correct_docs": [],
+      "cited_correct_doc": false,
+      "expected_token_in_answer": false,
+      "distinct_documents": 0,
+      "supporting_sources": 0,
+      "all_claims_verified": false,
+      "unsupported_claims_removed": 0,
+      "conflicts_detected": 1,
+      "languages_in_evidence": [],
+      "unsupported_scripts": [],
+      "missing_evidence": [
+        "generated answer failed the faithfulness gate"
+      ]
+    },
+    {
+      "question": "How much notice must an employee at the Bengaluru office give when resigning?",
+      "probe": "none",
+      "expect_decision": "abstain",
+      "expected": "",
+      "decision": "refused",
+      "answer": "I can't answer that from the available evidence.",
+      "answer_language": "en",
+      "cited_docs": [],
+      "top_doc": null,
+      "cited_doc_languages": [],
+      "cited_passage_languages": [],
+      "correct_docs": [],
+      "cited_correct_doc": false,
+      "expected_token_in_answer": false,
+      "distinct_documents": 0,
+      "supporting_sources": 0,
+      "all_claims_verified": false,
+      "unsupported_claims_removed": 0,
+      "conflicts_detected": 0,
+      "languages_in_evidence": [],
+      "unsupported_scripts": [],
+      "missing_evidence": [
+        "generated answer failed the faithfulness gate"
+      ]
+    }
+  ]
+}
