@@ -17,6 +17,8 @@
           "en"
         ],
         "unsupported_scripts": [],
+        "authority_tier": "",
+        "authority_floor_applied": false,
         "loop": null
       },
       "claims": [
@@ -73,6 +75,8 @@
         "conflicts_detected": 0,
         "languages_in_evidence": [],
         "unsupported_scripts": [],
+        "authority_tier": "",
+        "authority_floor_applied": false,
         "loop": null
       },
       "claims": [],

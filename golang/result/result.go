@@ -56,6 +56,21 @@ type EvidenceSignals struct {
 	// capability gap is exactly what let the ASCII-only tokenizer hide. Empty on
 	// every Latin-script Result, so existing Results serialize unchanged.
 	UnsupportedScripts []string `json:"unsupported_scripts"`
+	// AuthorityTier is the cited source's authority tier name, and
+	// AuthorityFloorApplied records whether the strict-mode authority floor
+	// actually WITHHELD grounded evidence on this call (ADR-0004) — not merely
+	// that a floor was configured, which was true of every strict call and
+	// carried no information. A STANDING signal, never an evidence judgement —
+	// the same distinction UnsupportedScripts draws for capability. A refusal
+	// with AuthorityFloorApplied true says "what I found has no standing here",
+	// which is a different thing from "the evidence isn't there". Empty/false on
+	// every Result from an unranked corpus, so those serialize unchanged.
+	//
+	// The ports carry these fields for wire parity only: authority SELECTION
+	// (Python's citenexus.answer.authority) runs in the ask() facade, which the
+	// ports do not have, so Go always emits the empty/false defaults.
+	AuthorityTier         string `json:"authority_tier"`
+	AuthorityFloorApplied bool   `json:"authority_floor_applied"`
 	// Loop is deep-ask (agentic) loop accounting; nil (→ null) on the strict flow.
 	// Deep-ask is Python-only today, so Go always emits null — present for wire
 	// parity with the Python reference. See structural-code-graph / deep-ask.

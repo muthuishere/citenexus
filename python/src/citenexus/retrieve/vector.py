@@ -63,6 +63,7 @@ class VectorRetriever(RetrieverPlugin):
                     language=hit.get("language"),
                     checksum=hit.get("checksum"),
                     raw_uri=hit.get("raw_uri"),
+                    authority_meta=str(hit.get("authority_meta") or ""),
                 )
             )
         return candidates

@@ -11,6 +11,7 @@ import {
   SCRIPT_RANGES_FOR_TEST,
   SUPPORTED_SCRIPTS,
   TOKENIZER_VERSION,
+  scriptsIn,
   tokenizeV2,
   unsupportedScripts,
 } from "./tokenize-v2.js";
@@ -106,5 +107,46 @@ describe("tokenizeV2 conformance (ADR-0011)", () => {
       if (Array.from(c.input).some((ch) => ch.codePointAt(0)! > 127)) continue;
       expect(tokenizeV2(c.input)).toEqual(tokenize(c.input));
     }
+  });
+});
+
+// Telugu (U+0C00-U+0C7F) was absent from the range table ENTIRELY: it read as a
+// NEIGHBOUR plus "unknown" and still emitted six delimited tokens, so BM25
+// ranked a script no fixture had ever validated while the answer flow filtered
+// every Telugu passage out of the grounding set.
+describe("the range table itself", () => {
+  it("classifies Telugu as Telugu, space-delimited", () => {
+    const text = "\u0C09\u0C26\u0C4D\u0C2F\u0C4B\u0C17\u0C3F \u0C30\u0C39\u0C38\u0C4D\u0C2F";
+    expect(scriptsIn(text)).toEqual(["telugu"]);
+    expect(unsupportedScripts(text)).toEqual([]);
+    expect(tokenizeV2(text)).toEqual(text.split(" "));
+  });
+
+  // A second script in this list is exactly what Telugu's ["devanagari",
+  // "unknown"] was. Japanese genuinely mixes Han and Hiragana.
+  it.each(FIXTURE.supported)("$script classifies to itself and nothing else", (c) => {
+    for (const s of scriptsIn(c.text)) {
+      expect(s).not.toBe("unknown");
+      if (s !== c.script) expect([c.script, s]).toEqual(["hiragana", "han"]);
+    }
+  });
+
+  // The structural half: a script ABSENT from the table has no validated
+  // segmentation rule, so it produces NOTHING — BM25 cannot rank it and the gate
+  // cannot accept it (an empty claim never aligns).
+  it.each([
+    "\u12E8\u1230\u122B\u1270\u129B\u12CD \u121A\u1235\u1325\u122B\u12CA \u1218\u1228\u1303",
+    "\u13D7\u13D9\u13F3\u13C5\u13CD\u13D7 \u13A0\u13D3\u13C5\u13D9\u13D9",
+  ])("a script absent from the table does not tokenize at all", (text) => {
+    expect(unsupportedScripts(text)).toEqual(["unknown"]);
+    expect(tokenizeV2(text)).toEqual([]);
+    expect(isSupportedV2(text, text)).toBe(false);
+  });
+
+  it("drops only the unknown run, not the rest of the sentence", () => {
+    expect(tokenizeV2("\u12E8\u1230\u122B\u1270\u129B\u12CD 2026 policy")).toEqual([
+      "2026",
+      "policy",
+    ]);
   });
 });

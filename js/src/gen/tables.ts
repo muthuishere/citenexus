@@ -151,6 +151,7 @@ export const SUPPORTED_SCRIPTS_TABLE: readonly string[] = [
   "katakana",
   "latin",
   "tamil",
+  "telugu",
   "thai"
 ];
 

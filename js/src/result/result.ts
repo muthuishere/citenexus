@@ -48,6 +48,23 @@ export interface EvidenceSignals {
    * existing Results serialize unchanged.
    */
   unsupported_scripts: string[];
+  /**
+   * The cited source's authority tier name, and whether the strict-mode
+   * authority floor actually WITHHELD grounded evidence on this call
+   * (ADR-0004) — not merely that a floor was configured, which was true of
+   * every strict call and carried no information. A STANDING signal, never an
+   * evidence judgement — the same distinction `unsupported_scripts` draws for
+   * capability. A refusal with `authority_floor_applied` true says "what I
+   * found has no standing here", which is a different thing from "the evidence
+   * isn't there". Empty/false on every Result from an unranked corpus, so those
+   * serialize unchanged.
+   *
+   * The ports carry these for wire parity only: authority SELECTION (Python's
+   * citenexus.answer.authority) runs in the ask() facade, which JS does not
+   * have, so JS always emits the empty/false defaults.
+   */
+  authority_tier: string;
+  authority_floor_applied: boolean;
   /** null on the strict flow (deep-ask is Python-only) — present for wire parity. */
   loop: LoopSignals | null;
 }
@@ -101,6 +118,8 @@ export function evidenceSignals(opts: {
   conflictsDetected?: number;
   languagesInEvidence?: string[];
   unsupportedScripts?: string[];
+  authorityTier?: string;
+  authorityFloorApplied?: boolean;
 }): EvidenceSignals {
   return {
     decision: opts.decision,
@@ -112,6 +131,8 @@ export function evidenceSignals(opts: {
     conflicts_detected: opts.conflictsDetected ?? 0,
     languages_in_evidence: opts.languagesInEvidence ?? [],
     unsupported_scripts: opts.unsupportedScripts ?? [],
+    authority_tier: opts.authorityTier ?? "",
+    authority_floor_applied: opts.authorityFloorApplied ?? false,
     loop: null,
   };
 }

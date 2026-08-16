@@ -176,3 +176,57 @@ func isASCIIWords(s string) bool {
 	}
 	return true
 }
+
+// Telugu (U+0C00-U+0C7F) was absent from the range table entirely: it read as a
+// NEIGHBOUR plus "unknown" and still emitted six delimited tokens, so BM25
+// ranked a script no fixture had ever validated while the answer flow filtered
+// every Telugu passage out of the grounding set.
+func TestTeluguClassifiesAsItselfAndIsDelimited(t *testing.T) {
+	const text = "ఉద్యోగి రహస్య సమాచారాన్ని"
+	if got := ScriptsIn(text); !reflect.DeepEqual(got, []string{"telugu"}) {
+		t.Fatalf("ScriptsIn = %q, want [telugu]", got)
+	}
+	if got := UnsupportedScripts(text); len(got) != 0 {
+		t.Fatalf("UnsupportedScripts = %q, want none", got)
+	}
+	want := []string{"ఉద్యోగి", "రహస్య", "సమాచారాన్ని"}
+	if got := TokenizeV2(text); !reflect.DeepEqual(got, want) {
+		t.Fatalf("TokenizeV2 = %q, want %q (Telugu writes spaces; bigrams would be the mirror defect)", got, want)
+	}
+}
+
+// Every CLAIMED script must classify to ITSELF — a second script in this list is
+// exactly what Telugu's ('devanagari', 'unknown') was.
+func TestEveryClaimedScriptSampleClassifiesToItself(t *testing.T) {
+	for _, c := range loadTokenizeV2(t).Supported {
+		for _, s := range ScriptsIn(c.Text) {
+			// Japanese genuinely mixes Han and Hiragana; nothing may be "unknown".
+			if s == "unknown" {
+				t.Fatalf("%s: sample classifies partly as unknown", c.Script)
+			}
+			if s != c.Script && !(c.Script == "hiragana" && s == "han") {
+				t.Fatalf("%s: sample also classifies as %q", c.Script, s)
+			}
+		}
+	}
+}
+
+// The structural half: a script ABSENT from the range table has no validated
+// segmentation rule, so it produces NOTHING. BM25 cannot rank it, and the gate
+// cannot accept it (an empty claim never aligns).
+func TestAScriptAbsentFromTheTableDoesNotTokenize(t *testing.T) {
+	for _, text := range []string{"የሰራተኛው ሚስጥራዊ መረጃ", "ᏗᏙᎳᏅᏍᏗ ᎠᏓᏅᏙ", "ཞིབ་འཇུག"} {
+		if got := UnsupportedScripts(text); !reflect.DeepEqual(got, []string{"unknown"}) {
+			t.Fatalf("%q: UnsupportedScripts = %q, want [unknown]", text, got)
+		}
+		if got := TokenizeV2(text); len(got) != 0 {
+			t.Fatalf("%q: TokenizeV2 = %q, want no tokens", text, got)
+		}
+	}
+	// Only the unknown RUN is dropped — a stray character cannot silence an
+	// otherwise-supported passage.
+	want := []string{"2026", "policy"}
+	if got := TokenizeV2("የሰራተኛው 2026 policy"); !reflect.DeepEqual(got, want) {
+		t.Fatalf("TokenizeV2 = %q, want %q", got, want)
+	}
+}

@@ -135,19 +135,40 @@ var scriptRanges = [...]scriptRange{
 	{0x0870, 0x08FF, "arabic"},
 	{0x0900, 0x097F, "devanagari"},
 	{0x0980, 0x09FF, "bengali"},
+	{0x0A00, 0x0A7F, "gurmukhi"},
+	{0x0A80, 0x0AFF, "gujarati"},
+	{0x0B00, 0x0B7F, "oriya"},
 	{0x0B80, 0x0BFF, "tamil"},
+	{0x0C00, 0x0C7F, "telugu"},
+	{0x0C80, 0x0CFF, "kannada"},
+	{0x0D00, 0x0D7F, "malayalam"},
+	{0x0D80, 0x0DFF, "sinhala"},
 	{0x0E00, 0x0E7F, "thai"},
 	{0x0E80, 0x0EFF, "lao"},
 	{0x1000, 0x109F, "myanmar"},
 	{0x10A0, 0x10FF, "georgian"},
 	{0x1100, 0x11FF, "hangul"},
 	{0x1780, 0x17FF, "khmer"},
+	{0x1AB0, 0x1AFF, "common"}, // combining marks extended — Inherited
+	{0x1C80, 0x1C8F, "cyrillic"},
+	{0x1C90, 0x1CBF, "georgian"}, // Mtavruli
+	{0x1D00, 0x1D25, "latin"},
+	{0x1D26, 0x1D2A, "greek"},
+	{0x1D2B, 0x1D2B, "cyrillic"},
+	{0x1D6B, 0x1D77, "latin"},
+	{0x1D78, 0x1D78, "cyrillic"},
+	{0x1D79, 0x1D9A, "latin"},
+	{0x1DC0, 0x1DFF, "common"}, // combining marks supplement — Inherited
 	{0x1E00, 0x1EFF, "latin"},
 	{0x1F00, 0x1FFF, "greek"},
+	{0x20D0, 0x20F0, "common"}, // combining marks for symbols — Inherited
+	{0x2184, 0x2184, "latin"},
 	{0x2C60, 0x2C7F, "latin"},
+	{0x2D00, 0x2D2F, "georgian"}, // Khutsuri supplement
 	{0x2DE0, 0x2DFF, "cyrillic"},
 	{0x2E80, 0x2EFF, "han"},
 	{0x3005, 0x3007, "han"},
+	{0x302E, 0x302F, "hangul"}, // Hangul tone marks (Mn)
 	{0x3040, 0x309F, "hiragana"},
 	{0x30A0, 0x30FF, "katakana"},
 	{0x3130, 0x318F, "hangul"},
@@ -156,15 +177,37 @@ var scriptRanges = [...]scriptRange{
 	{0x4E00, 0x9FFF, "han"},
 	{0xA640, 0xA69F, "cyrillic"},
 	{0xA720, 0xA7FF, "latin"},
+	{0xA8E0, 0xA8FF, "devanagari"}, // Devanagari Extended
 	{0xA960, 0xA97F, "hangul"},
+	{0xA9E0, 0xA9FF, "myanmar"}, // Myanmar Extended-B
+	{0xAA60, 0xAA7F, "myanmar"}, // Myanmar Extended-A
+	{0xAB30, 0xAB64, "latin"},
+	{0xAB65, 0xAB65, "greek"},
+	{0xAB66, 0xAB68, "latin"},
 	{0xAC00, 0xD7A3, "hangul"},
+	{0xD7B0, 0xD7FF, "hangul"}, // Hangul Jamo Extended-B
 	{0xF900, 0xFAFF, "han"},
 	{0xFB1D, 0xFB4F, "hebrew"},
 	{0xFB50, 0xFDFF, "arabic"},
+	{0xFE00, 0xFE0F, "common"}, // variation selectors — Inherited
+	{0xFE20, 0xFE2F, "common"}, // combining half marks — Inherited
 	{0xFE70, 0xFEFF, "arabic"},
 	{0xFF21, 0xFF3A, "latin"},
 	{0xFF41, 0xFF5A, "latin"},
+	{0x10140, 0x1018B, "greek"},    // Ancient Greek Numbers
+	{0x10EFD, 0x10EFF, "arabic"},   // Arabic Extended-C marks
+	{0x11FC0, 0x11FF1, "tamil"},    // Tamil Supplement
+	{0x1AFF0, 0x1B000, "katakana"}, // Kana Extended-B
+	{0x1B001, 0x1B11F, "hiragana"},
+	{0x1B120, 0x1B122, "katakana"},
+	{0x1B132, 0x1B132, "hiragana"},
+	{0x1B150, 0x1B152, "hiragana"},
+	{0x1B155, 0x1B155, "katakana"},
+	{0x1B164, 0x1B167, "katakana"},
+	{0x1DF00, 0x1DF2A, "latin"}, // Latin Extended-G
 	{0x20000, 0x2A6DF, "han"},
+	{0x2A700, 0x2EBEF, "han"}, // CJK ext C-I
+	{0x30000, 0x323AF, "han"}, // CJK ext G-H
 }
 
 // ScriptOf returns the script of one rune; "common" for script-neutral runes
@@ -200,8 +243,19 @@ func isWordChar(r rune) bool {
 var caseFolder = cases.Fold()
 
 // emit flushes one same-script run into out.
+//
+// A run whose script the table does not cover is DROPPED, not emitted. There is
+// no validated segmentation rule for a script nobody put in the table — Telugu
+// was absent from it entirely, read as a NEIGHBOUR plus "unknown", and still
+// produced six delimited tokens, which is how BM25 came to rank a script no
+// fixture had ever validated. Emitting nothing makes the failure loud: the gate
+// refuses (an empty claim never aligns, so this cannot rubber-stamp), lexical
+// retrieval scores nothing, and UnsupportedScripts reports "unknown".
 func emit(run []rune, script string, out *[]string) {
 	if len(run) == 0 {
+		return
+	}
+	if script == "unknown" {
 		return
 	}
 	loadScriptTable()

@@ -13,6 +13,7 @@
     "katakana",
     "latin",
     "tamil",
+    "telugu",
     "thai"
   ],
   "continuous_scripts": [
@@ -247,6 +248,20 @@
       "unsupported_scripts": []
     },
     {
+      "script": "telugu",
+      "text": "ఉద్యోగి రహస్య సమాచారాన్ని వెల్లడించకూడదు.",
+      "tokens": [
+        "ఉద్యోగి",
+        "రహస్య",
+        "సమాచారాన్ని",
+        "వెల్లడించకూడదు"
+      ],
+      "v1_tokens": [],
+      "self_supported": true,
+      "unrelated_supported": false,
+      "unsupported_scripts": []
+    },
+    {
       "script": "thai",
       "text": "พนักงานต้องไม่เปิดเผยข้อมูลที่เป็นความลับ",
       "tokens": [
@@ -313,6 +328,27 @@
       ]
     },
     {
+      "script": "gujarati",
+      "text": "કર્મચારી ગોપનીય માહિતી જાહેર કરશે નહીં",
+      "unsupported_scripts": [
+        "gujarati"
+      ]
+    },
+    {
+      "script": "gurmukhi",
+      "text": "ਕਰਮਚਾਰੀ ਗੁਪਤ ਜਾਣਕਾਰੀ ਜ਼ਾਹਰ ਨਹੀਂ ਕਰੇਗਾ",
+      "unsupported_scripts": [
+        "gurmukhi"
+      ]
+    },
+    {
+      "script": "kannada",
+      "text": "ಉದ್ಯೋಗಿ ಗೌಪ್ಯ ಮಾಹಿತಿಯನ್ನು ಬಹಿರಂಗಪಡಿಸಬಾರದು",
+      "unsupported_scripts": [
+        "kannada"
+      ]
+    },
+    {
       "script": "khmer",
       "text": "បុគ្គលិកមិនត្រូវបង្ហាញព័ត៌មានសម្ងាត់",
       "unsupported_scripts": [
@@ -327,10 +363,31 @@
       ]
     },
     {
+      "script": "malayalam",
+      "text": "ജീവനക്കാരൻ രഹസ്യ വിവരങ്ങൾ വെളിപ്പെടുത്തരുത്",
+      "unsupported_scripts": [
+        "malayalam"
+      ]
+    },
+    {
       "script": "myanmar",
       "text": "ဝန်ထမ်းသည် လျှို့ဝှက်ချက်ကို မဖော်ထုတ်ရ",
       "unsupported_scripts": [
         "myanmar"
+      ]
+    },
+    {
+      "script": "oriya",
+      "text": "କର୍ମଚାରୀ ଗୋପନୀୟ ସୂଚନା ପ୍ରକାଶ କରିବେ ନାହିଁ",
+      "unsupported_scripts": [
+        "oriya"
+      ]
+    },
+    {
+      "script": "sinhala",
+      "text": "සේවකයා රහස්‍ය තොරතුරු හෙළි නොකළ යුතුය",
+      "unsupported_scripts": [
+        "sinhala"
       ]
     }
   ],
@@ -509,6 +566,29 @@
         "직원은",
         "기밀",
         "정보를"
+      ]
+    },
+    {
+      "input": "ఉద్యోగి రహస్య సమాచారాన్ని",
+      "tokens": [
+        "ఉద్యోగి",
+        "రహస్య",
+        "సమాచారాన్ని"
+      ]
+    },
+    {
+      "input": "የሰራተኛው ሚስጥራዊ መረጃ",
+      "tokens": []
+    },
+    {
+      "input": "ᏗᏙᎳᏅᏍᏗ ᎠᏓᏅᏙ",
+      "tokens": []
+    },
+    {
+      "input": "የሰራተኛው 2026 policy",
+      "tokens": [
+        "2026",
+        "policy"
       ]
     }
   ]

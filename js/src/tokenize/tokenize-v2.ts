@@ -66,19 +66,40 @@ const SCRIPT_RANGES: ReadonlyArray<readonly [number, number, string]> = [
   [0x0870, 0x08ff, "arabic"],
   [0x0900, 0x097f, "devanagari"],
   [0x0980, 0x09ff, "bengali"],
+  [0x0a00, 0x0a7f, "gurmukhi"],
+  [0x0a80, 0x0aff, "gujarati"],
+  [0x0b00, 0x0b7f, "oriya"],
   [0x0b80, 0x0bff, "tamil"],
+  [0x0c00, 0x0c7f, "telugu"],
+  [0x0c80, 0x0cff, "kannada"],
+  [0x0d00, 0x0d7f, "malayalam"],
+  [0x0d80, 0x0dff, "sinhala"],
   [0x0e00, 0x0e7f, "thai"],
   [0x0e80, 0x0eff, "lao"],
   [0x1000, 0x109f, "myanmar"],
   [0x10a0, 0x10ff, "georgian"],
   [0x1100, 0x11ff, "hangul"],
   [0x1780, 0x17ff, "khmer"],
+  [0x1ab0, 0x1aff, "common"], // combining marks extended — Inherited
+  [0x1c80, 0x1c8f, "cyrillic"],
+  [0x1c90, 0x1cbf, "georgian"], // Mtavruli
+  [0x1d00, 0x1d25, "latin"],
+  [0x1d26, 0x1d2a, "greek"],
+  [0x1d2b, 0x1d2b, "cyrillic"],
+  [0x1d6b, 0x1d77, "latin"],
+  [0x1d78, 0x1d78, "cyrillic"],
+  [0x1d79, 0x1d9a, "latin"],
+  [0x1dc0, 0x1dff, "common"], // combining marks supplement — Inherited
   [0x1e00, 0x1eff, "latin"],
   [0x1f00, 0x1fff, "greek"],
+  [0x20d0, 0x20f0, "common"], // combining marks for symbols — Inherited
+  [0x2184, 0x2184, "latin"],
   [0x2c60, 0x2c7f, "latin"],
+  [0x2d00, 0x2d2f, "georgian"], // Khutsuri supplement
   [0x2de0, 0x2dff, "cyrillic"],
   [0x2e80, 0x2eff, "han"],
   [0x3005, 0x3007, "han"],
+  [0x302e, 0x302f, "hangul"], // Hangul tone marks (Mn)
   [0x3040, 0x309f, "hiragana"],
   [0x30a0, 0x30ff, "katakana"],
   [0x3130, 0x318f, "hangul"],
@@ -87,15 +108,37 @@ const SCRIPT_RANGES: ReadonlyArray<readonly [number, number, string]> = [
   [0x4e00, 0x9fff, "han"],
   [0xa640, 0xa69f, "cyrillic"],
   [0xa720, 0xa7ff, "latin"],
+  [0xa8e0, 0xa8ff, "devanagari"], // Devanagari Extended
   [0xa960, 0xa97f, "hangul"],
+  [0xa9e0, 0xa9ff, "myanmar"], // Myanmar Extended-B
+  [0xaa60, 0xaa7f, "myanmar"], // Myanmar Extended-A
+  [0xab30, 0xab64, "latin"],
+  [0xab65, 0xab65, "greek"],
+  [0xab66, 0xab68, "latin"],
   [0xac00, 0xd7a3, "hangul"],
+  [0xd7b0, 0xd7ff, "hangul"], // Hangul Jamo Extended-B
   [0xf900, 0xfaff, "han"],
   [0xfb1d, 0xfb4f, "hebrew"],
   [0xfb50, 0xfdff, "arabic"],
+  [0xfe00, 0xfe0f, "common"], // variation selectors — Inherited
+  [0xfe20, 0xfe2f, "common"], // combining half marks — Inherited
   [0xfe70, 0xfeff, "arabic"],
   [0xff21, 0xff3a, "latin"],
   [0xff41, 0xff5a, "latin"],
+  [0x10140, 0x1018b, "greek"], // Ancient Greek Numbers
+  [0x10efd, 0x10eff, "arabic"], // Arabic Extended-C marks
+  [0x11fc0, 0x11ff1, "tamil"], // Tamil Supplement
+  [0x1aff0, 0x1b000, "katakana"], // Kana Extended-B
+  [0x1b001, 0x1b11f, "hiragana"],
+  [0x1b120, 0x1b122, "katakana"],
+  [0x1b132, 0x1b132, "hiragana"],
+  [0x1b150, 0x1b152, "hiragana"],
+  [0x1b155, 0x1b155, "katakana"],
+  [0x1b164, 0x1b167, "katakana"],
+  [0x1df00, 0x1df2a, "latin"], // Latin Extended-G
   [0x20000, 0x2a6df, "han"],
+  [0x2a700, 0x2ebef, "han"], // CJK ext C-I
+  [0x30000, 0x323af, "han"], // CJK ext G-H
 ];
 
 /** Exported for the drift-guard test that asserts the table stays sorted. */
@@ -149,8 +192,17 @@ export function caseFold(text: string): string {
 }
 
 // Flush one same-script run into `out`.
+//
+// A run whose script the table does not cover is DROPPED, not emitted. There is
+// no validated segmentation rule for a script nobody put in the table — Telugu
+// was absent from it entirely, read as a NEIGHBOUR plus "unknown", and still
+// produced six delimited tokens, which is how BM25 came to rank a script no
+// fixture had ever validated. Emitting nothing makes the failure loud: the gate
+// refuses (an empty claim never aligns, so this cannot rubber-stamp), lexical
+// retrieval scores nothing, and `unsupportedScripts` reports "unknown".
 function emit(run: string[], script: string, out: string[]): void {
   if (run.length === 0) return;
+  if (script === "unknown") return;
   if (CONTINUOUS_SCRIPTS.has(script) && run.length > 1) {
     // Character bigrams (Lucene CJKBigramFilter semantics). Deterministic,
     // dictionary-free, adequate for both lexical retrieval and ordered

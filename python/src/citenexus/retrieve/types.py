@@ -45,6 +45,11 @@ class Candidate(BaseModel):
     language: str | None = None
     checksum: str | None = None
     raw_uri: str | None = None
+    #: Caller-supplied source metadata as canonical JSON (ADR-0004), carried from
+    #: the ``authority_meta`` row column. Opaque here: only an ``AuthorityProfile``
+    #: interprets it, and it is METADATA — a tier is never derived from the text
+    #: above. ``""`` on rows written before the column existed ⇒ unranked.
+    authority_meta: str = ""
 
     @property
     def citable_text(self) -> str:
