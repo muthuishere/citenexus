@@ -7,12 +7,21 @@
 // {"Content-Type":"application/json"}: auth is the endpoint layer's job, never
 // these clients'. No key/secret ever touches a header or the request body.
 
-/** The single seam every model client posts through. */
+/** The single seam every model client posts through.
+ *
+ * ASYNC-CAPABLE (ADR-0014 R2). It was declared `=> string`, which no real
+ * transport can satisfy: the only concrete one, `HttpClient.send` (`http.ts`),
+ * is `async … Promise<string>`. Casting past the type put a Promise where the
+ * body string was expected, so every real call died in `JSON.parse` with
+ * `Unexpected token 'o', "[object Promise]"` — and the JS port had no working
+ * real-model path at all. A synchronous transport (the hermetic test fakes) is
+ * still valid; clients await either. Failure is a thrown error or a rejected
+ * promise — never a placeholder value. */
 export type Transport = (
   url: string,
   body: string,
   headers: Record<string, string>,
-) => string;
+) => string | Promise<string>;
 
 /** The pinned grounded-answer system prompt (conformance/prompts.json). */
 export const SYSTEM_PROMPT =
@@ -67,7 +76,7 @@ export class OpenAIChatGenerator {
     this.headers = config.headers;
   }
 
-  answer(question: string, passage: string, answerLanguage = "en"): string {
+  async answer(question: string, passage: string, answerLanguage = "en"): Promise<string> {
     const request: Record<string, unknown> = {
       model: this.model,
       messages: [
@@ -80,7 +89,7 @@ export class OpenAIChatGenerator {
     if (this.maxTokens !== null) {
       request["max_tokens"] = this.maxTokens;
     }
-    const raw = this.transport(
+    const raw = await this.transport(
       `${this.baseUrl}/chat/completions`,
       JSON.stringify(request),
       wireHeaders(this.headers),

@@ -43,7 +43,7 @@ export class AnthropicGenerator {
     this.headers = config.headers;
   }
 
-  answer(question: string, passage: string, answerLanguage = "en"): string {
+  async answer(question: string, passage: string, answerLanguage = "en"): Promise<string> {
     const request: Record<string, unknown> = {
       model: this.model,
       system: SYSTEM_PROMPT,
@@ -54,7 +54,7 @@ export class AnthropicGenerator {
       max_tokens: this.maxTokens,
       temperature: this.temperature,
     };
-    const raw = this.transport(
+    const raw = await this.transport(
       `${this.baseUrl}/v1/messages`,
       JSON.stringify(request),
       wireHeaders(this.headers),

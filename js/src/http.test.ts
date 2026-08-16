@@ -34,7 +34,7 @@ describe("HTTP ${ENV} header auth (toolnexus style)", () => {
     });
   });
 
-  it("a model client forwards header templates to its transport", () => {
+  it("a model client forwards header templates to its transport", async () => {
     process.env["CN_TEST_KEY"] = "sk-live-999";
     let seen: Record<string, string> = {};
     const recorder = (_url: string, _body: string, headers: Record<string, string>) => {
@@ -46,7 +46,7 @@ describe("HTTP ${ENV} header auth (toolnexus style)", () => {
       { base_url: "http://x/v1", model: "m", headers: { Authorization: "Bearer ${CN_TEST_KEY}" } },
       recorder,
     );
-    embedder.embed(["hi"]);
+    await embedder.embed(["hi"]);
 
     // The client forwards the TEMPLATE; a real HttpClient resolves it at the edge.
     expect(seen["Authorization"]).toBe("Bearer ${CN_TEST_KEY}");
@@ -54,7 +54,7 @@ describe("HTTP ${ENV} header auth (toolnexus style)", () => {
 
     // No headers → exactly the pinned model_wire header set.
     let bare: Record<string, string> = {};
-    new OpenAIEmbedder({ base_url: "http://x/v1", model: "m" }, (_u, _b, h) => {
+    await new OpenAIEmbedder({ base_url: "http://x/v1", model: "m" }, (_u, _b, h) => {
       bare = h;
       return JSON.stringify({ data: [] });
     }).embed(["hi"]);

@@ -72,7 +72,7 @@ function cannedTransport(response: unknown): Transport {
 }
 
 /** Invoke the client named by `kind` with the fixture inputs. */
-function invoke(kind: ClientKind, config: WireConfig, inputs: ChatInputs | EmbedInputs, transport: Transport): unknown {
+function invoke(kind: ClientKind, config: WireConfig, inputs: ChatInputs | EmbedInputs, transport: Transport): Promise<unknown> {
   if (kind === "openai_chat") {
     const c = inputs as ChatInputs;
     return new OpenAIChatGenerator(
@@ -97,15 +97,15 @@ describe("model wire conformance — requests", () => {
   });
 
   for (const c of fixture.requests) {
-    it(c.name, () => {
+    it(c.name, async () => {
       const { transport, calls } = capturingTransport();
       // The stub response ("{}") makes response parsing throw; we assert only on
       // the captured request, which is recorded before the client parses.
-      try {
-        invoke(c.client, c.config, c.inputs, transport);
-      } catch {
+      // The client is async now, so a parse failure arrives as a REJECTION;
+      // swallow it explicitly (an unhandled one would fail the run).
+      await invoke(c.client, c.config, c.inputs, transport).catch(() => {
         /* response parse is irrelevant to the request contract */
-      }
+      });
       expect(calls.length).toBe(1);
       const call = calls[0]!;
       expect({
@@ -124,14 +124,14 @@ describe("model wire conformance — responses", () => {
   });
 
   for (const c of fixture.responses) {
-    it(c.name, () => {
+    it(c.name, async () => {
       const transport = cannedTransport(c.response_body);
       // Response inputs are irrelevant to the parse; supply harmless placeholders.
       const inputs: ChatInputs | EmbedInputs =
         c.client === "openai_embed"
           ? { texts: ["x"] }
           : { question: "q", passage: "p", answer_language: "en" };
-      const out = invoke(c.client, { base_url: "https://api.example.com/v1", model: "m" }, inputs, transport);
+      const out = await invoke(c.client, { base_url: "https://api.example.com/v1", model: "m" }, inputs, transport);
       expect(out).toEqual(c.expected);
     });
   }

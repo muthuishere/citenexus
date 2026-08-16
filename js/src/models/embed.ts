@@ -31,10 +31,12 @@ export class OpenAIEmbedder {
     this.headers = config.headers;
   }
 
-  /** Embed `texts` into dense vectors, preserving input order. */
-  embed(texts: readonly string[]): number[][] {
+  /** Embed `texts` into dense vectors, preserving input order. Rejects when the
+   *  model call fails — the seam's way of saying "I did not embed this"
+   *  (ADR-0014 R2). It never returns a placeholder vector. */
+  async embed(texts: readonly string[]): Promise<number[][]> {
     const request = { model: this.model, input: [...texts] };
-    const raw = this.transport(
+    const raw = await this.transport(
       `${this.baseUrl}/embeddings`,
       JSON.stringify(request),
       wireHeaders(this.headers),
@@ -43,9 +45,10 @@ export class OpenAIEmbedder {
     return payload.data.map((item) => item.embedding.map((x) => Number(x)));
   }
 
-  /** Embed a single text — the ingest convenience. */
-  embedQuery(text: string): number[] {
-    const first = this.embed([text])[0];
+  /** Embed a single text — the ingest convenience. Plugs straight into
+   *  `ingest()`'s Embedder seam: `(t) => client.embedQuery(t)`. */
+  async embedQuery(text: string): Promise<number[]> {
+    const first = (await this.embed([text]))[0];
     if (first === undefined) throw new Error("openai embed: empty data");
     return first;
   }
