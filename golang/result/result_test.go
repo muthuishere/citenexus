@@ -50,6 +50,7 @@ func TestResultRoundtripConformance(t *testing.T) {
 			DistinctDocuments:   1,
 			AllClaimsVerified:   true,
 			LanguagesInEvidence: []string{"en"},
+			UnsupportedScripts:  []string{},
 		},
 		Claims: []Claim{
 			{

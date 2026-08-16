@@ -5,8 +5,11 @@ description: Point CiteNexus at any provider — base URL, custom headers, custo
 
 import { Aside } from '@astrojs/starlight/components';
 
-Every model in CiteNexus is an endpoint you configure. Auth is a **header
-template**: you write `"Bearer ${OPENAI_API_KEY}"`, and the `${ENV_VAR}` is
+A model that *is* an HTTP endpoint is one you configure here. (It need not be:
+the model seam is a [published contract](/citenexus/providers/), and everything
+on this page — `base_url`, `headers`, `transport` — belongs to the shipped HTTP
+clients rather than to the contract. A provider that never opens a socket ignores
+all of it.) Auth is a **header template**: you write `"Bearer ${OPENAI_API_KEY}"`, and the `${ENV_VAR}` is
 expanded from the process environment **at the moment the request is sent** — never
 before. The secret's *value* never lives on a client object, in a config, in a
 `repr`, or in a log. Only the `${NAME}` placeholder is ever held.
@@ -14,12 +17,12 @@ before. The secret's *value* never lives on a client object, in a config, in a
 ## First-class auth on any model client
 
 Every direct client — `OpenAICompatibleEmbedding`, `OpenAICompatibleGenerator`,
-`OpenAICompatibleVision`, `OpenAICompatibleReranker` — takes a `headers=` of
-`${ENV}` templates plus any custom provider headers:
+`OpenAICompatibleVision`, `OpenAICompatibleReranker` — is importable from the
+top-level package and takes a `headers=` of `${ENV}` templates plus any custom
+provider headers:
 
 ```python
-from citenexus.embed.client import OpenAICompatibleEmbedding
-from citenexus.vision.client import OpenAICompatibleVision
+from citenexus import OpenAICompatibleEmbedding, OpenAICompatibleVision
 
 embedder = OpenAICompatibleEmbedding(
     base_url="https://api.jina.ai/v1",
@@ -132,9 +135,13 @@ const http = new HttpClient();
 const embed = new OpenAIEmbedder(
   { base_url: "https://api.jina.ai/v1", model: "jina-embeddings-v3",
     headers: { Authorization: "Bearer ${JINA_API_KEY}" } },
-  (url, body, headers) => /* your transport calls */ http.send(url, body, headers) as any,
+  (url, body, headers) => http.send(url, body, headers),
 );
 ```
+
+`Transport` is `(url, body, headers) => string | Promise<string>`, so an async
+transport needs no cast — the clients `await` either. A synchronous transport (the
+hermetic test fakes) stays valid.
 
 <Aside type="note" title="Legacy: api_key on HttpEndpoint">
 `HttpEndpoint(api_key=SecretStr(...), auth_header=..., auth_scheme=...)` still works
@@ -143,3 +150,7 @@ Prefer an `${ENV}` header — it keeps the value out of the object entirely. Non
 providers are covered by a header key of your choice (`"x-api-key": "${TOKEN}"`), so
 `auth_header`/`auth_scheme` are rarely needed.
 </Aside>
+
+Writing a model that is not an HTTP endpoint at all — in-process, a mock, an
+adapter for a third library? None of this page applies:
+[Provider contracts](/citenexus/providers/).

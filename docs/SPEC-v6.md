@@ -1,6 +1,6 @@
 # CiteNexus Specification (v6)
 
-> Evidence-first, multilingual, S3-native RAG for domains where hallucination is unacceptable.
+> Evidence-first, multilingual, S3-native RAG for domains where hallucination is unacceptable. (Script coverage is explicit and fixture-backed — see §11a Script Support. The Go and JS ports remain ASCII-only until their tokenizer change lands.)
 > v2 resolved the review issues: dead graph backend removed, graph persisted on LanceDB, `retrieve()` exposed, scalar confidence replaced with structured signals, entity resolution added, two-speed update model made explicit, community/wiki layer committed, multilingual lexical search fixed, conflict semantics defined, vision made conditional.
 > v3 added (S3-native): a document-structure retrieval signal, and a deferred-RBAC `acl` field on every Evidence Unit (carried, not enforced).
 > **v3.1 makes the tenancy model hierarchical and physical — org → product line → product, each a separate partition — and adds an explicit performance model. Partitioning is the isolation boundary *and* the primary latency lever. Final RBAC enforcement is delegated to an external store the operator manages (Postgres or other DB); the library stays S3-pure, carries the hierarchy tags + `acl`, and consumes an allowed-partitions set as a hard pre-filter.** Still deliberately *not* adopted: stop controller, in-loop conflict weighing, in-library RBAC engine, LibreChat citation path.
@@ -47,6 +47,36 @@ each section. Key invariants the implementation MUST hold (do not drift from the
 8. **Physical partitioning** by a declared, variable-depth hierarchy; isolation by partition
    selection; finer authorization delegated to an external operator-managed store, consumed
    as a hard `allowed_partitions` pre-filter (§6b, §7c).
+
+**§11a Script Support — what "multilingual" means today.** The per-script support
+matrix below is part of §11a. A script is *supported* only where an answer in
+that script can pass the faithfulness gate; every other script abstains.
+
+| Script | Languages | Status |
+| --- | --- | --- |
+| Latin | English, Dutch, German, French, Spanish, Portuguese, Italian, … | supported |
+| Chinese (Han) | Chinese | not supported — abstains |
+| Japanese | Japanese | not supported — abstains |
+| Korean (Hangul) | Korean | not supported — abstains |
+| Arabic | Arabic | not supported — abstains |
+| Hebrew | Hebrew | not supported — abstains |
+| Greek | Greek | not supported — abstains |
+| Cyrillic | Russian, Ukrainian, … | not supported — abstains |
+| Devanagari | Hindi | not supported — abstains |
+| Tamil | Tamil | not supported — abstains |
+| Thai | Thai | not supported — abstains |
+
+The cause is the tokenizer: the pinned SPEC-PORTS-v1 §4 tokenizer matches ASCII
+`[a-z0-9]+` only, so text in any script outside Latin/ASCII produces no tokens.
+The §11 faithfulness gate therefore rejects even a verbatim quote of its own
+source, and lexical retrieval (§10 BM25 and the §7b structure retriever share
+that tokenizer) returns nothing. Abstention in those scripts is a **capability
+gap, not an evidence judgement** — invariant 1 ("no ungrounded claim") still
+holds, but the capability claim was too broad. The fix — a Unicode-aware,
+versioned tokenizer — is specified in
+[`adr/0011-tokenizer-and-non-latin-scripts.md`](adr/0011-tokenizer-and-non-latin-scripts.md)
+and is in progress; no script may be added to this table as supported until it
+has a golden fixture.
 
 The numbered sections (§1 Product Goal · §2 Core Principles · §3 Design Rationale ·
 §4 Architecture · §4b Plugins · §4c Artifact Versioning & Partial Rebuild · §5 Two-speed

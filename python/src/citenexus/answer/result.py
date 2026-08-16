@@ -25,6 +25,33 @@ class Decision(StrEnum):
     partial = "partial"
 
 
+class LoopStopReason(StrEnum):
+    """Why the agentic deep-ask loop stopped (deep strategy only).
+
+    ``sufficient`` — the driver judged the pool answers the question.
+    ``no_new_evidence`` — a hop added no unseen Evidence Unit (the deterministic
+    default stop). ``budget`` — a hop/tool-call/evidence-unit cap was hit.
+    ``timeout`` — the whole-loop wall clock elapsed. It *explains* an abstain;
+    it never softens the gate.
+    """
+
+    no_new_evidence = "no_new_evidence"
+    sufficient = "sufficient"
+    budget = "budget"
+    timeout = "timeout"
+
+
+class LoopSignals(BaseModel):
+    """Deep-ask loop accounting (``signals.loop``) — absent on the strict flow."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    stop_reason: LoopStopReason
+    hops: int = 0
+    tool_calls: int = 0
+    evidence_units: int = 0
+
+
 class EvidenceSignals(BaseModel):
     """Structured retrieval/verification signals — replaces scalar confidence (§12)."""
 
@@ -38,6 +65,27 @@ class EvidenceSignals(BaseModel):
     unsupported_claims_removed: int = 0
     conflicts_detected: int = 0
     languages_in_evidence: tuple[str, ...] = ()
+    # Scripts present in the question or the evidence that the tokenizer does not
+    # claim to support (ADR-0011). A CAPABILITY signal, never an evidence
+    # judgement: a refusal carrying a non-empty value here means "I cannot read
+    # this script", which is a different thing from "the evidence isn't there".
+    # Returning the evidence-absent refusal for a capability gap is exactly what
+    # let the ASCII-only tokenizer hide. Empty on every Latin-script Result, so
+    # existing Results serialize unchanged.
+    unsupported_scripts: tuple[str, ...] = ()
+    # The cited source's authority tier name, and whether the strict-mode
+    # authority floor was enforced on this call (ADR-0004). A STANDING signal,
+    # never an evidence judgement — the same distinction ``unsupported_scripts``
+    # draws for capability. A refusal with ``authority_floor_applied`` true says
+    # "what I found has no standing here", which is a different thing from "the
+    # evidence isn't there"; conflating the two is exactly how an out-of-
+    # jurisdiction citation stayed invisible behind 100% groundedness. Empty on
+    # every Result from an unranked corpus, so those serialize unchanged.
+    authority_tier: str = ""
+    authority_floor_applied: bool = False
+    # Present only for the agentic deep strategy; ``None`` on the strict flow so
+    # existing Results are byte-identical.
+    loop: LoopSignals | None = None
 
 
 class SourceRef(BaseModel):

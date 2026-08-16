@@ -44,6 +44,10 @@ class NativeTextStore:
             }
         ]
 
+    def delete_document(self, document_id: str) -> None:  # pragma: no cover - fake
+        """Part of the VectorStore protocol (document-revoke); unused by this test."""
+        return None
+
 
 def test_native_text_search_is_used_when_available() -> None:
     store = NativeTextStore()
@@ -59,6 +63,9 @@ def test_native_text_search_is_used_when_available() -> None:
 def test_bm25_fallback_still_works_without_native_search() -> None:
     class ScanOnlyStore:
         def upsert(self, rows: Any) -> None: ...
+
+        def delete_document(self, document_id: str) -> None:  # pragma: no cover - fake
+            return None
 
         def search(self, vector: Any, limit: int = 10) -> list[dict[str, Any]]:
             return []

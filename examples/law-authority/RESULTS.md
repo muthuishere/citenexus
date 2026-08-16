@@ -1,118 +1,154 @@
-# CiteNexus on LAW — cite-or-abstain baseline + the AUTHORITY gap
+# CiteNexus on LAW — the authority gap, and what closing it actually bought
 
 A real, runnable stress-test of CiteNexus on a high-stakes domain (California
-landlord–tenant notice law). It establishes baseline evidence-quality numbers and
-demonstrates, on real statute/case text, the **authority gap**: ranking is
+landlord–tenant notice law). It was built to *demonstrate* a gap: ranking is
 token-relevance only, so a low-authority source that repeats the query vocabulary
-out-ranks the controlling statute / binding case.
+out-ranks the controlling statute. That gap is now closed by the ADR-0004
+**authority floor**, and this file records the before and after — including the
+part that did **not** get fixed.
 
-All numbers below are from an actual run against **live endpoints** — Jina
-embeddings + reranker and Gemini generation. Nothing here is mocked.
+All numbers are from actual runs against **live endpoints** — Jina embeddings +
+reranker and Gemini generation. Nothing here is mocked. The committed
+`results.json` is a post-floor run.
 
 ## The corpus (6 real docs, one topic, deliberately varied authority)
 
-| # | document_id | source (real, public) | authority |
+| # | document_id | source (real, public) | curator-declared tier |
 |---|---|---|---|
-| 01 | `01-ca-civ-1946_1-statute` | **Cal. Civ. Code § 1946.1** (leginfo.ca.gov) — *controlling* residential periodic-tenancy statute: **60 days'** notice if the tenant has resided ≥ 1 year, **30 days'** if < 1 year | HIGH (binding statute) |
-| 02 | `02-mak-v-berkeley-2015-appellate` | **Mak v. City of Berkeley Rent Stab. Bd.** (Cal. Ct. App. 2015, courtlistener.com) — quotes and applies § 1946.1's 60-day rule | HIGH (binding appellate) |
-| 03 | `03-ca-civ-1946_2-justcause-statute` | **Cal. Civ. Code § 1946.2** (Tenant Protection Act) — just cause after 12 months | HIGH (binding statute) |
-| 04 | `04-ca-civ-1946-general-statute` | **Cal. Civ. Code § 1946** — the *older, general* rule: month-to-month terminable on **30 days'** notice. § 1946.1 opens "**Notwithstanding Section 1946**," i.e. it controls residential | MEDIUM (superseded for residential) |
-| 05 | `05-nolo-month-to-month-blog` | **Nolo** self-help article — "In most states, landlords must provide a **30-day** notice to terminate a month-to-month tenancy" (omits CA's 60-day rule) | LOW (non-binding secondary) |
-| 06 | `06-florida-83_57-statute` | **Fla. Stat. § 83.57** — month-to-month terminable on **30 days'** notice | WRONG JURISDICTION for a CA question |
+| 01 | `01-ca-civ-1946_1-statute` | **Cal. Civ. Code § 1946.1** (leginfo.ca.gov) — *controlling* residential periodic-tenancy statute: **60 days'** notice if the tenant has resided ≥ 1 year, **30 days'** if < 1 year | `controlling-statute` |
+| 02 | `02-mak-v-berkeley-2015-appellate` | **Mak v. City of Berkeley Rent Stab. Bd.** (Cal. Ct. App. 2015, courtlistener.com) — quotes and applies § 1946.1's 60-day rule | `binding-appellate` |
+| 03 | `03-ca-civ-1946_2-justcause-statute` | **Cal. Civ. Code § 1946.2** (Tenant Protection Act) — just cause after 12 months | `statute` |
+| 04 | `04-ca-civ-1946-general-statute` | **Cal. Civ. Code § 1946** — the *older, general* rule: month-to-month terminable on **30 days'** notice. § 1946.1 opens "**Notwithstanding Section 1946**," i.e. it controls residential | `general-statute` |
+| 05 | `05-nolo-month-to-month-blog` | **Nolo** self-help article — "In most states, landlords must provide a **30-day** notice…" (omits CA's 60-day rule) | `secondary-blog` |
+| 06 | `06-florida-83_57-statute` | **Fla. Stat. § 83.57** — month-to-month terminable on **30 days'** notice | `out-of-jurisdiction` |
 
 The trap is built in: **four** of the six documents say "30 days" for a
 month-to-month tenancy and repeat *month-to-month / notice / terminate / landlord*
-densely. Only the two highest-authority California sources (§ 1946.1 and the Mak
-opinion) carry the correct **60-day** rule for a long-term tenant — in denser,
-less repetitive prose.
+densely. Only the two highest-authority California sources carry the correct
+**60-day** rule for a long-term tenant — in denser, less repetitive prose.
 
-## Headline numbers (11-question golden set)
+Tiers are **curator assertions** supplied at ingest via `authority=` (see
+`authority.csv`); the library never derives them from prose.
 
-| metric | value | meaning |
-|---|---|---|
-| answered / refused | **5 / 6** | strict mode is the default |
-| **groundedness_rate** | **100%** (5/5) | every answered question is fully verified against a cited passage |
-| **citation_rate** | **100%** (5/5) | every answer carries a source citation |
-| answer-when-grounded | 50% (4/8) | of the 8 questions the corpus *can* ground, 4 were answered |
-| abstain-when-no-evidence | 67% (2/3) | of the 3 questions it *should* refuse, 2 were refused |
-| library `evaluate()` | groundedness 100%, citation 100%, expected_support 45% | see note on `expected_support` below |
+## The measured progression (11-question golden set)
 
-**The thesis holds on the metric that matters for a regulated domain: zero
-ungrounded / fabricated answers.** Every claim CiteNexus emitted traced to a real
-passage it cited — versus the **17–33% hallucination rate reported for generic
-legal RAG** (Magesh et al., Stanford RegLab, *Hallucination-Free? Assessing the
-Reliability of Leading AI Legal Research Tools*, 2024). We did **not** re-run a
-generic-RAG baseline here; that range is cited as external context, not
-reproduced. CiteNexus's failure mode is **not** hallucination — it is
-**over-refusal** and **wrong-authority citation** (below).
+| metric | v0.9.0 | v0.10.0, pre-floor | **post-floor (now)** |
+|---|---|---|---|
+| answered / refused | 5 / 6 | 8 / 3 | **6 / 5** |
+| groundedness_rate | 100% | 100% | **100%** |
+| citation_rate | 100% | 100% | **100%** |
+| answer_when_grounded | 50% | 75% | **75%** |
+| abstain_when_no_evidence | 67% | 33% | **100%** |
+| out-of-jurisdiction citations | — | **4** | **0** |
 
-## The AUTHORITY gap — demonstrated three ways
+Read the columns together, because each one on its own misleads:
 
-CiteNexus has **no authority / precedence / jurisdiction weighting** (confirmed in
-the spec — see "Library finding" below). Retrieval fuses dense + lexical signals
-and a Jina reranker; all of them score *token/semantic relevance*. Nothing in the
-ranking knows that § 1946.1 outranks a blog. Three concrete outcomes from the run:
+- **The safety metric is what moved, and it moved all the way.** Four citations
+  of a Florida statute against California and Texas questions → **zero**. Every
+  question that should refuse now refuses (3/3).
+- **v0.10.0 pre-floor is the cautionary column.** It looks like the best run —
+  8 answered, `answer_when_grounded` up from 50% to 75%, groundedness still
+  100% — and it is the *least trustworthy* of the three. Those extra answers
+  include a Texas question answered from Florida law with
+  `all_claims_verified: true`. **100% groundedness with 4 wrong-jurisdiction
+  citations is the whole reason authority had to exist:** the gate proved the
+  words came from the passage, which was true, and said nothing about whether the
+  passage governed.
+- **Recall did not regress to buy that.** `answer_when_grounded` held at 75%
+  across the floor; what disappeared was the wrong-authority answers, not the
+  right ones.
+- The library's own `evaluate()` still reports `expected_support 45%` — see
+  limitation 2 below; it cannot score a *correct* refusal.
 
-### 1. Wrong-authority source *wins the citation* (clearest example)
+### Caveat: Gemini is not deterministic at temperature 0
 
-> **Q:** "How much notice is required to terminate a California residential
-> month-to-month tenancy if the tenant has resided there **less than one year**?"
-> **A:** "not less than 30 days' notice" — **cited `06-florida-83_57-statute`**
-> (tier = out-of-jurisdiction).
+An earlier, **identical** post-floor run produced **5/6** answered/refused and
+`answer_when_grounded` **62%**, not 6/5 and 75%. Same code, same corpus, same
+prompts, same temperature.
 
-The answer number is right (30 days), but the **cited authority is the Florida
-statute**, not the controlling California § 1946.1(c) — which contains the exact
-same rule. A lawyer who followed the citation would be reading the wrong state's
-law. The script flags this automatically as `CITED-WRONG-AUTHORITY`.
+What was stable across both runs: **out-of-jurisdiction citations = 0**,
+groundedness 100%, citation rate 100%, `abstain_when_no_evidence` 100%. So treat
+the rate metrics as ±1 question of wobble and the **safety** metrics as the
+reproducible result. Any single-run rate quoted from this example is an
+illustration, not a benchmark number.
 
-### 2. A should-abstain question answered from a non-authority source
+## What the floor fixed
+
+### 1. The Texas question (`SHOULD-ABSTAIN-BUT-ANSWERED` → refused)
 
 > **Q:** "What is the notice period to end a month-to-month tenancy in **Texas**?"
-> **A:** "not less than 30 days' notice" — **cited `06-florida-83_57-statute`**.
+> **Pre-floor:** "not less than 30 days' notice" — cited `06-florida-83_57-statute`,
+> `all_claims_verified: true`.
+> **Post-floor:** refused.
 
-Texas is **not in the corpus**; the correct behaviour is to refuse. Instead the
-out-of-jurisdiction Florida statute token-matched "month-to-month / notice" and
-answered a question about a *third* state. Flagged as
-`SHOULD-ABSTAIN-BUT-ANSWERED`.
+Texas is not in the corpus. The out-of-jurisdiction Florida statute token-matched
+"month-to-month / notice" and answered a question about a *third* state, perfectly
+grounded. The floor withholds it before generation, and the refusal reason is
+deliberately distinct from "no relevant evidence found".
 
-### 3. The high-authority answer is *suppressed*, causing a refusal
+### 2. The 60-day authority probes stopped being suppressed
 
-> **Q:** "How many days' notice must a California landlord give to end a
-> month-to-month residential tenancy when the tenant has lived there for **more
-> than one year**?" → **REFUSED.**
+Both long-tenancy questions now answer **60 days** from the right sources:
 
-The correct answer (60 days, § 1946.1(b), reinforced by Mak) exists in the corpus,
-but the retrieval ranking for this query is dominated by the low-authority 30-day
-sources. Actual `retrieve(k=6)` output for this question:
+| question | cited | tier |
+|---|---|---|
+| "> one year" | `02-mak-v-berkeley-2015-appellate` | `binding-appellate` |
+| "three years, month-to-month" | `01-ca-civ-1946_1-statute` | `controlling-statute` |
 
-```
-06-florida-83_57-statute   score=0.0315   "(1) ... year to year ... not less than 60 ..."
-06-florida-83_57-statute   score=0.0154   "(3) ... month to month ... not less than 3[0] ..."
-05-nolo-month-to-month-blog score=0.0313  "In most states, landlords must provide a 30-day notice ..."
-06-florida-83_57-statute   score=0.0152   "(2) ... quarter to quarter ..."
-01-ca-civ-1946_1-statute   score=0.0323   "(c) ... 30 days ... resided ... less than one year"   <- wrong branch
-```
+Both are classified `CORRECT-AUTHORITY` in `results.json`. Pre-floor these
+**refused**: the repetitive 30-day text (Florida × 3 + the Nolo blog) crowded
+§ 1946.1(b) and the *Mak* opinion out of the top 6 entirely, so the extractive
+faithfulness gate had no 60-day passage to verify against. Authority-blindness had
+silently suppressed the controlling answer.
 
-The § 1946.1(**b**) "60-day" passage and the **Mak** binding appellate opinion do
-**not** appear in the top 6 at all — out-competed by the repetitive 30-day text.
-With the correct high-authority passage absent and the surfaced evidence uniformly
-saying "30 days", the extractive faithfulness gate cannot verify a 60-day answer,
-so the system refuses. **Authority-blindness silently suppressed the controlling
-answer.** Both 60-day probe questions (>1 year, and a 3-year tenancy) refused for
-this reason.
+## Three things this run does not let us claim
 
-## Library finding: authority weighting does not exist (by design)
+### A. One golden question now refuses *by design*, and the golden set is wrong about it
 
-Grepping the source and spec: there is **no** authority / precedence / credibility /
-jurisdiction field on an Evidence Unit, and no weighting of it in retrieval or the
-answer flow. This is deliberate — `docs/SPEC-v6.md` lists **"in-loop conflict
-weighing"** among the things "**deliberately *not* adopted**" (v3.1 note), and § 13
-"Conflict Model" only *detects/reports* conflicts (`conflicts_detected` on the
-result), it does not resolve them by source rank. The `acl` / partition hierarchy
-is an *access* filter, not an *authority* ordering. So the authority gap shown here
-is architectural, not a tuning miss — closing it needs a new per-document authority
-signal fed into fusion/rerank (or a strict-mode "prefer the highest-authority
-source among conflicting evidence" rule).
+> **Q:** "What minimum notice is required to terminate a month-to-month tenancy in
+> **Florida**?" — `expect_decision=answer` → **refused**.
+
+The curator declared Florida `out-of-jurisdiction` for this corpus. A floored
+California corpus therefore *cannot* answer a Florida question, and refusing is
+the correct behaviour of the configuration as written. This is **corpus scoping,
+not a bug** — but it does mean the golden set now encodes an expectation the
+configuration contradicts, and that counts against `answer_when_grounded`. Either
+the question leaves the golden set or the corpus stops being California-only; the
+current state is honest but inconsistent.
+
+### B. The subject-scope gap is NOT fixed — the commercial-lease case passed by luck
+
+> **Q:** "How much notice must a landlord give to terminate a fixed five-year
+> **commercial** lease with a specified term in California?" — must **abstain**.
+
+It refuses in this run. **That is luck, not authority.** Dropping the Florida
+chunks changed which passages reached the generator; the floor did nothing here
+and cannot. The source that produces the wrong answer is
+`01-ca-civ-1946_1-statute` — tier `controlling-statute`, the **highest** tier in
+the corpus. No ordering over sources can exclude the top of the ordering. It is
+genuinely the right authority, about the wrong kind of tenancy.
+
+The spike at `spikes/subject-scope/NOTES.md` found the real cause, and it is not a
+scoring problem: **applicability severance**. `TxtExtractor` splits on blank lines
+and `chunk_text` chunks each block independently, so one statutory subdivision is
+one EvidenceUnit. The clause that decides whether § 1946.1 applies at all — "*for
+a term not specified by the parties*" — is EU `::2::0`; the operative 60-day rule
+is EU `::3::0`. Retrieval, the generator and the gate all saw `::3::0` and none of
+them ever saw `::2::0`. Measured: **8 of 11** operative notice-period EUs are
+citable in isolation from the precondition that governs them — a **73% severance
+rate** on this corpus.
+
+The scope information is *in the corpus* (5 of 6 documents state their term-scope
+in plain prose). It is severed by chunking, and every downstream guard is
+chunk-local by design. See **`docs/adr/0012-subject-scope-applicability.md`**.
+
+### C. Over-refusal is still real
+
+Two groundable questions refuse for gate-conservatism, not authority: § 1162
+"manner of service", where the extractive gate (every answer token must appear
+verbatim in one cited passage) could not verify a short cross-reference answer
+even though the passage was present — plus the Florida question in (A). Safe for a
+regulated domain; it costs recall.
 
 ## Reproduce
 
@@ -128,7 +164,8 @@ python ../examples/law-authority/run.py
 ```
 
 Writes a machine-readable `results.json` (per-question decisions, cited docs,
-authority tiers, evidence signals) next to `run.py`.
+authority tiers, evidence signals) next to `run.py`. Expect the rate metrics to
+move by a question between runs; see the determinism caveat above.
 
 Refresh the raw source text from the public pages (not needed to run — the trimmed
 corpus is committed):
@@ -138,43 +175,44 @@ export JINA_API_KEY=...
 examples/law-authority/fetch_sources.sh    # -> examples/law-authority/raw/*.md
 ```
 
-## How Jina was wired (and what is/ isn't real)
+## How Jina was wired (and what is / isn't real)
 
-- **Jina embeddings** (`jina-embeddings-v3`) are wired as CiteNexus's embedding
+- **Jina embeddings** (`jina-embeddings-v3`) wired as CiteNexus's embedding
   endpoint via `OpenAIHttpEndpoint(base_url="https://api.jina.ai/v1")` — the
   library's OpenAI-compatible embedding path. **Real, no shim.**
-- **Jina reranker** (`jina-reranker-v2-base-multilingual`) is wired as the
+- **Jina reranker** (`jina-reranker-v2-base-multilingual`) wired as the
   `RerankerConfig` endpoint (same Jina connection). **Real.**
 - **Gemini** (`gemini-2.5-flash`, temperature 0) is the answer generator via
-  `GeminiHttpEndpoint`. An answering LLM is required for `ask()`/`evaluate()`.
-  **Real.** (`GEMINI_API_KEY` here; the library itself reads no env.)
+  `GeminiHttpEndpoint`. **Real.** (`GEMINI_API_KEY` here; the library itself reads
+  no env.)
 - Storage is local filesystem + LanceDB (zero-infra default). **Real.**
 
 No fake/hermetic provider was used anywhere in this example.
 
 ## Honest limitations
 
-1. **No authority weighting exists** (the whole point above). The demonstration is
-   of a *missing* capability, not a tuned one.
-2. **`evaluate()` can't score abstention.** Its CSV is `question,expected`; an empty
-   `expected` is scored "supported" only if the row was *answered*, so a *correct*
-   refusal counts *against* `expected_support_rate` (that's why it reads 45% while
-   groundedness/citation are 100%). This example therefore computes its own
-   answer/abstain accuracy in `run.py`; the extra golden.csv columns
+1. **Zero fabrication is the claim; zero wrong answers is not.** Every claim
+   CiteNexus emitted traced to a real passage it cited — versus the **17–33%
+   hallucination rate reported for generic legal RAG** (Magesh et al., Stanford
+   RegLab, *Hallucination-Free? Assessing the Reliability of Leading AI Legal
+   Research Tools*, 2024), which is **cited as external context, not reproduced**
+   here. CiteNexus's failure modes are over-refusal and — until the floor —
+   wrong-authority citation, with wrong-*subject* citation still open.
+2. **`evaluate()` can't score abstention.** Its CSV is `question,expected`; an
+   empty `expected` is scored "supported" only if the row was *answered*, so a
+   *correct* refusal counts *against* `expected_support_rate` (why it reads 45%
+   while groundedness/citation are 100%). This example computes its own
+   answer/abstain accuracy in `run.py`; the extra `golden.csv` columns
    (`expect_decision`, `probe`, `correct_docs`, `trap_docs`) are ignored by
    `evaluate()` and used only by our analysis.
-3. **Over-refusal is real too.** 4/8 groundable questions refused: the two 60-day
-   authority probes (authority suppression, above) **and** the § 1946.2 "12 months"
-   and the § 1162 "manner of service" questions, where the conservative extractive
-   faithfulness gate (every answer token must appear verbatim in one cited passage)
-   couldn't verify a short numeric/cross-reference answer even though the passage
-   was present. Safe for a regulated domain, but it lowers recall.
-4. **The 17–33% hallucination baseline is cited, not reproduced.** It comes from the
-   Stanford RegLab study of commercial legal-RAG tools; we did not run a generic RAG
-   over this same corpus to produce a head-to-head number.
-5. **Small set, single run.** 6 docs / 11 questions on one sub-topic; temperature 0
-   makes it stable but this is an illustrative baseline, not a benchmark. LLM
-   phrasing can still shift `expected`-token matches run to run.
-6. **Corpus text is trimmed.** The `corpus/*.txt` files are faithful excerpts of the
-   cited sources (headers + the substantive provisions), not the full pages, to keep
-   the example light; `fetch_sources.sh` pulls the complete originals.
+3. **Authority is curator-supplied, and a mis-declared tier is a real failure
+   mode.** The floor is only as good as `authority.csv`. Nothing in the library
+   validates that a document really is a controlling statute.
+4. **Small set, few runs.** 6 docs / 11 questions on one sub-topic, and the
+   generator is not reproducible at temperature 0 (above). Illustrative baseline,
+   not a benchmark.
+5. **Corpus text is trimmed.** The `corpus/*.txt` files are faithful excerpts
+   (headers + the substantive provisions), not the full pages, to keep the example
+   light; `fetch_sources.sh` pulls the complete originals. Severance rates depend
+   on extractor granularity, so they are specific to plain-text ingest of *this*
+   corpus.

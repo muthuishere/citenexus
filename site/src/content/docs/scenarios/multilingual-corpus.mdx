@@ -1,0 +1,202 @@
+---
+title: Cross-lingual corpus
+description: The authoritative clause is written in a script the query shares no token with, so a reachable-but-superseded document answers instead — verbatim, correctly cited, and wrong. search_languages fans the question out across the languages the corpus is actually written in.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="Requires 0.10.0 — not yet on PyPI or npm">
+This capability is on `main` and documented here, but the published packages are
+still **0.9.0**. Install from source until 0.10.0 ships.
+</Aside>
+
+**The failure this prevents:** an employee at the Hyderabad office asks how much
+unused leave they may carry forward. The answer comes back *"a maximum of 10
+days"*, quoted verbatim from the English handbook, with a real document ID and a
+passing faithfulness gate. The binding Telugu annexure for that office caps it at
+**5** — and it was never retrieved, because an English query shares **zero** BM25
+tokens with Telugu prose.
+
+Nothing in the pipeline is broken. Groundedness is 100%, the citation is real,
+the quote is exact. The answer is simply from a document that does not govern the
+person asking — and at the point of use that is **indistinguishable** from a
+correct answer.
+
+This is the sibling failure to [Regulated audit](/citenexus/scenarios/regulated-audit/)
+and [Authority](/citenexus/authority/): there, the wrong document was *reachable
+and shouldn't have been*; here, the right document was **unreachable**, and no
+ordering over what you retrieved can rescue a passage you never retrieved.
+
+<Steps>
+
+1. **Configure a reformulator.** The fan-out rewrites the question into each
+   requested language with a small model, then RRF-fuses every retrieval. Without
+   an endpoint there are no extra queries, so it is required rather than silently
+   skipped.
+
+   ```python
+   from citenexus.config.schema import ReformulationConfig
+
+   ReformulationConfig(
+       enabled=True,                      # default: False
+       model="gemini-2.5-flash-lite",     # a SMALL model is enough
+       endpoint=gemini,                   # required — no endpoint, no fan-out
+   )
+   ```
+
+2. **Name the languages the corpus is written in.** Same keyword on `ask()` and
+   `retrieve()`; the default is `("en",)`, which is the pre-fan-out behaviour.
+
+   ```python
+   response = rag.ask(
+       "How many days of earned leave may a Hyderabad employee carry forward?",
+       search_languages=("en", "ta", "te"),
+   )
+   ```
+
+   The original question is **always** issued too, so the fan-out is strictly
+   additive: it can surface candidates the original missed, never displace them.
+
+3. **Read the two language fields separately.** They answer different questions.
+
+   ```python
+   response.answer_language          # "en" — resolved for the ANSWER
+   response.sources[0].passage_language   # "te" — the SOURCE's own language
+   response.sources[0].passage            # verbatim Telugu, untranslated
+   ```
+
+</Steps>
+
+## Searching a language is a capability claim, so it is checked first
+
+An unsupported language **raises before any model call is spent** — it does not
+return an empty list, and it does not abstain.
+
+```python
+rag.ask(q, search_languages=("en", "kn"))
+# UnsupportedSearchLanguageError: search language 'kn' (Kannada) is written in
+# 'kannada', which this tokenizer does not claim (ADR-0011).
+```
+
+That is deliberate. Returning `[]` for a language the tokenizer cannot segment is
+indistinguishable from *"the corpus does not contain this"*, and routing a
+capability gap through the abstention channel is exactly how an ASCII-only
+tokenizer once hid inside a library advertised as multilingual.
+
+**Telugu is now claimed** — `U+0C00–U+0C7F` was a hole in the script range table
+and is fixed, with a golden fixture behind it. **Kannada, Malayalam, Gujarati,
+Gurmukhi, Oriya and Sinhala are named in the table and deliberately not claimed**:
+naming them is what lets the refusal say *"Kannada is not supported"* instead of
+*"unknown language code"*. See
+[Languages & multilingual](/citenexus/languages/) for the full script matrix.
+
+<Aside type="note" title="Two independent knobs">
+`search_languages` decides which languages the question is **searched** in.
+`answer_language` decides which language it is **answered** in — an explicit code
+forces it, the sentinel `"auto"` detects it from the *question*, and leaving it
+unset uses the configured `default_answer_language`. The retrieved evidence never
+votes on either.
+</Aside>
+
+<Aside type="caution" title="Not available on strategy=&quot;deep&quot;">
+The agentic loop writes its own follow-up queries, so passing `search_languages`
+to `strategy="deep"` raises rather than searching fewer languages than you asked
+for. Use `strategy="strict"`.
+</Aside>
+
+## Measured
+
+From the live run in
+[`examples/multilingual/`](https://github.com/muthuishere/citenexus/tree/main/examples/multilingual)
+on **2026-08-16** — 12 authored documents (4 English / 4 Tamil / 4 Telugu, two of
+the Tamil ones as real PDFs), 22 questions all asked in English, real Jina
+embeddings + `jina-reranker-v2-base-multilingual`, real `gemini-2.5-flash`
+generation at temperature 0, nothing mocked. One constant changed between runs:
+`("en",)` → `("en", "ta", "te")`.
+
+| bucket | n | answered before | answered after |
+|---|---:|---:|---:|
+| Tamil-only | 6 | 1 | **4** |
+| Telugu-only | 7 | 2 | **7** |
+| English control | 5 | 5 | 5 |
+| Ungroundable (must abstain) | 4 | 0 | 0 |
+
+| metric | before | after |
+|---|---|---|
+| answered / abstained | 8 / 14 | **16 / 6** |
+| `groundedness_rate` | 100% | 100% |
+| `citation_rate` | 100% | 100% |
+| `cited_right_document_rate` | 75% | **100%** |
+| `answer_when_groundable` | 44% | **89%** |
+| `abstain_when_ungroundable` | 100% | 100% |
+
+The Hyderabad question is now answered `5 రోజులు`, cited to
+`09-te-hyderabad-leave-annexure`. The two rows that must never move — abstention
+on ungroundable questions, and groundedness — did not move. **The recall was not
+bought out of the abstention guarantee.**
+
+<Aside type="caution" title="Two changes shipped; only one of them is the fan-out">
+Telugu could not be cited **at all** in the baseline: its script range was missing
+from the tokenizer, so every Telugu passage was filtered out of the grounding set
+before search language mattered. That was fixed in the same sitting. **The Telugu
+column is therefore the sum of two changes and this benchmark cannot split them.**
+
+**Read the Tamil bucket instead if you want to know what the fan-out itself
+buys.** Tamil was already claimed and already citable in the baseline, so nothing
+about it changed except the search languages: **1/6 → 4/6**. At n = 6 that is a
+direction, not a rate you can plan against.
+</Aside>
+
+## Known limitation: verbatim wins over answer language
+
+The Hyderabad answer comes back as `5 రోజులు` — Telugu script — while
+`answer_language` reads `"en"`. That is a real inconsistency, and it is **not
+solved**. It falls out of two individually correct rules that genuinely conflict:
+
+- The strict flow is **extractive** — the answer must survive the faithfulness
+  gate against the passage it cites, which is what makes "no ungrounded claim"
+  checkable at all.
+- Citations stay **verbatim in their source language**, because a translated
+  quote is no longer the evidence.
+
+When the only support for an English question is a Telugu clause, "answer in the
+query's language" and "quote verbatim" cannot both hold — and verbatim wins.
+`answer_language` then reports what the resolution chain decided, not what script
+the returned text is in.
+
+Two candidate fixes, neither implemented: make `answer_language` **descriptive of
+the returned text** (cheap, but it changes the meaning of a field with
+conformance vectors on it), or **generate an answer alongside the verbatim
+citation** (a real design change to the strict flow, not a patch). Until one
+lands: **read `sources[*].passage_language`, not `answer_language`, when you need
+to know what script is in front of you.**
+
+<Aside type="caution" title="How to read these numbers">
+**Single run per configuration.** Gemini is not deterministic at temperature 0 —
+on the [law benchmark](/citenexus/benchmark-law/) rate metrics moved ±1 question
+between identical runs while the safety metrics reproduced exactly. A ±1 movement
+in any bucket here would not surprise us.
+
+**The corpus is authored fiction.** Twelve invented employment-policy documents
+for a company that does not exist; every figure was chosen to make the
+measurement possible. Not real policy, **not legal advice**, nothing scraped. See
+[`PROVENANCE.md`](https://github.com/muthuishere/citenexus/blob/main/examples/multilingual/PROVENANCE.md).
+
+**`evaluate()` does not fan out.** `rag.evaluate(csv)` calls `ask()` with the
+default `search_languages=("en",)`. Drive `ask()` yourself if you need a
+fanned-out evaluation.
+</Aside>
+
+## Cost
+
+One reformulation call per requested language per question, cached per
+`(question, language)` and shared across `ask()` and `retrieve()`. Three
+languages is two extra small-model calls before retrieval runs. A reformulation
+that fails, comes back empty, or duplicates the original contributes nothing —
+retrieval proceeds with fewer queries rather than erroring.
+
+<Aside type="note" title="The Go and JavaScript ports are Latin-script only">
+The ports run the frozen ASCII tokenizer, so non-Latin text yields no tokens
+there and abstains. This benchmark is Python. Every other pinned algorithm is at
+parity — see [Languages & multilingual](/citenexus/languages/).
+</Aside>

@@ -48,6 +48,8 @@ example/.trustrag-data/
 
 # Language ports
 js/node_modules/
+# any nested node_modules (spikes, examples, tooling)
+node_modules/
 js/dist/
 golang/**/*.test
 
@@ -56,3 +58,9 @@ golang/**/*.test
 
 # personal corpus (bank/card statements, private docs) — never commit
 corpus/
+# ...but the examples ship AUTHORED, public test corpora. Without this negation the
+# bare rule above silently swallowed examples/multilingual/corpus/ on commit, so CI
+# had the tests and none of the documents. examples/law-authority/corpus/ only
+# survived because it was tracked before the rule existed.
+!examples/*/corpus/
+!examples/*/corpus/**

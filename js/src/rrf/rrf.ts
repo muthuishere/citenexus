@@ -7,7 +7,15 @@
 // Contributions sum across all lists. The result is ordered by descending fused
 // score, tie-broken ascending by eu_id.
 
-/** Fuse ranked eu_id lists with Reciprocal Rank Fusion (k defaults to 60). */
+/**
+ * Fuse ranked eu_id lists with Reciprocal Rank Fusion (k defaults to 60).
+ *
+ * @deprecated rrf now lives once in the shared Rust core (ADR-0006). Prefer the
+ * core-backed `rrf` from `citenexus/core`, which shares one implementation
+ * across all SDKs. This pure helper is retained for the native-lib-free path and
+ * stays pinned to the Python reference by the conformance/cases/rrf.json vectors;
+ * it is byte-identical to `core.rrf`.
+ */
 export function rrfFuse(lists: string[][], k = 60): string[] {
   const fusedScore = new Map<string, number>();
 

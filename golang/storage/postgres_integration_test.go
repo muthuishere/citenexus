@@ -60,13 +60,13 @@ func TestPostgresRoundTrip(t *testing.T) {
 	rows := []Row{
 		{
 			"eu_id": "nda::0", "vector": []float64{1, 0, 0},
-			"text":     "The employee shall not disclose confidential information.",
+			"text":        "The employee shall not disclose confidential information.",
 			"document_id": "nda", "language": "en", "page": 1,
 			"checksum": "abc", "raw_uri": "raw/abc",
 		},
 		{
 			"eu_id": "cats::0", "vector": []float64{0, 1, 0},
-			"text":     "Cats are small domestic animals.",
+			"text":        "Cats are small domestic animals.",
 			"document_id": "cats", "language": "en", "page": -1,
 			"checksum": "def", "raw_uri": "raw/def",
 		},

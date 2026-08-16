@@ -1,0 +1,93 @@
+---
+title: Conflicting sources
+description: When two documents assert opposite things, surface both and abstain rather than letting retrieval rank decide which truth the caller sees.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+**The failure this prevents:** your corpus holds a filing and its restatement, or
+a 2019 policy and its 2026 replacement. Both are real, both are indexed, both are
+grounded. Whichever one happens to rank first becomes the answer — and nothing
+tells the caller the other one exists.
+
+That is not hypothetical. Before conflict detection existed, this returned a
+confident, correctly-cited answer with `conflicts_detected = 0`:
+
+```python
+rag.ingest(text="The dividend for the period was 12 cents per share.",
+           document_id="filing-q1")
+rag.ingest(text="The dividend for the period was 30 cents per share.",
+           document_id="filing-q1-restated")
+
+response = rag.ask("What was the dividend per share for the period?")
+```
+
+## What happens now
+
+```python
+print(response.evidence.decision)            # refused
+print(response.conflicts)
+# ('value: filing-q1-restated vs filing-q1 (30 vs 12)',)
+
+for src in response.sources:                 # BOTH sides are cited
+    print(src.document, "—", src.passage)
+```
+
+In `strict` mode an unresolved conflict that touches the answer's own claim is an
+**abstention with both sides cited**. "These sources disagree, here is each of
+them" is a defensible output. Silently picking one is not.
+
+## Choosing how much to enforce
+
+```python
+from citenexus.domain.trust import TrustMode
+
+rag.ask(q, mode=TrustMode.strict)        # conflict on the claim -> abstain, cite both
+rag.ask(q, mode=TrustMode.normal)        # answer, but surface the conflict
+rag.ask(q, mode=TrustMode.exploratory)   # record only
+```
+
+Use `strict` where a wrong answer is worse than none. Use `normal` when a human
+reads every answer anyway and wants the flag, not the block.
+
+## Detection is deterministic, and it never resolves
+
+No model is involved. Detection runs over already-grounded candidates using
+content-derived signals only — negation asymmetry, mismatched numeric and date
+literals across an otherwise-shared token set — so it is reproducible and pinned
+by the cross-language conformance suite.
+
+It deliberately **does not resolve**. Deciding *which* of two contradictory
+sources wins is a policy question about authority, recency and jurisdiction. That
+belongs to you, not to a retrieval library.
+
+<Aside type="caution" title="Why the false-positive rate is the number that matters">
+In strict mode a detected conflict causes an abstention, so a **false** conflict
+is a **false refusal** — the library becomes useless long before it becomes
+wrong. Detection is therefore tuned against hard negatives: passages that look
+contradictory but are not (a dose for adults vs one for children, p50 vs p99
+latency, staging vs production). Measured: **0 false positives** across 27 hard
+negatives and 10 held-out cases, in five unrelated domains independently.
+</Aside>
+
+## Duplicates stop inflating your confidence
+
+The same comparison, inverted, catches near-duplicates. One sentence mirrored
+across five document IDs used to report `distinct_documents = 5` — five
+independent confirmations of a fact that had exactly one source.
+
+```python
+response.evidence.distinct_documents   # 1, not 5
+response.evidence.supporting_sources   # 1
+```
+
+This claims **surface clones only**. Telling a genuinely independent restatement
+apart from a paraphrase of the same origin is not decidable from text —
+independence is a fact about provenance — so the rule is biased to
+under-collapse. Two sources it keeps separate may still share an origin.
+
+## Related
+
+- [Regulated audit](/citenexus/scenarios/regulated-audit/) — for when the
+  superseded document should not be in the index at all.
+- [Ask & abstain](/citenexus/ask/) — the full decision surface.

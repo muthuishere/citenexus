@@ -15,6 +15,12 @@ const DefaultK = 60
 
 // Fuse merges ranked lists of eu_id strings by Reciprocal Rank Fusion and
 // returns the fused eu_id order (descending score, ascending eu_id tie-break).
+//
+// Deprecated: rrf now lives once in the shared Rust core (ADR-0006). Prefer the
+// core-backed core.Fuse (build tag citenexus_ffi), which shares one
+// implementation across all SDKs. This pure helper is retained for the
+// go-get-clean path and stays pinned to the Python reference by the
+// conformance/cases/rrf.json vectors; it is byte-identical to core.Fuse.
 func Fuse(lists [][]string, k int) []string {
 	scores := map[string]float64{}
 	order := []string{} // first-seen order, to make iteration deterministic

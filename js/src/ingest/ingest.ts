@@ -11,9 +11,10 @@
 
 import { extract, Store, type ExtractedBlock, type StoreRow } from "../core/core.js";
 import { chunkText, DEFAULT_MAX_TOKENS, DEFAULT_OVERLAP } from "../chunker/chunker.js";
+import { checkVector, type Embedder } from "./embedder.js";
 
-/** A dense embedder: text in, one vector out. Injected by the caller. */
-export type Embedder = (text: string) => number[];
+export type { Embedder } from "./embedder.js";
+export { isZeroVector } from "./embedder.js";
 
 export interface IngestOptions {
   maxTokens?: number;
@@ -36,21 +37,31 @@ export interface IngestResult {
  * is split by the recursive chunker and each chunk becomes one evidence unit
  * with eu_id `{documentID}::{order}::{i}` (parity with the chunked builder).
  * Returns the ids written. The store is the caller's — this does not close it.
+ *
+ * Failure is FAIL-CLOSED and ALL-OR-NOTHING: if any chunk fails to embed, or the
+ * embedder yields a vector that must not be indexed (empty, wrong-dimension,
+ * non-finite, or all zeros), `ingest` rejects and writes NOTHING — nothing is
+ * upserted until every vector is in hand. Skipping the failed unit was rejected:
+ * a document missing one chunk is, at retrieval time, indistinguishable from a
+ * document that never contained that sentence, and the caller cannot tell a
+ * partially indexed corpus from a complete one. Retrying is safe — the store
+ * merges on eu_id, so re-ingesting the same document is idempotent.
  */
-export function ingest(
+export async function ingest(
   store: Store,
   bytes: Uint8Array,
   sourceType: string,
   documentID: string,
   embed: Embedder,
   options: IngestOptions = {},
-): IngestResult {
+): Promise<IngestResult> {
   const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
   const overlap = options.overlap ?? DEFAULT_OVERLAP;
 
   const doc = extract(bytes, sourceType, documentID);
   const rows: StoreRow[] = [];
   const euIds: string[] = [];
+  let dim = 0;
 
   for (const block of doc.blocks as ExtractedBlock[]) {
     if (block.text.trim().length === 0) {
@@ -60,13 +71,17 @@ export function ingest(
     for (let i = 0; i < chunks.length; i++) {
       const text = chunks[i]!;
       const euId = `${documentID}::${block.order}::${i}`;
+      // A rejection here propagates: nothing has been upserted yet, so a failed
+      // model call leaves the corpus untouched rather than quietly incomplete.
+      const vector = checkVector(euId, await embed(text), dim);
+      dim = vector.length;
       rows.push({
         eu_id: euId,
         document_id: documentID,
         order: block.order,
         chunk_index: i,
         text,
-        vector: embed(text),
+        vector,
       });
       euIds.push(euId);
     }

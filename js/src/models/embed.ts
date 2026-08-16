@@ -6,6 +6,7 @@
 // headers are ALWAYS just {"Content-Type":"application/json"} — no key/secret
 // ever touches a header or the request body.
 
+import type { EmbeddingProvider } from "../contracts.js";
 import { wireHeaders } from "../http.js";
 import type { Transport } from "./openai.js";
 
@@ -31,10 +32,12 @@ export class OpenAIEmbedder {
     this.headers = config.headers;
   }
 
-  /** Embed `texts` into dense vectors, preserving input order. */
-  embed(texts: readonly string[]): number[][] {
+  /** Embed `texts` into dense vectors, preserving input order. Rejects when the
+   *  model call fails — the seam's way of saying "I did not embed this"
+   *  (ADR-0014 R2). It never returns a placeholder vector. */
+  async embed(texts: readonly string[]): Promise<number[][]> {
     const request = { model: this.model, input: [...texts] };
-    const raw = this.transport(
+    const raw = await this.transport(
       `${this.baseUrl}/embeddings`,
       JSON.stringify(request),
       wireHeaders(this.headers),
@@ -43,10 +46,23 @@ export class OpenAIEmbedder {
     return payload.data.map((item) => item.embedding.map((x) => Number(x)));
   }
 
-  /** Embed a single text — the ingest convenience. */
-  embedQuery(text: string): number[] {
-    const first = this.embed([text])[0];
+  /** Embed a single text — the ingest convenience. Plugs straight into
+   *  `ingest()`'s Embedder seam: `(t) => client.embedQuery(t)`. */
+  async embedQuery(text: string): Promise<number[]> {
+    const first = (await this.embed([text]))[0];
     if (first === undefined) throw new Error("openai embed: empty data");
     return first;
   }
 }
+
+// CONTRACT DECLARATION (ADR-0014 R4). Python declares by inheriting the Protocol,
+// so `mypy --strict` re-checks the client on every run; TS has structural typing,
+// so the idiomatic equivalent is this static assertion — if `OpenAIEmbedder` ever
+// drifts from the published seam, `tsc --noEmit` fails HERE rather than a caller
+// failing at runtime.
+//
+// Note what the contract does NOT mention: base_url, headers, transport. Those
+// are constructor parameters of this client (R3), which is precisely why an
+// in-process provider that never opens a socket satisfies the same interface.
+const _embeddingContract: EmbeddingProvider = null! as OpenAIEmbedder;
+void _embeddingContract;

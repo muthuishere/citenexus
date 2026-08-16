@@ -36,6 +36,9 @@ pub enum SourceType {
     Txt,
     Csv,
     Image,
+    Code,
+    SchemaSql,
+    SchemaOpenapi,
     Plain,
 }
 
@@ -64,6 +67,14 @@ pub struct ExtractedBlock {
     pub bbox: Option<BBox>,
     #[serde(default)]
     pub level: Option<u32>,
+    /// 1-based line range of the block in the source file, when the extractor
+    /// knows it (the code extractor carries it so a symbol EU cites `file:Lx-Ly`).
+    /// None for extractors with no line geometry — serialized as `null`, matching
+    /// the `page`/`level` convention so the block JSON is byte-stable across ports.
+    #[serde(default)]
+    pub start_line: Option<u32>,
+    #[serde(default)]
+    pub end_line: Option<u32>,
     /// Ancestor heading path — Python defaults this to `()`, so it is a plain
     /// (possibly empty) list here, never null.
     #[serde(default)]
@@ -84,6 +95,8 @@ impl ExtractedBlock {
             page: None,
             bbox: None,
             level: None,
+            start_line: None,
+            end_line: None,
             structure_path: vec![],
             cells: vec![],
         }

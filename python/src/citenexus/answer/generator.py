@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 
+from citenexus.contracts import CompletionProvider, GeneratorProvider
 from citenexus.http import DEFAULT_TRANSPORT, Transport
 from citenexus.telemetry.events import TokenUsage
 
@@ -39,11 +40,13 @@ _SYSTEM_PROMPT = (
 )
 
 
-class OpenAICompatibleGenerator:
+class OpenAICompatibleGenerator(GeneratorProvider, CompletionProvider):
     """Grounded answers over an OpenAI-compatible ``/chat/completions`` endpoint.
 
-    Implements the ``answer/flow.Generator`` protocol so it drops straight into
-    ``AnswerFlow`` / ``CiteNexus(generator=...)``.
+    Declares the published `GeneratorProvider` contract (what ``ask()`` calls) and
+    `CompletionProvider` (the deep-ask decision seam), so it drops straight into
+    ``AnswerFlow`` / ``CiteNexus(generator=...)`` and mypy checks it against the
+    shape a third-party generator must match.
     """
 
     plugin_version = "openai-generator-v1"
@@ -93,6 +96,27 @@ class OpenAICompatibleGenerator:
                 {"role": "user", "content": user},
             ],
             # Always sent — a grounded answer must be deterministic (§4b).
+            "temperature": self._temperature,
+        }
+        if self._max_tokens is not None:
+            request["max_tokens"] = self._max_tokens
+        body = json.dumps(request).encode("utf-8")
+        raw = self._transport(self._endpoint, body, self._headers())
+        payload = json.loads(raw)
+        self.last_usage = _usage_of(payload)
+        content: str = payload["choices"][0]["message"]["content"]
+        return content
+
+    def complete(self, prompt: str) -> str:
+        """Raw single-prompt completion — the deep-ask structured-decision seam.
+
+        A plain ``/chat/completions`` call with one user message; the caller
+        (`answer/decision.py`) parses a JSON decision from the reply. NOT provider
+        tool/function-calling — the model never owns the loop's control flow.
+        """
+        request: dict[str, object] = {
+            "model": self._model,
+            "messages": [{"role": "user", "content": prompt}],
             "temperature": self._temperature,
         }
         if self._max_tokens is not None:

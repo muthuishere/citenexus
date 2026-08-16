@@ -50,7 +50,8 @@ In law, medicine, and compliance, a confidently wrong answer isn't the model's
 mistake — it's yours, and you're the one who has to defend it. CiteNexus answers
 **only** from retrieved evidence, quotes it verbatim with a page and bbox, and
 **abstains** when the evidence is weak, missing, or conflicting. The same
-guarantee, in every language:
+guarantee, in every [supported script](/citenexus/languages/) — 13 of them in
+Python, Latin-script in the Go and JS ports:
 
 <Tabs syncKey="lang">
 <TabItem label="Go">
@@ -83,8 +84,8 @@ const corpus = [
 ]
 
 const r = ask(corpus, "Can the employee disclose confidential information?")
-console.log(r.answer)            // the verbatim quote — or the pinned refusal
-console.log(r.evidence.decision) // "answered" | "refused"
+console.log(response.answer)            // the verbatim quote — or the pinned refusal
+console.log(response.evidence.decision) // "answered" | "refused"
 ```
 </TabItem>
 <TabItem label="Python">
@@ -95,9 +96,9 @@ rag = CiteNexus("./citenexus-data", embedder=..., generator=...)  # your OpenAI-
 
 rag.ingest(text="The employee shall not disclose confidential information.", document_id="employee-nda")
 
-r = rag.ask("Can the employee disclose confidential information?")
-print(r.answer)             # the verbatim quote — or the pinned refusal
-print(r.evidence.decision)  # "answered" | "refused"
+response = rag.ask("Can the employee disclose confidential information?")
+print(response.answer)             # the verbatim quote — or the pinned refusal
+print(response.evidence.decision)  # "answered" | "refused"
 ```
 </TabItem>
 </Tabs>
@@ -109,10 +110,17 @@ hermetic cite-or-abstain **core** — `ask` over an in-memory corpus, plus
 extraction, language detection, chunking, BM25 + RRF fusion, and the grounding
 gate. **Python** is the batteries-included library: your injected models,
 S3-native storage, and the `ingest` / `ask` / `evaluate` verbs (there is no
-`CiteNexus` facade in Go/JS yet). The deterministic decision is byte-for-byte
-identical, pinned by the shared
+`CiteNexus` facade in Go/JS yet). The deterministic decision is pinned by the
+shared
 [`conformance/`](https://github.com/muthuishere/citenexus/tree/main/conformance)
 suite — see the full Python setup in the [Quickstart](/citenexus/quickstart/).
+
+**Parity status:** Python's faithfulness gate is currently *ahead* of the ports.
+It verifies per atomic claim with an order-aware predicate, so an answer that
+reuses the passage's words to assert the opposite is rejected; Go and JS still
+run the frozen token-containment predicate and accept it. Every other pinned
+algorithm remains byte-for-byte identical. The ports land once the new
+conformance vectors are in.
 </Aside>
 
 <p class="cn-statement">If it can't <em>cite</em> it, it won't <em>say</em> it.</p>

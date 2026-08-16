@@ -1,0 +1,71 @@
+{
+  "_comment": [
+    "DRAFT of conformance/polarity.json for ADR-0007 (tier 2 per ADR-0010).",
+    "Language-dependent DATA only; the code reading it is native per port.",
+    "Tokens are post-tokenize() form: lowercase [a-z0-9]+ (SPEC-PORTS-v1 §4).",
+    "'nl' is drafted but MUST NOT ship until a native-speaker golden fixture exists",
+    "(ADR-0007 consequence: a bad table = false conflicts = false abstention)."
+  ],
+  "version": 1,
+  "languages": {
+    "en": {
+      "negations": [
+        "not", "no", "never", "nor", "neither", "none", "without",
+        "cannot", "cant", "wont", "doesnt", "dont", "isnt", "arent",
+        "unable", "fails", "fail", "failed", "lacks", "lack",
+        "absent", "excluded", "except", "exempt"
+      ],
+      "antonyms": [
+        ["above", "below"], ["exceeds", "below"], ["exceed", "below"],
+        ["increase", "decrease"], ["increased", "decreased"],
+        ["increases", "decreases"], ["rose", "fell"], ["rises", "falls"],
+        ["higher", "lower"], ["greater", "lower"], ["greater", "less"],
+        ["more", "less"], ["gain", "loss"], ["profit", "loss"],
+        ["surplus", "deficit"], ["before", "after"],
+        ["approved", "rejected"], ["granted", "denied"],
+        ["permitted", "prohibited"], ["allowed", "forbidden"],
+        ["mandatory", "optional"], ["required", "optional"],
+        ["valid", "invalid"], ["eligible", "ineligible"],
+        ["attracts", "repels"], ["expands", "contracts"],
+        ["accelerates", "decelerates"], ["upheld", "overturned"],
+        ["passed", "failed"], ["open", "closed"], ["enabled", "disabled"]
+      ],
+      "report_markers": [
+        "claim", "claims", "claimed", "allegation", "alleged", "allegedly",
+        "argued", "argues", "asserts", "asserted", "assertion",
+        "contends", "contention", "dispute", "disputed", "disputes",
+        "rebutted", "refuted", "purported", "purportedly", "hypothesis",
+        "myth", "misconception", "whether", "question"
+      ],
+      "scope_markers": [
+        "adults", "adult", "children", "child", "paediatric", "pediatric",
+        "infants", "neonates", "elderly", "domestic", "international",
+        "residential", "commercial", "annual", "monthly", "quarterly",
+        "weekly", "daily", "hourly", "gross", "net", "peak", "offpeak",
+        "onshore", "offshore", "inbound", "outbound", "vacuum", "air"
+      ]
+    },
+    "nl": {
+      "_status": "DRAFT — unvalidated, must not ship without a golden fixture",
+      "negations": [
+        "niet", "geen", "nooit", "nimmer", "zonder", "noch", "evenmin",
+        "ontbreekt", "ontbreken", "uitgesloten", "onmogelijk"
+      ],
+      "antonyms": [
+        ["boven", "onder"], ["meer", "minder"], ["hoger", "lager"],
+        ["stijgt", "daalt"], ["stijging", "daling"],
+        ["toegestaan", "verboden"], ["goedgekeurd", "afgewezen"],
+        ["verplicht", "optioneel"], ["geldig", "ongeldig"],
+        ["winst", "verlies"], ["voor", "na"], ["overschrijdt", "onder"]
+      ],
+      "report_markers": [
+        "bewering", "beweert", "beweerde", "vermeend", "betwist",
+        "verworpen", "stelling", "of"
+      ],
+      "scope_markers": [
+        "volwassenen", "kinderen", "ouderen", "jaarlijks", "maandelijks",
+        "bruto", "netto", "binnenlands", "buitenlands"
+      ]
+    }
+  }
+}

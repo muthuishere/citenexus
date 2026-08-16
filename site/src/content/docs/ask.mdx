@@ -13,13 +13,13 @@ guessing.
 ```python
 from citenexus.answer.result import Decision
 
-answer = rag.ask("Can the employee disclose this?")   # mode=strict by default
+response = rag.ask("Can the employee disclose this?")   # mode=strict by default
 
-if answer.evidence.decision is Decision.answered:
-    src = answer.sources[0]
-    print(answer.answer, "—", src.document, "p.", src.page, src.bbox)
+if response.evidence.decision is Decision.answered:
+    src = response.sources[0]
+    print(response.answer, "—", src.document, "p.", src.page, src.bbox)
 else:
-    print("abstained:", answer.answer)          # the pinned refusal, not a fabrication
+    print("abstained:", response.answer)          # the pinned refusal, not a fabrication
 ```
 
 ## Options
@@ -47,7 +47,7 @@ Import: `from citenexus.domain.trust import TrustMode`
 ```python
 from citenexus.domain.trust import TrustMode
 
-answer = rag.ask("Summarize the risk factors.", mode=TrustMode.exploratory)
+response = rag.ask("Summarize the risk factors.", mode=TrustMode.exploratory)
 ```
 
 <Aside type="note" title="The guarantee lives in strict">
@@ -86,21 +86,21 @@ if res.Evidence.Decision == result.DecisionAnswered {
 <TabItem label="JavaScript">
 ```ts
 const r = ask(corpus, "Can the employee disclose confidential information?")
-if (r.evidence.decision === "answered") {
-  console.log(r.answer, "—", r.sources[0].passage)
+if (response.evidence.decision === "answered") {
+  console.log(response.answer, "—", response.sources[0].passage)
 } else {
-  console.log("abstained:", r.answer)       // the pinned refusal
+  console.log("abstained:", response.answer)       // the pinned refusal
 }
 ```
 </TabItem>
 <TabItem label="Python">
 ```python
 # the store-backed facade — corpus already ingested via rag.ingest(...)
-r = rag.ask("Can the employee disclose confidential information?")
-if r.evidence.decision is Decision.answered:
-    print(r.answer, "—", r.sources[0].passage)
+response = rag.ask("Can the employee disclose confidential information?")
+if response.evidence.decision is Decision.answered:
+    print(response.answer, "—", response.sources[0].passage)
 else:
-    print("abstained:", r.answer)           # the pinned refusal
+    print("abstained:", response.answer)           # the pinned refusal
 ```
 </TabItem>
 </Tabs>

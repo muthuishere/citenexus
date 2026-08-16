@@ -19,11 +19,9 @@ import (
 	"github.com/muthuishere/citenexus/golang/core"
 )
 
-// Embedder turns chunk text into a dense vector. It is injected so the core owns
-// orchestration and the model stays an endpoint (CLAUDE.md: no bundled models).
-type Embedder interface {
-	Embed(text string) []float64
-}
+// The Embedder seam and its write-path guard live in embedder.go, which carries
+// no build tag: the contract is pure Go and stays compiled and tested without
+// the native library.
 
 // extractedDoc is the slice of the Rust ExtractedDoc JSON that ingest consumes.
 type extractedDoc struct {
@@ -49,6 +47,19 @@ type Row struct {
 
 // Ingest extracts data as sourceType, chunks and embeds each block, and upserts
 // the resulting Evidence-Unit rows into store. It returns the rows written.
+//
+// Failure is FAIL-CLOSED and ALL-OR-NOTHING: if any chunk fails to embed, or the
+// embedder hands back a vector that must not be indexed (empty, wrong-dimension,
+// or all zeros), Ingest returns the error and writes NOTHING. Nothing is upserted
+// until every vector is in hand.
+//
+// The alternative — skip the failed unit and report it — was rejected: a document
+// missing one chunk is indistinguishable, at retrieval time, from a document that
+// never contained that sentence, and the caller has no way to tell a partially
+// indexed corpus from a complete one. Refusing outright is the only outcome the
+// library can be honest about ("we never want wrong at all; it's okay to say we
+// don't know"). Retrying is safe: the store merges on eu_id, so a re-ingest of
+// the same document is idempotent.
 func Ingest(store *core.Store, data []byte, sourceType, documentID string, embedder Embedder) ([]Row, error) {
 	raw := core.Extract(data, sourceType, documentID)
 
@@ -61,12 +72,21 @@ func Ingest(store *core.Store, data []byte, sourceType, documentID string, embed
 	}
 
 	var rows []Row
+	dim := 0
 	for _, block := range doc.Blocks {
 		chunks := chunker.ChunkText(block.Text, chunker.DefaultMaxTokens, chunker.DefaultOverlap)
 		for ci, chunk := range chunks {
-			vec := embedder.Embed(chunk)
+			euID := fmt.Sprintf("%s:b%d:c%d", documentID, block.Order, ci)
+			vec, err := embedder.Embed(chunk)
+			if err != nil {
+				return nil, fmt.Errorf("ingest: embed %s: %w", euID, err)
+			}
+			if err := checkVector(euID, vec, dim); err != nil {
+				return nil, err
+			}
+			dim = len(vec)
 			rows = append(rows, Row{
-				EuID:       fmt.Sprintf("%s:b%d:c%d", documentID, block.Order, ci),
+				EuID:       euID,
 				DocumentID: documentID,
 				BlockOrder: block.Order,
 				ChunkIndex: ci,

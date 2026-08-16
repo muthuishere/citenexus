@@ -5,6 +5,7 @@
 //! `source_type=plain`). Binary types (docx/pptx/pdf/xlsx/image) take bytes;
 //! text types decode UTF-8 lossily first (Python reads text files as UTF-8 too).
 
+pub mod code;
 pub mod csv;
 pub mod html;
 pub mod image;
@@ -12,6 +13,8 @@ pub mod md;
 pub mod ooxml;
 #[cfg(feature = "pdf")]
 pub mod pdf;
+pub mod schema_openapi;
+pub mod schema_sql;
 pub mod txt;
 pub mod xlsx;
 
@@ -36,6 +39,11 @@ pub fn extract(
         SourceType::Md => Ok(md::extract(&text(), document_id, source_uri)),
         SourceType::Html => Ok(html::extract(&text(), document_id, source_uri)),
         SourceType::Csv => Ok(csv::extract(&text(), document_id, source_uri)),
+        SourceType::Code => Ok(code::extract(&text(), document_id, source_uri)),
+        SourceType::SchemaSql => Ok(schema_sql::extract(&text(), document_id, source_uri)),
+        SourceType::SchemaOpenapi => {
+            Ok(schema_openapi::extract(&text(), document_id, source_uri))
+        }
         SourceType::Docx => ooxml::extract_docx(bytes, document_id, source_uri),
         SourceType::Pptx => ooxml::extract_pptx(bytes, document_id, source_uri),
         SourceType::Xlsx => xlsx::extract(bytes, document_id, source_uri),
@@ -55,6 +63,8 @@ pub fn source_type_for_extension(ext: &str) -> SourceType {
         "md" | "markdown" => SourceType::Md,
         "csv" => SourceType::Csv,
         "html" | "htm" => SourceType::Html,
+        "py" | "go" => SourceType::Code,
+        "sql" => SourceType::SchemaSql,
         "docx" => SourceType::Docx,
         "pptx" => SourceType::Pptx,
         "xlsx" => SourceType::Xlsx,

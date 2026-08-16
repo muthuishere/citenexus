@@ -1,6 +1,10 @@
 # 0004 — Authority-weighting on the grounded-evidence seam
 
-Status: proposed · 2026-07-06
+Status: accepted · 2026-07-06 · **implemented** 2026-08-16 for the strict flow
+(`answer/flow.py`) and the deep-ask loop (`answer/agentic.py`) — see
+`openspec/changes/authority-floor/` and `openspec/changes/deep-ask-authority/`,
+and the "Implementation notes" below for the three claims implementation
+falsified.
 
 ## Context
 
@@ -31,24 +35,77 @@ a deterministic, **metadata-derived** signal applied strictly *after* grounding:
   **metadata** (never content) to a totally-ordered `AuthorityTier`. Three
   built-ins are pinned: `default.v1` (everything unranked = today's behavior),
   `legal.v1`, `medical.v1`.
-- A single new selection point (`select_by_authority`, replacing
+- A single selection **function** (`select_by_authority`, replacing
   `answer/flow.py:89`) reorders grounded candidates and enforces a strict-mode
-  minimum tier. The faithfulness gate stays **byte-identical** and is never
-  called by authority code.
+  minimum tier. The property being protected is **one implementation**, not one
+  call site: two implementations of a min-bar are two things that can drift, and
+  the drifted one is the hole. The faithfulness gate stays **byte-identical** and
+  is never called by authority code.
 - TrustMode coupling: strict = enforce min tier or abstain; normal = tie-break;
   exploratory = ignore.
 - One additive storage column (`authority_meta`), one additive config section,
-  additive Result/EvidenceSignals fields, and a cross-corpus `compare_corpora`
+  additive Result/EvidenceSignals fields (`authority_tier`,
+  `authority_floor_applied`), and a cross-corpus `compare_corpora`
   comparator so `evaluate()` can rank corpus A vs B by *most-authoritative
   grounded evidence*, not coverage.
-- **Backward compatibility is provable:** `default.v1` ranks every source 0, the
-  selection key collapses to today's fusion order, and old corpora read
-  `authority_meta=""`. Every existing Result serializes byte-for-byte unchanged;
-  the feature is strictly opt-in.
+- **Backward compatibility is provable at the level of BEHAVIOUR:** `default.v1`
+  ranks every source 0, the selection key collapses to today's fusion order, and
+  old corpora read `authority_meta=""`. Every existing Result carries the same
+  decision, the same citations and the same values on every pre-existing field;
+  the feature is strictly opt-in. **Serialization is not unchanged** — the two
+  additive fields appear at their empty defaults, so a serialized Result gains
+  lines (measured: `conformance/cases/result_roundtrip.json` +4 lines, two
+  fields × two Results, `authority_tier: ""` and
+  `authority_floor_applied: false`). Byte-exactness and additive fields cannot
+  both hold; additive fields is what this ADR chose, and consumers must read
+  Results by field, not by byte.
 
 Full contract, file:line integration anchors, the pinned algorithms, conformance
 fixtures, TrustMode table, build plan, and risks:
 **`docs/SPEC-authority-weighting-v1.md`**.
+
+## Implementation notes (2026-08-16)
+
+The reasoning above stands as written. Three of its *claims* were falsified by
+building it; they are corrected in place above and recorded here.
+
+### 1. `authority_tier` on a multi-source answer is the WEAKEST cited tier
+
+The original text ("the cited source's tier") is well-defined only for the strict
+flow, which cites one source. Deep-ask (`answer/agentic.py`) cites one Evidence
+Unit **per claim**, so an answer can rest on several tiers at once and the phrase
+has no referent. **Normative:** `authority_tier` SHALL name the **lowest-ranked
+tier among the Evidence Units actually cited**. An answer's standing is the
+standing of its weakest support; reporting the strongest would let one binding
+citation launder a weaker co-citation. The two definitions agree wherever they
+overlap — the strict flow cites one source, so its behaviour is unchanged.
+
+This is spelled out rather than left to each port's reading on purpose. An
+ambiguous rule that four languages interpret independently is how this repo got a
+faithfulness gate that accepted 9 of 9 false answers identically in Python, Go and
+JS. A port that read "the cited source's tier" as *strongest* would disagree
+silently, and disagreement about *reported standing* is exactly the failure this
+ADR exists to prevent.
+
+### 2. "A single new selection point" was the wrong invariant to write down
+
+There are now **three** call sites — the strict flow (between grounding and
+generation), deep-ask pool admission, and deep-ask finish. What the ADR meant to
+protect survives intact and is stronger than the word "point": there is **one
+implementation**, `select_by_authority`, made generic over "anything carrying
+`authority_meta`" (the one-member `HasAuthorityMeta` protocol) rather than
+duplicated per flow. The protocol also cannot reach `text` / `passage` /
+`citable_text`, so the metadata-never-content seam is structural, not a
+convention. Read the Decision as "a single selection *function*".
+
+### 3. Serialization moved; behaviour did not
+
+"Every existing Result serializes byte-for-byte unchanged" contradicted the same
+Decision's "additive Result/EvidenceSignals fields", and measurement settled it:
+`conformance/cases/result_roundtrip.json` grew by **+4 lines** when
+`authority_tier: ""` and `authority_floor_applied: false` were added to its two
+Results. No pre-existing field changed name, type or value, and no decision
+changed. The compatibility promise is therefore **behavioural**, not byte-level.
 
 ## Consequences
 

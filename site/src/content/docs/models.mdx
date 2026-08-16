@@ -1,19 +1,27 @@
 ---
 title: Bring your own models
-description: Every model is an injected, OpenAI-compatible endpoint — embedding, LLM, and optionally a reranker and vision. Nothing is bundled.
+description: Every model is injected — embedding, LLM, and optionally a reranker and vision. Nothing is bundled. The shipped clients speak the OpenAI API; the seam itself is a published contract, so an in-process model or a mock works just as well.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
 CiteNexus bundles **no models**. Embedding, LLM, and optionally a reranker and a
-vision model for figures are injected OpenAI-compatible endpoints. Nothing runs
-locally that you didn't wire up; the key stays in your endpoint config.
+vision model for figures are injected by you. The shipped clients speak the
+OpenAI API — nothing runs locally that you didn't wire up, and the key stays in
+your endpoint config.
+
+All four are importable from the top-level package and share one constructor
+shape (keyword-only `base_url`, `model`, `transport`, `headers`, plus
+role-specific extras):
 
 ```python
-from citenexus import CiteNexus
-from citenexus.embed.client import OpenAICompatibleEmbedding
-from citenexus.answer.generator import OpenAICompatibleGenerator
-from citenexus.vision import OpenAICompatibleVision
+from citenexus import (
+    CiteNexus,
+    OpenAICompatibleEmbedding,
+    OpenAICompatibleGenerator,
+    OpenAICompatibleReranker,
+    OpenAICompatibleVision,
+)
 
 rag = CiteNexus(
     "./citenexus-data",
@@ -27,6 +35,15 @@ Any endpoint that speaks the OpenAI API works — Ollama, OpenAI, a local vLLM o
 llama.cpp server, or Gemini's OpenAI-compatibility endpoint. The reference
 example runs entirely on local Ollama (`bge-m3` + `qwen2.5` + `bge-reranker-v2-m3`).
 
+<Aside type="tip" title="An endpoint is one option, not the requirement">
+The model seam is a **published contract**, not a URL. `base_url`, `headers` and
+`transport` are constructor parameters of *these* clients — they appear in no
+contract method — so an in-process model, a mock, or a cached fixture satisfies
+the same seam without opening a socket. The shipped clients above are ordinary
+providers with no privileges. See
+[Provider contracts](/citenexus/providers/).
+</Aside>
+
 <Aside type="note" title="Vision is host-fulfilled">
 The vision model is called through a two-phase seam: the core emits a description
 *request*, your host fulfills it against the endpoint, and the description is
@@ -34,5 +51,7 @@ assembled back into a cited figure Evidence Unit. The core never holds your API
 key.
 </Aside>
 
-Go deeper on each: [Reranking & retrieval](/citenexus/reranking/) ·
+Go deeper on each: [Provider contracts](/citenexus/providers/) ·
+[Custom endpoints & auth](/citenexus/custom-endpoints/) ·
+[Reranking & retrieval](/citenexus/reranking/) ·
 [Vision — figures as cited evidence](/citenexus/vision/).

@@ -21,7 +21,9 @@ import json
 from collections.abc import Mapping
 from typing import Any
 
+from citenexus.contracts import VisionProvider
 from citenexus.http import DEFAULT_TRANSPORT, Transport
+from citenexus.plugins.base import VisionPlugin
 
 _VISION_PROMPT = (
     "Describe this image for a document search index, covering every aspect so a "
@@ -61,8 +63,13 @@ def _image_bytes(image: Any) -> bytes:
     )
 
 
-class OpenAICompatibleVision:
-    """Image description over an OpenAI-compatible vision ``/chat/completions``."""
+class OpenAICompatibleVision(VisionPlugin, VisionProvider):
+    """Image description over an OpenAI-compatible vision ``/chat/completions``.
+
+    Declares the published `VisionProvider` contract *and* the ``VisionPlugin``
+    ABC — the base that existed all along and that this client, before ADR-0014,
+    never named.
+    """
 
     plugin_version = "openai-vision-v1"
 

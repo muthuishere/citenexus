@@ -1,0 +1,119 @@
+---
+title: Multilingual desk
+description: Ask in one language over a corpus written in another — the answer follows the question, the citation stays verbatim in the source language, and unsupported scripts say so.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+**The failure this prevents:** a French-speaking analyst asks a question, the
+system answers in French, and the "quote" it shows is a French **translation** of
+an English clause. That translation is not the evidence. Nobody can diff it
+against the source, and the moment it is wrong there is nothing to catch it.
+
+<Steps>
+
+1. **Ingest a corpus in whatever languages it is written in.** Language is
+   detected per document; nothing needs declaring.
+
+   ```python
+   rag.ingest("handboek-nl.pdf")        # Dutch
+   rag.ingest("policy-en.pdf")          # English
+   rag.ingest("richtlinie-de.pdf")      # German
+   ```
+
+2. **Ask in the reader's language.**
+
+   ```python
+   response = rag.ask("Quelle est la durée de conservation des données ?")
+   ```
+
+3. **Read the two languages separately.** They are different fields on purpose.
+
+   ```python
+   print(response.answer_language)      # "fr" — follows the QUESTION
+   print(response.answer)               # the answer, in French
+
+   src = response.sources[0]
+   print(src.passage_language)          # "nl" — the SOURCE's language
+   print(src.passage)                   # verbatim Dutch, untranslated
+   print(src.translation)               # optional, additive, clearly marked
+   ```
+
+</Steps>
+
+## The rule that makes this defensible
+
+**The answer follows the question. The citation never moves.** A translated quote
+is no longer the evidence, so `passage` always stays verbatim in the source
+language and any translation is additive on `translation` — never a replacement.
+
+The answer language is **stated by the caller**, never inferred from the corpus:
+an explicit `answer_language="de"` wins outright, the sentinel
+`answer_language="auto"` detects it from the *question*, then the ongoing
+conversation, then the client's `default_answer_language`. The retrieved evidence
+does not vote.
+
+```python
+rag.ask("What is the retention period?", answer_language="de")     # forced German
+rag.ask("Quelle est la durée de conservation ?", answer_language="auto")  # detected
+```
+
+<Aside type="caution" title="When verbatim and the answer language collide">
+The strict flow is extractive, so if the *only* support for a question is a
+passage in another script, the verbatim quote wins and the returned text is in
+the source's script even though `answer_language` says otherwise. Read
+`sources[*].passage_language` for what is actually in front of you. Known open
+limitation — see
+[Cross-lingual corpus](/citenexus/scenarios/multilingual-corpus/).
+</Aside>
+
+## Script support is explicit, and narrower than "multilingual"
+
+Fourteen scripts are supported in the Python reference — Latin, Cyrillic, Greek,
+Han, Hiragana, Katakana, Hangul, Arabic, Hebrew, Devanagari, Bengali, Tamil,
+Telugu and Thai. Space-less scripts (Han, Kana, Thai) are indexed by character
+bigrams.
+
+Each claimed script is backed by a golden conformance fixture. A script is
+claimed **only** when its evidence exists — the fixture generator fails if the
+claim set and the fixture set disagree in either direction.
+
+```python
+response.evidence.unsupported_scripts   # ('khmer',) — a CAPABILITY gap
+```
+
+That signal is deliberately distinct from "no supporting evidence". An abstention
+carrying `unsupported_scripts` means *"I cannot read this script"*, which is a
+different fact from *"the evidence isn't there"* — and conflating the two is
+exactly how an ASCII-only tokenizer hid in a library advertised as multilingual
+for months.
+
+<Aside type="caution" title="Khmer, Lao and Myanmar are deliberately NOT claimed">
+The bigram path mechanically works for them. That is precisely why they are not
+claimed: answering through a segmentation no fixture has ever checked produces an
+answer indistinguishable, at the point of use, from a verified one. Refusing is
+the honest output until a golden fixture exists.
+</Aside>
+
+<Aside type="note" title="The Go and JavaScript ports are Latin-script only">
+The ports run the frozen ASCII tokenizer, so non-Latin text yields no tokens
+there and abstains. Every other pinned algorithm is at parity. See
+[Languages & multilingual](/citenexus/languages/) for the full matrix.
+</Aside>
+
+## Known sharp edge
+
+Arabic and Hebrew diacritics are **not** stripped — marks are word-forming, so a
+diacritized spelling and an undiacritized one are different tokens. This is
+conservative (it can only cause a false abstention, never a false answer) and is
+correct for the abugidas, but it means a corpus mixing both spellings will
+under-retrieve. Normalise at ingest if that describes your data.
+
+## When the question and the corpus share no tokens at all
+
+This page assumes retrieval reaches the evidence. Across a script boundary it
+often does not: an English query contributes **zero** BM25 tokens against Tamil
+or Telugu prose, and a reachable-but-superseded English document answers instead
+— verbatim, correctly cited, and wrong for the person asking. That is a separate
+build, with a measured before/after:
+[**Cross-lingual corpus**](/citenexus/scenarios/multilingual-corpus/).

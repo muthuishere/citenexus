@@ -1,40 +1,177 @@
 ---
 title: Languages & multilingual
-description: Answers come back in the question's language; cited passages stay verbatim in the source language, with any translation additive. Language is detected by fastText lid.176 (or an offline heuristic detector).
+description: Fourteen scripts in the Python reference, Latin-script in the Go and JS ports — the caller states the answer language; cited passages stay verbatim in the source language, with any translation additive. Unsupported scripts and unsupported search languages refuse by name. Language is detected by fastText lid.176 (or an offline heuristic detector).
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-CiteNexus is multilingual by design. Ask in French over an English corpus and the
-**answer** comes back in French — but the **citation** stays verbatim in English,
-because a translated quote is no longer the evidence. Any translation is additive
-and clearly marked.
+CiteNexus supports **14 scripts** in the Python reference. Ask in French over an
+English corpus and the **answer** comes back
+in French — but the **citation** stays verbatim in English, because a translated
+quote is no longer the evidence. Any translation is additive and clearly marked.
+
+Text in a script CiteNexus does not claim **abstains with an explicit
+`unsupported_scripts` signal** — a capability gap, never an evidence judgement.
+See [Script support](#script-support) below.
+
+## Script support
+
+| Script | Languages | Python | Go / JS |
+| --- | --- | --- | --- |
+| Latin | English, Dutch, German, French, Spanish, Portuguese, … | supported | supported |
+| Cyrillic | Russian, Ukrainian, … | supported | abstains |
+| Greek | Greek | supported | abstains |
+| Han | Chinese | supported (bigram) | abstains |
+| Hiragana / Katakana | Japanese | supported (bigram) | abstains |
+| Hangul | Korean | supported | abstains |
+| Arabic | Arabic | supported | abstains |
+| Hebrew | Hebrew | supported | abstains |
+| Devanagari | Hindi, Marathi, … | supported | abstains |
+| Bengali | Bengali | supported | abstains |
+| Tamil | Tamil | supported | abstains |
+| Telugu | Telugu | supported | abstains |
+| Thai | Thai | supported (bigram) | abstains |
+| Kannada, Malayalam, Gujarati, Gurmukhi, Oriya, Sinhala | — | **not claimed** | abstains |
+| Khmer, Lao, Myanmar, Georgian, Armenian | — | **not claimed** | abstains |
+
+Every claimed script is backed by a golden conformance fixture: a script is
+claimed only when its evidence exists, and the fixture generator fails if the two
+disagree in either direction.
+
+Khmer, Lao and Myanmar are **deliberately not claimed even though the bigram path
+mechanically works for them**. Answering through a segmentation no fixture has
+checked is worse than refusing — it is indistinguishable, at the point of use,
+from a verified answer.
+
+Space-less scripts (Han, Kana, Thai) are indexed by **character bigrams**, which
+do not cross script boundaries: Japanese `従業員は` yields `従業`, `業員`, `は`.
+
+<Aside type="caution" title="The Go and JavaScript ports are still ASCII-only">
+The ports run the frozen SPEC-PORTS-v1 §4 tokenizer (`[a-z0-9]+`), so non-Latin
+text yields no tokens there and abstains. Every other pinned algorithm remains at
+parity. Background:
+[ADR-0011](https://github.com/muthuishere/citenexus/blob/main/docs/adr/0011-tokenizer-and-non-latin-scripts.md).
+</Aside>
+
+## Translation: three knobs, all off by default
+
+CiteNexus never translates anything unless you ask it to, and the three places it
+*can* are separate settings with different risk profiles.
+
+### 1. Query reformulation — helps cross-lingual retrieval
+
+A French question over an English corpus aligns imperfectly in embedding space
+and shares **zero** BM25 tokens, which is a leading cause of unnecessary
+abstention. Enabling reformulation has a small model rewrite the query in
+English, then retrieves with **both** the original and the rewrite and RRF-fuses
+the two ranked lists.
+
+```python
+from citenexus.config.schema import ReformulationConfig, HttpEndpoint
+
+ReformulationConfig(
+    enabled=True,                          # default: False
+    model="gemini-2.5-flash-lite",
+    endpoint=HttpEndpoint(base_url="..."),  # required — no endpoint, no reformulation
+)
+```
+
+The original query is **always kept**. Translation damages exactly the tokens
+lexical retrieval depends on — names, IDs, clause and article numbers — so the
+rewrite is additive: it can surface candidates the original missed, but it can
+never displace them. It is enhancement-only in the strict sense too: a failure,
+an empty reply, or a rewrite identical to the original degrades to single-query
+retrieval rather than erroring.
+
+This cannot weaken the guarantee. Reformulation affects **which passages are
+retrieved**, never whether an answer is grounded — the faithfulness gate still
+verifies the answer against the passage it cites.
+
+### 2. Citation translation — additive, never in place
+
+```python
+from citenexus.config.schema import LanguageConfig
+
+LanguageConfig(translate_citations=True)   # default: False
+```
+
+Even enabled, `SourceRef.passage` stays **verbatim in the source language**. The
+translation lands on a separate, clearly marked `translation` field. A translated
+quote is not the evidence, so it never overwrites the evidence.
+
+```python
+src = response.sources[0]
+src.passage        # verbatim — this is what you show and what a reviewer diffs
+src.translation    # optional, marked, additive — a reading aid, not a citation
+```
+
+### 3. Search-language fan-out — reformulation, per language, on demand
+
+`search_languages` on `ask()` and `retrieve()` names the languages a question is
+*searched* in. Each one gets its own reformulation, and every ranked list is
+fused through the same RRF merge; the original question is always issued too.
+
+```python
+response = rag.ask(question, search_languages=("en", "ta", "te"))   # default: ("en",)
+```
+
+A language whose script is not claimed **raises `UnsupportedSearchLanguageError`
+before any model call is spent** — by name, so the error says *"Kannada is not
+supported"* rather than *"unknown language code"*. Codes are never guessed: an
+unknown code raises too. Requesting two or more languages with no reformulation
+endpoint configured also raises, because a fan-out that issues no extra queries
+looks exactly like a search that found nothing.
+
+Measured on a 12-document Tamil/Telugu corpus, this took answered-when-groundable
+from 44% to 89% with abstention on ungroundable questions unchanged at 100% —
+[Cross-lingual corpus](/citenexus/scenarios/multilingual-corpus/) has the full
+before/after and its caveats.
 
 ## The answer-language rule
 
-The language of the answer is resolved by an ordered fallback chain:
+`search_languages` decides where CiteNexus **looks**; `answer_language` decides
+what language it **answers in**, and the caller states it. The retrieved evidence
+never votes.
 
-1. the reliably-detected language of the **question**;
-2. an explicit `answer_language=` override on `ask()`;
+1. an explicit `answer_language="de"` — the caller's word outranks everything;
+2. the sentinel `answer_language="auto"` — detect it from the **question**, via
+   the injected detector;
 3. the language of the ongoing conversation, if any;
-4. the dominant language among the retrieved evidence;
-5. the client's `default_answer_language` (`"en"` by default).
+4. the client's `default_answer_language` (`"en"` by default).
+
+Leaving `answer_language` unset is rung 4 — a fixed, predictable default, never a
+quiet inference.
 
 ```python
-answer = rag.ask("Quelle est la durée de conservation ?")          # answered in French
-answer = rag.ask("What is the retention period?", answer_language="de")  # forced to German
+rag.ask("Quelle est la durée de conservation ?", answer_language="auto")   # → French
+rag.ask("What is the retention period?", answer_language="de")             # forced German
+rag.ask("What is the retention period?")                                   # default_answer_language
 ```
 
-On the `Result`, `answer_language` is the guaranteed answer language, and each
-`SourceRef` keeps `passage` verbatim with its own `passage_language`; an optional
-`translation` field is additive and never replaces the passage.
+<Aside type="caution" title="Verbatim beats the answer language">
+The strict flow is extractive: the answer has to survive the faithfulness gate
+against the passage it cites. When the only support for an English question is a
+Telugu clause, "answer in the query's language" and "quote verbatim" genuinely
+conflict — and **verbatim wins**. `answer_language` then describes what the chain
+resolved, not what script the returned text is in. Read
+`sources[*].passage_language` when you need the latter. This is a known open
+limitation, written up in
+[Cross-lingual corpus](/citenexus/scenarios/multilingual-corpus/).
+</Aside>
+
+On the `Result`, `answer_language` is the language the chain resolved and the
+generator was asked for, and each `SourceRef` keeps `passage` verbatim with its
+own `passage_language`; an optional `translation` field is additive and never
+replaces the passage.
 
 <Aside type="note" title="Honest scope of the invariant">
-The answer is produced in `answer_language` and citations are never rewritten.
-There is **no** re-generation loop today: if the generated answer fails the
-faithfulness gate (or the language can't be honored), the flow **refuses** rather
-than silently retrying. Abstention over an ungrounded or off-language answer is
-the intended behavior.
+Citations are never rewritten, and the answer is never re-generated to force a
+language. The strict flow will offer the generator the **next-ranked passage**
+(bounded, a handful of attempts) when an answer fails the faithfulness gate — so
+one badly-phrased top passage does not cost you the answer — but every returned
+answer still has to be supported by the passage it cites, and when nothing passes
+the flow **refuses**. Abstention over an ungrounded answer is the intended
+behaviour.
 </Aside>
 
 ## Detecting language

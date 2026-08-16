@@ -2,8 +2,8 @@
 
 Evidence-first, multilingual, S3-native RAG library for domains where a wrong
 answer is worse than no answer (legal, medical, finance/compliance, enterprise
-search). Python library + a runnable example. Answers **only** from retrieved
-evidence; refuses or states uncertainty when evidence is weak, missing, or
+search). Python library + a runnable example. Answers **only** from
+retrieved evidence; refuses or states uncertainty when evidence is weak, missing, or
 conflicting. The achievable guarantee is **"no ungrounded claim,"** not "zero
 hallucination."
 
@@ -17,8 +17,11 @@ behavior ships. This file is *how we build it*; the spec is *what we build*.
 Keep this boundary sharp so the library grows in focus instead of sprawling.
 
 **Is:** an evidence-first, multilingual, S3-native **RAG library** (Python is the
-reference; Go / JS / Rust ports at parity). It ingests *artifacts* — PDF, docx,
-pptx, html, md, txt, csv, and images-into-evidence — and answers **only** from
+reference; Go / JS / Rust ports at parity *except the tokenizer* — Python claims
+13 scripts, the ports are still ASCII-only and abstain on non-Latin text; see
+`docs/adr/0011-tokenizer-and-non-latin-scripts.md`). It ingests
+*artifacts* — PDF, docx, pptx, html, md, txt, csv, and images-into-evidence —
+and answers **only** from
 retrieved, cited evidence, abstaining when evidence is weak, missing, or
 conflicting. Graph + wiki are **navigation over evidence** (navigate-not-cite):
 every hit resolves down to a bbox / `file:line`-cited EvidenceUnit before an
@@ -196,3 +199,26 @@ surface and the small-model escape hatch.
   (import stays `citenexus`).
 - **fastText `lid.176`** (~126 MB) is a vendored asset behind
   `LanguageDetectorPlugin` — fetch on first use / cache, not a pip dep.
+
+<!-- ctx-optimize:begin -->
+<ctx-optimize>
+  <precondition>Run `command -v ctx-optimize` first. If it is NOT installed, IGNORE this entire
+  block and answer by reading the code normally — the store is an optimization, not a requirement
+  (install later with `npm install -g @muthuishere/ctx-optimize`, or download the binary). Everything
+  below applies ONLY when the command exists.</precondition>
+  <store>MULTI-MODULE repo, pre-built knowledge store at `~/ctxoptimize/rag-cite-nexus/` — one graph per module + a navigator, 6 modules declared in `.ctxoptimize/config.json`.</store>
+  <use>Use it INSTEAD of grep-and-read chains — PICK BY INTENT: find → `ctx-optimize query "<terms>"` ·
+  inspect a symbol → `card <symbol>` · about to EDIT → `change-plan <symbol>` (callers+impact+tests, one
+  call) · blast radius → `affected <symbol>` · connection → `path <a> <b>` ·
+  list/filter (no jq): `nodes --kind K` / `edges --relation R` / `deps --scope dev`.
+  Scope follows your cwd: a module dir answers from that module (zero hits escalate repo-wide); the root
+  federates via the navigator (`~/ctxoptimize/rag-cite-nexus/navigator.md`; `--modules all|a,b` widens).
+  Output is parsed fact with exact file:line — cite it directly, do NOT re-verify in source.
+  Exhaustive literal-string sweeps stay grep's job.</use>
+  <deep-doc>The FULL usage card — verify discipline, store-vs-grep ladder, sources (databases/
+  buckets/queues/APIs by env-var name), remote push/pull, `up` — is committed at
+  `.ctxoptimize/instructions.md`. Read it before deeper store work.</deep-doc>
+  <no-local-store>Fresh clone with nothing at `~/ctxoptimize/rag-cite-nexus/`? Run `ctx-optimize up` —
+  it pulls the team's prebuilt store when the config declares one, otherwise rebuilds every module store in seconds.</no-local-store>
+</ctx-optimize>
+<!-- ctx-optimize:end -->

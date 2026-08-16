@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 )
 
@@ -64,7 +65,10 @@ func (e *OpenAIEmbedding) EmbedQuery(text string) ([]float64, error) {
 		return nil, err
 	}
 	if len(vecs) == 0 {
-		return nil, nil
+		// ADR-0014 R2: a missing vector is a failure, and it must SAY so. Handing
+		// back (nil, nil) is the same silent poison as the zero vector — the
+		// caller cannot tell "no signal" from "no answer".
+		return nil, errors.New("openai embed: empty data for a single input")
 	}
 	return vecs[0], nil
 }

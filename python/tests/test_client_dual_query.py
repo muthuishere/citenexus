@@ -30,8 +30,9 @@ class FakeReformulator:
             ),
         }
 
-    def reformulate(self, query: str) -> str | None:
+    def reformulate(self, query: str, language: str = "en") -> str | None:
         self.calls += 1
+        assert language == "en", "the default search language is still English"
         return self._table.get(query)
 
 

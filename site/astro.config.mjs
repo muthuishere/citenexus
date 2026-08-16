@@ -21,6 +21,8 @@ export default defineConfig({
 			],
 			title: 'CiteNexus',
 			tagline: 'Answers you can defend.',
+			// Remove the right-hand "On this page" table of contents site-wide.
+			tableOfContents: false,
 			description:
 				'Evidence-first, multilingual, S3-native RAG for Go, JavaScript and Python. Answers only from cited evidence — with the exact quote, page and bbox — and abstains when the evidence is weak, missing or conflicting. The guarantee is "no ungrounded claim."',
 			customCss: ['@fontsource-variable/inter', './src/styles/citenexus.css'],
@@ -36,6 +38,21 @@ export default defineConfig({
 					items: [
 						{ label: 'Quickstart', slug: 'quickstart' },
 						{ label: 'How it holds the line', slug: 'concepts' },
+					],
+				},
+				{
+					label: 'Scenarios — full builds',
+					items: [
+						{ label: 'Which scenario?', slug: 'scenarios' },
+						{ label: 'Contract review', slug: 'scenarios/contract-review' },
+						{ label: 'Conflicting sources', slug: 'scenarios/conflicting-sources' },
+						{ label: 'Wrong subject, right source', slug: 'scenarios/subject-scope' },
+						{ label: 'Regulated audit', slug: 'scenarios/regulated-audit' },
+						{ label: 'Right to erasure', slug: 'scenarios/right-to-erasure' },
+						{ label: 'Multilingual desk', slug: 'scenarios/multilingual-desk' },
+						{ label: 'Cross-lingual corpus', slug: 'scenarios/multilingual-corpus' },
+						{ label: 'Evaluate a corpus', slug: 'scenarios/evaluate-a-corpus' },
+						{ label: 'Support assistant', slug: 'scenarios/support-assistant' },
 					],
 				},
 				{
@@ -61,8 +78,10 @@ export default defineConfig({
 					items: [
 						{ label: 'Bring your own models', slug: 'models' },
 						{ label: 'Custom endpoints & auth', slug: 'custom-endpoints' },
+						{ label: 'Provider contracts', slug: 'providers' },
 						{ label: 'Reranking & retrieval', slug: 'reranking' },
 						{ label: 'Ask & abstain', slug: 'ask' },
+						{ label: 'Authority — source standing', slug: 'authority' },
 						{ label: 'The Result object', slug: 'result' },
 						{ label: 'Languages & multilingual', slug: 'languages' },
 					],

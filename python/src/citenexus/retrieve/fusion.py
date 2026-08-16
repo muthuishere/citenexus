@@ -22,6 +22,15 @@ def rrf_fuse(lists: Sequence[list[Candidate]], k: int = 60) -> list[Candidate]:
     with the highest individual ``score``; first occurrence breaks ties) with its
     score replaced by the fused score. The result is ordered by descending fused
     score, with ``eu_id`` as a deterministic tie-break.
+
+    .. deprecated::
+        The pure fusion *arithmetic* now lives once in the Rust core, exposed via
+        the ``citenexus_rrf`` FFI (ADR-0006) — that is the canonical, cross-SDK
+        implementation, byte-parity-tested against this reference
+        (``tests/core/test_rust_rrf_parity.py``). This Python function remains the
+        behavior reference that generates ``conformance/cases/rrf.json`` and the
+        native-toolchain-free fusion path; its fused ordering is identical to the
+        core's by construction.
     """
     fused_score: dict[str, float] = {}
     best_payload: dict[str, Candidate] = {}

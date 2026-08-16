@@ -38,6 +38,8 @@ pub fn extract(
             page: Some(number),
             bbox: None, // word-derived bbox lands with the conformance pass
             level: None,
+            start_line: None,
+            end_line: None,
             structure_path: vec![],
             cells: vec![],
         });

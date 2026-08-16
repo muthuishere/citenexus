@@ -1,0 +1,27 @@
+{
+  "languages": [
+    "en"
+  ],
+  "markers": [
+    "absent",
+    "cannot",
+    "denied",
+    "except",
+    "excluding",
+    "failed",
+    "fails",
+    "forbidden",
+    "neither",
+    "never",
+    "no",
+    "nobody",
+    "none",
+    "nor",
+    "not",
+    "nothing",
+    "other",
+    "prohibited",
+    "unless",
+    "without"
+  ]
+}

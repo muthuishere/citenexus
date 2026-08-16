@@ -16,6 +16,7 @@ package core
 #include <stdint.h>
 char* citenexus_extract(const uint8_t* bytes, size_t len, const char* source_type, const char* document_id);
 char* citenexus_to_markdown(const uint8_t* bytes, size_t len, const char* source_type);
+char* citenexus_rrf(const char* lists_json, int64_t k);
 void citenexus_free_string(char* s);
 const char* citenexus_core_version();
 
@@ -36,6 +37,7 @@ void citenexus_store_close(LanceStore* handle);
 import "C"
 
 import (
+	"encoding/json"
 	"errors"
 	"unsafe"
 )
@@ -43,6 +45,31 @@ import (
 // Version returns the shared Rust core's version (static string, no free needed).
 func Version() string {
 	return C.GoString(C.citenexus_core_version())
+}
+
+// Fuse reciprocal-rank-fuses ranked eu_id lists through the shared Rust core
+// (ADR-0006: rrf is pure rank arithmetic and lives once in the core). k is the
+// RRF constant (60 is standard). The fused eu_id order is byte-identical to the
+// Python reference and to every other SDK's core-backed fusion. This is the
+// canonical fusion path; the pure golang/rrf.Fuse helper is deprecated in its
+// favor. Returns an error only on a malformed core response.
+func Fuse(lists [][]string, k int) ([]string, error) {
+	payload, err := json.Marshal(lists)
+	if err != nil {
+		return nil, err
+	}
+	cLists := C.CString(string(payload))
+	defer C.free(unsafe.Pointer(cLists))
+
+	out := C.citenexus_rrf(cLists, C.int64_t(k))
+	defer C.citenexus_free_string(out)
+
+	raw := C.GoString(out)
+	var fused []string
+	if err := json.Unmarshal([]byte(raw), &fused); err != nil {
+		return nil, errors.New("citenexus: unexpected rrf response: " + raw)
+	}
+	return fused, nil
 }
 
 // Extract runs the shared Rust extractor over raw bytes and returns the

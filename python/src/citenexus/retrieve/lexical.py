@@ -48,10 +48,12 @@ class LexicalRetriever(RetrieverPlugin):
                     signal=RetrievalSignal.lexical,
                     document_id=row.get("document_id"),
                     text=row.get("text"),
+                    passage=row.get("passage"),
                     page=_page(row.get("page")),
                     language=row.get("language"),
                     checksum=row.get("checksum"),
                     raw_uri=row.get("raw_uri"),
+                    authority_meta=str(row.get("authority_meta") or ""),
                 )
             )
         return candidates

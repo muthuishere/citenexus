@@ -27,6 +27,10 @@ class GraphRetriever(RetrieverPlugin):
         self._leaf_store = leaf_store
 
     def retrieve(self, query: str, k: int) -> list[Candidate]:
+        # Deferred rebuild: a single ingest only marks the graph dirty, so the read
+        # path rebuilds lazily here before loading — the ask() always sees a graph
+        # consistent with all committed ingests.
+        self._graph_store.ensure_current(self._leaf_store)
         index = self._graph_store.load()
         if index is None:
             return []
@@ -62,6 +66,7 @@ class GraphRetriever(RetrieverPlugin):
                     language=row.get("language"),
                     checksum=row.get("checksum"),
                     raw_uri=row.get("raw_uri"),
+                    authority_meta=str(row.get("authority_meta") or ""),
                 )
             )
         return candidates[:k]

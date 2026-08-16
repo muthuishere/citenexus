@@ -13,13 +13,18 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping, Sequence
 
+from citenexus.contracts import RerankerProvider
 from citenexus.http import DEFAULT_TRANSPORT, Transport
 from citenexus.plugins.base import RerankerPlugin
 from citenexus.retrieve.types import Candidate
 
 
-class OpenAICompatibleReranker(RerankerPlugin):
-    """Cross-encoder rerank over an injected, OpenAI-compatible endpoint."""
+class OpenAICompatibleReranker(RerankerPlugin, RerankerProvider):
+    """Cross-encoder rerank over an injected, OpenAI-compatible endpoint.
+
+    Declares the published `RerankerProvider` contract alongside the existing
+    ``RerankerPlugin`` ABC (0.x policy: deprecated-not-removed).
+    """
 
     plugin_version = "openai-rerank-v1"
 

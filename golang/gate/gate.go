@@ -57,11 +57,49 @@ func ContentTokens(text string) map[string]struct{} {
 	return out
 }
 
+// ContentTokensV2 is ContentTokens over the Unicode tokenizer (ADR-0011).
+//
+// The stopword table stays English-only and stays applied unconditionally: it is
+// a fixed list of ASCII words, so it is a no-op on tokens from any other script
+// and cannot silently strip meaning there.
+func ContentTokensV2(text string) map[string]struct{} {
+	stop := loadStopwords()
+	out := make(map[string]struct{})
+	for _, tok := range tokenize.TokenizeV2(text) {
+		if _, isStop := stop[tok]; isStop {
+			continue
+		}
+		out[tok] = struct{}{}
+	}
+	return out
+}
+
 // HasRelevanceOverlap is true when question and passage share at least one
 // content token.
+//
+// FROZEN alongside IsSupported — pinned by the shipped conformance vectors. The
+// answer path uses HasRelevanceOverlapV2.
 func HasRelevanceOverlap(question, passage string) bool {
 	q := ContentTokens(question)
 	p := ContentTokens(passage)
+	for tok := range q {
+		if _, ok := p[tok]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// HasRelevanceOverlapV2 is true when question and passage share at least one
+// Unicode content token.
+//
+// Under v1 this returned false for every non-Latin script — both sides tokenized
+// to the empty set — so the relevance gate abstained before the faithfulness
+// gate ever ran. The abstention was over-determined; this is one of the two
+// places it came from (ADR-0011).
+func HasRelevanceOverlapV2(question, passage string) bool {
+	q := ContentTokensV2(question)
+	p := ContentTokensV2(passage)
 	for tok := range q {
 		if _, ok := p[tok]; ok {
 			return true

@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 
 from citenexus.answer.generator import _SYSTEM_PROMPT
+from citenexus.contracts import CompletionProvider, GeneratorProvider
 from citenexus.http import DEFAULT_TRANSPORT, Transport
 from citenexus.telemetry.events import TokenUsage
 
@@ -27,8 +28,12 @@ _ANTHROPIC_VERSION = "2023-06-01"
 _DEFAULT_MAX_TOKENS = 1024
 
 
-class AnthropicGenerator:
-    """Grounded answers over Anthropic's native ``/v1/messages`` endpoint."""
+class AnthropicGenerator(GeneratorProvider, CompletionProvider):
+    """Grounded answers over Anthropic's native ``/v1/messages`` endpoint.
+
+    Declares the same published contracts as the OpenAI-compatible generator
+    (ADR-0014 R4): one contract, idiomatic spellings, two wire protocols.
+    """
 
     plugin_version = "anthropic-generator-v1"
 
@@ -70,6 +75,25 @@ class AnthropicGenerator:
             "messages": [{"role": "user", "content": user}],
             # Both always sent — max_tokens is required, temperature keeps answers
             # deterministic (§4b).
+            "max_tokens": self._max_tokens,
+            "temperature": self._temperature,
+        }
+        body = json.dumps(request).encode("utf-8")
+        raw = self._transport(self._endpoint, body, self._headers())
+        payload = json.loads(raw)
+        self.last_usage = _usage_of(payload)
+        return _text_of(payload)
+
+    def complete(self, prompt: str) -> str:
+        """Raw single-prompt completion — the deep-ask structured-decision seam.
+
+        The same ``/v1/messages`` transport with one user message; the caller
+        (`answer/decision.py`) parses a JSON decision from the reply. NOT provider
+        tool/function-calling — the model never owns the loop's control flow.
+        """
+        request: dict[str, object] = {
+            "model": self._model,
+            "messages": [{"role": "user", "content": prompt}],
             "max_tokens": self._max_tokens,
             "temperature": self._temperature,
         }

@@ -183,6 +183,24 @@ class GraphConfig(_Section):
     max_hops: int = 2
 
 
+class AgenticConfig(_Section):
+    """Deep-ask: the bounded, library-scripted answer loop (``strategy="deep"``).
+
+    Off by default — ``strategy="strict"`` stays the unchanged single-passage path.
+    The hop cap is NOT here: it is honored from :attr:`GraphConfig.max_hops` so the
+    declared graph-traversal depth governs the loop. ``timeout_s`` is a whole-loop
+    wall clock (bounds every tool call and the final generate, not just the
+    between-hop check).
+    """
+
+    enabled: bool = False
+    max_tool_calls: int = 10
+    max_evidence_units: int = 40
+    timeout_s: float = 60.0
+    stop_when: str = "no_new_evidence"
+    search_k: int = 5
+
+
 class RetrievalConfig(_Section):
     """Fusion + retrieval knobs (§10)."""
 
@@ -201,16 +219,55 @@ class TrustConfig(_Section):
     require_citations: bool = True
 
 
+class AuthorityConfig(_Section):
+    """Source-standing weighting over already-grounded evidence (ADR-0004).
+
+    Declarative on purpose — the client builds the profile from this, so the
+    config stays serializable. ``profile="default.v1"`` (the default) ranks every
+    source equal and is byte-for-byte today's behaviour.
+
+    ``tier_order`` is LEAST-authoritative first, e.g.::
+
+        tier_order=("out-of-jurisdiction", "secondary-blog", "general-statute",
+                    "statute", "binding-appellate", "controlling-statute")
+        minimum_tier="general-statute"
+
+    ``minimum_tier`` is enforced only in ``strict`` mode: no candidate below it
+    may be cited, and if none survives the answer is an abstain. A tier name not
+    in ``tier_order`` ranks below every named tier.
+    """
+
+    profile: str = "default.v1"
+    # Read from the caller's ingest-time metadata under this key.
+    metadata_key: str = "authority_tier"
+    tier_order: tuple[str, ...] = ()
+    minimum_tier: str | None = None
+
+
 class MultilingualConfig(_Section):
     """Language detection + the answer-language invariant (§11, §11a)."""
 
     detector: str = "fasttext-lid176"
     detect_confidence_threshold: float = 0.50
+    # The answer language for every call that does not state one (§11a rung 4).
+    # It used to be reached only after an evidence-dominance inference, which is
+    # why it was named ``fallback_language``; now it IS the default, so it gets
+    # the name that says so. The old key keeps working — configs in the field set
+    # it, and a silent regression to "en" on upgrade would be worse than a
+    # deprecated alias.
+    default_answer_language: str = "en"
     fallback_language: str = "en"
     # The answer is always returned in the query's language (§11) — regenerate on
     # mismatch; citations stay verbatim and are never translated in place.
     answer_in_query_language: bool = True
     translate_citations: bool = False
+
+    @property
+    def resolved_default_answer_language(self) -> str:
+        """The effective default: the new knob, else the deprecated alias."""
+        if self.default_answer_language != "en":
+            return self.default_answer_language
+        return self.fallback_language
 
 
 class AccessControlConfig(_Section):
@@ -291,8 +348,10 @@ class CiteNexusConfig(BaseModel):
     context_model: ContextModelConfig = Field(default_factory=ContextModelConfig)
     vector_store: VectorStoreConfig = Field(default_factory=VectorStoreConfig)
     graph: GraphConfig = Field(default_factory=GraphConfig)
+    agentic: AgenticConfig = Field(default_factory=AgenticConfig)
     retrieval: RetrievalConfig = Field(default_factory=RetrievalConfig)
     trust: TrustConfig = Field(default_factory=TrustConfig)
+    authority: AuthorityConfig = Field(default_factory=AuthorityConfig)
     multilingual: MultilingualConfig = Field(default_factory=MultilingualConfig)
     access_control: AccessControlConfig = Field(default_factory=AccessControlConfig)
     plugins: dict[str, str] = Field(default_factory=dict)

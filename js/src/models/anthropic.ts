@@ -7,6 +7,7 @@
 // are ALWAYS just {"Content-Type":"application/json"} (auth is the endpoint
 // layer's job), and temperature is always sent (default 0.0 — deterministic).
 
+import type { GeneratorProvider } from "../contracts.js";
 import { wireHeaders } from "../http.js";
 import { SYSTEM_PROMPT, userMessage, type Transport } from "./openai.js";
 
@@ -43,7 +44,7 @@ export class AnthropicGenerator {
     this.headers = config.headers;
   }
 
-  answer(question: string, passage: string, answerLanguage = "en"): string {
+  async answer(question: string, passage: string, answerLanguage = "en"): Promise<string> {
     const request: Record<string, unknown> = {
       model: this.model,
       system: SYSTEM_PROMPT,
@@ -54,7 +55,7 @@ export class AnthropicGenerator {
       max_tokens: this.maxTokens,
       temperature: this.temperature,
     };
-    const raw = this.transport(
+    const raw = await this.transport(
       `${this.baseUrl}/v1/messages`,
       JSON.stringify(request),
       wireHeaders(this.headers),
@@ -69,3 +70,9 @@ export class AnthropicGenerator {
       .join("");
   }
 }
+
+// CONTRACT DECLARATION (ADR-0014 R4) — see models/embed.ts for the rationale.
+// Two clients, ONE seam: an Anthropic-shaped endpoint and an OpenAI-shaped one
+// are indistinguishable to a caller, which is the whole point of the contract.
+const _generatorContract: GeneratorProvider = null! as AnthropicGenerator;
+void _generatorContract;

@@ -1,0 +1,106 @@
+---
+title: Contract review
+description: Answer clause questions from a contract set with the exact quote, page and bbox — and get a refusal when no clause supports the question.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+**The failure this prevents:** a reviewer asks "can they subcontract without
+consent?", the model produces a fluent paragraph, and no clause in the agreement
+actually says it. The answer looks identical to a correct one.
+
+<Steps>
+
+1. **Ingest the agreement set.** PDFs keep their page and bounding box, so every
+   later citation lands on a rectangle a human can open and check.
+
+   ```python
+   for path in ["msa.pdf", "sow-2026.pdf", "dpa.pdf"]:
+       rag.ingest(path)
+   ```
+
+2. **Ask in the reviewer's own words.**
+
+   ```python
+   response = rag.ask("May the supplier subcontract without our written consent?")
+   ```
+
+3. **Read the decision before the prose.** The answer text is the last thing you
+   should trust; the decision and the citation are the first.
+
+   ```python
+   from citenexus.answer.result import Decision
+
+   if response.evidence.decision is Decision.answered:
+       src = response.sources[0]
+       print(response.answer)                       # verbatim from the contract
+       print(src.document, "p.", src.page, src.bbox)
+   else:
+       print("no clause supports this:", response.answer)
+   ```
+
+</Steps>
+
+## What you get back
+
+```text
+The Supplier shall not subcontract any part of the Services without the prior
+written consent of the Customer.
+msa.pdf p. 14 (72.0, 431.5, 523.0, 466.2)
+```
+
+The quoted sentence is **verbatim from the source**, not a paraphrase. That is
+deliberate: a paraphrased quote is no longer evidence, and a reviewer who cannot
+diff the quote against the page cannot defend the answer.
+
+## Reading the signals
+
+```python
+sig = response.evidence
+sig.decision                     # answered | refused | partial
+sig.distinct_documents           # how many DIFFERENT documents support this
+sig.unsupported_claims_removed   # sentences dropped for lacking support
+sig.all_claims_verified          # False means the answer was trimmed
+```
+
+`unsupported_claims_removed` is the one reviewers care about most. An answer is
+verified **per atomic claim**: if the model produces two sentences and only one
+is supported by the cited clause, you get the supported sentence and a count of
+what was dropped — not a fluent paragraph that is 50% invented.
+
+<Aside type="caution" title="Reordering is not support">
+A passage containing every word of a claim does **not** support it. "The Customer
+shall indemnify the Supplier" and "The Supplier shall indemnify the Customer" are
+the same bag of words and opposite obligations. The gate requires the claim's
+tokens in **order**, and requires any negation in the matched span to survive
+into the claim — so a dropped "not" is rejected rather than quoted back at you.
+</Aside>
+
+## Scoping to one matter
+
+Partitions keep matters apart, so a question about one client can never cite
+another's paper:
+
+```python
+rag.ingest("msa.pdf", acl=["matter-4471"])
+```
+
+See [Access & partitions](/citenexus/access/) for how scope becomes a hard
+pre-filter rather than a post-filter on results.
+
+## When the wrong paper is cited
+
+A clause quoted verbatim from a superseded draft, or from the counterparty's
+template instead of the executed MSA, passes the gate — the words really are
+there. Rank the versions at ingest and let strict mode refuse below the floor:
+see [Authority — grounding is not standing](/citenexus/authority/).
+
+## Where this goes wrong
+
+- **A clause split across a page break.** Chunking respects structure, but a
+  clause whose operative sentence straddles pages can be cited to the page
+  holding the sentence, not the clause heading. Check `src.page` against the
+  clause number in the quote.
+- **Definitions.** "Services" may be defined 40 pages earlier. The answer cites
+  where the obligation is stated, not where its terms are defined — ask the
+  definition as its own question.

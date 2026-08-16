@@ -2,20 +2,24 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+from citenexus.answer.agentic import AgenticAnswerFlow, LoopBudget
 from citenexus.answer.anthropic import AnthropicGenerator
+from citenexus.answer.decision import CompletionDecisionModel, DecisionModel, LoopDecision
 from citenexus.answer.flow import AnswerFlow, Generator
 from citenexus.answer.generator import OpenAICompatibleGenerator
 from citenexus.answer.result import Decision, Result
 from citenexus.config.schema import CiteNexusConfig
 from citenexus.config.signals import Signal, resolve_signals
+from citenexus.contracts import EmbeddingProvider, SingleTextEmbedder
 from citenexus.delete import DeleteResult
+from citenexus.domain.authority import AuthorityPolicy
 from citenexus.domain.partition import PartitionPath
 from citenexus.domain.trust import TrustMode
-from citenexus.embed import OpenAICompatibleEmbedding, embed_in_batches
+from citenexus.embed import OpenAICompatibleEmbedding
 from citenexus.embed import Transport as EmbedTransport
 from citenexus.evaluate import EvaluationReport, Evaluator
 from citenexus.evidence.chunked_builder import Contextualizer as ContextualizerSeam
@@ -28,6 +32,7 @@ from citenexus.ingest.pipeline import IngestPipeline, VisionDescriber
 from citenexus.ingest.result import IngestResult
 from citenexus.ingest.web import FetchTransport, crawl, fetch_url, is_url
 from citenexus.lang.detect import FastTextDetector
+from citenexus.lang.search import UnsupportedSearchLanguageError, resolve_search_languages
 from citenexus.memory import MemoryStore, MemoryTurn
 from citenexus.plugins.base import LanguageDetectorPlugin, RerankerPlugin, RetrieverPlugin
 from citenexus.retrieve.engine import RetrievalEngine
@@ -36,7 +41,7 @@ from citenexus.retrieve.reformulate import QueryReformulator, Reformulator
 from citenexus.retrieve.rerank import OpenAICompatibleReranker
 from citenexus.retrieve.structure import StructureRetriever
 from citenexus.retrieve.types import Candidate
-from citenexus.retrieve.vector import QueryEmbedder, VectorRetriever
+from citenexus.retrieve.vector import VectorRetriever
 from citenexus.storage.backend import LocalFsBackend, S3Backend, StorageBackend
 from citenexus.storage.lance_store import LanceVectorStore, StorageOptions
 from citenexus.storage.location import S3
@@ -50,6 +55,25 @@ from citenexus.telemetry.sinks import TelemetrySink
 from citenexus.vision import OpenAICompatibleVision
 from citenexus.wiki import LLMWikiDistiller, WikiDistiller, WikiRetriever, WikiStore
 
+if TYPE_CHECKING:
+    from citenexus.code import CodeFacade
+    from citenexus.reconcile.manifest import CorpusManifest
+    from citenexus.reconcile.report import ReconcileReport, RemediationReport
+    from citenexus.schema import SchemaFacade
+
+
+class _SingleHopDecider:
+    """Fallback deep-ask decider: one gather hop, then answer from that pool.
+
+    Used when no answering model exposes a ``complete()`` decision path. Never
+    reports "sufficient" and never proposes a next query, so the loop halts on
+    ``no_new_evidence`` after the first retrieval — a bounded, deterministic
+    default that still runs the pool through the per-claim single-EU gate.
+    """
+
+    def decide(self, question: str, evidence: Sequence[str]) -> LoopDecision:
+        return LoopDecision()
+
 
 class _IdentityReranker(RerankerPlugin):
     plugin_version = "identity-rerank-v1"
@@ -58,35 +82,29 @@ class _IdentityReranker(RerankerPlugin):
         return list(candidates)
 
 
-class _SingleTextEmbedder:
-    """Adapt a batch ``OpenAICompatibleEmbedding`` to the single-text seam.
+def _authority_policy(config: CiteNexusConfig) -> AuthorityPolicy:
+    """Build the ADR-0004 policy from the declarative config section.
 
-    Ingest and the vector retriever call ``embed(text) -> list[float]``; the
-    OpenAI-compatible plugin's ``embed`` takes a sequence. This wraps its
-    ``embed_query`` convenience so the batch plugin drops into the client.
+    ``default.v1`` (the default) returns the unranked policy, so a config that
+    never mentions authority produces exactly today's behaviour.
     """
+    section = config.authority
+    if section.profile == "default.v1":
+        return AuthorityPolicy.unranked()
+    if section.profile == "ordered.v1":
+        return AuthorityPolicy.ordered(
+            section.tier_order,
+            minimum_tier=section.minimum_tier,
+            key=section.metadata_key,
+        )
+    raise ValueError(
+        f"unknown authority profile {section.profile!r} (expected 'default.v1' or 'ordered.v1')"
+    )
 
-    def __init__(self, plugin: OpenAICompatibleEmbedding, batch_size: int = 32) -> None:
-        self._plugin = plugin
-        self._batch_size = batch_size
 
-    def embed(self, text: str) -> list[float]:
-        return self._plugin.embed_query(text)
-
-    def embed_many(self, texts: list[str]) -> list[list[float]]:
-        """Batched embedding — one request per ``batch_size`` texts (§10)."""
-        return embed_in_batches(self._plugin, texts, self._batch_size)
-
-
-class _ZeroEmbedder:
-    """Placeholder embedder for model-less clients (lexical-only search).
-
-    Rows still need a vector column; this writes a constant 1-dim vector that
-    is never searched — without an embedder the vector retriever is not built.
-    """
-
-    def embed(self, text: str) -> list[float]:
-        return [0.0]
+# The search-language default. `("en",)` is today's behaviour exactly: one
+# English reformulation when a reformulator is configured, nothing otherwise.
+DEFAULT_SEARCH_LANGUAGES: tuple[str, ...] = ("en",)
 
 
 class CiteNexus:
@@ -102,7 +120,7 @@ class CiteNexus:
         *,
         partition: PartitionPath | None = None,
         signals: Iterable[str | Signal] | None = None,
-        embedder: QueryEmbedder | None = None,
+        embedder: EmbeddingProvider | SingleTextEmbedder | None = None,
         generator: Generator | None = None,
         reranker: RerankerPlugin | None = None,
         detector: LanguageDetectorPlugin | None = None,
@@ -124,6 +142,9 @@ class CiteNexus:
         chunk_max_tokens: int = 450,
         chunk_overlap: int = 60,
         contextualizer: ContextualizerSeam | None = None,
+        agentic_budget: LoopBudget | None = None,
+        agentic_decider: DecisionModel | None = None,
+        authority: AuthorityPolicy | None = None,
     ) -> None:
         # A first-class S3 location carries endpoint + credential names and
         # derives BOTH storage halves; strings/paths keep the simple behavior.
@@ -152,7 +173,7 @@ class CiteNexus:
             backend=self._backend,
             base_uri=self.base_uri,
             partition=self.partition,
-            embedder=embedder or _ZeroEmbedder(),
+            embedder=embedder,
             detector=detector,
             signals=self.signals,
             storage_options=storage_options,
@@ -183,15 +204,24 @@ class CiteNexus:
             retrievers=retrievers,
             reranker=reranker or _IdentityReranker(),
         )
+        # ADR-0004: source STANDING, applied after grounding. The default is
+        # ``default.v1`` with no floor -- every tier equal, nothing dropped.
+        self._authority = authority or AuthorityPolicy.unranked()
+        self._detector = detector
         self._answer = (
             AnswerFlow(
                 generator=generator,
                 default_answer_language=default_answer_language,
+                authority=self._authority,
+                detector=detector,
             )
             if generator is not None
             else None
         )
         self._generator = generator
+        self._default_answer_language = default_answer_language
+        self._agentic_budget = agentic_budget
+        self._agentic_decider = agentic_decider
         self._sink = sink
         self._fetch_transport = fetch_transport
         self._reformulator = reformulator
@@ -232,14 +262,15 @@ class CiteNexus:
 
         # Every model is optional: no embedding endpoint -> lexical-only
         # search; no llm endpoint -> retrieve-only client (ask() explains).
-        embedder: QueryEmbedder | None = None
+        embedder: EmbeddingProvider | SingleTextEmbedder | None = None
         if config.embedding.endpoint is not None:
-            embedder = _SingleTextEmbedder(
-                OpenAICompatibleEmbedding(
-                    base_url=config.embedding.endpoint.base_url,
-                    model=config.embedding.model,
-                    transport=styled(config.embedding.endpoint, embed_transport),
-                ),
+            # The client goes straight to the model. It satisfies
+            # `EmbeddingProvider` itself, so there is no adapter between our own
+            # abstractions any more (ADR-0014).
+            embedder = OpenAICompatibleEmbedding(
+                base_url=config.embedding.endpoint.base_url,
+                model=config.embedding.model,
+                transport=styled(config.embedding.endpoint, embed_transport),
                 batch_size=config.embedding.batch_size,
             )
 
@@ -360,17 +391,29 @@ class CiteNexus:
                 if config.storage.endpoint_url.startswith("http://"):
                     storage_options["allow_http"] = "true"
 
+        # Deep-ask budget: the hop cap is honored from GraphConfig.max_hops (the
+        # declared graph-traversal depth), the rest from AgenticConfig.
+        agentic_budget = LoopBudget(
+            max_hops=config.graph.max_hops,
+            max_tool_calls=config.agentic.max_tool_calls,
+            max_evidence_units=config.agentic.max_evidence_units,
+            timeout_s=config.agentic.timeout_s,
+            stop_when=config.agentic.stop_when,
+            search_k=config.agentic.search_k,
+        )
+
         return cls(
             config.storage.bucket,
             partition=partition,
             signals=config.signals,
             embedder=embedder,
             generator=generator,
+            agentic_budget=agentic_budget,
             reranker=reranker,
             detector=detector,
             backend=backend,
             storage_options=storage_options,
-            default_answer_language=config.multilingual.fallback_language,
+            default_answer_language=config.multilingual.resolved_default_answer_language,
             top_k=config.retrieval.top_k,
             memory_max_turns=config.memory.max_turns,
             sink=sink,
@@ -383,6 +426,7 @@ class CiteNexus:
             chunk_max_tokens=config.chunking.max_tokens,
             chunk_overlap=config.chunking.overlap,
             contextualizer=contextualizer,
+            authority=_authority_policy(config),
         )
 
     def ingest(
@@ -393,16 +437,27 @@ class CiteNexus:
         document_id: str | None = None,
         source_type: Any = None,
         acl: Any = None,
+        authority: Mapping[str, str] | None = None,
     ) -> IngestResult:
+        """Ingest one source.
+
+        ``authority`` is caller-supplied source METADATA (ADR-0004) -- e.g.
+        ``{"authority_tier": "controlling-statute", "jurisdiction": "CA"}``. It
+        is carried and persisted verbatim on the Evidence Unit rows and read only
+        by an ``AuthorityProfile`` at answer time; the library never parses it and
+        never derives standing from the document's text. Omitting it leaves the
+        document unranked, which is exactly the pre-ADR-0004 behaviour.
+        """
         # A URL is just another source: fetch it, then ingest as HTML.
         if text is None and is_url(source):
-            return self._ingest_url(source, document_id=document_id, acl=acl)
+            return self._ingest_url(source, document_id=document_id, acl=acl, authority=authority)
         result = self._ingest.ingest(
             source,
             text=text,
             document_id=document_id,
             source_type=source_type,
             acl=acl,
+            authority=authority,
         )
         if result.status == "ingested":
             self._refresh_incremental(result.document_id)
@@ -412,14 +467,43 @@ class CiteNexus:
     def _refresh_incremental(self, document_id: str) -> None:
         """Per-document slow-path refresh — scales to very large corpora.
 
-        The wiki upserts ONE page (Karpathy-style compounding); the graph still
-        rebuilds (co-mention edges are corpus-wide). A full wiki rebuild —
+        The graph is only marked dirty here (co-mention edges are corpus-wide, so a
+        per-ingest full rebuild does not scale); the read path rebuilds it lazily.
+        The wiki upserts ONE page (Karpathy-style compounding). A full rebuild —
         including LLM distillation — happens via refresh_slow_path().
         """
         if Signal.graph in self.signals or Signal.community in self.signals:
-            self._graph_store.build_from_store(self._store)
+            self._graph_store.mark_dirty()
         if Signal.wiki in self.signals:
             self._wiki_store.integrate_document(document_id, self._store)
+
+    @property
+    def code(self) -> CodeFacade:
+        """The ``rag.code`` sub-facade — typed intake for source-code corpora.
+
+        ``rag.code.ingest_from(folder | git)`` acquires and ingests a code corpus
+        as symbol Evidence Units, then rebuilds the structural graph. It reads the
+        existing ``signals`` contract (raising if ``graph``/``community`` is not
+        declared) and the shared stores — no new constructor surface.
+        """
+        from citenexus.code import CodeFacade
+
+        return CodeFacade(self)
+
+    @property
+    def schema(self) -> SchemaFacade:
+        """The ``rag.schema`` sub-facade — typed intake for schema artifacts.
+
+        ``rag.schema.ingest_from(file | doc)`` ingests a SQL DDL file or an
+        OpenAPI/JSON-Schema document (a path or bytes — never a live connection
+        URL) into verbatim schema Evidence Units, then rebuilds the structural
+        graph so the injected schema distiller can emit FK / ``$ref`` edges. It
+        reads the existing ``signals`` contract (raising if ``graph``/``community``
+        is not declared) and the shared stores — no new constructor surface.
+        """
+        from citenexus.schema import SchemaFacade
+
+        return SchemaFacade(self)
 
     def revoke(self, document_id: str) -> DeleteResult:
         """Alias of :meth:`delete` — retract one document and all it produced."""
@@ -462,10 +546,15 @@ class CiteNexus:
         raw_prefix = layer_prefix(Layer.raw, self.partition)
         self._backend.delete_prefix(f"{raw_prefix}/images/{document_id}/")
 
-        # The raw blob is content-addressed and shared by identical bytes — delete
-        # it ONLY when no other document still owns the checksum (§1).
-        if not manifest.owners_of(checksum, excluding=document_id):
-            self._backend.delete_prefix(f"{raw_prefix}/{checksum}")
+        # Raw blobs are content-addressed and shared by identical bytes — delete
+        # one ONLY when no other document still owns the checksum (§1). Every
+        # checksum this document ever wrote is swept, not just the current one:
+        # a re-ingest retires the previous checksum into the manifest, and
+        # skipping those would leave the revoked document's earlier full text in
+        # the bucket while this call reported ``status="deleted"``.
+        for owned in (checksum, *manifest.superseded_of(document_id)):
+            if not manifest.owners_of(owned, excluding=document_id):
+                self._backend.delete_prefix(f"{raw_prefix}/{owned}")
 
         # Navigation must not point at revoked evidence.
         if Signal.graph in self.signals or Signal.community in self.signals:
@@ -477,13 +566,18 @@ class CiteNexus:
         manifest.forget(document_id)
         save_manifest(self._backend, self.partition, etag_name, manifest)
 
-        result = DeleteResult(
-            document_id=document_id, status="deleted", removed_eu_ids=removed
-        )
+        result = DeleteResult(document_id=document_id, status="deleted", removed_eu_ids=removed)
         self._hooks.fire("on_delete", result)
         return result
 
-    def _ingest_url(self, url: str, *, document_id: str | None, acl: Any) -> IngestResult:
+    def _ingest_url(
+        self,
+        url: str,
+        *,
+        document_id: str | None,
+        acl: Any,
+        authority: Mapping[str, str] | None = None,
+    ) -> IngestResult:
         """Fetch a URL and ingest its body via the content-appropriate extractor."""
         from citenexus.extract.types import SourceType
 
@@ -494,6 +588,7 @@ class CiteNexus:
             document_id=document_id or url,
             source_type=source_type,
             acl=acl,
+            authority=authority,
         )
         if result.status == "ingested":
             self.refresh_slow_path()
@@ -506,6 +601,7 @@ class CiteNexus:
         max_pages: int = 50,
         max_depth: int = 3,
         acl: Any = None,
+        authority: Mapping[str, str] | None = None,
     ) -> list[IngestResult]:
         """Crawl a website (same-domain, capped) and ingest each page as HTML."""
         from citenexus.extract.types import SourceType
@@ -522,6 +618,7 @@ class CiteNexus:
                 document_id=page.url,
                 source_type=SourceType.html,
                 acl=acl,
+                authority=authority,
             )
             results.append(result)
         if any(r.status == "ingested" for r in results):
@@ -541,11 +638,20 @@ class CiteNexus:
         *,
         k: int | None = None,
         conversation_id: str | None = None,
+        search_languages: Sequence[str] = DEFAULT_SEARCH_LANGUAGES,
     ) -> list[Candidate]:
+        """Retrieve for ``question``, optionally fanned out across languages.
+
+        ``search_languages`` (ADR-0013) reformulates the question into each named
+        language and fuses every retrieval through the one RRF merge. The original
+        question is always issued too, so fan-out is strictly additive. A language
+        whose script the tokenizer does not claim raises rather than returning
+        nothing.
+        """
         candidates = self._retrieve.retrieve(
             self._retrieval_query(question, conversation_id=conversation_id),
             k or self._top_k,
-            extra_queries=self._extra_queries(question),
+            extra_queries=self._extra_queries(question, search_languages),
         )
         self._hooks.fire("on_retrieve", question, candidates)
         return candidates
@@ -558,9 +664,52 @@ class CiteNexus:
         k: int | None = None,
         answer_language: str | None = None,
         conversation_id: str | None = None,
+        strategy: str = "strict",
+        search_languages: Sequence[str] = DEFAULT_SEARCH_LANGUAGES,
     ) -> Result:
+        """Answer ``question``, cite or abstain.
+
+        ``strategy="strict"`` (default) is the unchanged single-passage flow.
+        ``strategy="deep"`` runs the bounded, library-scripted agentic loop
+        (`answer/agentic.py`): gather verbatim EUs across hops, then answer through
+        the per-claim single-EU gate. Budgets bound cost; only the gate bounds truth.
+
+        ``search_languages`` (ADR-0013) decides which languages the question is
+        *searched* in; ``answer_language`` decides which language it is *answered*
+        in, and the caller states it:
+
+        * an explicit code (``"ta"``) forces that language, unconditionally;
+        * ``"auto"`` detects it from the QUESTION, via the injected detector;
+        * unspecified (``None``) is the configured ``default_answer_language`` —
+          a fixed, predictable value, never an inference.
+
+        The evidence never votes. Deriving the answer language from the retrieved
+        pool stamped 15 of 22 English questions ``te``/``ta`` on
+        ``examples/multilingual/``, and ``search_languages`` fan-out would have
+        made that worse by design.
+
+        The two knobs are independent: a fan-out changes only which passages reach
+        the gate, and citations stay verbatim in their own source language.
+        """
+        if strategy == "deep":
+            # Deep-ask writes its own follow-up queries inside the loop; it does not
+            # go through the reformulation seam. Silently ignoring a fan-out request
+            # would search fewer languages than asked, so it is refused instead.
+            if tuple(search_languages) != tuple(DEFAULT_SEARCH_LANGUAGES):
+                raise UnsupportedSearchLanguageError(
+                    "search_languages is not supported by strategy='deep': the "
+                    "agentic loop issues its own queries. Use strategy='strict'."
+                )
+            return self._deep_ask(
+                question,
+                mode=mode,
+                answer_language=answer_language,
+                conversation_id=conversation_id,
+            )
+        if strategy != "strict":
+            raise ValueError(f"unknown ask strategy {strategy!r} (expected 'strict' or 'deep')")
         retrieval_query = self._retrieval_query(question, conversation_id=conversation_id)
-        extra_queries = self._extra_queries(question)
+        extra_queries = self._extra_queries(question, search_languages)
         # The EN reformulation also counts for the relevance gate: it is the same
         # question in the evidence's language. Citations and the faithfulness
         # gate stay exactly as strict — this only widens *relevance* matching.
@@ -586,16 +735,86 @@ class CiteNexus:
             self._memory.append(conversation_id, question, result.answer)
         return result
 
-    def _extra_queries(self, question: str) -> tuple[str, ...]:
-        """The EN dual-query reformulation, when configured and useful.
+    def _deep_ask(
+        self,
+        question: str,
+        *,
+        mode: TrustMode,
+        answer_language: str | None,
+        conversation_id: str | None,
+    ) -> Result:
+        """Run the agentic deep-ask loop over this client's tools + generator."""
+        generator = self._generator
+        if generator is None:
+            self._require_answer()  # raises the clear search-only-client error
+        decider = self._agentic_decider or self._default_decider(generator)
+        flow = AgenticAnswerFlow(
+            generator=generator,  # type: ignore[arg-type]
+            decider=decider,
+            tools=self.tools(),
+            budget=self._agentic_budget or LoopBudget(),
+            default_answer_language=self._default_answer_language,
+            detector=self._detector,
+            # The SAME policy object the strict flow got. A guarantee that holds
+            # on one strategy and not the other is not a guarantee, and deep-ask
+            # must not need its own ceremony to inherit it (ADR-0004).
+            authority=self._authority,
+        )
+        result = flow.ask(question, mode=mode, answer_language=answer_language)
+        self._emit_generate(result)
+        if result.evidence.decision is Decision.answered:
+            self._hooks.fire("on_answer", result)
+        else:
+            self._hooks.fire("on_refuse", result)
+        if conversation_id is not None:
+            self._memory.append(conversation_id, question, result.answer)
+        return result
 
-        Cached inside the reformulator, so ask/retrieve/evaluate share one model
-        call per distinct question. No reformulator, or nothing gained → ().
+    def _default_decider(self, generator: Generator | None) -> DecisionModel:
+        """The loop's decision model: parse a JSON decision off the completion path.
+
+        A generator exposing ``complete()`` drives the structured single-decision
+        (no provider tool-calling). Without one, the loop makes a single gather hop
+        (never "sufficient", never a next query) and answers from that pool.
         """
+        if generator is not None and hasattr(generator, "complete"):
+            return CompletionDecisionModel(generator)  # type: ignore[arg-type]
+        return _SingleHopDecider()
+
+    def _extra_queries(
+        self,
+        question: str,
+        search_languages: Sequence[str] = DEFAULT_SEARCH_LANGUAGES,
+    ) -> tuple[str, ...]:
+        """One reformulation of ``question`` per requested search language.
+
+        Cached inside the reformulator by (question, language), so
+        ask/retrieve/evaluate share one model call per pair. A reformulation that
+        fails, comes back empty, duplicates another, or equals the original
+        contributes nothing — retrieval then proceeds with fewer queries, never an
+        error. Ordering is the caller's ``search_languages`` order, so the issued
+        queries are deterministic and inspectable at the call site.
+
+        The capability check runs FIRST, so an unsupported language costs zero
+        model calls (ADR-0013).
+        """
+        languages = resolve_search_languages(search_languages)
         if self._reformulator is None:
+            if len(languages) > 1:
+                raise UnsupportedSearchLanguageError(
+                    "search_languages requests "
+                    f"{len(languages)} languages but no reformulation endpoint is "
+                    "configured, so the fan-out would issue no extra queries and "
+                    "look like a search that simply found nothing. Enable the "
+                    "reformulation config section, or search one language."
+                )
             return ()
-        rewritten = self._reformulator.reformulate(question)
-        return (rewritten,) if rewritten else ()
+        rewritten: list[str] = []
+        for language in languages:
+            candidate = self._reformulator.reformulate(question, language.code)
+            if candidate and candidate != question and candidate not in rewritten:
+                rewritten.append(candidate)
+        return tuple(rewritten)
 
     def _emit_generate(self, result: Result) -> None:
         """Emit the answering-model telemetry event (§6c). No-op without a sink.
@@ -664,6 +883,53 @@ class CiteNexus:
     def evaluate(self, csv_path: str | Path) -> EvaluationReport:
         self._require_answer()
         return Evaluator(self.ask).evaluate(csv_path)
+
+    def reconcile(self, manifest: CorpusManifest, *, audit: bool = True) -> ReconcileReport:
+        """Diff this partition's index against a caller-declared corpus (ADR-0008).
+
+        Answers the question the cite-or-abstain guarantee cannot: not "is this
+        citation faithful to the index" but "is this index derived from exactly
+        the corpus we agreed to". Returns three disjoint sets — ``orphans``
+        (indexed, undeclared), ``missing`` (declared current, not indexed), and
+        ``drifted`` (declared and indexed, hashes disagree, including a declared
+        version that has been superseded).
+
+        Read-only: it modifies no evidence layer and deletes nothing under any
+        circumstances. By default it appends one line to the append-only
+        reconciliation audit stream; ``audit=False`` writes nothing at all.
+
+        The report is document-keyed, and says so in its own ``scope`` field — an
+        empty report means the declared corpus and the index agree at document
+        level, not that the bucket is clean.
+        """
+        from citenexus.reconcile.engine import reconcile as _reconcile
+
+        return _reconcile(
+            backend=self._backend,
+            partition=self.partition,
+            store=self._store,
+            manifest=manifest,
+            audit=audit,
+        )
+
+    def remediate(self, report: ReconcileReport, *, audit: bool = True) -> RemediationReport:
+        """Act on a reconciliation report by revoking its ORPHANS — nothing else.
+
+        Deliberately separate from :meth:`reconcile`: nothing is ever deleted as
+        a side effect of a diagnostic. Removal goes through :meth:`delete`, so a
+        remediated orphan leaves nothing behind in any layer. ``missing`` and
+        ``drifted`` need an ingest and a re-ingest respectively — neither is a
+        deletion, so neither is touched.
+        """
+        from citenexus.reconcile.engine import remediate as _remediate
+
+        return _remediate(
+            backend=self._backend,
+            partition=self.partition,
+            revoker=self,
+            report=report,
+            audit=audit,
+        )
 
     def _require_answer(self) -> AnswerFlow:
         """The answer flow, or a clear error for search-only clients."""

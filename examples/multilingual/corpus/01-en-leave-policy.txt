@@ -1,0 +1,61 @@
+SOURCE: Vaanam Technologies Private Limited — Employee Handbook, Part 2: Leave Policy
+LANGUAGE: en
+DOCUMENT: VTPL-HB-02
+EFFECTIVE: 01 April 2026
+STATUS: AUTHORED FOR THIS EXAMPLE — NOT A REAL POLICY. See PROVENANCE.md.
+
+PART 2 — LEAVE POLICY
+
+2.0 Scope. This Part applies to every confirmed employee of Vaanam Technologies
+Private Limited ("the Company") on the rolls of any Indian office. Contractors,
+interns and consultants engaged through a third-party vendor are outside the
+scope of this Part and are governed by their engagement letter.
+
+2.1 Annual earned leave. A confirmed employee accrues 18 days of earned leave
+per completed leave year. The leave year runs from 1 April to 31 March. Earned
+leave accrues at the rate of 1.5 days for each completed calendar month of
+service and is credited to the employee's leave account on the first day of the
+following month.
+
+2.2 Application and approval. An employee shall apply for earned leave through
+the leave-management system. An application for three or more consecutive
+working days requires the written approval of the reporting manager and of the
+department head. The Company may decline a leave application where the absence
+would materially affect a customer commitment, and shall record the reason in
+writing.
+
+2.3 Leave during notice. Earned leave shall not be applied for or availed during
+the notice period referred to in Part 3, except with the written approval of the
+department head. Leave availed during the notice period does not extend the
+notice period unless the approval expressly says so.
+
+2.4 Carry-forward. An employee may carry forward a maximum of 10 days of unused
+earned leave into the next leave year. Any balance above 10 days as on 31 March
+lapses and is not payable.
+
+2.5 Encashment. On separation, the unused earned leave standing to the credit of
+the employee, up to a maximum of 30 days, is encashed at the employee's basic
+salary. Allowances, variable pay and reimbursements are excluded from the
+encashment computation.
+
+2.6 Casual leave. An employee is entitled to 7 days of casual leave per leave
+year. Casual leave may not be combined with earned leave, does not carry forward
+and is not encashed.
+
+2.7 Sick leave. An employee is entitled to 12 days of sick leave per leave year.
+A medical certificate from a registered medical practitioner is required for an
+absence of more than 2 consecutive working days on sick leave.
+
+2.8 Public holidays. The Company publishes a list of 10 public holidays for each
+calendar year. The list is published by the Human Resources department not later
+than 15 December of the preceding year.
+
+2.9 Regional annexures. The Company may issue a regional leave annexure for a
+particular office. Where a regional annexure is in force, the annexure prevails
+over this Part to the extent of any inconsistency, for employees on the rolls of
+that office. A regional annexure is issued in the principal language of the
+office to which it applies and is binding in that language.
+
+2.10 Unpaid leave. Leave without pay may be sanctioned only by the department
+head and only after the employee's earned leave and casual leave balances are
+exhausted.

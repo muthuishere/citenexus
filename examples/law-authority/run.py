@@ -27,6 +27,7 @@ from pathlib import Path
 from citenexus import CiteNexus, GeminiHttpEndpoint, OpenAIHttpEndpoint
 from citenexus.answer.result import Decision, Result
 from citenexus.config.schema import (
+    AuthorityConfig,
     CiteNexusConfig,
     EmbeddingConfig,
     LLMConfig,
@@ -41,6 +42,23 @@ _CORPUS = _HERE / "corpus"
 _GOLDEN = _HERE / "golden.csv"
 _AUTHORITY = _HERE / "authority.csv"
 _OUT = _HERE / "results.json"
+
+# ADR-0004: the corpus's authority ordering, LEAST-authoritative first. This is
+# the curator's assertion about each source's STANDING -- it is metadata, not
+# something recoverable from the prose (a California statute's body text never
+# says "California").
+_TIER_ORDER = (
+    "out-of-jurisdiction",
+    "secondary-blog",
+    "general-statute",
+    "statute",
+    "binding-appellate",
+    "controlling-statute",
+)
+# For a California question, a Florida statute and a self-help blog have no
+# standing at all. Strict mode may not cite below this tier; if nothing at or
+# above it supports an answer, the honest output is "I don't know".
+_MINIMUM_TIER = "general-statute"
 
 
 def _require(*names: str) -> str:
@@ -61,6 +79,14 @@ def _config() -> CiteNexusConfig:
     base_uri = os.environ.get("CITENEXUS_BASE_URI", str(_HERE / ".citenexus-data"))
     return CiteNexusConfig(
         storage=StorageConfig(bucket=base_uri),
+        # The authority floor (ADR-0004): applied strictly AFTER grounding, as a
+        # separate selection signal. It can only ever remove already-grounded
+        # candidates, never admit a new one.
+        authority=AuthorityConfig(
+            profile="ordered.v1",
+            tier_order=_TIER_ORDER,
+            minimum_tier=_MINIMUM_TIER,
+        ),
         embedding=EmbeddingConfig(endpoint=jina, model="jina-embeddings-v3"),
         llm=LLMConfig(
             endpoint=gemini,
@@ -99,8 +125,16 @@ def main() -> None:
 
     print("== Ingest ==")
     for path in sorted(_CORPUS.glob("*.txt")):
-        res = rag.ingest(path, document_id=path.stem)
-        print(f"   {path.stem:38} -> {res.status}")
+        # The authority row is METADATA about the source, handed to the library
+        # at ingest and persisted on the EU rows. The library never derives it
+        # from the document's text.
+        row = authority.get(path.stem, {})
+        meta = {
+            "authority_tier": row.get("authority_tier", ""),
+            "authority_rank": row.get("authority_rank", ""),
+        }
+        res = rag.ingest(path, document_id=path.stem, authority=meta)
+        print(f"   {path.stem:38} -> {res.status}  [tier={meta['authority_tier'] or '-'}]")
 
     with _GOLDEN.open(newline="", encoding="utf-8") as fh:
         rows = list(csv.DictReader(fh))
@@ -139,6 +173,9 @@ def main() -> None:
             "supporting_sources": result.evidence.supporting_sources,
             "conflicts_detected": result.evidence.conflicts_detected,
             "all_claims_verified": result.evidence.all_claims_verified,
+            "authority_tier_signal": result.evidence.authority_tier,
+            "authority_floor_applied": result.evidence.authority_floor_applied,
+            "missing_evidence": list(result.missing_evidence),
             "expected": row.get("expected", ""),
             "correct_docs": correct,
             "trap_docs": traps,

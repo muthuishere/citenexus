@@ -1,0 +1,241 @@
+---
+title: Authority — grounding is not standing
+description: A perfectly grounded quote can still come from the wrong law. Authority is caller-supplied source metadata, applied strictly after grounding, with a strict-mode floor that refuses rather than cite a source with no standing.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="Requires 0.10.0 — not yet on PyPI or npm">
+This capability is on `main` and documented here, but the published packages are
+still **0.9.0**. Install from source until 0.10.0 ships.
+</Aside>
+
+A Florida statute can be quoted perfectly verbatim and still be the wrong law for
+a Texas question — and the faithfulness gate passes it, because the words really
+are in the passage. **Grounding proves the words came from the source. It says
+nothing about whether that source governs.**
+
+That is not a bug in the gate; it is the limit of what a gate can prove. Closing
+it needs a second, separate signal: the **standing** of the source.
+
+## Authority is metadata, never content
+
+A California statute's body text never says "California." Jurisdiction,
+precedential weight and publisher standing are properties *asserted by whoever
+curated the corpus* — they are not recoverable from the prose. So the seam is
+`Mapping[str, str] -> AuthorityTier`: a profile is handed metadata and never a
+passage, and therefore *cannot* read content.
+
+Two content-derived alternatives were measured and rejected before this shape was
+chosen: a query-term relevance floor (fixed 2 failures, broke 3) and a
+token-coverage threshold (the bad answers scored inside the good range). See
+[ADR-0004](https://github.com/muthuishere/citenexus/blob/main/docs/adr/0004-authority-weighting.md).
+
+## Policy and profiles
+
+`AuthorityPolicy` binds a profile to an optional minimum tier — the floor:
+
+```python
+from citenexus.domain.authority import AuthorityPolicy
+
+policy = AuthorityPolicy.unranked()          # default.v1, no floor — today's behaviour
+
+policy = AuthorityPolicy.ordered(            # ordered.v1, floored
+    (
+        "out-of-jurisdiction",
+        "secondary-blog",
+        "general-statute",
+        "statute",
+        "binding-appellate",
+        "controlling-statute",
+    ),                                        # LEAST-authoritative first
+    minimum_tier="general-statute",
+)
+```
+
+| Profile | `profile_version` | Behaviour |
+|---|---|---|
+| `DefaultAuthorityProfile` | `default.v1` | Every source gets `UNRANKED` (rank 0). All ranks equal ⇒ the stable sort is the identity ⇒ fusion order survives ⇒ existing Results are unchanged. |
+| `OrderedTierProfile` | `ordered.v1` | Rank = index in the caller-supplied `order` tuple, read from the metadata key `authority_tier` (override with `key=`). A name absent from `order` — including missing metadata — ranks `UNKNOWN_RANK` (`-1`), below every named tier. |
+
+An `AuthorityTier` is `rank: int` plus a reporting-only `name: str`. `name` is
+deliberately **excluded from comparison**: two profiles that disagree on naming
+must still produce one total order, and comparing names would make authority
+depend on spelling.
+
+The same thing declaratively, via `AuthorityConfig`:
+
+```python
+from citenexus import CiteNexus
+from citenexus.config.schema import AuthorityConfig, CiteNexusConfig, StorageConfig
+
+config = CiteNexusConfig(
+    storage=StorageConfig(bucket="./citenexus-data"),
+    authority=AuthorityConfig(
+        profile="ordered.v1",
+        tier_order=("out-of-jurisdiction", "secondary-blog", "general-statute",
+                    "statute", "binding-appellate", "controlling-statute"),
+        minimum_tier="general-statute",
+        # metadata_key="authority_tier",   # the default
+    ),
+)
+rag = CiteNexus.from_config(config)
+```
+
+<Aside type="note" title="Opt-in by construction">
+The default is `profile="default.v1"` with no `minimum_tier`. Every source
+compares equal, the authority sort is the identity, and no floor can exclude
+anything. A corpus ingested before this feature existed reads back as unranked
+rather than failing — absence is not failure.
+</Aside>
+
+## Attaching authority at ingest
+
+`ingest()` takes `authority=` — opaque caller-supplied key/value metadata, the
+same posture as `acl`, except that it *is* persisted on the Evidence Unit rows
+(as the additive `authority_meta` column) because selection happens at read time.
+`crawl()` takes the same keyword, and a URL passed to `ingest()` carries it
+through the fetch.
+
+<Steps>
+
+1. **Curate the standing of each document.** A CSV next to the corpus is enough —
+   this is the curator's assertion, not something the library derives:
+
+   ```text
+   document_id,authority_tier,authority_rank,label
+   01-ca-civ-1946_1-statute,controlling-statute,1,CA Civil Code 1946.1 — controlling statute
+   05-nolo-month-to-month-blog,secondary-blog,5,Nolo self-help summary (non-binding)
+   06-florida-83_57-statute,out-of-jurisdiction,9,Fla. Stat. 83.57 — wrong state
+   ```
+
+2. **Hand it to `ingest()` as metadata.**
+
+   ```python
+   import csv
+   from pathlib import Path
+
+   with Path("authority.csv").open(newline="", encoding="utf-8") as fh:
+       authority = {row["document_id"]: row for row in csv.DictReader(fh)}
+
+   for path in Path("corpus").glob("*.txt"):
+       row = authority.get(path.stem, {})
+       rag.ingest(
+           path,
+           document_id=path.stem,
+           authority={
+               "authority_tier": row.get("authority_tier", ""),
+               "authority_rank": row.get("authority_rank", ""),
+           },
+       )
+   ```
+
+3. **Ask in strict mode.** The floor is enforced between grounding and
+   generation; nothing else about `ask()` changes.
+
+   ```python
+   response = rag.ask("What is the notice period to end a month-to-month tenancy in Texas?")
+   ```
+
+</Steps>
+
+Omit `authority=` and the document is unranked — exactly the pre-feature
+behaviour.
+
+## Where it applies: after grounding, never inside it
+
+```text
+retrieve → fuse → rerank
+         → grounded candidates                          (faithfulness, unchanged)
+         → select_by_authority(grounded, policy, mode)   (the ONE authority function)
+         → generate → per-claim faithfulness gate        (unchanged)
+```
+
+`select_by_authority()` can only ever **reorder** or **remove** candidates that
+grounding already admitted. It cannot promote anything grounding rejected, so the
+only reachable behaviour change is *more* abstention — it is structurally
+incapable of admitting an ungrounded claim. No authority module imports the
+faithfulness predicate, and the predicate never sees a tier.
+
+## TrustMode coupling
+
+| `TrustMode` | What authority does |
+|---|---|
+| `strict` | **Enforces the floor.** Every candidate below `minimum` is dropped outright — no fallback to a lower tier — then the survivors are stably sorted by tier descending. If nothing survives, the answer is a refusal with the reason `"no evidence at or above the required authority tier"`. |
+| `normal` | **Tie-break only.** A stable sort by descending tier; nothing is dropped. |
+| `exploratory` | **Ignored entirely.** The candidates are returned untouched. |
+
+The refusal reason is deliberately distinct from "no sufficiently relevant
+evidence found": conflating *"I found nothing"* with *"what I found has no
+standing"* is exactly how an out-of-jurisdiction citation stayed invisible behind
+100% groundedness.
+
+## The signals
+
+Two additive fields on `EvidenceSignals` — modelled on `unsupported_scripts`,
+which established that a *standing/capability* signal is not an *evidence*
+judgement:
+
+```python
+sig = response.evidence
+sig.authority_tier             # str — the WEAKEST cited tier name ("" when unranked)
+sig.authority_floor_applied    # bool — the floor WITHHELD grounded evidence on this call
+```
+
+`authority_floor_applied` is not "a floor was configured" — a signal that is true
+on every strict call tells you nothing. It means *"I had evidence and declined to
+cite it for lack of standing."*
+
+Both fields are additive: no existing field on `EvidenceSignals` changed meaning
+or type, and both are empty on every Result from an unranked corpus.
+
+## Measured on the law benchmark
+
+From the live run in
+[`examples/law-authority/`](https://github.com/muthuishere/citenexus/tree/main/examples/law-authority)
+(real Jina embeddings + reranker, real Gemini generation, nothing mocked):
+
+| metric | before the floor | with the floor |
+|---|---|---|
+| out-of-jurisdiction citations | **4** | **0** |
+| `abstain_when_no_evidence` | 33% | **100%** |
+| `groundedness_rate` / `citation_rate` | 100% | 100% |
+
+The Texas question — previously answered "not less than 30 days' notice" from a
+**Florida** statute with `all_claims_verified: True` — is now a refusal. That is
+the trade the floor buys: strictly stronger abstention, never a weaker one.
+
+## What the floor does not fix
+
+<Aside type="caution" title="Wrong jurisdiction, not wrong subject">
+The authority floor is a **source-standing** filter. It is not a **subject-scope**
+filter, and no ordering over sources can be made into one.
+
+In the same benchmark, a question about a five-year **commercial** lease is
+answerable from `01-ca-civ-1946_1-statute` — a **residential periodic-tenancy**
+statute. That source's tier is `controlling-statute`, the *highest* tier in the
+corpus, so no floor can exclude it: it is genuinely the right authority, about
+the wrong subject.
+
+Subject-scope relevance is an **open gap**. CiteNexus does not currently guarantee
+that a cited source is in-scope for the question's subject matter — only that the
+words are really in it, and (with a floor) that the source has standing. Closing
+it needs a separate applicability signal.
+
+The root cause is measured, and it is not a scoring problem:
+[**Wrong subject, right source**](/citenexus/scenarios/subject-scope/) walks
+through applicability severance — the precondition that governs a rule ends up in
+a *different* Evidence Unit than the rule — and what you can do about it today.
+</Aside>
+
+Also out of scope today: model-derived authority classification and
+authority-aware conflict resolution.
+
+<Aside type="note" title="Which flows the floor covers">
+The same `select_by_authority()` — one implementation, not one per flow — is used
+by the strict flow (between grounding and generation) and by the `deep` answer
+strategy (at pool admission and at finish). Where a deep answer cites several
+Evidence Units, `authority_tier` reports the **weakest** cited tier: an answer's
+standing is the standing of its weakest support, so one binding citation cannot
+launder a weaker co-citation.
+</Aside>

@@ -1,0 +1,27 @@
+{
+  "supported_scripts": [
+    "arabic",
+    "bengali",
+    "cyrillic",
+    "devanagari",
+    "greek",
+    "han",
+    "hangul",
+    "hebrew",
+    "hiragana",
+    "katakana",
+    "latin",
+    "tamil",
+    "telugu",
+    "thai"
+  ],
+  "continuous_scripts": [
+    "han",
+    "hiragana",
+    "katakana",
+    "khmer",
+    "lao",
+    "myanmar",
+    "thai"
+  ]
+}

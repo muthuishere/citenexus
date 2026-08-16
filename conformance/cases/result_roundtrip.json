@@ -15,7 +15,11 @@
         "conflicts_detected": 0,
         "languages_in_evidence": [
           "en"
-        ]
+        ],
+        "unsupported_scripts": [],
+        "authority_tier": "",
+        "authority_floor_applied": false,
+        "loop": null
       },
       "claims": [
         {
@@ -69,7 +73,11 @@
         "all_claims_verified": false,
         "unsupported_claims_removed": 0,
         "conflicts_detected": 0,
-        "languages_in_evidence": []
+        "languages_in_evidence": [],
+        "unsupported_scripts": [],
+        "authority_tier": "",
+        "authority_floor_applied": false,
+        "loop": null
       },
       "claims": [],
       "sources": [],

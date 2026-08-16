@@ -68,6 +68,8 @@ pub fn extract(bytes: &[u8], document_id: &str, source_uri: Option<String>) -> E
         page: None,
         bbox: None,
         level: None,
+        start_line: None,
+        end_line: None,
         structure_path: vec![],
         cells: vec![],
     };

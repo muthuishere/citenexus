@@ -4,10 +4,18 @@ from __future__ import annotations
 
 import hashlib
 import time
+from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any
 
 from citenexus.config.signals import Signal, requires_slow_path, resolve_signals
+from citenexus.contracts import (
+    EmbeddingProvider,
+    SingleTextEmbedder,
+    VisionProvider,
+    embed_texts,
+)
+from citenexus.domain.authority import encode_authority_meta
 from citenexus.domain.vision import PendingVisionRequest
 from citenexus.evidence.builder import build_evidence_units
 from citenexus.evidence.chunked_builder import Contextualizer, build_chunked_units
@@ -18,7 +26,12 @@ from citenexus.ingest.result import IngestResult
 from citenexus.lang.detect import HeuristicDetector
 from citenexus.lang.fallback import resolve_answer_language
 from citenexus.storage.lance_store import LanceVectorStore, StorageOptions
-from citenexus.storage.manifest import EtagManifest, load_manifest, save_manifest
+from citenexus.storage.manifest import (
+    EtagManifest,
+    load_manifest,
+    record_tokenizer_version,
+    save_manifest,
+)
 from citenexus.storage.paths import Layer, layer_prefix, leaf_vector_uri, partition_segment
 from citenexus.telemetry.events import Stage, StageEvent
 from citenexus.vision.client import _VISION_PROMPT
@@ -39,18 +52,23 @@ if TYPE_CHECKING:
     from citenexus.worker.queue import DurableQueue
 
 
-class Embedder(Protocol):
-    def embed(self, text: str) -> list[float]: ...
+#: The embedding seam ingest accepts. `EmbeddingProvider` (batch, the contract)
+#: is preferred; `SingleTextEmbedder` is the deprecated one-at-a-time shape,
+#: still supported. Both are published in `citenexus.contracts` (ADR-0014).
+Embedder = SingleTextEmbedder
 
+#: The injected vision seam — describe an image's bytes (§9). Optional: with no
+#: describer configured, ingest is text-level only. ONE definition, published as
+#: `citenexus.contracts.VisionProvider`; satisfied by ``OpenAICompatibleVision``
+#: and ``FakeVision``.
+VisionDescriber = VisionProvider
 
-class VisionDescriber(Protocol):
-    """The injected vision seam — describe an image's bytes (§9).
-
-    Optional: with no describer configured, ingest is text-level only. Satisfied
-    by ``OpenAICompatibleVision`` and ``FakeVision``.
-    """
-
-    def describe(self, image_region: Any) -> Any: ...
+#: What goes in the vector column when the client has no embedding model at all.
+#: A lexical-only corpus still needs a value there, and it is never searched (the
+#: vector retriever is simply not constructed). Deliberately NOT modelled as a
+#: fake "zero embedder": a provider that returns constant vectors is
+#: indistinguishable from a broken one, which is the failure ADR-0014 R2 names.
+_PLACEHOLDER_VECTOR: list[float] = [0.0]
 
 
 def _raw_bytes(source: Any, text: str | None) -> bytes:
@@ -84,7 +102,7 @@ class IngestPipeline:
         backend: StorageBackend,
         base_uri: str,
         partition: PartitionPath,
-        embedder: Embedder,
+        embedder: EmbeddingProvider | SingleTextEmbedder | None = None,
         detector: LanguageDetectorPlugin | None = None,
         signals: Iterable[str | Signal] | None = None,
         storage_options: StorageOptions | None = None,
@@ -126,6 +144,7 @@ class IngestPipeline:
         document_id: str | None = None,
         source_type: SourceType | None = None,
         acl: Any = None,
+        authority: Mapping[str, str] | None = None,
     ) -> IngestResult:
         raw = _raw_bytes(source, text)
         doc_id = _document_id(source, text, document_id)
@@ -175,6 +194,8 @@ class IngestPipeline:
             key = f"{layer_prefix(Layer.knowledge, self._partition)}/structure/{doc_id}.json"
             self._backend.put_json(key, index.model_dump(mode="json"))
 
+        authority_meta = encode_authority_meta(authority)
+
         # embedding/text signal → embed + upsert into the leaf vector store.
         if Signal.embedding in self._signals or Signal.text in self._signals:
             started = time.perf_counter()
@@ -183,12 +204,24 @@ class IngestPipeline:
                 {
                     "eu_id": eu.eu_id,
                     "vector": vector,
+                    # `text` is what we EMBED -- under contextual retrieval it carries
+                    # the context model's blurb. `passage` is the verbatim source chunk
+                    # and is what we may quote. Persisting only `text` (the old shape)
+                    # meant retrieval had nothing but the enriched string, so the small
+                    # model's own prose got cited as the merchant's words.
                     "text": eu.text,
+                    "passage": eu.citation.passage,
                     "document_id": eu.document_id,
                     "language": eu.language,
                     "page": eu.citation.page if eu.citation.page is not None else -1,
                     "checksum": checksum,
                     "raw_uri": raw_uri,
+                    # ADR-0004: ONE additive column carrying the caller's opaque
+                    # source metadata. Never parsed here -- only an
+                    # AuthorityProfile reads it, at answer time. "" on every
+                    # corpus ingested before this column existed, which the
+                    # readers decode back to {} (unranked).
+                    "authority_meta": authority_meta,
                 }
                 for eu, vector in zip(units, vectors, strict=True)
             ]
@@ -205,6 +238,14 @@ class IngestPipeline:
 
         manifest.record(doc_id, checksum)
         save_manifest(self._backend, self._partition, self.ETAG, manifest)
+        # Stamp the tokenizer that built this partition's lexical terms, so an
+        # index left behind by an older tokenizer is detectable rather than
+        # silently returning nothing (ADR-0011).
+        record_tokenizer_version(self._backend, self._partition)
+        # COMMIT POINT above: the retired checksum is now durably recorded, so
+        # its blob is reachable (and revocable) even if this process dies here.
+        # Reclaiming it is a separate, restartable step for exactly that reason.
+        self._purge_superseded(manifest, doc_id, raw_prefix)
 
         return IngestResult(
             document_id=doc_id,
@@ -213,6 +254,31 @@ class IngestPipeline:
             n_units=len(units),
             enqueued_slow_path=enqueued,
         )
+
+    def _purge_superseded(self, manifest: EtagManifest, document_id: str, raw_prefix: str) -> None:
+        """Delete the raw blobs this document just retired, then forget them.
+
+        A re-ingest used to strand the previous blob: the etag map is
+        single-valued, so the old checksum was overwritten and nothing could name
+        those bytes again. Reclaiming them here keeps the bucket free of
+        unreachable copies of superseded document text — which for right-to-erasure
+        is a correctness property, not tidiness.
+
+        A retired checksum is deleted ONLY when no OTHER document currently owns
+        it (identical bytes share one content-addressed blob). That guard is what
+        makes this safe on a shared bucket: we delete nothing we cannot prove
+        belongs to this document alone. If the process dies mid-purge the retired
+        entries are still recorded, so the next ingest — or the revoke — finishes
+        the job.
+        """
+        stale = manifest.superseded_of(document_id)
+        if not stale:
+            return
+        for retired in stale:
+            if not manifest.owners_of(retired, excluding=document_id):
+                self._backend.delete_prefix(f"{raw_prefix}/{retired}")
+        manifest.clear_superseded(document_id)
+        save_manifest(self._backend, self._partition, self.ETAG, manifest)
 
     def _emit(self, stage: Stage, document_id: str, started: float) -> None:
         """Emit one ingest-stage telemetry event (§6c). No-op without a sink."""
@@ -333,12 +399,18 @@ class IngestPipeline:
             return None
 
     def _embed_texts(self, texts: list[str]) -> list[list[float]]:
-        """All EU vectors — one batched call when the embedder supports it."""
-        embed_many = getattr(self._embedder, "embed_many", None)
-        if callable(embed_many) and texts:
-            result: list[list[float]] = embed_many(texts)
-            return result
-        return [self._embedder.embed(text) for text in texts]
+        """All EU vectors — one batched call when the provider offers the contract.
+
+        Batching is chosen by ``isinstance(embedder, EmbeddingProvider)``, not by
+        probing for an attribute name: ADR-0014's point is that a capability found
+        by ``getattr`` is one no provider knows to offer.
+
+        With no embedder at all, rows still need a vector column, so each EU gets
+        the placeholder that is never searched.
+        """
+        if self._embedder is None:
+            return [list(_PLACEHOLDER_VECTOR) for _ in texts]
+        return embed_texts(self._embedder, texts)
 
     def _detect_language(self, doc: Any) -> str:
         text = " ".join(block.text for block in doc.blocks)[:2000]
