@@ -6,6 +6,7 @@
 // headers are ALWAYS just {"Content-Type":"application/json"} — no key/secret
 // ever touches a header or the request body.
 
+import type { EmbeddingProvider } from "../contracts.js";
 import { wireHeaders } from "../http.js";
 import type { Transport } from "./openai.js";
 
@@ -53,3 +54,15 @@ export class OpenAIEmbedder {
     return first;
   }
 }
+
+// CONTRACT DECLARATION (ADR-0014 R4). Python declares by inheriting the Protocol,
+// so `mypy --strict` re-checks the client on every run; TS has structural typing,
+// so the idiomatic equivalent is this static assertion — if `OpenAIEmbedder` ever
+// drifts from the published seam, `tsc --noEmit` fails HERE rather than a caller
+// failing at runtime.
+//
+// Note what the contract does NOT mention: base_url, headers, transport. Those
+// are constructor parameters of this client (R3), which is precisely why an
+// in-process provider that never opens a socket satisfies the same interface.
+const _embeddingContract: EmbeddingProvider = null! as OpenAIEmbedder;
+void _embeddingContract;

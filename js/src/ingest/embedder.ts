@@ -4,7 +4,20 @@
 // the corpus, are pure TypeScript and stay importable and unit-tested with no
 // native library built (ADR-0014 R2). Go's twin is golang/ingest/embedder.go.
 
+import {
+  checkVector as checkVectorContract,
+  isZeroVector as isZeroVectorContract,
+  type SingleTextEmbedder,
+} from "../contracts.js";
+
 /** A dense embedder: text in, one vector out. Injected by the caller.
+ *
+ * It is an ALIAS of the published `contracts.SingleTextEmbedder`, not a second
+ * declaration of the same shape (ADR-0014 R4). One definition, two names: a
+ * provider written against the published contract plugs in here with no
+ * conversion, and the two cannot drift apart. New providers should implement
+ * `contracts.EmbeddingProvider` instead — batch is the primitive, and
+ * `contracts.singleFrom` adapts one to this seam.
  *
  * ASYNC-CAPABLE (ADR-0014 R2). The old `=> number[]` was unsatisfiable by any
  * network- or model-backed provider: `tsc --strict` rejected every async
@@ -17,13 +30,14 @@
  * vector: a zero vector is not an error value, it is a valid embedding of
  * something, and once written it is indistinguishable from a document that
  * genuinely embeds near the origin. */
-export type Embedder = (text: string) => number[] | Promise<number[]>;
+export type Embedder = SingleTextEmbedder;
 
 /** Is `vec` the all-zeros vector — an embedding carrying no signal at all?
- *  Twin of the Python reference `citenexus.testing.fakes.is_zero_vector`,
- *  promoted from test-only helper to write-path guard. */
+ *  Twin of the Python reference `citenexus.testing.fakes.is_zero_vector`.
+ *  Delegates to the published contracts helper so the write path and the ask
+ *  path share ONE definition. */
 export function isZeroVector(vec: readonly number[]): boolean {
-  return vec.every((v) => v === 0);
+  return isZeroVectorContract(vec);
 }
 
 /** Reject a vector that must never become an evidence-unit row — the belt to the
@@ -33,27 +47,15 @@ export function isZeroVector(vec: readonly number[]): boolean {
  *  `dim` is the dimensionality established by this ingest run (0 for the first
  *  vector, which defines it). */
 export function checkVector(euId: string, vec: unknown, dim: number): number[] {
-  if (!Array.isArray(vec) || vec.some((v) => typeof v !== "number")) {
-    throw new TypeError(`ingest: embedder returned a non-vector for ${euId}`);
+  // The rejections themselves live in `contracts.checkVector` so the ingest
+  // write path and the ask path cannot diverge on what "a vector we refuse to
+  // index" means; ingest only adds its own prefix. The error CLASS is preserved
+  // (TypeError for a non-vector, Error otherwise) — only the message is framed.
+  try {
+    return checkVectorContract(euId, vec, dim);
+  } catch (err) {
+    if (err instanceof Error) err.message = `ingest: ${err.message}`;
+    throw err;
   }
-  const v = vec as number[];
-  if (v.length === 0) {
-    throw new Error(`ingest: embedder returned an empty vector for ${euId}`);
-  }
-  if (dim > 0 && v.length !== dim) {
-    throw new Error(
-      `ingest: embedder returned a ${v.length}-dim vector for ${euId}; this run is ${dim}-dim`,
-    );
-  }
-  if (v.some((x) => !Number.isFinite(x))) {
-    throw new Error(`ingest: embedder returned a non-finite vector for ${euId}`);
-  }
-  if (isZeroVector(v)) {
-    throw new Error(
-      `ingest: embedder returned the zero vector for ${euId} — it carries no signal ` +
-        `and would rank meaninglessly against every query`,
-    );
-  }
-  return v;
 }
 

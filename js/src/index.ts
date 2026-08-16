@@ -4,6 +4,9 @@
 // ingest) are separate subpath imports — "@muthuishere/citenexus-core/ffi" and
 // "@muthuishere/citenexus-core/ingest" — because they load a platform-native library at
 // runtime. Importing this root entry pulls in NO native dependency.
+// ADR-0014 R4: the published model seam. A provider author's ONE import — it
+// pulls in no other module, and satisfying a contract needs no CiteNexus class.
+export * from "./contracts.js";
 export * from "./tokenize/tokenize.js";
 // ADR-0011: the Unicode tokenizer that supersedes v1 on BM25 and the answer
 // path. v1 stays exported and frozen.

@@ -6,10 +6,21 @@
 
 package ingest
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/muthuishere/citenexus/golang/contracts"
+)
 
 // Embedder turns chunk text into a dense vector, or reports why it could not.
 // It is injected so the core owns orchestration and CiteNexus bundles no models.
+//
+// It is an ALIAS of the published contracts.SingleTextEmbedder, not a second
+// declaration of the same shape (ADR-0014 R4). One definition, two names: a
+// provider written against the published contract plugs in here with no
+// conversion, and the two cannot drift apart. New providers should implement
+// contracts.EmbeddingProvider instead — batch is the primitive, and
+// contracts.SingleFrom adapts one to this seam.
 //
 // The error return is the contract, not decoration (ADR-0014 R2): a model that
 // times out, refuses, rate-limits or runs out of memory must be able to SAY so.
@@ -21,9 +32,7 @@ import "fmt"
 //
 // An implementation MUST return a non-nil error rather than a placeholder vector
 // whenever it did not actually embed the text.
-type Embedder interface {
-	Embed(text string) ([]float64, error)
-}
+type Embedder = contracts.SingleTextEmbedder
 
 // EmbedderFunc adapts a plain function to Embedder (the http.HandlerFunc
 // pattern), so a client that already has the right shape plugs straight in:
@@ -37,15 +46,9 @@ func (f EmbedderFunc) Embed(text string) ([]float64, error) { return f(text) }
 
 // isZeroVector reports whether vec carries no signal at all. Twin of the Python
 // reference citenexus.testing.fakes.is_zero_vector, promoted here from test-only
-// helper to write-path guard.
-func isZeroVector(vec []float64) bool {
-	for _, v := range vec {
-		if v != 0 {
-			return false
-		}
-	}
-	return true
-}
+// helper to write-path guard. Delegates to the published contracts helper so the
+// write path and the ask path share ONE definition.
+func isZeroVector(vec []float64) bool { return contracts.IsZeroVector(vec) }
 
 // checkVector rejects a vector that must never become an Evidence-Unit row. It
 // is the belt to the Embedder error return's braces: even with a seam that CAN
@@ -60,21 +63,13 @@ func isZeroVector(vec []float64) bool {
 //   - wrong dimension — the run's vectors must be mutually comparable.
 //   - all zeros — the silent poison ADR-0014 names. Cosine against it does not
 //     raise, it just ranks meaninglessly.
+//
+// The three rejections themselves live in contracts.CheckVector so the ingest
+// write path and the ask path cannot diverge on what "a vector we refuse to
+// index" means; ingest only adds its own prefix to the message.
 func checkVector(euID string, vec []float64, dim int) error {
-	if len(vec) == 0 {
-		return fmt.Errorf("ingest: embedder returned an empty vector for %s", euID)
-	}
-	if dim > 0 && len(vec) != dim {
-		return fmt.Errorf(
-			"ingest: embedder returned a %d-dim vector for %s; this run is %d-dim",
-			len(vec), euID, dim,
-		)
-	}
-	if isZeroVector(vec) {
-		return fmt.Errorf(
-			"ingest: embedder returned the zero vector for %s — it carries no signal and "+
-				"would rank meaninglessly against every query", euID,
-		)
+	if err := contracts.CheckVector(euID, vec, dim); err != nil {
+		return fmt.Errorf("ingest: %w", err)
 	}
 	return nil
 }

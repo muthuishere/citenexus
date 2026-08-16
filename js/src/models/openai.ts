@@ -43,6 +43,7 @@ export function userMessage(question: string, passage: string, answerLanguage: s
   );
 }
 
+import type { GeneratorProvider } from "../contracts.js";
 import { wireHeaders } from "../http.js";
 
 export interface OpenAIChatConfig {
@@ -102,3 +103,7 @@ export class OpenAIChatGenerator {
     return first.message.content;
   }
 }
+
+// CONTRACT DECLARATION (ADR-0014 R4) — see models/embed.ts for the rationale.
+const _generatorContract: GeneratorProvider = null! as OpenAIChatGenerator;
+void _generatorContract;
