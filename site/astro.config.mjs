@@ -50,6 +50,7 @@ export default defineConfig({
 						{ label: 'Regulated audit', slug: 'scenarios/regulated-audit' },
 						{ label: 'Right to erasure', slug: 'scenarios/right-to-erasure' },
 						{ label: 'Multilingual desk', slug: 'scenarios/multilingual-desk' },
+						{ label: 'Cross-lingual corpus', slug: 'scenarios/multilingual-corpus' },
 						{ label: 'Evaluate a corpus', slug: 'scenarios/evaluate-a-corpus' },
 						{ label: 'Support assistant', slug: 'scenarios/support-assistant' },
 					],

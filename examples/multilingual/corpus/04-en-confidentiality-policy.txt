@@ -1,0 +1,44 @@
+SOURCE: Vaanam Technologies Private Limited — Employee Handbook, Part 9: Confidentiality and Intellectual Property
+LANGUAGE: en
+DOCUMENT: VTPL-HB-09
+EFFECTIVE: 01 April 2026
+STATUS: AUTHORED FOR THIS EXAMPLE — NOT A REAL POLICY. See PROVENANCE.md.
+
+PART 9 — CONFIDENTIALITY AND INTELLECTUAL PROPERTY
+
+9.0 Confidential information. "Confidential information" means any non-public
+information of the Company or of a customer of the Company that the employee
+receives, creates or has access to in the course of employment, including source
+code, architecture documents, customer lists, pricing, unreleased product plans,
+security findings and personnel data.
+
+9.2 Obligation. An employee shall not disclose confidential information to any
+person outside the Company, and shall not use it for any purpose other than
+performing the employee's duties. The obligation applies during employment and
+continues after the employment ends. The period for which the obligation
+continues after employment, and the consequences of a breach, are stated in the
+confidentiality annexure applicable to the employee's office; this Part does not
+itself state that period or those consequences.
+
+9.3 Company property. All notes, drawings, models, records and copies of
+confidential information, in any medium, are the property of the Company and
+shall be returned or destroyed on the last working day.
+
+9.5 Intellectual property. Every invention, design, work of authorship and
+improvement made by an employee in the course of employment, or using Company
+resources, vests in the Company. The employee shall sign any document reasonably
+required to record that vesting.
+
+9.6 Permitted disclosure. Nothing in this Part prevents an employee from making
+a disclosure required by law, or a good-faith report to a regulator or to the
+Company's whistle-blowing channel. An employee shall inform the Company's legal
+counsel of a disclosure required by law before making it, unless prevented from
+doing so by law.
+
+9.7 Personal devices. An employee shall not store confidential information on a
+personal device or a personal cloud account. Where remote access is approved,
+access is only through the Company's managed virtual desktop.
+
+9.8 Third-party confidential information. An employee shall not bring into the
+Company, or use in the course of employment, confidential information belonging
+to a previous employer or to any third party.

@@ -47,20 +47,32 @@ against the source, and the moment it is wrong there is nothing to catch it.
 is no longer the evidence, so `passage` always stays verbatim in the source
 language and any translation is additive on `translation` — never a replacement.
 
-The answer language is resolved by an ordered fallback: the detected language of
-the question, then an explicit `answer_language=` override, then the ongoing
-conversation, then the dominant language in the retrieved evidence, then the
-client default.
+The answer language is **stated by the caller**, never inferred from the corpus:
+an explicit `answer_language="de"` wins outright, the sentinel
+`answer_language="auto"` detects it from the *question*, then the ongoing
+conversation, then the client's `default_answer_language`. The retrieved evidence
+does not vote.
 
 ```python
-rag.ask("What is the retention period?", answer_language="de")   # forced German
+rag.ask("What is the retention period?", answer_language="de")     # forced German
+rag.ask("Quelle est la durée de conservation ?", answer_language="auto")  # detected
 ```
+
+<Aside type="caution" title="When verbatim and the answer language collide">
+The strict flow is extractive, so if the *only* support for a question is a
+passage in another script, the verbatim quote wins and the returned text is in
+the source's script even though `answer_language` says otherwise. Read
+`sources[*].passage_language` for what is actually in front of you. Known open
+limitation — see
+[Cross-lingual corpus](/citenexus/scenarios/multilingual-corpus/).
+</Aside>
 
 ## Script support is explicit, and narrower than "multilingual"
 
-Thirteen scripts are supported in the Python reference — Latin, Cyrillic, Greek,
-Han, Hiragana, Katakana, Hangul, Arabic, Hebrew, Devanagari, Bengali, Tamil and
-Thai. Space-less scripts (Han, Kana, Thai) are indexed by character bigrams.
+Fourteen scripts are supported in the Python reference — Latin, Cyrillic, Greek,
+Han, Hiragana, Katakana, Hangul, Arabic, Hebrew, Devanagari, Bengali, Tamil,
+Telugu and Thai. Space-less scripts (Han, Kana, Thai) are indexed by character
+bigrams.
 
 Each claimed script is backed by a golden conformance fixture. A script is
 claimed **only** when its evidence exists — the fixture generator fails if the
@@ -96,3 +108,12 @@ diacritized spelling and an undiacritized one are different tokens. This is
 conservative (it can only cause a false abstention, never a false answer) and is
 correct for the abugidas, but it means a corpus mixing both spellings will
 under-retrieve. Normalise at ingest if that describes your data.
+
+## When the question and the corpus share no tokens at all
+
+This page assumes retrieval reaches the evidence. Across a script boundary it
+often does not: an English query contributes **zero** BM25 tokens against Tamil
+or Telugu prose, and a reachable-but-superseded English document answers instead
+— verbatim, correctly cited, and wrong for the person asking. That is a separate
+build, with a measured before/after:
+[**Cross-lingual corpus**](/citenexus/scenarios/multilingual-corpus/).
