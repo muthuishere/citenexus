@@ -8,8 +8,8 @@ for per-claim verdicts the flow could not produce.
 
 from __future__ import annotations
 
-from citenexus.answer.flow import AnswerFlow
-from citenexus.answer.result import Decision
+from citenexus.answer.flow import AnswerFlow, Generator
+from citenexus.answer.result import Decision, Result
 from citenexus.retrieve.types import Candidate, RetrievalSignal
 
 _PASSAGE = "The contractor shall maintain liability insurance at all times."
@@ -53,8 +53,8 @@ class _Inverting:
         return "The liability insurance shall maintain the contractor at all times."
 
 
-def _ask(generator: object) -> object:
-    flow = AnswerFlow(generator=generator)  # type: ignore[arg-type]
+def _ask(generator: Generator) -> Result:
+    flow = AnswerFlow(generator=generator)
     return flow.ask("Must the contractor maintain liability insurance?", [_candidate()])
 
 
