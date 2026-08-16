@@ -1,0 +1,240 @@
+{
+  "attacks": [
+    {
+      "name": "legal/role-inversion",
+      "passage": "The tenant shall indemnify the landlord for damage to the property.",
+      "answer": "The landlord shall indemnify the tenant for damage to the property.",
+      "supported": false
+    },
+    {
+      "name": "finance/role-inversion",
+      "passage": "The borrower pays the lender a fee of 400 basis points.",
+      "answer": "The lender pays the borrower a fee of 400 basis points.",
+      "supported": false
+    },
+    {
+      "name": "medical/role-inversion",
+      "passage": "Ibuprofen increases the effect of warfarin in adult patients.",
+      "answer": "Warfarin increases the effect of ibuprofen in adult patients.",
+      "supported": false
+    },
+    {
+      "name": "legal/negation-deletion",
+      "passage": "The employee shall not disclose confidential information.",
+      "answer": "The employee shall disclose confidential information.",
+      "supported": false
+    },
+    {
+      "name": "operations/negation-deletion",
+      "passage": "The reactor must not be restarted without a signed safety review.",
+      "answer": "The reactor must be restarted without a signed safety review.",
+      "supported": false
+    },
+    {
+      "name": "medical/negation-deletion",
+      "passage": "This medication is not approved for patients under twelve years.",
+      "answer": "This medication is approved for patients under twelve years.",
+      "supported": false
+    },
+    {
+      "name": "finance/value-swap",
+      "passage": "Region A reported 40 million in revenue and region B reported 12 million.",
+      "answer": "Region A reported 12 million in revenue and region B reported 40 million.",
+      "supported": false
+    },
+    {
+      "name": "physics/value-swap",
+      "passage": "The sample melts at 240 kelvin and boils at 610 kelvin.",
+      "answer": "The sample melts at 610 kelvin and boils at 240 kelvin.",
+      "supported": false
+    },
+    {
+      "name": "physics/comparator-inversion",
+      "passage": "Pressure in chamber one is greater than pressure in chamber two.",
+      "answer": "Pressure in chamber two is greater than pressure in chamber one.",
+      "supported": false
+    }
+  ],
+  "controls": [
+    {
+      "name": "verbatim/legal",
+      "passage": "The contractor shall maintain liability insurance at all times during the term.",
+      "answer": "The contractor shall maintain liability insurance at all times during the term.",
+      "supported": true
+    },
+    {
+      "name": "verbatim/finance",
+      "passage": "The borrower pays the lender a fee of 400 basis points on the outstanding balance.",
+      "answer": "The borrower pays the lender a fee of 400 basis points on the outstanding balance.",
+      "supported": true
+    },
+    {
+      "name": "verbatim/medical",
+      "passage": "The recommended dose for adult patients is 500 milligrams taken once daily.",
+      "answer": "The recommended dose for adult patients is 500 milligrams taken once daily.",
+      "supported": true
+    },
+    {
+      "name": "verbatim/operations",
+      "passage": "The maintenance window opens at 02:00 UTC on Sunday and closes later.",
+      "answer": "The maintenance window opens at 02:00 UTC on Sunday and closes later.",
+      "supported": true
+    },
+    {
+      "name": "verbatim/physics",
+      "passage": "The detector threshold is calibrated to 4.5 gigaelectronvolts before each run.",
+      "answer": "The detector threshold is calibrated to 4.5 gigaelectronvolts before each run.",
+      "supported": true
+    },
+    {
+      "name": "subspan/legal",
+      "passage": "The contractor shall maintain liability insurance at all times during the term.",
+      "answer": "The contractor shall maintain liability insurance",
+      "supported": true
+    },
+    {
+      "name": "subspan/finance",
+      "passage": "The borrower pays the lender a fee of 400 basis points on the outstanding balance.",
+      "answer": "The borrower pays the lender a fee of 400 basis points",
+      "supported": true
+    },
+    {
+      "name": "subspan/medical",
+      "passage": "The recommended dose for adult patients is 500 milligrams taken once daily.",
+      "answer": "The recommended dose for adult patients is 500 milligrams",
+      "supported": true
+    },
+    {
+      "name": "subspan/operations",
+      "passage": "The maintenance window opens at 02:00 UTC on Sunday and closes later.",
+      "answer": "The maintenance window opens at 02:00 UTC on Sunday",
+      "supported": true
+    },
+    {
+      "name": "subspan/physics",
+      "passage": "The detector threshold is calibrated to 4.5 gigaelectronvolts before each run.",
+      "answer": "The detector threshold is calibrated to 4.5 gigaelectronvolts",
+      "supported": true
+    },
+    {
+      "name": "interior/legal",
+      "passage": "The contractor shall maintain liability insurance at all times during the term.",
+      "answer": "maintain liability insurance at all times",
+      "supported": true
+    },
+    {
+      "name": "interior/finance",
+      "passage": "The borrower pays the lender a fee of 400 basis points on the outstanding balance.",
+      "answer": "a fee of 400 basis points",
+      "supported": true
+    },
+    {
+      "name": "interior/medical",
+      "passage": "The recommended dose for adult patients is 500 milligrams taken once daily.",
+      "answer": "500 milligrams taken once daily",
+      "supported": true
+    },
+    {
+      "name": "interior/operations",
+      "passage": "The maintenance window opens at 02:00 UTC on Sunday and closes later.",
+      "answer": "opens at 02:00 UTC on Sunday",
+      "supported": true
+    },
+    {
+      "name": "interior/physics",
+      "passage": "The detector threshold is calibrated to 4.5 gigaelectronvolts before each run.",
+      "answer": "calibrated to 4.5 gigaelectronvolts",
+      "supported": true
+    },
+    {
+      "name": "noise/legal",
+      "passage": "The contractor shall maintain liability insurance at all times during the term.",
+      "answer": "  the CONTRACTOR shall maintain liability insurance!  ",
+      "supported": true
+    },
+    {
+      "name": "noise/finance",
+      "passage": "The borrower pays the lender a fee of 400 basis points on the outstanding balance.",
+      "answer": "The borrower pays the lender a fee — of 400 basis points.",
+      "supported": true
+    },
+    {
+      "name": "noise/medical",
+      "passage": "The recommended dose for adult patients is 500 milligrams taken once daily.",
+      "answer": "the recommended DOSE for adult patients is 500 milligrams",
+      "supported": true
+    },
+    {
+      "name": "noise/operations",
+      "passage": "The maintenance window opens at 02:00 UTC on Sunday and closes later.",
+      "answer": "The maintenance window opens at 02:00 UTC, on Sunday.",
+      "supported": true
+    },
+    {
+      "name": "noise/physics",
+      "passage": "The detector threshold is calibrated to 4.5 gigaelectronvolts before each run.",
+      "answer": "THE DETECTOR THRESHOLD IS CALIBRATED TO 4.5 GIGAELECTRONVOLTS",
+      "supported": true
+    },
+    {
+      "name": "compress/legal",
+      "passage": "The contractor shall maintain liability insurance at all times during the term.",
+      "answer": "The contractor shall maintain insurance",
+      "supported": true
+    },
+    {
+      "name": "compress/finance",
+      "passage": "The borrower pays the lender a fee of 400 basis points on the outstanding balance.",
+      "answer": "The borrower pays a fee of 400 basis points",
+      "supported": true
+    },
+    {
+      "name": "compress/medical",
+      "passage": "The recommended dose for adult patients is 500 milligrams taken once daily.",
+      "answer": "The recommended dose is 500 milligrams daily",
+      "supported": true
+    },
+    {
+      "name": "compress/operations",
+      "passage": "The maintenance window opens at 02:00 UTC on Sunday and closes later.",
+      "answer": "The maintenance window opens on Sunday",
+      "supported": true
+    },
+    {
+      "name": "compress/physics",
+      "passage": "The detector threshold is calibrated to 4.5 gigaelectronvolts before each run.",
+      "answer": "The detector threshold is 4.5 gigaelectronvolts",
+      "supported": true
+    },
+    {
+      "name": "negation-kept/legal",
+      "passage": "The employee shall not disclose confidential information.",
+      "answer": "The employee shall not disclose confidential information.",
+      "supported": true
+    },
+    {
+      "name": "negation-kept/medical",
+      "passage": "This medication is not approved for patients under twelve years.",
+      "answer": "This medication is not approved for patients under twelve",
+      "supported": true
+    },
+    {
+      "name": "negation-kept/operations",
+      "passage": "The reactor must not be restarted without a signed safety review.",
+      "answer": "The reactor must not be restarted",
+      "supported": true
+    },
+    {
+      "name": "negation-kept/finance",
+      "passage": "The lender may not charge a fee above 400 basis points.",
+      "answer": "The lender may not charge a fee",
+      "supported": true
+    },
+    {
+      "name": "negation-kept/physics",
+      "passage": "The sample does not melt below 240 kelvin.",
+      "answer": "The sample does not melt below 240 kelvin.",
+      "supported": true
+    }
+  ]
+}

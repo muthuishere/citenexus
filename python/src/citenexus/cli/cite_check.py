@@ -8,7 +8,7 @@ claim and the directory — never the passage — so an ungrounded "done" claim
 cannot fabricate its own support.
 
 Deterministic and offline: no LLM call, no S3, no running `CiteNexus` instance.
-The full-support verdict reuses `citenexus.answer.verify.is_supported` — the
+The full-support verdict reuses `citenexus.answer.verify.is_supported_v2` — the
 exact function `AnswerFlow.ask()` uses — so it can never drift from the
 library's faithfulness gate. Threshold rationale (AIS full-support proxy,
 RAGAS-style relaxation, fail-safe abstention) is in the OpenSpec change
@@ -24,7 +24,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from citenexus.answer.verify import content_tokens, is_supported
+from citenexus.answer.verify import content_tokens, is_supported_v2
 from citenexus.extract.dispatch import extract
 
 _EXCERPT_CHARS = 240
@@ -99,13 +99,13 @@ def cite_check(claim: str, evidence_dir: Path, *, min_coverage: float = 1.0) -> 
     """Decide CITED/ABSTAIN for ``claim`` against the files under ``evidence_dir``.
 
     Strict default (``min_coverage == 1.0``): CITE only when a single passage
-    fully supports the claim, per ``is_supported`` (an AIS full-support proxy).
+    fully supports the claim, per ``is_supported_v2`` (an AIS full-support proxy).
     A lower ``min_coverage`` relaxes to a content-token coverage ratio — it can
     only turn ABSTAIN into CITED, never the reverse.
     """
     claim_content = frozenset(content_tokens(claim))
     passages = _iter_passages(evidence_dir)
-    # At the strict default (1.0) we use `is_supported` — full token containment,
+    # At the strict default (1.0) we use `is_supported_v2` — ordered containment,
     # stopwords included — so the strictest setting is provably the library's own
     # gate. Any `min_coverage < 1.0` switches to a content-token ratio (stopwords
     # excluded), which is deliberately looser; 1.0 is therefore stricter than
@@ -121,7 +121,7 @@ def cite_check(claim: str, evidence_dir: Path, *, min_coverage: float = 1.0) -> 
         coverage = _coverage(claim_content, passage.text)
         if best is None or coverage > best_coverage:
             best, best_coverage = passage, coverage
-        supported = is_supported(claim, passage.text) if strict else coverage >= min_coverage
+        supported = is_supported_v2(claim, passage.text) if strict else coverage >= min_coverage
         if supported and supporter is None:
             # First supporting passage wins the citation (files iterate in sorted order).
             supporter, supporter_coverage = passage, coverage

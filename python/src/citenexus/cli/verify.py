@@ -2,7 +2,7 @@
 
 Proves each claim's tokens are contained in one of its cited passages,
 deterministically: no LLM call, no S3, no running `CiteNexus` instance. Calls
-`citenexus.answer.verify.is_supported`/`has_relevance_overlap` directly — the
+`citenexus.answer.verify.is_supported_v2`/`has_relevance_overlap` directly — the
 exact functions `AnswerFlow.ask()` uses — so this can never drift from the
 internal faithfulness gate.
 
@@ -23,7 +23,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from citenexus.answer.verify import has_relevance_overlap, is_supported
+from citenexus.answer.verify import has_relevance_overlap, is_supported_v2
 from citenexus.tokenize import tokenize
 
 REPORT_VERSION = "1"
@@ -94,7 +94,7 @@ def _verify_claim(claim: VerifyClaim, question: str | None) -> ClaimVerdict:
     matched: VerifyCitation | None = None
 
     for citation in claim.citations:
-        if is_supported(claim.text, citation.passage):
+        if is_supported_v2(claim.text, citation.passage):
             matched = citation
             best_citation = citation
             best_missing = set()
