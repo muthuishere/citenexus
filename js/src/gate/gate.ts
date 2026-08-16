@@ -6,9 +6,10 @@
 // pinned 44-word stopword list loaded from conformance/stopwords.json.
 
 import { tokenize } from "../tokenize/tokenize.js";
-import { loadData } from "../conform/fixtures.js";
+import { tokenizeV2 } from "../tokenize/tokenize-v2.js";
+import { STOPWORDS_TABLE } from "../gen/tables.js";
 
-const STOPWORDS: ReadonlySet<string> = new Set(loadData<string[]>("stopwords.json"));
+const STOPWORDS: ReadonlySet<string> = new Set(STOPWORDS_TABLE);
 
 /** Meaning-bearing tokens used by the relevance gate: tokens minus stopwords. */
 export function contentTokens(text: string): Set<string> {
@@ -19,10 +20,44 @@ export function contentTokens(text: string): Set<string> {
   return out;
 }
 
-/** True when question and passage share at least one content token. */
+/**
+ * `contentTokens` over the Unicode tokenizer (ADR-0011).
+ *
+ * The stopword table stays English-only and stays applied unconditionally: it is
+ * a fixed list of ASCII words, so it is a no-op on tokens from any other script
+ * and cannot silently strip meaning there.
+ */
+export function contentTokensV2(text: string): Set<string> {
+  const out = new Set<string>();
+  for (const tok of tokenizeV2(text)) {
+    if (!STOPWORDS.has(tok)) out.add(tok);
+  }
+  return out;
+}
+
+/** True when question and passage share at least one content token.
+ *
+ * FROZEN alongside `isSupported` — pinned by the shipped conformance vectors.
+ * The answer path uses `hasRelevanceOverlapV2`. */
 export function hasRelevanceOverlap(question: string, passage: string): boolean {
   const q = contentTokens(question);
   for (const tok of contentTokens(passage)) {
+    if (q.has(tok)) return true;
+  }
+  return false;
+}
+
+/**
+ * True when question and passage share at least one Unicode content token.
+ *
+ * Under v1 this returned false for every non-Latin script — both sides tokenized
+ * to the empty set — so the relevance gate abstained before the faithfulness
+ * gate ever ran. The abstention was over-determined; this is one of the two
+ * places it came from (ADR-0011).
+ */
+export function hasRelevanceOverlapV2(question: string, passage: string): boolean {
+  const q = contentTokensV2(question);
+  for (const tok of contentTokensV2(passage)) {
     if (q.has(tok)) return true;
   }
   return false;

@@ -25,12 +25,12 @@ abstain, and prove it on a golden set that rewards abstention.
    citation. For a regulated surface, do **not** drop to `normal`/`exploratory`.
 
    ```python
-   answer = rag.ask("What is the maximum pediatric dose of drug X?")  # strict
-   if answer.evidence.decision.value == "answered":
-       src = answer.sources[0]
-       print(answer.answer, "—", src.document, "p.", src.page)   # cite the exact passage
+   response = rag.ask("What is the maximum pediatric dose of drug X?")  # strict
+   if response.evidence.decision.value == "answered":
+       src = response.sources[0]
+       print(response.answer, "—", src.document, "p.", src.page)   # cite the exact passage
    else:
-       print("abstained:", answer.answer)   # no dosage invented
+       print("abstained:", response.answer)   # no dosage invented
    ```
 
 3. **Inject your models.** Any OpenAI-compatible embedding + LLM (+ reranker, +
@@ -73,6 +73,6 @@ retrieval. This is architectural, not a tuning knob — see the
 The same shape applies: ingest the guideline / formulary / label, keep strict mode
 so a dose or contraindication is only ever quoted from the source (never
 synthesized), cite the exact page, and put "not in the guideline" questions in the
-golden set so abstention is measured. Multilingual answers come back in the
-clinician's language while the citation stays verbatim — see
-[languages](/citenexus/languages/).
+golden set so abstention is measured. In any [supported script](/citenexus/languages/), answers come
+back in the clinician's language while the citation stays verbatim; other scripts
+abstain today — see [languages](/citenexus/languages/).

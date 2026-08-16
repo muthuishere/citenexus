@@ -17,6 +17,13 @@ from citenexus.http import (
     OpenAIHttpEndpoint,
     OpenRouterHttpEndpoint,
 )
+from citenexus.reconcile import (
+    CorpusEntry,
+    CorpusManifest,
+    DriftedDocument,
+    ReconcileReport,
+    RemediationReport,
+)
 from citenexus.storage.location import S3
 
 __version__ = "0.2.0"
@@ -25,7 +32,10 @@ __all__ = [
     "S3",
     "AnthropicHttpEndpoint",
     "CiteNexus",
+    "CorpusEntry",
+    "CorpusManifest",
     "DeleteResult",
+    "DriftedDocument",
     "GeminiHttpEndpoint",
     "Hooks",
     "HttpClient",
@@ -33,5 +43,7 @@ __all__ = [
     "OllamaHttpEndpoint",
     "OpenAIHttpEndpoint",
     "OpenRouterHttpEndpoint",
+    "ReconcileReport",
+    "RemediationReport",
     "__version__",
 ]

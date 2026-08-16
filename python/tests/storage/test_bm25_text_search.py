@@ -27,6 +27,10 @@ class ScanStore:
     def scan(self, limit: int | None = None) -> list[dict[str, Any]]:
         return self._rows
 
+    def delete_document(self, document_id: str) -> None:  # pragma: no cover - fake
+        """Part of the VectorStore protocol (document-revoke); unused by this test."""
+        return None
+
 
 def _rows() -> list[dict[str, Any]]:
     return [

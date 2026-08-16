@@ -68,13 +68,13 @@ const refused = ask(corpus, "What is the capital of France?")
 </TabItem>
 <TabItem label="Python">
 ```python
-answer = rag.ask("Can the employee disclose confidential information?")
+response = rag.ask("Can the employee disclose confidential information?")
 
-if answer.evidence.decision.value == "answered":
-    src = answer.sources[0]
-    print(answer.answer, "—", src.document, "p.", src.page, src.bbox)
+if response.evidence.decision.value == "answered":
+    src = response.sources[0]
+    print(response.answer, "—", src.document, "p.", src.page, src.bbox)
 else:
-    print("abstained:", answer.answer)     # the pinned refusal, not a fabrication
+    print("abstained:", response.answer)     # the pinned refusal, not a fabrication
 ```
 </TabItem>
 </Tabs>

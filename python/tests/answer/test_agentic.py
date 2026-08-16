@@ -280,3 +280,66 @@ def test_budget_abstain_carries_budget_reason() -> None:
     assert result.evidence.decision is Decision.refused
     assert result.evidence.loop is not None
     assert result.evidence.loop.stop_reason is LoopStopReason.budget
+
+
+# --- Conflict surfacing on the deep path (ADR-0007) ------------------------
+
+
+_NOTICE_OLD = "The notice period is 30 days."
+_NOTICE_NEW = "The notice period is 60 days."
+
+
+def _conflicting_search(query: str, k: int) -> list[Row]:
+    return [
+        _row("a", _NOTICE_OLD, document_id="policy-2019"),
+        _row("b", _NOTICE_NEW, document_id="policy-2026"),
+    ]
+
+
+def test_deep_ask_strict_abstains_on_a_conflict_citing_both_sides() -> None:
+    """The loop pools across hops, so it is MORE likely to hold two disagreeing
+    passages than a single-shot retrieval. Strict must not pick one."""
+    flow = _flow(
+        _conflicting_search,
+        [LoopDecision(sufficient=True)],
+        budget=LoopBudget(max_hops=2),
+        generator=_ScriptedGenerator(_NOTICE_OLD),
+    )
+    result = flow.ask("What is the notice period?")
+    assert result.evidence.decision is Decision.refused
+    assert result.evidence.conflicts_detected == 1
+    assert {source.passage for source in result.sources} == {_NOTICE_OLD, _NOTICE_NEW}
+    assert len(result.conflicts) == 1
+
+
+def test_deep_ask_normal_answers_and_surfaces_the_conflict() -> None:
+    from citenexus.domain.trust import TrustMode
+
+    flow = _flow(
+        _conflicting_search,
+        [LoopDecision(sufficient=True)],
+        budget=LoopBudget(max_hops=2),
+        generator=_ScriptedGenerator(_NOTICE_OLD),
+    )
+    result = flow.ask("What is the notice period?", mode=TrustMode.normal)
+    assert result.evidence.decision is Decision.answered
+    assert result.evidence.conflicts_detected == 1
+    assert "policy-2019" in result.conflicts[0]
+    assert "policy-2026" in result.conflicts[0]
+
+
+def test_deep_ask_collapses_mirrored_documents() -> None:
+    text = "The maintenance window opens at 02:00 UTC on Sunday."
+
+    def search(query: str, k: int) -> list[Row]:
+        return [_row(f"m{i}", text, document_id=f"mirror-{i}") for i in range(4)]
+
+    flow = _flow(
+        search,
+        [LoopDecision(sufficient=True)],
+        budget=LoopBudget(max_hops=2),
+        generator=_ScriptedGenerator(text),
+    )
+    result = flow.ask("When does the maintenance window open?")
+    assert result.evidence.decision is Decision.answered
+    assert result.evidence.distinct_documents == 1

@@ -71,26 +71,24 @@ def test_strict_verdict_matches_is_supported(tmp_path: Path) -> None:
     assert (report.verdict == "CITED") == is_supported(claim, passage)
 
 
-def test_known_limitation_bag_of_tokens_cannot_detect_negation(tmp_path: Path) -> None:
-    """Documented weakness (huddle 2026-07-13): the gate is bag-of-tokens.
+def test_reordered_passage_no_longer_cites(tmp_path: Path) -> None:
+    """Was a PINNED KNOWN LIMITATION (huddle 2026-07-13); fixed by ADR-0009.
 
-    A passage containing every token of the claim in a *different order* — even
-    one that means the opposite — CITES. Extractive token-containment is a
-    lexical lower bound on AIS full-support; it cannot model word order or
-    negation scope. This is accepted for v0.1 because the bias is toward
-    false-CITED only on adversarially-ordered evidence the caller controls; a
-    reranker/NLI seam is the documented upgrade path. This test PINS the
-    limitation so it can't silently change without a decision.
+    The old gate was bag-of-tokens: a passage containing every token of the
+    claim in a *different order* — even one meaning the opposite — returned
+    CITED. `spikes/library-stress/` measured that hole accepting 9 of 9 false
+    answers, identically in Python, Go and JS.
+
+    `is_supported_v2` requires the claim's tokens to appear in ORDER within a
+    bounded gap, so the scrambled passage below no longer supports the claim.
     """
-    # Passage has all of the claim's tokens ("not", "disclose", ...) but asserts
-    # the opposite intent by ordering.
+    # Every token of the claim is present, but scrambled to assert the opposite.
     evidence = _dir_with(
         tmp_path,
         {"h.txt": "Disclose freely: the employee may, and is not confidential information."},
     )
     report = cite_check("The employee may not disclose confidential information.", evidence)
-    # Bag-of-tokens containment holds → CITED, despite opposite meaning.
-    assert report.verdict == "CITED"
+    assert report.verdict == "ABSTAIN"
 
 
 def test_partial_support_abstains_under_strict_default(tmp_path: Path) -> None:

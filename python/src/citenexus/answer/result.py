@@ -65,6 +65,14 @@ class EvidenceSignals(BaseModel):
     unsupported_claims_removed: int = 0
     conflicts_detected: int = 0
     languages_in_evidence: tuple[str, ...] = ()
+    # Scripts present in the question or the evidence that the tokenizer does not
+    # claim to support (ADR-0011). A CAPABILITY signal, never an evidence
+    # judgement: a refusal carrying a non-empty value here means "I cannot read
+    # this script", which is a different thing from "the evidence isn't there".
+    # Returning the evidence-absent refusal for a capability gap is exactly what
+    # let the ASCII-only tokenizer hide. Empty on every Latin-script Result, so
+    # existing Results serialize unchanged.
+    unsupported_scripts: tuple[str, ...] = ()
     # Present only for the agentic deep strategy; ``None`` on the strict flow so
     # existing Results are byte-identical.
     loop: LoopSignals | None = None

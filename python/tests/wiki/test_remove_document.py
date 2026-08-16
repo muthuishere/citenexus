@@ -24,6 +24,16 @@ class FakeLeafStore:
     def scan(self, limit: int | None = None) -> list[dict[str, Any]]:
         return self.rows
 
+    def upsert(self, rows: Any) -> None:  # pragma: no cover - fake
+        return None
+
+    def search(self, vector: Any, limit: int = 10) -> list[dict[str, Any]]:  # pragma: no cover
+        return []
+
+    def delete_document(self, document_id: str) -> None:  # pragma: no cover - fake
+        """Part of the VectorStore protocol (document-revoke); unused by this test."""
+        return None
+
 
 def _store(tmp_path: Path) -> WikiStore:
     backend = LocalFsBackend(tmp_path)
@@ -41,7 +51,7 @@ def _store(tmp_path: Path) -> WikiStore:
 
 def test_remove_document_drops_page_and_index_entry(tmp_path: Path) -> None:
     wiki = _store(tmp_path)
-    backend = wiki._backend  # type: ignore[attr-defined]
+    backend = wiki._backend
     assert backend.exists(wiki.page_json_key("wiki:nda"))
 
     wiki.remove_document("nda")
@@ -56,7 +66,7 @@ def test_remove_document_drops_page_and_index_entry(tmp_path: Path) -> None:
 def test_remove_document_logs_a_delete_line(tmp_path: Path) -> None:
     wiki = _store(tmp_path)
     wiki.remove_document("nda")
-    log = wiki._backend.get_bytes(wiki.log_key).decode("utf-8")  # type: ignore[attr-defined]
+    log = wiki._backend.get_bytes(wiki.log_key).decode("utf-8")
     assert "delete | nda" in log
 
 

@@ -17,7 +17,8 @@ import unicodedata
 from pathlib import Path
 from typing import Any
 
-from citenexus.answer.generator import _SYSTEM_PROMPT
+from citenexus.answer.anthropic import AnthropicGenerator
+from citenexus.answer.generator import _SYSTEM_PROMPT, OpenAICompatibleGenerator
 from citenexus.answer.result import (
     Claim,
     Decision,
@@ -26,18 +27,17 @@ from citenexus.answer.result import (
     Result,
     SourceRef,
 )
+from citenexus.answer.segment import split_claims
 from citenexus.answer.verify import (
     _STOPWORDS,
     content_tokens,
     has_relevance_overlap,
     is_supported,
+    is_supported_v2,
 )
-from citenexus.answer.anthropic import AnthropicGenerator
-from citenexus.answer.generator import OpenAICompatibleGenerator
+from citenexus.domain.partition import PartitionPath
 from citenexus.domain.trust import TrustMode
 from citenexus.embed.client import OpenAICompatibleEmbedding
-from citenexus.testing.fakes import FakeEmbedding, FakeLLM
-from citenexus.domain.partition import PartitionPath
 from citenexus.evidence.builder import build_evidence_units
 from citenexus.evidence.chunked_builder import build_chunked_units
 from citenexus.evidence.chunker import chunk_text
@@ -58,7 +58,14 @@ from citenexus.retrieve.fusion import rrf_fuse
 from citenexus.retrieve.reformulate import _PROMPT as _REFORMULATE_PROMPT
 from citenexus.retrieve.types import Candidate, RetrievalSignal
 from citenexus.storage.bm25 import Bm25TextSearch
-from citenexus.testing.fakes import tokenize
+from citenexus.testing.fakes import FakeEmbedding, FakeLLM, tokenize
+from citenexus.tokenize import (
+    CONTINUOUS_SCRIPTS,
+    SUPPORTED_SCRIPTS,
+    TOKENIZER_VERSION,
+    tokenize_v2,
+    unsupported_scripts,
+)
 from citenexus.vision.client import _VISION_PROMPT
 from citenexus.vision.describe import FakeVision
 from citenexus.vision.fulfill import fulfill_vision_requests
@@ -503,8 +510,9 @@ def _hermetic_ask(question: str) -> dict[str, Any]:
     """The reference cite-or-abstain outcome for ``question`` over the corpus.
 
     Reuses the exact pinned primitives: FakeEmbedding (§4 hash), content-token
-    grounding (relevance gate), the extractive FakeLLM, and is_supported (the
-    faithfulness gate). Vectors are L2-normalized, so cosine == dot product.
+    grounding (relevance gate), the extractive FakeLLM, and the per-claim
+    faithfulness gate (``split_claims`` + ``is_supported_v2``). Vectors are
+    L2-normalized, so cosine == dot product.
     """
     embedder = FakeEmbedding()
     llm = FakeLLM()
@@ -523,14 +531,27 @@ def _hermetic_ask(question: str) -> dict[str, Any]:
     q_terms = content_tokens(question)
     grounded = [r for r in ranked if q_terms & content_tokens(str(r["text"]))]
     if not grounded:
-        return {"decision": Decision.refused.value, "answer": _REFUSAL,
-                "document": None, "passage": None, "eu_id": None}
+        return {
+            "decision": Decision.refused.value,
+            "answer": _REFUSAL,
+            "document": None,
+            "passage": None,
+            "eu_id": None,
+        }
     top = grounded[0]
     passage = str(top["text"])
-    answer = llm.answer(question, passage)
-    if not is_supported(answer, passage):
-        return {"decision": Decision.refused.value, "answer": _REFUSAL,
-                "document": None, "passage": None, "eu_id": None}
+    generated = llm.answer(question, passage)
+    # Per-atomic-claim gate, mirroring SmokePipeline.ask (ADR-0009).
+    supported = [c for c in split_claims(generated) if is_supported_v2(c, passage)]
+    if not supported:
+        return {
+            "decision": Decision.refused.value,
+            "answer": _REFUSAL,
+            "document": None,
+            "passage": None,
+            "eu_id": None,
+        }
+    answer = " ".join(supported)
     return {
         "decision": Decision.answered.value,
         "answer": answer,
@@ -651,7 +672,11 @@ def _wire_requests() -> list[dict[str, Any]]:
             "name": "openai chat answer, temperature always sent, no max_tokens",
             "client": "openai_chat",
             "config": {"base_url": "https://api.example.com/v1", "model": "qwen2.5"},
-            "inputs": {"question": _WIRE_QUESTION, "passage": _WIRE_PASSAGE, "answer_language": "en"},
+            "inputs": {
+                "question": _WIRE_QUESTION,
+                "passage": _WIRE_PASSAGE,
+                "answer_language": "en",
+            },
             "expected_request": cap.call,
         }
     )
@@ -665,8 +690,16 @@ def _wire_requests() -> list[dict[str, Any]]:
         {
             "name": "openai chat answer with max_tokens and non-en language",
             "client": "openai_chat",
-            "config": {"base_url": "https://api.example.com/v1", "model": "qwen2.5", "max_tokens": 256},
-            "inputs": {"question": _WIRE_QUESTION, "passage": _WIRE_PASSAGE, "answer_language": "de"},
+            "config": {
+                "base_url": "https://api.example.com/v1",
+                "model": "qwen2.5",
+                "max_tokens": 256,
+            },
+            "inputs": {
+                "question": _WIRE_QUESTION,
+                "passage": _WIRE_PASSAGE,
+                "answer_language": "de",
+            },
             "expected_request": cap.call,
         }
     )
@@ -681,7 +714,11 @@ def _wire_requests() -> list[dict[str, Any]]:
             "name": "anthropic messages: top-level system + default max_tokens 1024",
             "client": "anthropic",
             "config": {"base_url": "https://api.anthropic.com", "model": "claude-x"},
-            "inputs": {"question": _WIRE_QUESTION, "passage": _WIRE_PASSAGE, "answer_language": "en"},
+            "inputs": {
+                "question": _WIRE_QUESTION,
+                "passage": _WIRE_PASSAGE,
+                "answer_language": "en",
+            },
             "expected_request": cap.call,
         }
     )
@@ -707,11 +744,21 @@ def _wire_responses() -> list[dict[str, Any]]:
     responses: list[dict[str, Any]] = []
 
     # OpenAI chat: reply = choices[0].message.content.
-    chat_body = {"choices": [{"message": {"content": _WIRE_ANSWER}}], "usage": {"prompt_tokens": 12, "completion_tokens": 8}}
+    chat_body = {
+        "choices": [{"message": {"content": _WIRE_ANSWER}}],
+        "usage": {"prompt_tokens": 12, "completion_tokens": 8},
+    }
     chat_out = OpenAICompatibleGenerator(
         base_url="https://x", model="m", transport=lambda _u, _b, _h: json.dumps(chat_body).encode()
     ).answer(_WIRE_QUESTION, _WIRE_PASSAGE, "en")
-    responses.append({"name": "openai chat parse", "client": "openai_chat", "response_body": chat_body, "expected": chat_out})
+    responses.append(
+        {
+            "name": "openai chat parse",
+            "client": "openai_chat",
+            "response_body": chat_body,
+            "expected": chat_out,
+        }
+    )
 
     # Anthropic: concat content[].text, non-text blocks ignored, order kept.
     anth_body = {
@@ -725,14 +772,28 @@ def _wire_responses() -> list[dict[str, Any]]:
     anth_out = AnthropicGenerator(
         base_url="https://x", model="m", transport=lambda _u, _b, _h: json.dumps(anth_body).encode()
     ).answer(_WIRE_QUESTION, _WIRE_PASSAGE, "en")
-    responses.append({"name": "anthropic parse multi-block text-only", "client": "anthropic", "response_body": anth_body, "expected": anth_out})
+    responses.append(
+        {
+            "name": "anthropic parse multi-block text-only",
+            "client": "anthropic",
+            "response_body": anth_body,
+            "expected": anth_out,
+        }
+    )
 
     # Embeddings: data[].embedding as float vectors, input order preserved.
     emb_body = {"data": [{"embedding": [0.1, 0.2, 0.3]}, {"embedding": [0.4, 0.5, 0.6]}]}
     emb_out = OpenAICompatibleEmbedding(
         base_url="https://x", model="m", transport=lambda _u, _b, _h: json.dumps(emb_body).encode()
     ).embed(["a", "b"])
-    responses.append({"name": "openai embeddings parse", "client": "openai_embed", "response_body": emb_body, "expected": emb_out})
+    responses.append(
+        {
+            "name": "openai embeddings parse",
+            "client": "openai_embed",
+            "response_body": emb_body,
+            "expected": emb_out,
+        }
+    )
     return responses
 
 
@@ -830,8 +891,14 @@ _GRAPH_CORPORA: list[dict[str, Any]] = [
     {
         "name": "two overlapping docs",
         "rows": [
-            {"eu_id": "d1::0", "text": "The employee cannot disclose confidential salary information."},
-            {"eu_id": "d2::0", "text": "Confidential salary information stays private under the policy."},
+            {
+                "eu_id": "d1::0",
+                "text": "The employee cannot disclose confidential salary information.",
+            },
+            {
+                "eu_id": "d2::0",
+                "text": "Confidential salary information stays private under the policy.",
+            },
         ],
     },
     {
@@ -955,7 +1022,7 @@ def _ml_tokenize_cases() -> list[dict[str, Any]]:
 
 _ML_BM25_CASES: list[dict[str, Any]] = [
     {
-        "name": "turkish dotted-I: query 'İstanbul' -> tokens i + stanbul",
+        "name": "turkish dotted-I: query 'İstanbul' -> one token i+U+0307+stanbul",
         "rows": [
             {"eu_id": "tr::0", "text": "İstanbul Büyükşehir Belediyesi kararı"},
             {"eu_id": "tr::1", "text": "Ankara başkenttir ve merkezdir"},
@@ -963,7 +1030,7 @@ _ML_BM25_CASES: list[dict[str, Any]] = [
         "query": "İstanbul",
     },
     {
-        "name": "german ß: query 'Straße' -> tokens stra + e",
+        "name": "german ß: query 'Straße' case-folds to one token strasse",
         "rows": [
             {"eu_id": "de::0", "text": "Die große Straße ist heute gesperrt"},
             {"eu_id": "de::1", "text": "Eine kleine Gasse ohne jede Sperrung"},
@@ -971,7 +1038,7 @@ _ML_BM25_CASES: list[dict[str, Any]] = [
         "query": "Straße",
     },
     {
-        "name": "cjk text ranks only by its embedded latin/digit tokens",
+        "name": "cjk text ranks by latin/digit tokens AND its han bigrams",
         "rows": [
             {"eu_id": "cjk::0", "text": "東京 Tokyo 2024 annual report"},
             {"eu_id": "cjk::1", "text": "大阪 Osaka quarterly summary"},
@@ -1071,6 +1138,195 @@ def _multilingual_cases() -> dict[str, Any]:
     }
 
 
+# --------------------------------------------------------------------------- #
+# polarity.json / segmentation.json — ADR-0010 tier-2 tables.
+# The Python module is the reference (conformance/README.md §0); every port's
+# copy is GENERATED from these files, never hand-maintained.
+# --------------------------------------------------------------------------- #
+
+
+def _polarity_table() -> dict[str, Any]:
+    from citenexus.answer.tables import POLARITY_LANGUAGES, POLARITY_MARKERS
+
+    return {
+        "languages": list(POLARITY_LANGUAGES),
+        "markers": sorted(POLARITY_MARKERS),
+    }
+
+
+def _conflict_table() -> dict[str, Any]:
+    """ADR-0007 conflict tables + the pinned thresholds.
+
+    ``max_residual`` is data here on purpose: a port that quietly relaxes it to 2
+    buys 4pp of recall and pays 15pp of false abstention, and the only way to
+    catch that across languages is to pin the number in the shared contract.
+    """
+    from citenexus.answer import conflict as conflict_module
+    from citenexus.answer.tables import (
+        CONFLICT_ANTONYMS,
+        CONFLICT_NEGATIONS,
+        CONFLICT_REPORT_BIGRAMS,
+        CONFLICT_SCOPE_MARKERS,
+        MEASUREMENT_UNITS,
+    )
+
+    return {
+        "languages": ["en"],
+        "negations": sorted(CONFLICT_NEGATIONS),
+        "antonyms": sorted(sorted(pair) for pair in CONFLICT_ANTONYMS),
+        "report_bigrams": sorted(list(pair) for pair in CONFLICT_REPORT_BIGRAMS),
+        "scope_markers": sorted(CONFLICT_SCOPE_MARKERS),
+        "measurement_units": sorted(MEASUREMENT_UNITS),
+        "thresholds": {
+            "subject_overlap": conflict_module.SUBJECT_OVERLAP,
+            "max_symdiff": conflict_module.MAX_SYMDIFF,
+            "max_residual": conflict_module.MAX_RESIDUAL,
+            "min_content": conflict_module.MIN_CONTENT,
+            "duplicate_jaccard": conflict_module.DUPLICATE_JACCARD,
+            "duplicate_max_length_delta": conflict_module.DUPLICATE_MAX_LENGTH_DELTA,
+            "top_k": conflict_module.CONFLICT_TOP_K,
+        },
+    }
+
+
+def _conflict_cases() -> dict[str, Any]:
+    """Every ADR-0007 fixture with its expected verdict.
+
+    The hard negatives are the load-bearing half: a port that reproduces the true
+    conflicts but not the *declines* has a higher false-abstention rate than this
+    one, and nothing inside it would say so.
+    """
+    import sys
+
+    if str(_REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(_REPO_ROOT))
+    from tests.answer.test_conflict import (
+        DUPLICATE_CASES,
+        HARD_NEGATIVES,
+        HELDOUT_CONFLICTS,
+        HELDOUT_NEGATIVES,
+        TRUE_CONFLICTS,
+        UNRELATED,
+    )
+
+    from citenexus.answer.conflict import detect_conflict, is_near_duplicate
+
+    def _pairs(fixtures: list[tuple[str, str, str, str]]) -> list[dict[str, Any]]:
+        rows = []
+        for domain, label, left, right in fixtures:
+            finding = detect_conflict(left, right)
+            rows.append(
+                {
+                    "domain": domain,
+                    "label": label,
+                    "left": left,
+                    "right": right,
+                    "conflict": finding is not None,
+                    "rule": finding.rule if finding else None,
+                }
+            )
+        return rows
+
+    return {
+        "true_conflicts": _pairs(TRUE_CONFLICTS),
+        "hard_negatives": _pairs(HARD_NEGATIVES),
+        "unrelated": _pairs(UNRELATED),
+        "heldout_conflicts": _pairs(HELDOUT_CONFLICTS),
+        "heldout_negatives": _pairs(HELDOUT_NEGATIVES),
+        "near_duplicates": [
+            {
+                "label": label,
+                "left": left,
+                "right": right,
+                "collapses": is_near_duplicate(left, right) is not None,
+            }
+            for label, left, right, _ in DUPLICATE_CASES
+        ],
+        # The tokenization trap, with its own vector: a digit-LEADING token is a
+        # measured value, a letter-leading token containing digits is an
+        # IDENTIFIER and must stay in the content set.
+        "identifier_tokenization": [
+            {
+                "left": "The p50 latency budget is 200 ms.",
+                "right": "The p99 latency budget is 900 ms.",
+                "conflict": detect_conflict(
+                    "The p50 latency budget is 200 ms.", "The p99 latency budget is 900 ms."
+                )
+                is not None,
+            },
+            {
+                "left": "The latency budget is 200 ms.",
+                "right": "The latency budget is 900 ms.",
+                "conflict": detect_conflict(
+                    "The latency budget is 200 ms.", "The latency budget is 900 ms."
+                )
+                is not None,
+            },
+        ],
+    }
+
+
+def _segmentation_table() -> dict[str, Any]:
+    from citenexus.answer.tables import ABBREVIATIONS, TERMINATORS
+
+    return {
+        "terminators": list(TERMINATORS),
+        "abbreviations": sorted(ABBREVIATIONS),
+    }
+
+
+# --------------------------------------------------------------------------- #
+# cases/faithful_v2.json — ADR-0009 ordered containment + polarity guard.
+# The nine adversarial fixtures (each answer FALSE w.r.t. its passage) and the
+# control set. Ports must reproduce every verdict exactly.
+# --------------------------------------------------------------------------- #
+
+
+def _faithful_v2_cases() -> dict[str, Any]:
+    import sys
+
+    # The fixtures live with the tests so they stay human-readable in one place;
+    # this file is the generator, not a second copy of the data.
+    if str(_REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(_REPO_ROOT))
+    from tests.answer.test_verify_v2 import ATTACKS, CONTROLS
+
+    from citenexus.answer.verify import is_supported_v2
+
+    return {
+        "attacks": [
+            {"name": n, "passage": p, "answer": a, "supported": is_supported_v2(a, p)}
+            for n, p, a in ATTACKS
+        ],
+        "controls": [
+            {"name": n, "passage": p, "answer": a, "supported": is_supported_v2(a, p)}
+            for n, p, a in CONTROLS
+        ],
+    }
+
+
+_SEGMENTATION_INPUTS = [
+    "Art. 5 applies to all tenants.",
+    "See Dr. Smith for details.",
+    "J. Smith signed the agreement.",
+    "The dose is 500.00 milligrams daily.",
+    "The contractor maintains insurance. The term is five years.",
+    "Is it approved? It is not.",
+    "Really?! Yes.",
+    "The window opens at 02:00 UTC",
+    "\u5f93\u696d\u54e1\u306f\u958b\u793a\u3057\u3066\u306f\u306a\u3089\u306a\u3044\u3002\u671f\u9593\u306f\u4e94\u5e74\u3067\u3042\u308b\u3002",
+    "The parties are (a) the tenant; (b) the landlord.",
+    "france is in europe\nparis is the capital",
+    "   ",
+]
+
+
+def _segmentation_cases() -> list[dict[str, Any]]:
+    from citenexus.answer.segment import split_claims
+
+    return [{"text": t, "claims": split_claims(t)} for t in _SEGMENTATION_INPUTS]
+
+
 def generate() -> dict[str, str]:
     """All fixtures as {relative path under conformance/: rendered JSON text}."""
     return {
@@ -1080,6 +1336,12 @@ def generate() -> dict[str, str]:
         "cases/bm25.json": _render(_bm25_cases()),
         "cases/rrf.json": _render(_rrf_cases()),
         "cases/faithful.json": _render(_faithful_cases()),
+        "polarity.json": _render(_polarity_table()),
+        "conflict.json": _render(_conflict_table()),
+        "cases/conflict.json": _render(_conflict_cases()),
+        "segmentation.json": _render(_segmentation_table()),
+        "cases/faithful_v2.json": _render(_faithful_v2_cases()),
+        "cases/segmentation.json": _render(_segmentation_cases()),
         "cases/chunker.json": _render(_chunker_cases()),
         "cases/language.json": _render(_language_cases()),
         "cases/eu_ids.json": _render(_eu_id_cases()),
@@ -1090,6 +1352,113 @@ def generate() -> dict[str, str]:
         "cases/structure.json": _render(_structure_cases()),
         "cases/vision_orchestration.json": _render(_vision_orchestration_cases()),
         "cases/multilingual.json": _render(_multilingual_cases()),
+        "cases/tokenize_v2.json": _render(_tokenize_v2_cases()),
+    }
+
+
+# --------------------------------------------------------------------------- #
+# cases/tokenize_v2.json — the Unicode tokenizer, PER SCRIPT (ADR-0011).
+#
+# The rule this file exists to enforce: **no script may be claimed as supported
+# without a golden fixture.** `supported` below is generated from
+# `SUPPORTED_SCRIPTS`, and every entry in it carries three assertions a port must
+# reproduce — tokens are produced, a verbatim quote of the passage is accepted by
+# the gate, and unrelated text is still rejected. Adding a script to
+# SUPPORTED_SCRIPTS without adding it here fails `_tokenize_v2_cases`, which is
+# the mechanism that makes the claim and the evidence for it the same artifact.
+#
+# `unsupported` pins the other half: scripts the tokenizer will process
+# mechanically but that CiteNexus does not claim, which must be REPORTED rather
+# than silently half-served.
+# --------------------------------------------------------------------------- #
+
+# One sentence of plausible evidence per claimed script.
+_V2_SCRIPT_SAMPLES: dict[str, str] = {
+    "arabic": "لا يجوز للموظف إفشاء المعلومات السرية.",
+    "bengali": "কর্মচারী গোপনীয় তথ্য প্রকাশ করবেন না।",
+    "cyrillic": "Работник не должен раскрывать конфиденциальную информацию.",
+    "devanagari": "कर्मचारी गोपनीय जानकारी प्रकट नहीं करेगा।",
+    "greek": "Ο εργαζόμενος δεν πρέπει να αποκαλύπτει εμπιστευτικές πληροφορίες.",
+    "han": "员工不得披露机密信息。",
+    "hangul": "직원은 기밀 정보를 공개해서는 안 된다.",
+    "hebrew": "העובד לא יגלה מידע סודי.",
+    "hiragana": "従業員は機密情報を開示してはならない。",
+    "katakana": "コンフィデンシャルナジョウホウ",
+    "latin": "The employee shall not disclose confidential information.",
+    "tamil": "ஊழியர் ரகசியத் தகவலை வெளியிடக் கூடாது.",
+    "thai": "พนักงานต้องไม่เปิดเผยข้อมูลที่เป็นความลับ",
+}
+
+# Scripts the range table can NAME but that carry no claim. A port must report
+# these, not quietly bigram them and pretend.
+_V2_UNCLAIMED_SAMPLES: dict[str, str] = {
+    "armenian": "Աշխատողը չպետք է բացահայտի",
+    "georgian": "თანამშრომელმა არ უნდა გაამჟღავნოს",
+    "khmer": "បុគ្គលិកមិនត្រូវបង្ហាញព័ត៌មានសម្ងាត់",
+    "lao": "ພະນັກງານບໍ່ຄວນເປີດເຜີຍຂໍ້ມູນລັບ",
+    "myanmar": "ဝန်ထမ်းသည် လျှို့ဝှက်ချက်ကို မဖော်ထုတ်ရ",
+}
+
+# The Unicode mechanics that differ from v1, plus the ASCII inputs that must NOT.
+# The ASCII half is why moving BM25, the structure retriever and the gate onto v2
+# left every pinned ASCII vector unchanged.
+_V2_UNICODE_INPUTS: list[str] = [
+    *_TOKENIZE_INPUTS,  # every v1 vector, re-pinned under v2
+    "Café Münster naïve résumé",
+    "Straße",
+    "STRASSE",
+    "ＡＢＣ１２３",  # NFKC fullwidth -> ASCII
+    "İstanbul",  # Turkish dotted capital I
+    _nfc("Déjà"),
+    _nfd("Déjà"),
+    "東京tokyo",  # script boundary inside a word run
+    "日本語。中国",  # punctuation separates two Han runs
+    "従業員は",  # Han/Hiragana boundary: bigrams do not cross it
+    "木",  # single-character continuous run
+    "직원은 기밀 정보를",  # Hangul is space-delimited, NOT bigrammed
+]
+
+_V2_UNRELATED = "Employees are entitled to thirty days of annual leave."
+
+
+def _tokenize_v2_cases() -> dict[str, Any]:
+    missing = SUPPORTED_SCRIPTS - set(_V2_SCRIPT_SAMPLES)
+    if missing:  # the golden-fixture-per-script rule, enforced mechanically
+        raise AssertionError(f"claimed scripts with no golden fixture: {sorted(missing)}")
+    extra = set(_V2_SCRIPT_SAMPLES) - SUPPORTED_SCRIPTS
+    if extra:
+        raise AssertionError(f"fixture for unclaimed script: {sorted(extra)}")
+
+    supported = []
+    for script in sorted(_V2_SCRIPT_SAMPLES):
+        text = _V2_SCRIPT_SAMPLES[script]
+        supported.append(
+            {
+                "script": script,
+                "text": text,
+                "tokens": tokenize_v2(text),
+                "v1_tokens": tokenize(text),  # the defect, pinned for contrast
+                "self_supported": is_supported_v2(text, text),
+                "unrelated_supported": is_supported_v2(text, _V2_UNRELATED),
+                "unsupported_scripts": list(unsupported_scripts(text)),
+            }
+        )
+    unclaimed = [
+        {
+            "script": script,
+            "text": text,
+            "unsupported_scripts": list(unsupported_scripts(text)),
+        }
+        for script, text in sorted(_V2_UNCLAIMED_SAMPLES.items())
+    ]
+    return {
+        "tokenizer_version": TOKENIZER_VERSION,
+        "supported_scripts": sorted(SUPPORTED_SCRIPTS),
+        "continuous_scripts": sorted(CONTINUOUS_SCRIPTS),
+        "unrelated_passage": _V2_UNRELATED,
+        "supported": supported,
+        "unclaimed": unclaimed,
+        "unicode": [{"input": text, "tokens": tokenize_v2(text)} for text in _V2_UNICODE_INPUTS],
     }
 
 

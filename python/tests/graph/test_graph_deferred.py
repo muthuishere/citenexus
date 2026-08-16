@@ -11,6 +11,7 @@ from pathlib import Path
 
 from citenexus.domain.partition import PartitionPath
 from citenexus.graph import GraphRetriever, GraphStore
+from citenexus.graph.store import GraphIndex
 from citenexus.storage.backend import LocalFsBackend
 from citenexus.storage.lance_store import LanceVectorStore
 from citenexus.testing import FakeEmbedding
@@ -115,7 +116,5 @@ def test_build_from_store_clears_dirty(tmp_path: Path) -> None:
     assert "zzzsecond" not in labels
 
 
-def _empty() -> object:
-    from citenexus.graph.store import GraphIndex
-
+def _empty() -> GraphIndex:
     return GraphIndex(nodes=(), edges=())

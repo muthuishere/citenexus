@@ -78,7 +78,7 @@ or override it per call:
 ```python
 rag = CiteNexus("./citenexus-data", embedder=..., generator=..., top_k=5)  # default
 
-answer = rag.ask("What notice does termination require?", k=8)  # override for this call
+response = rag.ask("What notice does termination require?", k=8)  # override for this call
 docs   = rag.retrieve("termination notice", k=20)               # retrieval only, no generation
 ```
 

@@ -21,14 +21,21 @@ from citenexus.testing import FakeEmbedding, FakeLLM
 NDA = "The employee shall not disclose confidential information."
 
 
-def _local_pipeline(tmp_path: Path) -> SmokePipeline:
+def _local_pipeline(tmp_path: Path, generator: object | None = None) -> SmokePipeline:
     return SmokePipeline(
         backend=LocalFsBackend(tmp_path),
         base_uri=str(tmp_path),
         partition=PartitionPath.of(("workspace", "w1")),
         embedder=FakeEmbedding(),
-        generator=FakeLLM(),
+        generator=generator or FakeLLM(),  # type: ignore[arg-type]
     )
+
+
+class _HalfTrueLLM:
+    """Quotes the passage verbatim, then appends an invented sentence."""
+
+    def answer(self, question: str, passage: str) -> str:
+        return f"{passage} The penalty is a fine of one million euros."
 
 
 def test_ingest_then_answer_cites_evidence(tmp_path: Path) -> None:
@@ -58,6 +65,34 @@ def test_abstains_on_irrelevant_question_with_nonempty_corpus(tmp_path: Path) ->
     r = p.ask("What is the capital of France?")
     assert r.evidence.decision is Decision.refused
     assert r.claims == ()
+
+
+def test_unsupported_claim_is_dropped_not_fatal(tmp_path: Path) -> None:
+    """Per-claim drop-not-fail: the true half survives, the invented half does not."""
+    p = _local_pipeline(tmp_path, generator=_HalfTrueLLM())
+    p.ingest(NDA, "nda")
+    r = p.ask("Can the employee disclose confidential information?")
+    assert r.evidence.decision is Decision.answered
+    assert r.answer == NDA
+    assert "million euros" not in r.answer
+    assert r.evidence.unsupported_claims_removed == 1
+    assert r.evidence.all_claims_verified is False
+    # Both verdicts are recorded, so the drop is auditable rather than silent.
+    assert [c.supported for c in r.claims] == [True, False]
+    assert len(r.provenance) == 1
+
+
+def test_reordered_claim_fails_the_gate(tmp_path: Path) -> None:
+    """The smoke pipeline uses the shared ordered predicate, not set containment."""
+
+    class _ReorderingLLM:
+        def answer(self, question: str, passage: str) -> str:
+            return "Confidential information shall disclose the employee."
+
+    p = _local_pipeline(tmp_path, generator=_ReorderingLLM())
+    p.ingest(NDA, "nda")
+    r = p.ask("Can the employee disclose confidential information?")
+    assert r.evidence.decision is Decision.refused
 
 
 def test_retrieves_the_relevant_document(tmp_path: Path) -> None:

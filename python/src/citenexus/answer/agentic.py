@@ -12,7 +12,7 @@ Two invariants carry the guarantee:
   no-new-evidence, budget, timeout) generates from the deduped pool and passes the
   **per-claim single-EU gate** — each claim ⊆ *some single* EU, never the pooled
   union (a claim stitched from EUs that never co-occurred is ungrounded and is
-  dropped). This decomposition is net-new; `is_supported` is reused only as the
+  dropped). This decomposition is net-new; `is_supported_v2` is reused only as the
   per-(claim, EU) predicate.
 - **A whole-loop wall clock.** ``timeout_s`` bounds the *entire* run — each tool
   call and the final ``generate()`` too, not just the between-hop check. A hung
@@ -23,7 +23,6 @@ Two invariants carry the guarantee:
 from __future__ import annotations
 
 import functools
-import re
 import threading
 import time
 from collections.abc import Callable, Sequence
@@ -32,6 +31,13 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from citenexus.answer.conflict import (
+    CONFLICT_TOP_K,
+    ConflictPair,
+    collapse_near_duplicates,
+    describe_conflicts,
+    find_conflicts,
+)
 from citenexus.answer.decision import DecisionModel
 from citenexus.answer.flow import Generator
 from citenexus.answer.result import (
@@ -44,13 +50,12 @@ from citenexus.answer.result import (
     Result,
     SourceRef,
 )
-from citenexus.answer.verify import is_supported
+from citenexus.answer.segment import split_claims
+from citenexus.answer.verify import is_supported_v2
 from citenexus.domain.trust import TrustMode
 from citenexus.lang.fallback import resolve_answer_language
 
 ToolSpec = dict[str, Any]
-
-_SENTENCE_SPLIT = re.compile(r"[.!?\n]+")
 
 
 class LoopBudget(BaseModel):
@@ -140,11 +145,6 @@ def _to_pooled(row: dict[str, Any]) -> _PooledEvidence | None:
         signal=str(row.get("signal", "vector")),
         score=float(row.get("score", 0.0)),
     )
-
-
-def _split_claims(text: str) -> list[str]:
-    """Decompose a generated answer into individual claims (sentence-level)."""
-    return [claim.strip() for claim in _SENTENCE_SPLIT.split(text) if claim.strip()]
 
 
 class AgenticAnswerFlow:
@@ -333,13 +333,37 @@ class AgenticAnswerFlow:
             )
             for claim, eu in supported
         )
+        # Conflict surfacing (ADR-0007) applies here for the same reason it
+        # applies to the strict flow: the loop pools evidence from several hops,
+        # so it is *more* likely than a single-shot retrieval to hold two
+        # passages that disagree. Detection reports and never resolves.
+        window = units[:CONFLICT_TOP_K]
+        conflict_pairs = find_conflicts([e.text for e in window])
+        touching = tuple(
+            pair
+            for pair in conflict_pairs
+            if window[pair.left].eu_id in by_id or window[pair.right].eu_id in by_id
+        )
+        if touching and mode is TrustMode.strict:
+            return self._refuse_on_conflict(
+                mode=mode,
+                language=language,
+                window=window,
+                touching=touching,
+                total_conflicts=len(conflict_pairs),
+                units=units,
+                languages=languages,
+                loop=loop,
+            )
+        independent = [units[i] for i in collapse_near_duplicates([e.text for e in units])]
         signals = EvidenceSignals(
             decision=decision,
             supporting_sources=len(used),
-            distinct_documents=len({e.document_id or e.eu_id for e in units}),
+            distinct_documents=len({e.document_id or e.eu_id for e in independent}),
             retrieval_score_spread=_score_spread(units),
             all_claims_verified=removed == 0,
             unsupported_claims_removed=removed,
+            conflicts_detected=len(conflict_pairs),
             languages_in_evidence=languages,
             loop=loop,
         )
@@ -350,6 +374,9 @@ class AgenticAnswerFlow:
             evidence=signals,
             claims=claims,
             sources=sources,
+            conflicts=describe_conflicts(conflict_pairs, _documents(window))
+            if mode is TrustMode.normal
+            else (),
             provenance=provenance,
         )
 
@@ -364,13 +391,60 @@ class AgenticAnswerFlow:
         """
         supported: list[tuple[str, _PooledEvidence]] = []
         removed = 0
-        for claim in _split_claims(answer_text):
-            source = next((eu for eu in units if is_supported(claim, eu.text)), None)
+        for claim in split_claims(answer_text):
+            source = next((eu for eu in units if is_supported_v2(claim, eu.text)), None)
             if source is not None:
                 supported.append((claim, source))
             else:
                 removed += 1
         return supported, removed
+
+    def _refuse_on_conflict(
+        self,
+        *,
+        mode: TrustMode,
+        language: str,
+        window: Sequence[_PooledEvidence],
+        touching: Sequence[ConflictPair],
+        total_conflicts: int,
+        units: Sequence[_PooledEvidence],
+        languages: tuple[str, ...],
+        loop: LoopSignals,
+    ) -> Result:
+        """Strict abstention that cites both sides of the disagreement."""
+        cited: list[SourceRef] = []
+        seen: set[str] = set()
+        for pair in touching:
+            for unit in (window[pair.left], window[pair.right]):
+                if unit.eu_id in seen:
+                    continue
+                seen.add(unit.eu_id)
+                cited.append(
+                    SourceRef(
+                        document=unit.document_id or unit.eu_id,
+                        passage=unit.text,
+                        passage_language=unit.language or "und",
+                        page=unit.page,
+                    )
+                )
+        independent = [units[i] for i in collapse_near_duplicates([e.text for e in units])]
+        return Result(
+            answer="The available evidence disagrees, so I can't answer that.",
+            answer_language=language,
+            mode=mode,
+            evidence=EvidenceSignals(
+                decision=Decision.refused,
+                supporting_sources=len(independent),
+                distinct_documents=len({e.document_id or e.eu_id for e in independent}),
+                retrieval_score_spread=_score_spread(units),
+                conflicts_detected=total_conflicts,
+                languages_in_evidence=languages,
+                loop=loop,
+            ),
+            sources=tuple(cited),
+            conflicts=describe_conflicts(touching, _documents(window)),
+            missing_evidence=("cited sources disagree and the conflict is unresolved",),
+        )
 
     def _refuse(
         self,
@@ -387,6 +461,10 @@ class AgenticAnswerFlow:
             evidence=EvidenceSignals(decision=Decision.refused, loop=loop),
             missing_evidence=(reason,),
         )
+
+
+def _documents(units: Sequence[_PooledEvidence]) -> list[str]:
+    return [unit.document_id or unit.eu_id for unit in units]
 
 
 def _score_spread(units: Sequence[_PooledEvidence]) -> float:

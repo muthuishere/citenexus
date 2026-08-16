@@ -1,0 +1,808 @@
+{
+  "true_conflicts": [
+    {
+      "domain": "legal",
+      "label": "negation",
+      "left": "The employee shall disclose confidential information to third parties.",
+      "right": "The employee shall not disclose confidential information to third parties.",
+      "conflict": true,
+      "rule": "negation"
+    },
+    {
+      "domain": "legal",
+      "label": "value",
+      "left": "The notice period is 30 days.",
+      "right": "The notice period is 60 days.",
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "legal",
+      "label": "comparator",
+      "left": "The zoning variance was approved by the council.",
+      "right": "The zoning variance was rejected by the council.",
+      "conflict": true,
+      "rule": "antonym"
+    },
+    {
+      "domain": "legal",
+      "label": "superseded",
+      "left": "The confidentiality policy took effect in 2019.",
+      "right": "The confidentiality policy took effect in 2026.",
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "legal",
+      "label": "negation",
+      "left": "Arbitration is required for contract matters under this agreement.",
+      "right": "Arbitration is not required for contract matters under this agreement.",
+      "conflict": true,
+      "rule": "negation"
+    },
+    {
+      "domain": "legal",
+      "label": "comparator",
+      "left": "The injunction was upheld on appeal.",
+      "right": "The injunction was overturned on appeal.",
+      "conflict": true,
+      "rule": "antonym"
+    },
+    {
+      "domain": "legal",
+      "label": "negation-in-claim-language",
+      "left": "The claim for indemnity is valid under section four.",
+      "right": "The claim for indemnity is not valid under section four.",
+      "conflict": true,
+      "rule": "negation"
+    },
+    {
+      "domain": "finance",
+      "label": "comparator",
+      "left": "Revenue increased by 12 percent in the third quarter.",
+      "right": "Revenue decreased by 12 percent in the third quarter.",
+      "conflict": true,
+      "rule": "antonym"
+    },
+    {
+      "domain": "finance",
+      "label": "value",
+      "left": "The restated filing reports net income of 4.2 million.",
+      "right": "The restated filing reports net income of 6.8 million.",
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "finance",
+      "label": "comparator",
+      "left": "The covenant requires the leverage ratio to stay above 2.5.",
+      "right": "The covenant requires the leverage ratio to stay below 2.5.",
+      "conflict": true,
+      "rule": "antonym"
+    },
+    {
+      "domain": "finance",
+      "label": "superseded",
+      "left": "The special dividend was paid in 2024.",
+      "right": "The special dividend was paid in 2025.",
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "finance",
+      "label": "comparator",
+      "left": "The fund is eligible for the withholding exemption.",
+      "right": "The fund is ineligible for the withholding exemption.",
+      "conflict": true,
+      "rule": "antonym"
+    },
+    {
+      "domain": "medical",
+      "label": "negation",
+      "left": "The vaccine is recommended for pregnant patients.",
+      "right": "The vaccine is not recommended for pregnant patients.",
+      "conflict": true,
+      "rule": "negation"
+    },
+    {
+      "domain": "medical",
+      "label": "value",
+      "left": "The maximum daily dose is 4000 mg.",
+      "right": "The maximum daily dose is 3000 mg.",
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "medical",
+      "label": "comparator",
+      "left": "Treatment increased survival in the trial cohort.",
+      "right": "Treatment decreased survival in the trial cohort.",
+      "conflict": true,
+      "rule": "antonym"
+    },
+    {
+      "domain": "medical",
+      "label": "superseded",
+      "left": "The prescribing guideline was withdrawn in 2021.",
+      "right": "The prescribing guideline was withdrawn in 2023.",
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "medical",
+      "label": "negation",
+      "left": "Renal impairment is a contraindication for this drug.",
+      "right": "Renal impairment is not a contraindication for this drug.",
+      "conflict": true,
+      "rule": "negation"
+    },
+    {
+      "domain": "operations",
+      "label": "value",
+      "left": "The escalation threshold is 15 minutes.",
+      "right": "The escalation threshold is 45 minutes.",
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "operations",
+      "label": "value",
+      "left": "Database backups are retained for 90 days.",
+      "right": "Database backups are retained for 30 days.",
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "operations",
+      "label": "comparator",
+      "left": "Request tracing is enabled in the production cluster.",
+      "right": "Request tracing is disabled in the production cluster.",
+      "conflict": true,
+      "rule": "antonym"
+    },
+    {
+      "domain": "operations",
+      "label": "comparator",
+      "left": "Change requests are permitted during the freeze window.",
+      "right": "Change requests are prohibited during the freeze window.",
+      "conflict": true,
+      "rule": "negation"
+    },
+    {
+      "domain": "operations",
+      "label": "comparator",
+      "left": "The rollback rehearsal is mandatory before deployment.",
+      "right": "The rollback rehearsal is optional before deployment.",
+      "conflict": true,
+      "rule": "antonym"
+    },
+    {
+      "domain": "physics",
+      "label": "comparator",
+      "left": "Like charges attract each other.",
+      "right": "Like charges repel each other.",
+      "conflict": true,
+      "rule": "antonym"
+    },
+    {
+      "domain": "physics",
+      "label": "value",
+      "left": "The measured half life is 12 hours.",
+      "right": "The measured half life is 20 hours.",
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "physics",
+      "label": "value",
+      "left": "Pure water boils at 100 degrees at sea level.",
+      "right": "Pure water boils at 90 degrees at sea level.",
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "physics",
+      "label": "comparator",
+      "left": "The aluminium sample expands when heated.",
+      "right": "The aluminium sample contracts when heated.",
+      "conflict": true,
+      "rule": "antonym"
+    },
+    {
+      "domain": "physics",
+      "label": "negation-morphology",
+      "left": "The reaction conserves momentum in this frame.",
+      "right": "The reaction does not conserve momentum in this frame.",
+      "conflict": true,
+      "rule": "negation"
+    }
+  ],
+  "hard_negatives": [
+    {
+      "domain": "medical",
+      "label": "different-aspect (scope word)",
+      "left": "The recommended dose for adults is 500 mg.",
+      "right": "The recommended dose for children is 200 mg.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "medical",
+      "label": "different-aspect (no scope word)",
+      "left": "The oral dose is 500 mg.",
+      "right": "The intravenous dose is 200 mg.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "medical",
+      "label": "unit variant",
+      "left": "The single dose is 1 g.",
+      "right": "The single dose is 1000 mg.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "medical",
+      "label": "range elaboration",
+      "left": "The maintenance dose is 500 mg.",
+      "right": "The maintenance dose is between 250 mg and 500 mg.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "medical",
+      "label": "different-scope negation",
+      "left": "The vaccine is not recommended for pregnant patients.",
+      "right": "The vaccine is recommended for elderly patients.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "medical",
+      "label": "complementary",
+      "left": "The drug is metabolised in the liver.",
+      "right": "The drug is excreted by the kidneys.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal",
+      "label": "strict elaboration",
+      "left": "The notice period is 30 days.",
+      "right": "The notice period is 30 days, calculated from the date of service.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal",
+      "label": "quoted negation",
+      "left": "The claim that the device is not compliant was rejected.",
+      "right": "The device is compliant.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal",
+      "label": "different aspect + date",
+      "left": "The confidentiality policy took effect in 2019.",
+      "right": "The confidentiality policy was amended in 2026.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal",
+      "label": "scope-qualified",
+      "left": "The residential lease requires 30 days notice.",
+      "right": "The commercial lease requires 90 days notice.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal",
+      "label": "double negation restatement",
+      "left": "The clause is not inapplicable to subcontractors.",
+      "right": "The clause is applicable to subcontractors.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal",
+      "label": "restrictor not negation",
+      "left": "All employees except contractors receive the allowance.",
+      "right": "All employees receive the allowance.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal",
+      "label": "negation different object",
+      "left": "The employee shall not disclose confidential information.",
+      "right": "The employee shall disclose conflicts of interest.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance",
+      "label": "elaboration with extra figure",
+      "left": "Net income was 4.2 million.",
+      "right": "Net income was 4.2 million, up from 3.1 million.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance",
+      "label": "different subject same verb",
+      "left": "Revenue increased by 12 percent in the third quarter.",
+      "right": "Costs increased by 12 percent in the third quarter.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance",
+      "label": "antonym across scopes",
+      "left": "Domestic revenue increased in the third quarter.",
+      "right": "International revenue decreased in the third quarter.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance",
+      "label": "antonym across measures",
+      "left": "Gross margin increased in 2024.",
+      "right": "Net margin decreased in 2024.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance",
+      "label": "antonym different quantity",
+      "left": "Unit sales increased in the third quarter.",
+      "right": "Unit prices decreased in the third quarter.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance",
+      "label": "quoted negation",
+      "left": "The allegation that revenue was not restated proved false.",
+      "right": "Revenue was restated.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance",
+      "label": "complementary",
+      "left": "The fee is payable in advance.",
+      "right": "The fee is refundable on cancellation.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "operations",
+      "label": "different artefact",
+      "left": "Database backups are retained for 90 days.",
+      "right": "Database snapshots are retained for 7 days.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "operations",
+      "label": "different environment",
+      "left": "Request tracing is enabled in the staging cluster.",
+      "right": "Request tracing is disabled in the production cluster.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "operations",
+      "label": "unit variant",
+      "left": "The escalation threshold is 2 hours.",
+      "right": "The escalation threshold is 120 minutes.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "operations",
+      "label": "different metric",
+      "left": "The p50 latency budget is 200 ms.",
+      "right": "The p99 latency budget is 900 ms.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "physics",
+      "label": "different condition",
+      "left": "The aluminium sample expands when heated.",
+      "right": "The aluminium sample contracts when cooled.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "physics",
+      "label": "unit variant",
+      "left": "The half life is 2 hours.",
+      "right": "The half life is 120 minutes.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "physics",
+      "label": "different medium",
+      "left": "Sound travels at 343 metres per second in air.",
+      "right": "Sound travels at 1480 metres per second in water.",
+      "conflict": false,
+      "rule": null
+    }
+  ],
+  "unrelated": [
+    {
+      "domain": "legal",
+      "label": "shared 'policy'",
+      "left": "The retention policy applies to archived correspondence.",
+      "right": "The reactor purge policy requires a 30 second hold.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance",
+      "label": "shared 'interest'",
+      "left": "Interest accrues monthly on the outstanding balance.",
+      "right": "The employee must declare any conflict of interest.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "medical",
+      "label": "shared 'dose'",
+      "left": "The dose is measured in milligrams.",
+      "right": "A dose of radiation is measured in sieverts.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "operations",
+      "label": "shared 'cluster'",
+      "left": "The cluster runs three availability zones.",
+      "right": "The galaxy cluster spans four megaparsecs.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "physics",
+      "label": "shared 'charge'",
+      "left": "The charge on an electron is negative.",
+      "right": "A late payment charge is applied after 30 days.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal",
+      "label": "shared 'period'",
+      "left": "The notice period is 30 days.",
+      "right": "The orbital period is 30 days.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance",
+      "label": "shared 'margin'",
+      "left": "Gross margin improved in the third quarter.",
+      "right": "The margin of error is two percent.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "medical",
+      "label": "shared 'trial'",
+      "left": "The trial enrolled 400 patients.",
+      "right": "The trial court dismissed the motion.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "operations",
+      "label": "shared 'window'",
+      "left": "The freeze window closes on Friday.",
+      "right": "The transmission window is 30 minutes wide.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "physics",
+      "label": "shared 'mass'",
+      "left": "The mass of the sample is 40 grams.",
+      "right": "A mass tort claim was filed in 2019.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal",
+      "label": "shared 'service'",
+      "left": "Service of process must be personal.",
+      "right": "The service restarts nightly at midnight.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance",
+      "label": "shared 'return'",
+      "left": "The annual return was 12 percent.",
+      "right": "The tax return is filed in April.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "medical",
+      "label": "shared 'pressure'",
+      "left": "Blood pressure is measured twice daily.",
+      "right": "The vessel pressure is 4 bar.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "operations",
+      "label": "shared 'load'",
+      "left": "The load balancer drains connections gracefully.",
+      "right": "The beam load is 400 newtons.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "physics",
+      "label": "shared 'current'",
+      "left": "The current through the coil is 2 amps.",
+      "right": "The current policy took effect in 2026.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal",
+      "label": "shared 'agreement'",
+      "left": "The agreement is governed by Dutch law.",
+      "right": "There is broad agreement on the measurement technique.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance",
+      "label": "shared 'capital'",
+      "left": "Tier one capital exceeds 12 percent.",
+      "right": "The capital city hosts the registry office.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "medical",
+      "label": "shared 'resistance'",
+      "left": "Antibiotic resistance rose after 2019.",
+      "right": "The resistance of the wire is 4 ohms.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "operations",
+      "label": "shared 'incident'",
+      "left": "The incident was resolved in 45 minutes.",
+      "right": "An incident report must be filed within 30 days.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "physics",
+      "label": "shared 'decay'",
+      "left": "The isotope decay constant is 0.05.",
+      "right": "Urban decay was cited in the zoning report.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal",
+      "label": "shared 'term'",
+      "left": "The term of the lease is 60 months.",
+      "right": "The term is defined in the physics glossary.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance",
+      "label": "shared 'exposure'",
+      "left": "Net exposure fell to 4.2 million.",
+      "right": "Radiation exposure is limited to 20 millisieverts.",
+      "conflict": false,
+      "rule": null
+    }
+  ],
+  "heldout_conflicts": [
+    {
+      "domain": "legal",
+      "label": "value",
+      "left": "The liability cap is 5 million.",
+      "right": "The liability cap is 2 million.",
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "finance",
+      "label": "negation",
+      "left": "The instrument is subject to withholding tax.",
+      "right": "The instrument is not subject to withholding tax.",
+      "conflict": true,
+      "rule": "negation"
+    },
+    {
+      "domain": "medical",
+      "label": "superseded",
+      "left": "The recall was issued in 2022.",
+      "right": "The recall was issued in 2024.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "operations",
+      "label": "comparator",
+      "left": "The failover drill is mandatory each quarter.",
+      "right": "The failover drill is optional each quarter.",
+      "conflict": true,
+      "rule": "antonym"
+    },
+    {
+      "domain": "physics",
+      "label": "value",
+      "left": "The lattice constant is 5.4 angstroms.",
+      "right": "The lattice constant is 4.1 angstroms.",
+      "conflict": true,
+      "rule": "value"
+    }
+  ],
+  "heldout_negatives": [
+    {
+      "domain": "legal",
+      "label": "different party same duty",
+      "left": "The supplier shall maintain insurance of 5 million.",
+      "right": "The contractor shall maintain insurance of 2 million.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal",
+      "label": "condition vs base rule",
+      "left": "Late fees apply after 30 days.",
+      "right": "Late fees apply after 30 days unless waived by the registrar.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance",
+      "label": "different period",
+      "left": "Operating cash flow was 18 million in the first half.",
+      "right": "Operating cash flow was 24 million in the second half.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance",
+      "label": "currency variant",
+      "left": "The penalty is 500 usd.",
+      "right": "The penalty is 460 eur.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "medical",
+      "label": "different route timing",
+      "left": "The infusion runs over 30 minutes.",
+      "right": "The infusion runs over 30 minutes in a monitored setting.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "medical",
+      "label": "different population",
+      "left": "Screening starts at 45 years for average risk.",
+      "right": "Screening starts at 40 years for high risk.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "operations",
+      "label": "different tier",
+      "left": "The bronze tier response target is 8 hours.",
+      "right": "The gold tier response target is 1 hour.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "operations",
+      "label": "negated different object",
+      "left": "The queue does not retry poison messages.",
+      "right": "The queue retries transient failures.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "physics",
+      "label": "different material",
+      "left": "The rod conducts heat at 400 watts per metre kelvin.",
+      "right": "The rod conducts heat at 80 watts per metre kelvin in the alloy form.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "physics",
+      "label": "reported hypothesis",
+      "left": "The hypothesis that the field is not conservative was refuted.",
+      "right": "The field is conservative.",
+      "conflict": false,
+      "rule": null
+    }
+  ],
+  "near_duplicates": [
+    {
+      "label": "exact duplicate",
+      "left": "The vendor shall notify the customer within 30 days of a breach.",
+      "right": "The vendor shall notify the customer within 30 days of a breach.",
+      "collapses": true
+    },
+    {
+      "label": "whitespace variant",
+      "left": "The vendor shall notify the customer within 30 days of a breach.",
+      "right": "The vendor shall notify the customer  within 30 days of a breach.",
+      "collapses": true
+    },
+    {
+      "label": "punctuation variant",
+      "left": "The vendor shall notify the customer within 30 days of a breach.",
+      "right": "The vendor shall notify the customer, within 30 days, of a breach!",
+      "collapses": true
+    },
+    {
+      "label": "case variant",
+      "left": "The vendor shall notify the customer within 30 days of a breach.",
+      "right": "THE VENDOR SHALL NOTIFY THE CUSTOMER WITHIN 30 DAYS OF A BREACH.",
+      "collapses": true
+    },
+    {
+      "label": "one word changed (synonym)",
+      "left": "The vendor shall notify the customer within 30 days of a breach.",
+      "right": "The vendor must notify the customer within 30 days of a breach.",
+      "collapses": true
+    },
+    {
+      "label": "one word changed (VALUE)",
+      "left": "The vendor shall notify the customer within 30 days of a breach.",
+      "right": "The vendor shall notify the customer within 60 days of a breach.",
+      "collapses": false
+    },
+    {
+      "label": "one word changed (NEGATION)",
+      "left": "The vendor shall notify the customer within 30 days of a breach.",
+      "right": "The vendor shall not notify the customer within 30 days of a breach.",
+      "collapses": false
+    },
+    {
+      "label": "genuine independent restatement",
+      "left": "The vendor shall notify the customer within 30 days of a breach.",
+      "right": "Breach notification to the affected customer is due inside one month.",
+      "collapses": false
+    },
+    {
+      "label": "paraphrase of the same source",
+      "left": "The vendor shall notify the customer within 30 days of a breach.",
+      "right": "Within 30 days of a breach, the customer shall be notified by the vendor.",
+      "collapses": false
+    }
+  ],
+  "identifier_tokenization": [
+    {
+      "left": "The p50 latency budget is 200 ms.",
+      "right": "The p99 latency budget is 900 ms.",
+      "conflict": false
+    },
+    {
+      "left": "The latency budget is 200 ms.",
+      "right": "The latency budget is 900 ms.",
+      "conflict": true
+    }
+  ]
+}

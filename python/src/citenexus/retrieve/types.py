@@ -34,8 +34,24 @@ class Candidate(BaseModel):
     score: float
     signal: RetrievalSignal
     document_id: str | None = None
+    #: What the EU was INDEXED as. Under contextual retrieval (spec §7) this carries
+    #: a small model's situating blurb ahead of the source text -- great for ranking,
+    #: but it is NOT the customer's words. Never quote it; see ``citable_text``.
     text: str | None = None
+    #: The VERBATIM chunk, as written by the source document. This is the only text
+    #: that may be shown or attributed to the source.
+    passage: str | None = None
     page: int | None = None
     language: str | None = None
     checksum: str | None = None
     raw_uri: str | None = None
+
+    @property
+    def citable_text(self) -> str:
+        """The text that may be quoted, generated from, and verified against.
+
+        Falls back to ``text`` for rows indexed before ``passage`` was persisted:
+        those indexes are un-migrated, not broken, and degrading to the old
+        behaviour beats refusing to answer at all. Re-ingest to get the guarantee.
+        """
+        return self.passage if self.passage is not None else (self.text or "")

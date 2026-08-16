@@ -1,0 +1,77 @@
+[
+  {
+    "text": "Art. 5 applies to all tenants.",
+    "claims": [
+      "Art. 5 applies to all tenants."
+    ]
+  },
+  {
+    "text": "See Dr. Smith for details.",
+    "claims": [
+      "See Dr. Smith for details."
+    ]
+  },
+  {
+    "text": "J. Smith signed the agreement.",
+    "claims": [
+      "J. Smith signed the agreement."
+    ]
+  },
+  {
+    "text": "The dose is 500.00 milligrams daily.",
+    "claims": [
+      "The dose is 500.00 milligrams daily."
+    ]
+  },
+  {
+    "text": "The contractor maintains insurance. The term is five years.",
+    "claims": [
+      "The contractor maintains insurance.",
+      "The term is five years."
+    ]
+  },
+  {
+    "text": "Is it approved? It is not.",
+    "claims": [
+      "Is it approved?",
+      "It is not."
+    ]
+  },
+  {
+    "text": "Really?! Yes.",
+    "claims": [
+      "Really?!",
+      "Yes."
+    ]
+  },
+  {
+    "text": "The window opens at 02:00 UTC",
+    "claims": [
+      "The window opens at 02:00 UTC"
+    ]
+  },
+  {
+    "text": "従業員は開示してはならない。期間は五年である。",
+    "claims": [
+      "従業員は開示してはならない。",
+      "期間は五年である。"
+    ]
+  },
+  {
+    "text": "The parties are (a) the tenant; (b) the landlord.",
+    "claims": [
+      "The parties are (a) the tenant; (b) the landlord."
+    ]
+  },
+  {
+    "text": "france is in europe\nparis is the capital",
+    "claims": [
+      "france is in europe",
+      "paris is the capital"
+    ]
+  },
+  {
+    "text": "   ",
+    "claims": []
+  }
+]

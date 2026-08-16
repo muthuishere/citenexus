@@ -17,7 +17,7 @@ from citenexus.evidence.structure import StructureIndex, StructureNode
 from citenexus.plugins.base import RetrieverPlugin
 from citenexus.retrieve.types import Candidate, RetrievalSignal
 from citenexus.storage.paths import Layer, layer_prefix
-from citenexus.tokenize import tokenize
+from citenexus.tokenize import tokenize_v2
 
 if TYPE_CHECKING:
     from citenexus.domain.partition import PartitionPath
@@ -82,7 +82,7 @@ class StructureRetriever(RetrieverPlugin):
         if not indexes:
             return []
 
-        terms = set(tokenize(query))
+        terms = set(tokenize_v2(query))
         if not terms:
             return []
 
@@ -94,7 +94,7 @@ class StructureRetriever(RetrieverPlugin):
                 if node.parent_id is not None:
                     by_parent.setdefault(node.parent_id, []).append(node)
             for node in index.nodes:
-                hits = len(terms & set(tokenize(node.label)))
+                hits = len(terms & set(tokenize_v2(node.label)))
                 if hits == 0:
                     continue
                 for ref in _descendant_eu_refs(node, by_parent):
@@ -120,6 +120,7 @@ class StructureRetriever(RetrieverPlugin):
                         signal=RetrievalSignal.structure,
                         document_id=row.get("document_id"),
                         text=row.get("text"),
+                        passage=row.get("passage"),
                         page=_page(row.get("page")),
                         language=row.get("language"),
                         checksum=row.get("checksum"),

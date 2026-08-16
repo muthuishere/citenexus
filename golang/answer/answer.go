@@ -101,6 +101,7 @@ func Ask(corpus []Doc, question string, topK int) result.Result {
 			DistinctDocuments:   len(distinct),
 			AllClaimsVerified:   true,
 			LanguagesInEvidence: []string{"en"},
+			UnsupportedScripts:  []string{},
 		},
 		Claims: []result.Claim{
 			{Claim: ans, Supported: true, Sources: []string{top.euID}},

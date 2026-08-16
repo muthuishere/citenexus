@@ -1,0 +1,103 @@
+---
+title: Right to erasure
+description: Revoke a document and prove every byte it ever wrote is gone — including the copies left behind by earlier versions of the same document.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+**The failure this prevents:** `delete()` returns `status="deleted"`, and the
+document's text is still in your bucket. Not the current copy — an *earlier*
+copy, written before the document was last re-ingested, no longer named by any
+manifest and unreachable through any API. It is still bytes on disk, and a
+subject-access request or a privileged-document clawback does not care that your
+API can't see it.
+
+This was a real defect in CiteNexus, found by a spike and fixed. Documenting it
+here because the shape of the bug generalises to any content-addressed store.
+
+## Revoking a document
+
+<Steps>
+
+1. **Delete by document ID.** This removes the evidence units, the vector rows,
+   the lexical index entries, the structure index, the raw blobs, and the
+   manifest entry.
+
+   ```python
+   result = rag.delete("employee-nda")
+   print(result.status)          # "deleted"
+   ```
+
+2. **The commit point is the manifest entry**, written last. While it is present
+   the document is logically present, so an interrupted revoke is safe to re-run:
+   it is idempotent, not partial.
+
+3. **Verify with reconciliation**, which is the independent check:
+
+   ```python
+   report = rag.reconcile(manifest)
+   assert "employee-nda" not in {o.document_id for o in report.orphans}
+   ```
+
+</Steps>
+
+## Why re-ingested documents were the hard case
+
+A content-addressed store names each blob by its hash. The manifest maps
+`document_id → checksum`, and that map is **single-valued**. Re-ingesting a
+changed document overwrote the entry — and the previous checksum, the only
+reference tying those bytes to the document that wrote them, was simply dropped.
+
+`delete()` could then only ever remove the *currently recorded* checksum. The
+earlier blob stayed, unreferenced and unnameable:
+
+```text
+ingest("nda.pdf")        -> raw/<P>/3c58d7e6…   manifest: nda -> 3c58d7e6
+ingest("nda.pdf")  (v2)  -> raw/<P>/9a01bb2f…   manifest: nda -> 9a01bb2f
+                                                 3c58d7e6 is now unreachable
+delete("nda")            -> removes 9a01bb2f, reports "deleted"
+                                                 3c58d7e6 SURVIVES
+```
+
+The manifest now **remembers retired checksums**, so revoke sweeps the current
+blob and every one the document has ever retired. Re-ingest also reclaims the
+retired blob eagerly, after the manifest commit point — so there is no window in
+which a blob is both undeleted and unnameable.
+
+<Aside type="danger" title="A prefix sweep would have been the wrong fix">
+The tempting alternative — list the prefix, delete anything no manifest
+references — is unsound on a shared bucket. "Unreferenced by *my* manifest" does
+not imply "mine to delete": other partitions, other tenants, other tools, and
+in-flight ingests all live under the same prefix. Tracking the retirement instead
+keeps every deletion **positively justified**: this document recorded writing
+that checksum, and no other document currently claims it.
+</Aside>
+
+## Shared blobs are refcounted
+
+Two documents with identical content share one blob. Revoking one must not
+delete the other's evidence:
+
+```python
+rag.ingest(text="Identical text.", document_id="doc-a")
+rag.ingest(text="Identical text.", document_id="doc-b")
+
+rag.delete("doc-a")        # blob survives — doc-b still owns it
+rag.delete("doc-b")        # now the blob goes
+```
+
+Retired references deliberately do **not** count as ownership: those bytes are
+dead for their document too, so only a live owner keeps a blob alive.
+
+## The limitation, stated plainly
+
+Blobs stranded by re-ingests that happened **before** this fix shipped are not
+recoverable by it. Their checksums were overwritten and are gone from the
+manifest by construction — there is no record left tying them to a document. If
+you have a long-lived index with re-ingest history, treat a one-off storage-level
+sweep as a separate, manual exercise.
+
+## Related
+
+- [Revoke a document](/citenexus/revoke/) — the API reference.
+- [Regulated audit](/citenexus/scenarios/regulated-audit/) — proving the result.

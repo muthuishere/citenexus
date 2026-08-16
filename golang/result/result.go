@@ -48,6 +48,14 @@ type EvidenceSignals struct {
 	UnsupportedClaimsRemoved int      `json:"unsupported_claims_removed"`
 	ConflictsDetected        int      `json:"conflicts_detected"`
 	LanguagesInEvidence      []string `json:"languages_in_evidence"`
+	// UnsupportedScripts are the scripts present in the question or the evidence
+	// that the tokenizer does not claim to support (ADR-0011). A CAPABILITY
+	// signal, never an evidence judgement: a refusal carrying a non-empty value
+	// here means "I cannot read this script", which is a different thing from
+	// "the evidence isn't there". Returning the evidence-absent refusal for a
+	// capability gap is exactly what let the ASCII-only tokenizer hide. Empty on
+	// every Latin-script Result, so existing Results serialize unchanged.
+	UnsupportedScripts []string `json:"unsupported_scripts"`
 	// Loop is deep-ask (agentic) loop accounting; nil (→ null) on the strict flow.
 	// Deep-ask is Python-only today, so Go always emits null — present for wire
 	// parity with the Python reference. See structural-code-graph / deep-ask.
@@ -118,6 +126,7 @@ func Refused(mode TrustMode) Result {
 		Evidence: EvidenceSignals{
 			Decision:            DecisionRefused,
 			LanguagesInEvidence: []string{},
+			UnsupportedScripts:  []string{},
 		},
 		Claims:          []Claim{},
 		Sources:         []SourceRef{},

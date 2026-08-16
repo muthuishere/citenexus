@@ -120,3 +120,77 @@ def test_on_delete_hook_fires(tmp_path: Path) -> None:
     assert len(seen) == 1
     assert seen[0].document_id == "nda"
     assert seen[0].status == "deleted"
+
+
+# -- superseded-blob leak (ADR-0008 blocking precondition) -------------------
+#
+# Re-ingesting a document used to overwrite the single-valued
+# ``document_id -> checksum`` map without deleting the prior blob, so the
+# revoke path had no way to find it: ``delete()`` reported ``status="deleted"``
+# while the revoked document's earlier full text survived at
+# ``raw/<P>/<old-hash>`` — unreferenced and unreachable through any API.
+
+_NDA_V2 = "The employee shall not disclose confidential information to third parties."
+_NDA_V3 = "The employee shall never disclose confidential information, full stop."
+
+
+def _raw_keys(rag: CiteNexus) -> list[str]:
+    """Every key under this partition's raw layer (the residue probe)."""
+    return rag._backend.list_prefix("raw/workspace=default")
+
+
+def test_revoke_removes_superseded_raw_blob(tmp_path: Path) -> None:
+    rag = _rag(tmp_path)
+    rag.ingest(text=_NDA, document_id="nda")
+    rag.ingest(text=_NDA_V2, document_id="nda")
+
+    assert rag.delete("nda").status == "deleted"
+
+    # No residue ANYWHERE under raw/ — neither the current nor the prior blob.
+    assert _raw_keys(rag) == []
+    assert not rag._backend.exists(_raw_key(_NDA))
+    assert not rag._backend.exists(_raw_key(_NDA_V2))
+
+
+def test_revoke_removes_every_superseded_blob_across_many_reingests(tmp_path: Path) -> None:
+    rag = _rag(tmp_path)
+    for text in (_NDA, _NDA_V2, _NDA_V3):
+        rag.ingest(text=text, document_id="nda")
+
+    assert rag.delete("nda").status == "deleted"
+    assert _raw_keys(rag) == []
+
+
+def test_superseded_blob_owned_by_a_live_document_survives_revoke(tmp_path: Path) -> None:
+    """Shared-bucket safety: never delete bytes another document still owns."""
+    rag = _rag(tmp_path)
+    rag.ingest(text=_NDA, document_id="nda")
+    rag.ingest(text=_NDA_V2, document_id="nda")  # _NDA is now superseded for nda
+    rag.ingest(text=_NDA, document_id="twin")  # ...but current for twin
+
+    assert rag.delete("nda").status == "deleted"
+
+    assert rag._backend.exists(_raw_key(_NDA))  # twin's bytes untouched
+    assert not rag._backend.exists(_raw_key(_NDA_V2))
+    answer = rag.ask("Can the employee disclose confidential information?")
+    assert answer.evidence.decision is Decision.answered
+    assert all(s.document == "twin" for s in answer.sources)
+
+
+def test_reingest_does_not_strand_the_prior_blob(tmp_path: Path) -> None:
+    """The leak is closed at the source too: a re-ingest reclaims its own past."""
+    rag = _rag(tmp_path)
+    rag.ingest(text=_NDA, document_id="nda")
+    rag.ingest(text=_NDA_V2, document_id="nda")
+
+    assert _raw_keys(rag) == [_raw_key(_NDA_V2)]
+
+
+def test_reingest_keeps_a_prior_blob_another_document_still_owns(tmp_path: Path) -> None:
+    rag = _rag(tmp_path)
+    rag.ingest(text=_NDA, document_id="twin")
+    rag.ingest(text=_NDA, document_id="nda")
+    rag.ingest(text=_NDA_V2, document_id="nda")
+
+    assert rag._backend.exists(_raw_key(_NDA))
+    assert rag._backend.exists(_raw_key(_NDA_V2))
