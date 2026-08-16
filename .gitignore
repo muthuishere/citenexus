@@ -48,6 +48,8 @@ example/.trustrag-data/
 
 # Language ports
 js/node_modules/
+# any nested node_modules (spikes, examples, tooling)
+node_modules/
 js/dist/
 golang/**/*.test
 
