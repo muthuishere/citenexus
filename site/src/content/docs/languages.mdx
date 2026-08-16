@@ -51,6 +51,58 @@ parity. Background:
 [ADR-0011](https://github.com/muthuishere/citenexus/blob/main/docs/adr/0011-tokenizer-and-non-latin-scripts.md).
 </Aside>
 
+## Translation: two knobs, both off by default
+
+CiteNexus never translates anything unless you ask it to, and the two places it
+*can* are separate settings with different risk profiles.
+
+### 1. Query reformulation — helps cross-lingual retrieval
+
+A French question over an English corpus aligns imperfectly in embedding space
+and shares **zero** BM25 tokens, which is a leading cause of unnecessary
+abstention. Enabling reformulation has a small model rewrite the query in
+English, then retrieves with **both** the original and the rewrite and RRF-fuses
+the two ranked lists.
+
+```python
+from citenexus.config.schema import ReformulationConfig, HttpEndpoint
+
+ReformulationConfig(
+    enabled=True,                          # default: False
+    model="gemini-2.5-flash-lite",
+    endpoint=HttpEndpoint(base_url="..."),  # required — no endpoint, no reformulation
+)
+```
+
+The original query is **always kept**. Translation damages exactly the tokens
+lexical retrieval depends on — names, IDs, clause and article numbers — so the
+rewrite is additive: it can surface candidates the original missed, but it can
+never displace them. It is enhancement-only in the strict sense too: a failure,
+an empty reply, or a rewrite identical to the original degrades to single-query
+retrieval rather than erroring.
+
+This cannot weaken the guarantee. Reformulation affects **which passages are
+retrieved**, never whether an answer is grounded — the faithfulness gate still
+verifies the answer against the passage it cites.
+
+### 2. Citation translation — additive, never in place
+
+```python
+from citenexus.config.schema import LanguageConfig
+
+LanguageConfig(translate_citations=True)   # default: False
+```
+
+Even enabled, `SourceRef.passage` stays **verbatim in the source language**. The
+translation lands on a separate, clearly marked `translation` field. A translated
+quote is not the evidence, so it never overwrites the evidence.
+
+```python
+src = response.sources[0]
+src.passage        # verbatim — this is what you show and what a reviewer diffs
+src.translation    # optional, marked, additive — a reading aid, not a citation
+```
+
 ## The answer-language rule
 
 The language of the answer is resolved by an ordered fallback chain:

@@ -81,7 +81,15 @@ and the harness flags each automatically:
    out-ranked out of the top-k by the repetitive 30-day text, so the faithfulness
    gate couldn't verify a 60-day answer.
 
-<Aside type="caution" title="This is an architectural gap, not a tuning miss">
+<Aside type="note" title="This gap is now closed — opt in">
+The numbers above are the run **without** an authority floor. Source standing now
+ships as caller-supplied ingest metadata plus a strict-mode floor: on the same
+corpus it takes out-of-jurisdiction citations from 4 to 0 and
+`abstain_when_no_evidence` to 100%. See
+[Authority — grounding is not standing](/citenexus/authority/).
+</Aside>
+
+<Aside type="caution" title="Why relevance ranking alone could not fix it">
 `SPEC-v6` deliberately does **not** adopt in-loop conflict weighing; the conflict
 model *detects/reports*, it does not resolve by source rank. Closing the authority
 gap needs a new per-document authority signal fed into fusion/rerank — tracked as

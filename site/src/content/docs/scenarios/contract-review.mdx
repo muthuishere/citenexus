@@ -88,6 +88,13 @@ rag.ingest("msa.pdf", acl=["matter-4471"])
 See [Access & partitions](/citenexus/access/) for how scope becomes a hard
 pre-filter rather than a post-filter on results.
 
+## When the wrong paper is cited
+
+A clause quoted verbatim from a superseded draft, or from the counterparty's
+template instead of the executed MSA, passes the gate — the words really are
+there. Rank the versions at ingest and let strict mode refuse below the floor:
+see [Authority — grounding is not standing](/citenexus/authority/).
+
 ## Where this goes wrong
 
 - **A clause split across a page break.** Chunking respects structure, but a

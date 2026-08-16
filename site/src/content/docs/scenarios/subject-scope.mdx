@@ -1,0 +1,165 @@
+---
+title: Wrong subject, right source
+description: A grounded, top-authority citation can still be about the wrong kind of thing. Applicability severance is why — the clause that decides whether a rule applies gets chunked into a different Evidence Unit than the rule itself.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+**The failure this does NOT yet prevent.** This page documents a known open gap,
+not a feature. Read it before you put CiteNexus in front of anyone who will act on
+an answer without reading the cited passage in full.
+
+Here is the failure, from the live law benchmark:
+
+> **Q** "How much notice must a landlord give to terminate a fixed five-year
+> **commercial** lease with a specified term in California?"
+> **A** "at least 60 days prior to the proposed date of termination"
+> — citing `01-ca-civ-1946_1-statute`, tier `controlling-statute`.
+
+That answer is wrong, and **every guard in the library passed it, correctly**:
+
+| guard | verdict | and it was right |
+|---|---|---|
+| faithfulness gate | supported | those words are verbatim in that passage |
+| [authority floor](/citenexus/authority/) | admitted | nothing outranks a controlling statute |
+| conflict detection | no conflict | no other source contradicts it |
+
+§ 1946.1 is the *right* authority. It is simply about a different **kind of
+tenancy** — a periodic tenancy with no specified term, not a fixed five-year
+commercial lease. Grounding proves **provenance**. Authority adds **standing**.
+Neither is **applicability**.
+
+## Why authority cannot be stretched to cover it
+
+An authority floor is an ordering over sources, and it withholds what falls below
+a bar. The wrong-subject source here sits at the **top** of the ordering — it is
+the most authoritative document in the corpus. No floor can exclude the top of its
+own ordering. Raising the bar higher excludes everything else and still admits
+this.
+
+That is the structural reason, and it is not a tuning problem. Two content-derived
+alternatives were measured on this corpus and both failed:
+
+- a **query-term relevance floor** — fixed 2 cases, broke 3;
+- a **content-token coverage threshold** — the two known-bad pairings score
+  `0.31` and `0.83` against a good range of `0.29–0.80`. One sits *inside* the
+  good range, the other *above every good pairing*. The signal is not weak, it is
+  anti-correlated.
+
+The general form: **the wrong-scope passage is genuinely the most topically
+relevant passage in the corpus.** It is supposed to score high. So no monotone
+function of topical relevance — rerank score, fusion score, coverage, distinct
+document count — separates it, by construction.
+
+## The root cause: applicability severance
+
+The scope information is **not missing from the corpus**. It is *severed from the
+rule it governs by chunking*.
+
+Extraction emits one paragraph per block and each block is chunked independently,
+so one statutory subdivision becomes one Evidence Unit:
+
+```text
+01-ca-civ-1946_1-statute::2::0
+  "(a) … a hiring of residential real property or commercial real property by a
+   qualified commercial tenant FOR A TERM NOT SPECIFIED BY THE PARTIES …"   <- the precondition
+
+01-ca-civ-1946_1-statute::3::0
+  "… shall give notice at least 60 days prior to the proposed date of
+   termination."                                                            <- the operative rule
+```
+
+Retrieval selected `::3::0`. The gate saw `::3::0`. The generator saw `::3::0`.
+**Nothing in the pipeline ever saw the sentence saying this rule does not apply to
+a lease with a specified term.**
+
+Measured over that corpus: **8 of 11** operative notice-period Evidence Units are
+citable in isolation from the precondition that governs them — a **73%
+applicability-severance rate**. Five of the six documents state their term-scope
+in plain prose; one states it in its own title. The information is there, and
+every downstream guard is chunk-local by design.
+
+<Aside type="note" title="Severance is a property of your extractor, not a constant">
+73% is specific to plain-text ingest of that corpus. A PDF extractor emitting
+page-level blocks would put subdivisions (a) and (b) in the *same* Evidence Unit
+and the severance would vanish for that document — then reappear the moment a
+section runs past the chunk budget. Measure it on your own corpus; do not quote
+this number as a library property.
+</Aside>
+
+## What you can do about it today
+
+Nothing here closes the class. Each raises the cost of a wrong-scope answer.
+
+<Steps>
+
+1. **Keep the whole applicability clause in one chunk.** This is the highest-value
+   move and it is free. If your documents have preconditions ("for a term not
+   specified…", "applies to entities with more than 50 employees", "for patients
+   over 12"), ingest them so the precondition and the operative rule land in the
+   same Evidence Unit — larger blocks, or a section-aware pre-split rather than a
+   paragraph-level one. A precondition the generator can see is a precondition it
+   can be held to.
+
+2. **Encode scope you already know as authority metadata.** Where the scope
+   distinction is *stable per document*, it is a tier, and [the authority
+   floor](/citenexus/authority/) already handles it. Splitting a corpus into
+   `residential-*` and `commercial-*` tiers, and flooring per question class, is a
+   deterministic, refusal-only filter you can ship now:
+
+   ```python
+   rag.ingest(path, document_id=path.stem,
+              authority={"authority_tier": "ca-residential-periodic"})
+   ```
+
+   This is exactly the ADR-0004 seam — a curator's assertion turned into a
+   deterministic input. It does **not** generalise to scope facts that vary
+   *within* a document.
+
+3. **Read the citation, not just the answer.** Every answer carries its verbatim
+   passage, document and location precisely so a reviewer can check applicability
+   themselves. In this failure the answer looks impeccable and the *passage*, read
+   in context, does not support the question. That check is currently the human's.
+
+4. **Score your own golden set for scope, not just for grounding.**
+   `groundedness_rate` was **100%** on the run that produced the bad answer above.
+   A metric that cannot fall when the answer is about the wrong subject will not
+   warn you. Add abstain-expected rows for out-of-scope questions and track them
+   separately — see [Evaluate a corpus](/citenexus/scenarios/evaluate-a-corpus/).
+
+</Steps>
+
+## What is being built, and what it will honestly buy
+
+[ADR-0012](https://github.com/muthuishere/citenexus/blob/main/docs/adr/0012-subject-scope-applicability.md)
+treats applicability the way ADR-0004 treated standing — asserted about a source,
+applied strictly after grounding, never derived from a relevance score, able only
+to *withhold*:
+
+1. **Scope-context propagation** (deterministic, default-on) — carry a document's
+   applicability clause onto every Evidence Unit derived from it, shown to the
+   generator, excluded from the verbatim citation. Measured feasible with zero
+   recall cost. It refuses nothing on its own; it makes the precondition *visible*
+   to a check, a judge, or a human, where today it is invisible to all three.
+2. **Declared scope facets + a refusal-only floor** (deterministic, opt-in) —
+   measured on the law corpus: 1/1 target case caught, 0/8 regressions… and
+   **0/6 under paraphrase**. Six rewordings of the same commercial-lease question
+   that avoid the declared vocabulary all fail open. A closed vocabulary is per
+   language, and clients do not phrase questions the way curators write lexicons.
+3. **A model scope verdict as a recorded input to a deterministic rule** — the
+   only thing with a chance against those paraphrases, and it must never be sold
+   as deterministic.
+
+<Aside type="caution" title="The sentence that stays true until (3) ships">
+CiteNexus guarantees **no ungrounded claim**. It does **not** guarantee that a
+grounded, high-authority citation is **on-scope** for the question you asked.
+</Aside>
+
+## Related
+
+- [Authority — source standing](/citenexus/authority/) — the floor that closed
+  wrong *jurisdiction*, and why it cannot close wrong *subject*.
+- [Conflicting sources](/citenexus/scenarios/conflicting-sources/) — the other
+  class where a perfectly grounded answer is the wrong output.
+- [Worked example: law](/citenexus/benchmark-law/) — the corpus and run these
+  numbers come from.

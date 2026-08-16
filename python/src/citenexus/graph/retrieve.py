@@ -66,6 +66,7 @@ class GraphRetriever(RetrieverPlugin):
                     language=row.get("language"),
                     checksum=row.get("checksum"),
                     raw_uri=row.get("raw_uri"),
+                    authority_meta=str(row.get("authority_meta") or ""),
                 )
             )
         return candidates[:k]

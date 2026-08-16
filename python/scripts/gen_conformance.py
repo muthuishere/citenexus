@@ -1386,17 +1386,26 @@ _V2_SCRIPT_SAMPLES: dict[str, str] = {
     "katakana": "コンフィデンシャルナジョウホウ",
     "latin": "The employee shall not disclose confidential information.",
     "tamil": "ஊழியர் ரகசியத் தகவலை வெளியிடக் கூடாது.",
+    "telugu": "ఉద్యోగి రహస్య సమాచారాన్ని వెల్లడించకూడదు.",
     "thai": "พนักงานต้องไม่เปิดเผยข้อมูลที่เป็นความลับ",
 }
 
 # Scripts the range table can NAME but that carry no claim. A port must report
-# these, not quietly bigram them and pretend.
+# these, not quietly bigram them and pretend. Telugu's Indic neighbours are here
+# because NAMING a script is what stops the next one reading as a neighbour plus
+# "unknown" — which is precisely how Telugu read as Devanagari.
 _V2_UNCLAIMED_SAMPLES: dict[str, str] = {
     "armenian": "Աշխատողը չպետք է բացահայտի",
     "georgian": "თანამშრომელმა არ უნდა გაამჟღავნოს",
+    "gujarati": "કર્મચારી ગોપનીય માહિતી જાહેર કરશે નહીં",
+    "gurmukhi": "ਕਰਮਚਾਰੀ ਗੁਪਤ ਜਾਣਕਾਰੀ ਜ਼ਾਹਰ ਨਹੀਂ ਕਰੇਗਾ",
+    "kannada": "ಉದ್ಯೋಗಿ ಗೌಪ್ಯ ಮಾಹಿತಿಯನ್ನು ಬಹಿರಂಗಪಡಿಸಬಾರದು",
     "khmer": "បុគ្គលិកមិនត្រូវបង្ហាញព័ត៌មានសម្ងាត់",
     "lao": "ພະນັກງານບໍ່ຄວນເປີດເຜີຍຂໍ້ມູນລັບ",
+    "malayalam": "ജീവനക്കാരൻ രഹസ്യ വിവരങ്ങൾ വെളിപ്പെടുത്തരുത്",
     "myanmar": "ဝန်ထမ်းသည် လျှို့ဝှက်ချက်ကို မဖော်ထုတ်ရ",
+    "oriya": "କର୍ମଚାରୀ ଗୋପନୀୟ ସୂଚନା ପ୍ରକାଶ କରିବେ ନାହିଁ",
+    "sinhala": "සේවකයා රහස්‍ය තොරතුරු හෙළි නොකළ යුතුය",
 }
 
 # The Unicode mechanics that differ from v1, plus the ASCII inputs that must NOT.
@@ -1416,6 +1425,14 @@ _V2_UNICODE_INPUTS: list[str] = [
     "従業員は",  # Han/Hiragana boundary: bigrams do not cross it
     "木",  # single-character continuous run
     "직원은 기밀 정보를",  # Hangul is space-delimited, NOT bigrammed
+    "ఉద్యోగి రహస్య సమాచారాన్ని",  # Telugu is space-delimited too
+    # A script ABSENT from the range table produces NO tokens: there is no
+    # validated segmentation rule for it, and answering through an unvalidated
+    # one is worse than refusing (ADR-0011). Telugu was absent and still emitted
+    # six delimited tokens, so BM25 ranked a script no fixture had validated.
+    "የሰራተኛው ሚስጥራዊ መረጃ",  # Ethiopic — unknown, so []
+    "ᏗᏙᎳᏅᏍᏗ ᎠᏓᏅᏙ",  # Cherokee — unknown, so []
+    "የሰራተኛው 2026 policy",  # only the unknown RUN is dropped
 ]
 
 _V2_UNRELATED = "Employees are entitled to thirty days of annual leave."

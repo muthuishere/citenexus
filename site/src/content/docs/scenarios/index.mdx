@@ -1,13 +1,16 @@
 ---
 title: Which scenario?
-description: Seven worked builds — contract review, conflicting sources, regulated audit, right-to-erasure, multilingual desks, corpus evaluation, and a support assistant that refuses rather than invents.
+description: Seven worked builds — contract review, conflicting sources, regulated audit, right-to-erasure, multilingual desks, corpus evaluation, and a support assistant that refuses rather than invents — plus one honest account of a failure not yet closed.
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
 Each scenario is a complete build, not a snippet: the problem, the code, what
 comes back, and — most importantly — **the specific failure it protects you
-from**. Start with the one whose failure mode you recognise.
+from**. Start with the one whose failure mode you recognise. One of them —
+*Wrong subject, right source* — documents a failure CiteNexus does **not** yet
+prevent; it is here because a docs set that only lists wins is not a docs set you
+can plan against.
 
 <CardGrid>
 	<Card title="Contract review" icon="document">
@@ -19,6 +22,11 @@ from**. Start with the one whose failure mode you recognise.
 		Two documents assert opposite things. Protects against: rank order silently
 		deciding which truth you see.
 		[Read →](/citenexus/scenarios/conflicting-sources/)
+	</Card>
+	<Card title="Wrong subject, right source" icon="information">
+		A perfectly grounded, top-authority citation about the wrong *kind* of
+		thing. A known open gap — read it before you trust an answer unread.
+		[Read →](/citenexus/scenarios/subject-scope/)
 	</Card>
 	<Card title="Regulated audit" icon="approve-check">
 		Prove the index is derived from exactly the agreed corpus. Protects against:

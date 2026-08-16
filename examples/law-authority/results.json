@@ -1,12 +1,12 @@
 {
   "metrics": {
     "total": 11,
-    "answered": 5,
-    "refused": 6,
+    "answered": 6,
+    "refused": 5,
     "groundedness_rate": 1.0,
     "citation_rate": 1.0,
-    "answer_when_grounded": 0.5,
-    "abstain_when_no_evidence": 0.6666666666666666
+    "answer_when_grounded": 0.75,
+    "abstain_when_no_evidence": 1.0
   },
   "library_evaluate": {
     "total": 11,
@@ -21,15 +21,20 @@
       "question": "How many days notice must a California landlord give to end a month-to-month residential tenancy when the tenant has lived there for more than one year?",
       "expect_decision": "answer",
       "probe": "authority",
-      "decision": "refused",
-      "answer": "I can't answer that from the available evidence.",
-      "cited_docs": [],
-      "top_doc": null,
-      "top_authority_tier": "-",
-      "distinct_documents": 0,
-      "supporting_sources": 0,
+      "decision": "answered",
+      "answer": "An owner of a residential dwelling giving notice pursuant to this section shall give notice at least 60 days prior to the proposed date of termination.",
+      "cited_docs": [
+        "02-mak-v-berkeley-2015-appellate"
+      ],
+      "top_doc": "02-mak-v-berkeley-2015-appellate",
+      "top_authority_tier": "binding-appellate",
+      "distinct_documents": 3,
+      "supporting_sources": 5,
       "conflicts_detected": 0,
-      "all_claims_verified": false,
+      "all_claims_verified": true,
+      "authority_tier_signal": "binding-appellate",
+      "authority_floor_applied": true,
+      "missing_evidence": [],
       "expected": "60",
       "correct_docs": [
         "01-ca-civ-1946_1-statute",
@@ -40,21 +45,26 @@
         "05-nolo-month-to-month-blog",
         "06-florida-83_57-statute"
       ],
-      "winner_class": "-"
+      "winner_class": "CORRECT-AUTHORITY"
     },
     {
       "question": "A tenant has rented a California apartment for three years on a month-to-month basis. How many days notice must the landlord give to end the tenancy?",
       "expect_decision": "answer",
       "probe": "authority",
-      "decision": "refused",
-      "answer": "I can't answer that from the available evidence.",
-      "cited_docs": [],
-      "top_doc": null,
-      "top_authority_tier": "-",
-      "distinct_documents": 0,
-      "supporting_sources": 0,
+      "decision": "answered",
+      "answer": "An owner of a residential dwelling or commercial real property hired by a qualified commercial tenant giving notice pursuant to this section shall give notice at least 60 days prior to the proposed date of termination.",
+      "cited_docs": [
+        "01-ca-civ-1946_1-statute"
+      ],
+      "top_doc": "01-ca-civ-1946_1-statute",
+      "top_authority_tier": "controlling-statute",
+      "distinct_documents": 3,
+      "supporting_sources": 5,
       "conflicts_detected": 0,
-      "all_claims_verified": false,
+      "all_claims_verified": true,
+      "authority_tier_signal": "controlling-statute",
+      "authority_floor_applied": true,
+      "missing_evidence": [],
       "expected": "60",
       "correct_docs": [
         "01-ca-civ-1946_1-statute",
@@ -65,23 +75,26 @@
         "05-nolo-month-to-month-blog",
         "06-florida-83_57-statute"
       ],
-      "winner_class": "-"
+      "winner_class": "CORRECT-AUTHORITY"
     },
     {
       "question": "How much notice is required to terminate a California residential month-to-month tenancy if the tenant has resided there less than one year?",
       "expect_decision": "answer",
       "probe": "",
       "decision": "answered",
-      "answer": "not less than 30 days' notice",
+      "answer": "at least 30 days prior to the proposed date of termination",
       "cited_docs": [
-        "06-florida-83_57-statute"
+        "01-ca-civ-1946_1-statute"
       ],
-      "top_doc": "06-florida-83_57-statute",
-      "top_authority_tier": "out-of-jurisdiction",
-      "distinct_documents": 5,
-      "supporting_sources": 11,
+      "top_doc": "01-ca-civ-1946_1-statute",
+      "top_authority_tier": "controlling-statute",
+      "distinct_documents": 3,
+      "supporting_sources": 6,
       "conflicts_detected": 0,
       "all_claims_verified": true,
+      "authority_tier_signal": "controlling-statute",
+      "authority_floor_applied": true,
+      "missing_evidence": [],
       "expected": "30",
       "correct_docs": [
         "01-ca-civ-1946_1-statute"
@@ -93,15 +106,20 @@
       "question": "Under California law after how many months of continuous occupancy does a landlord need just cause to terminate a tenancy?",
       "expect_decision": "answer",
       "probe": "",
-      "decision": "refused",
-      "answer": "I can't answer that from the available evidence.",
-      "cited_docs": [],
-      "top_doc": null,
-      "top_authority_tier": "-",
-      "distinct_documents": 0,
-      "supporting_sources": 0,
+      "decision": "answered",
+      "answer": "for 12 months or more",
+      "cited_docs": [
+        "03-ca-civ-1946_2-justcause-statute"
+      ],
+      "top_doc": "03-ca-civ-1946_2-justcause-statute",
+      "top_authority_tier": "statute",
+      "distinct_documents": 2,
+      "supporting_sources": 6,
       "conflicts_detected": 0,
-      "all_claims_verified": false,
+      "all_claims_verified": true,
+      "authority_tier_signal": "statute",
+      "authority_floor_applied": true,
+      "missing_evidence": [],
       "expected": "12",
       "correct_docs": [
         "03-ca-civ-1946_2-justcause-statute"
@@ -122,6 +140,11 @@
       "supporting_sources": 0,
       "conflicts_detected": 0,
       "all_claims_verified": false,
+      "authority_tier_signal": "",
+      "authority_floor_applied": true,
+      "missing_evidence": [
+        "generated answer failed the faithfulness gate"
+      ],
       "expected": "1162",
       "correct_docs": [
         "01-ca-civ-1946_1-statute",
@@ -141,10 +164,13 @@
       ],
       "top_doc": "01-ca-civ-1946_1-statute",
       "top_authority_tier": "controlling-statute",
-      "distinct_documents": 6,
-      "supporting_sources": 11,
+      "distinct_documents": 3,
+      "supporting_sources": 7,
       "conflicts_detected": 0,
       "all_claims_verified": true,
+      "authority_tier_signal": "controlling-statute",
+      "authority_floor_applied": true,
+      "missing_evidence": [],
       "expected": "charge",
       "correct_docs": [
         "01-ca-civ-1946_1-statute",
@@ -157,17 +183,20 @@
       "question": "What minimum notice is required to terminate a month-to-month tenancy in Florida?",
       "expect_decision": "answer",
       "probe": "",
-      "decision": "answered",
-      "answer": "not less than 30 days' notice",
-      "cited_docs": [
-        "06-florida-83_57-statute"
-      ],
-      "top_doc": "06-florida-83_57-statute",
-      "top_authority_tier": "out-of-jurisdiction",
-      "distinct_documents": 6,
-      "supporting_sources": 11,
+      "decision": "refused",
+      "answer": "I can't answer that from the available evidence.",
+      "cited_docs": [],
+      "top_doc": null,
+      "top_authority_tier": "-",
+      "distinct_documents": 0,
+      "supporting_sources": 0,
       "conflicts_detected": 0,
-      "all_claims_verified": true,
+      "all_claims_verified": false,
+      "authority_tier_signal": "",
+      "authority_floor_applied": true,
+      "missing_evidence": [
+        "generated answer failed the faithfulness gate"
+      ],
       "expected": "30",
       "correct_docs": [
         "06-florida-83_57-statute"
@@ -186,10 +215,13 @@
       ],
       "top_doc": "01-ca-civ-1946_1-statute",
       "top_authority_tier": "controlling-statute",
-      "distinct_documents": 5,
-      "supporting_sources": 11,
+      "distinct_documents": 3,
+      "supporting_sources": 8,
       "conflicts_detected": 0,
       "all_claims_verified": true,
+      "authority_tier_signal": "controlling-statute",
+      "authority_floor_applied": true,
+      "missing_evidence": [],
       "expected": "tenant",
       "correct_docs": [
         "01-ca-civ-1946_1-statute"
@@ -210,6 +242,11 @@
       "supporting_sources": 0,
       "conflicts_detected": 0,
       "all_claims_verified": false,
+      "authority_tier_signal": "",
+      "authority_floor_applied": true,
+      "missing_evidence": [
+        "generated answer failed the faithfulness gate"
+      ],
       "expected": "",
       "correct_docs": [],
       "trap_docs": [],
@@ -228,6 +265,11 @@
       "supporting_sources": 0,
       "conflicts_detected": 0,
       "all_claims_verified": false,
+      "authority_tier_signal": "",
+      "authority_floor_applied": true,
+      "missing_evidence": [
+        "generated answer failed the faithfulness gate"
+      ],
       "expected": "",
       "correct_docs": [],
       "trap_docs": [],
@@ -237,17 +279,20 @@
       "question": "What is the notice period to end a month-to-month tenancy in Texas?",
       "expect_decision": "abstain",
       "probe": "jurisdiction",
-      "decision": "answered",
-      "answer": "not less than 30 days' notice",
-      "cited_docs": [
-        "06-florida-83_57-statute"
-      ],
-      "top_doc": "06-florida-83_57-statute",
-      "top_authority_tier": "out-of-jurisdiction",
-      "distinct_documents": 6,
-      "supporting_sources": 11,
+      "decision": "refused",
+      "answer": "I can't answer that from the available evidence.",
+      "cited_docs": [],
+      "top_doc": null,
+      "top_authority_tier": "-",
+      "distinct_documents": 0,
+      "supporting_sources": 0,
       "conflicts_detected": 0,
-      "all_claims_verified": true,
+      "all_claims_verified": false,
+      "authority_tier_signal": "",
+      "authority_floor_applied": true,
+      "missing_evidence": [
+        "generated answer failed the faithfulness gate"
+      ],
       "expected": "",
       "correct_docs": [],
       "trap_docs": [],

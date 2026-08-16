@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import time
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 from citenexus.config.signals import Signal, requires_slow_path, resolve_signals
+from citenexus.domain.authority import encode_authority_meta
 from citenexus.domain.vision import PendingVisionRequest
 from citenexus.evidence.builder import build_evidence_units
 from citenexus.evidence.chunked_builder import Contextualizer, build_chunked_units
@@ -131,6 +133,7 @@ class IngestPipeline:
         document_id: str | None = None,
         source_type: SourceType | None = None,
         acl: Any = None,
+        authority: Mapping[str, str] | None = None,
     ) -> IngestResult:
         raw = _raw_bytes(source, text)
         doc_id = _document_id(source, text, document_id)
@@ -180,6 +183,8 @@ class IngestPipeline:
             key = f"{layer_prefix(Layer.knowledge, self._partition)}/structure/{doc_id}.json"
             self._backend.put_json(key, index.model_dump(mode="json"))
 
+        authority_meta = encode_authority_meta(authority)
+
         # embedding/text signal → embed + upsert into the leaf vector store.
         if Signal.embedding in self._signals or Signal.text in self._signals:
             started = time.perf_counter()
@@ -200,6 +205,12 @@ class IngestPipeline:
                     "page": eu.citation.page if eu.citation.page is not None else -1,
                     "checksum": checksum,
                     "raw_uri": raw_uri,
+                    # ADR-0004: ONE additive column carrying the caller's opaque
+                    # source metadata. Never parsed here -- only an
+                    # AuthorityProfile reads it, at answer time. "" on every
+                    # corpus ingested before this column existed, which the
+                    # readers decode back to {} (unranked).
+                    "authority_meta": authority_meta,
                 }
                 for eu, vector in zip(units, vectors, strict=True)
             ]
