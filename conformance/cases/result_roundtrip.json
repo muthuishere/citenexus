@@ -16,6 +16,7 @@
         "languages_in_evidence": [
           "en"
         ],
+        "unsupported_scripts": [],
         "loop": null
       },
       "claims": [
@@ -71,6 +72,7 @@
         "unsupported_claims_removed": 0,
         "conflicts_detected": 0,
         "languages_in_evidence": [],
+        "unsupported_scripts": [],
         "loop": null
       },
       "claims": [],

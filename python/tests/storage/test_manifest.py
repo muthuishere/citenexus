@@ -6,8 +6,8 @@ from citenexus.domain.partition import PartitionPath
 from citenexus.storage.backend import LocalFsBackend
 from citenexus.storage.manifest import (
     EtagManifest,
-    ProcessingManifest,
     load_manifest,
+    manifest_key,
     save_manifest,
 )
 
@@ -50,14 +50,6 @@ def test_owners_of_is_the_shared_blob_refcount() -> None:
     assert m.owners_of("shaUNIQUE", excluding="doc3") == []
 
 
-def test_processing_manifest_clear_status_is_idempotent() -> None:
-    m = ProcessingManifest()
-    m.set_status("shaX", "done")
-    m.clear_status("shaX")
-    assert m.get_status("shaX") is None
-    m.clear_status("shaX")  # absent → no error
-
-
 def test_etag_manifest_persists_via_backend(tmp_path: Path) -> None:
     backend = LocalFsBackend(tmp_path)
     part = _partition()
@@ -69,12 +61,78 @@ def test_etag_manifest_persists_via_backend(tmp_path: Path) -> None:
     assert not loaded.is_changed("doc1", "sha256:abc")
 
 
-def test_processing_manifest_round_trip(tmp_path: Path) -> None:
+
+def test_record_retires_the_previous_checksum() -> None:
+    m = EtagManifest()
+    m.record("doc1", "shaA")
+    assert m.superseded_of("doc1") == ()
+    m.record("doc1", "shaB")
+    assert m.superseded_of("doc1") == ("shaA",)
+    m.record("doc1", "shaC")
+    assert m.superseded_of("doc1") == ("shaA", "shaB")
+
+
+def test_recording_the_same_checksum_retires_nothing() -> None:
+    m = EtagManifest()
+    m.record("doc1", "shaA")
+    m.record("doc1", "shaA")
+    assert m.superseded_of("doc1") == ()
+
+
+def test_returning_to_a_retired_checksum_un_retires_it() -> None:
+    """A → B → A: the current checksum is never in the retired list."""
+    m = EtagManifest()
+    m.record("doc1", "shaA")
+    m.record("doc1", "shaB")
+    m.record("doc1", "shaA")
+    assert m.superseded_of("doc1") == ("shaB",)
+
+
+def test_retired_references_are_not_owners() -> None:
+    """Only a CURRENT reference keeps a shared blob alive."""
+    m = EtagManifest()
+    m.record("doc1", "shaSHARED")
+    m.record("doc1", "shaNEW")  # doc1 retires shaSHARED
+    assert m.owners_of("shaSHARED", excluding="doc2") == []
+    m.record("doc2", "shaSHARED")
+    assert m.owners_of("shaSHARED", excluding="doc1") == ["doc2"]
+
+
+def test_forget_drops_the_retired_history_too() -> None:
+    m = EtagManifest()
+    m.record("doc1", "shaA")
+    m.record("doc1", "shaB")
+    m.forget("doc1")
+    assert m.superseded_of("doc1") == ()
+    assert m.etags == {}
+
+
+def test_clear_superseded_is_idempotent() -> None:
+    m = EtagManifest()
+    m.record("doc1", "shaA")
+    m.record("doc1", "shaB")
+    m.clear_superseded("doc1")
+    assert m.superseded_of("doc1") == ()
+    m.clear_superseded("doc1")  # absent → no error
+
+
+def test_retired_checksums_survive_a_round_trip(tmp_path: Path) -> None:
     backend = LocalFsBackend(tmp_path)
     part = _partition()
-    m = ProcessingManifest()
-    m.set_status("hash1", "done")
-    save_manifest(backend, part, "processing_manifest.json", m)
-    loaded = load_manifest(backend, part, "processing_manifest.json", ProcessingManifest)
-    assert isinstance(loaded, ProcessingManifest)
-    assert loaded.get_status("hash1") == "done"
+    m = EtagManifest()
+    m.record("doc1", "shaA")
+    m.record("doc1", "shaB")
+    save_manifest(backend, part, "etag_manifest.json", m)
+    loaded = load_manifest(backend, part, "etag_manifest.json", EtagManifest)
+    assert isinstance(loaded, EtagManifest)
+    assert loaded.superseded_of("doc1") == ("shaA",)
+
+
+def test_a_manifest_written_before_superseded_existed_still_loads(tmp_path: Path) -> None:
+    """Forward-compat: older manifests have no ``superseded`` key at all."""
+    backend = LocalFsBackend(tmp_path)
+    part = _partition()
+    backend.put_json(manifest_key(part, "etag_manifest.json"), {"etags": {"doc1": "shaA"}})
+    loaded = load_manifest(backend, part, "etag_manifest.json", EtagManifest)
+    assert isinstance(loaded, EtagManifest)
+    assert loaded.superseded_of("doc1") == ()

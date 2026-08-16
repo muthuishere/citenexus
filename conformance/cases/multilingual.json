@@ -95,7 +95,7 @@
   ],
   "bm25": [
     {
-      "name": "turkish dotted-I: query 'İstanbul' -> tokens i + stanbul",
+      "name": "turkish dotted-I: query 'İstanbul' -> one token i+U+0307+stanbul",
       "rows": [
         {
           "eu_id": "tr::0",
@@ -110,12 +110,12 @@
       "expected": [
         {
           "eu_id": "tr::0",
-          "score": 1.255876
+          "score": 0.693147
         }
       ]
     },
     {
-      "name": "german ß: query 'Straße' -> tokens stra + e",
+      "name": "german ß: query 'Straße' case-folds to one token strasse",
       "rows": [
         {
           "eu_id": "de::0",
@@ -130,12 +130,12 @@
       "expected": [
         {
           "eu_id": "de::0",
-          "score": 1.598017
+          "score": 0.693147
         }
       ]
     },
     {
-      "name": "cjk text ranks only by its embedded latin/digit tokens",
+      "name": "cjk text ranks by latin/digit tokens AND its han bigrams",
       "rows": [
         {
           "eu_id": "cjk::0",
@@ -150,7 +150,7 @@
       "expected": [
         {
           "eu_id": "cjk::0",
-          "score": 1.302558
+          "score": 1.32028
         }
       ]
     }

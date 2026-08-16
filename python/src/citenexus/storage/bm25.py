@@ -3,8 +3,12 @@
 Text search is its own store seam, symmetric with ``VectorStore``: Postgres
 implements it natively (``tsvector``), and THIS is what LanceDB — or any store
 that can ``scan()`` — uses. It scores the leaf's scanned rows with classic BM25
-over a language-agnostic tokenizer (lowercase ``[a-z0-9]+``, **no** stemming,
-**no** stopword list, §11a-safe) and returns the same ``_text_score``-carrying
+over the Unicode tokenizer (``tokenize_v2``: case-folded, Unicode word classes,
+character-bigram segmentation for spaceless scripts, **no** stemming, **no**
+stopword list, §11a-safe). It was ``tokenize`` v1 until ADR-0011: v1 is ASCII
+only, so lexical retrieval scored **zero** on every non-Latin script. v2 is
+identical to v1 on pure-ASCII text, so the pinned BM25 conformance vectors did
+not move and returns the same ``_text_score``-carrying
 row shape as every other ``TextSearch`` backend, so the lexical retriever has
 exactly one code path.
 
@@ -20,7 +24,7 @@ import math
 from collections import Counter
 from typing import TYPE_CHECKING, Any
 
-from citenexus.tokenize import tokenize
+from citenexus.tokenize import tokenize_v2
 
 if TYPE_CHECKING:
     from citenexus.storage.protocols import VectorStore
@@ -43,11 +47,11 @@ class Bm25TextSearch:
         rows = self._store.scan()
         if not rows:
             return []
-        terms = tokenize(query)
+        terms = tokenize_v2(query)
         if not terms:
             return []
 
-        tokenized = [tokenize(str(row.get("text", ""))) for row in rows]
+        tokenized = [tokenize_v2(str(row.get("text", ""))) for row in rows]
         n_docs = len(rows)
         avg_len = sum(len(toks) for toks in tokenized) / n_docs or 1.0
 

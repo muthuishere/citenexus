@@ -1,0 +1,515 @@
+{
+  "tokenizer_version": 2,
+  "supported_scripts": [
+    "arabic",
+    "bengali",
+    "cyrillic",
+    "devanagari",
+    "greek",
+    "han",
+    "hangul",
+    "hebrew",
+    "hiragana",
+    "katakana",
+    "latin",
+    "tamil",
+    "thai"
+  ],
+  "continuous_scripts": [
+    "han",
+    "hiragana",
+    "katakana",
+    "khmer",
+    "lao",
+    "myanmar",
+    "thai"
+  ],
+  "unrelated_passage": "Employees are entitled to thirty days of annual leave.",
+  "supported": [
+    {
+      "script": "arabic",
+      "text": "لا يجوز للموظف إفشاء المعلومات السرية.",
+      "tokens": [
+        "لا",
+        "يجوز",
+        "للموظف",
+        "إفشاء",
+        "المعلومات",
+        "السرية"
+      ],
+      "v1_tokens": [],
+      "self_supported": true,
+      "unrelated_supported": false,
+      "unsupported_scripts": []
+    },
+    {
+      "script": "bengali",
+      "text": "কর্মচারী গোপনীয় তথ্য প্রকাশ করবেন না।",
+      "tokens": [
+        "কর্মচারী",
+        "গোপনীয়",
+        "তথ্য",
+        "প্রকাশ",
+        "করবেন",
+        "না"
+      ],
+      "v1_tokens": [],
+      "self_supported": true,
+      "unrelated_supported": false,
+      "unsupported_scripts": []
+    },
+    {
+      "script": "cyrillic",
+      "text": "Работник не должен раскрывать конфиденциальную информацию.",
+      "tokens": [
+        "работник",
+        "не",
+        "должен",
+        "раскрывать",
+        "конфиденциальную",
+        "информацию"
+      ],
+      "v1_tokens": [],
+      "self_supported": true,
+      "unrelated_supported": false,
+      "unsupported_scripts": []
+    },
+    {
+      "script": "devanagari",
+      "text": "कर्मचारी गोपनीय जानकारी प्रकट नहीं करेगा।",
+      "tokens": [
+        "कर्मचारी",
+        "गोपनीय",
+        "जानकारी",
+        "प्रकट",
+        "नहीं",
+        "करेगा"
+      ],
+      "v1_tokens": [],
+      "self_supported": true,
+      "unrelated_supported": false,
+      "unsupported_scripts": []
+    },
+    {
+      "script": "greek",
+      "text": "Ο εργαζόμενος δεν πρέπει να αποκαλύπτει εμπιστευτικές πληροφορίες.",
+      "tokens": [
+        "ο",
+        "εργαζόμενοσ",
+        "δεν",
+        "πρέπει",
+        "να",
+        "αποκαλύπτει",
+        "εμπιστευτικέσ",
+        "πληροφορίεσ"
+      ],
+      "v1_tokens": [],
+      "self_supported": true,
+      "unrelated_supported": false,
+      "unsupported_scripts": []
+    },
+    {
+      "script": "han",
+      "text": "员工不得披露机密信息。",
+      "tokens": [
+        "员工",
+        "工不",
+        "不得",
+        "得披",
+        "披露",
+        "露机",
+        "机密",
+        "密信",
+        "信息"
+      ],
+      "v1_tokens": [],
+      "self_supported": true,
+      "unrelated_supported": false,
+      "unsupported_scripts": []
+    },
+    {
+      "script": "hangul",
+      "text": "직원은 기밀 정보를 공개해서는 안 된다.",
+      "tokens": [
+        "직원은",
+        "기밀",
+        "정보를",
+        "공개해서는",
+        "안",
+        "된다"
+      ],
+      "v1_tokens": [],
+      "self_supported": true,
+      "unrelated_supported": false,
+      "unsupported_scripts": []
+    },
+    {
+      "script": "hebrew",
+      "text": "העובד לא יגלה מידע סודי.",
+      "tokens": [
+        "העובד",
+        "לא",
+        "יגלה",
+        "מידע",
+        "סודי"
+      ],
+      "v1_tokens": [],
+      "self_supported": true,
+      "unrelated_supported": false,
+      "unsupported_scripts": []
+    },
+    {
+      "script": "hiragana",
+      "text": "従業員は機密情報を開示してはならない。",
+      "tokens": [
+        "従業",
+        "業員",
+        "は",
+        "機密",
+        "密情",
+        "情報",
+        "を",
+        "開示",
+        "して",
+        "ては",
+        "はな",
+        "なら",
+        "らな",
+        "ない"
+      ],
+      "v1_tokens": [],
+      "self_supported": true,
+      "unrelated_supported": false,
+      "unsupported_scripts": []
+    },
+    {
+      "script": "katakana",
+      "text": "コンフィデンシャルナジョウホウ",
+      "tokens": [
+        "コン",
+        "ンフ",
+        "フィ",
+        "ィデ",
+        "デン",
+        "ンシ",
+        "シャ",
+        "ャル",
+        "ルナ",
+        "ナジ",
+        "ジョ",
+        "ョウ",
+        "ウホ",
+        "ホウ"
+      ],
+      "v1_tokens": [],
+      "self_supported": true,
+      "unrelated_supported": false,
+      "unsupported_scripts": []
+    },
+    {
+      "script": "latin",
+      "text": "The employee shall not disclose confidential information.",
+      "tokens": [
+        "the",
+        "employee",
+        "shall",
+        "not",
+        "disclose",
+        "confidential",
+        "information"
+      ],
+      "v1_tokens": [
+        "the",
+        "employee",
+        "shall",
+        "not",
+        "disclose",
+        "confidential",
+        "information"
+      ],
+      "self_supported": true,
+      "unrelated_supported": false,
+      "unsupported_scripts": []
+    },
+    {
+      "script": "tamil",
+      "text": "ஊழியர் ரகசியத் தகவலை வெளியிடக் கூடாது.",
+      "tokens": [
+        "ஊழியர்",
+        "ரகசியத்",
+        "தகவலை",
+        "வெளியிடக்",
+        "கூடாது"
+      ],
+      "v1_tokens": [],
+      "self_supported": true,
+      "unrelated_supported": false,
+      "unsupported_scripts": []
+    },
+    {
+      "script": "thai",
+      "text": "พนักงานต้องไม่เปิดเผยข้อมูลที่เป็นความลับ",
+      "tokens": [
+        "พน",
+        "นั",
+        "ัก",
+        "กง",
+        "งา",
+        "าน",
+        "นต",
+        "ต้",
+        "้อ",
+        "อง",
+        "งไ",
+        "ไม",
+        "ม่",
+        "่เ",
+        "เป",
+        "ปิ",
+        "ิด",
+        "ดเ",
+        "เผ",
+        "ผย",
+        "ยข",
+        "ข้",
+        "้อ",
+        "อม",
+        "มู",
+        "ูล",
+        "ลท",
+        "ที",
+        "ี่",
+        "่เ",
+        "เป",
+        "ป็",
+        "็น",
+        "นค",
+        "คว",
+        "วา",
+        "าม",
+        "มล",
+        "ลั",
+        "ับ"
+      ],
+      "v1_tokens": [],
+      "self_supported": true,
+      "unrelated_supported": false,
+      "unsupported_scripts": []
+    }
+  ],
+  "unclaimed": [
+    {
+      "script": "armenian",
+      "text": "Աշխատողը չպետք է բացահայտի",
+      "unsupported_scripts": [
+        "armenian"
+      ]
+    },
+    {
+      "script": "georgian",
+      "text": "თანამშრომელმა არ უნდა გაამჟღავნოს",
+      "unsupported_scripts": [
+        "georgian"
+      ]
+    },
+    {
+      "script": "khmer",
+      "text": "បុគ្គលិកមិនត្រូវបង្ហាញព័ត៌មានសម្ងាត់",
+      "unsupported_scripts": [
+        "khmer"
+      ]
+    },
+    {
+      "script": "lao",
+      "text": "ພະນັກງານບໍ່ຄວນເປີດເຜີຍຂໍ້ມູນລັບ",
+      "unsupported_scripts": [
+        "lao"
+      ]
+    },
+    {
+      "script": "myanmar",
+      "text": "ဝန်ထမ်းသည် လျှို့ဝှက်ချက်ကို မဖော်ထုတ်ရ",
+      "unsupported_scripts": [
+        "myanmar"
+      ]
+    }
+  ],
+  "unicode": [
+    {
+      "input": "Hello, World!",
+      "tokens": [
+        "hello",
+        "world"
+      ]
+    },
+    {
+      "input": "The price is $4.50 (approx).",
+      "tokens": [
+        "the",
+        "price",
+        "is",
+        "4",
+        "50",
+        "approx"
+      ]
+    },
+    {
+      "input": "ISO-9001:2015 certified",
+      "tokens": [
+        "iso",
+        "9001",
+        "2015",
+        "certified"
+      ]
+    },
+    {
+      "input": "MixedCASE tokens123abc under_score",
+      "tokens": [
+        "mixedcase",
+        "tokens123abc",
+        "under",
+        "score"
+      ]
+    },
+    {
+      "input": "co-operate re-use state-of-the-art",
+      "tokens": [
+        "co",
+        "operate",
+        "re",
+        "use",
+        "state",
+        "of",
+        "the",
+        "art"
+      ]
+    },
+    {
+      "input": "Café Münster naïve résumé",
+      "tokens": [
+        "café",
+        "münster",
+        "naïve",
+        "résumé"
+      ]
+    },
+    {
+      "input": "Über die Straße",
+      "tokens": [
+        "über",
+        "die",
+        "strasse"
+      ]
+    },
+    {
+      "input": "தமிழ் உரை and english words",
+      "tokens": [
+        "தமிழ்",
+        "உரை",
+        "and",
+        "english",
+        "words"
+      ]
+    },
+    {
+      "input": "3.14159 and 2e10 numbers",
+      "tokens": [
+        "3",
+        "14159",
+        "and",
+        "2e10",
+        "numbers"
+      ]
+    },
+    {
+      "input": "",
+      "tokens": []
+    },
+    {
+      "input": "   \n\t  ",
+      "tokens": []
+    },
+    {
+      "input": "Café Münster naïve résumé",
+      "tokens": [
+        "café",
+        "münster",
+        "naïve",
+        "résumé"
+      ]
+    },
+    {
+      "input": "Straße",
+      "tokens": [
+        "strasse"
+      ]
+    },
+    {
+      "input": "STRASSE",
+      "tokens": [
+        "strasse"
+      ]
+    },
+    {
+      "input": "ＡＢＣ１２３",
+      "tokens": [
+        "abc123"
+      ]
+    },
+    {
+      "input": "İstanbul",
+      "tokens": [
+        "i̇stanbul"
+      ]
+    },
+    {
+      "input": "Déjà",
+      "tokens": [
+        "déjà"
+      ]
+    },
+    {
+      "input": "Déjà",
+      "tokens": [
+        "déjà"
+      ]
+    },
+    {
+      "input": "東京tokyo",
+      "tokens": [
+        "東京",
+        "tokyo"
+      ]
+    },
+    {
+      "input": "日本語。中国",
+      "tokens": [
+        "日本",
+        "本語",
+        "中国"
+      ]
+    },
+    {
+      "input": "従業員は",
+      "tokens": [
+        "従業",
+        "業員",
+        "は"
+      ]
+    },
+    {
+      "input": "木",
+      "tokens": [
+        "木"
+      ]
+    },
+    {
+      "input": "직원은 기밀 정보를",
+      "tokens": [
+        "직원은",
+        "기밀",
+        "정보를"
+      ]
+    }
+  ]
+}
