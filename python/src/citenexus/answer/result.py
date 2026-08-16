@@ -73,6 +73,16 @@ class EvidenceSignals(BaseModel):
     # let the ASCII-only tokenizer hide. Empty on every Latin-script Result, so
     # existing Results serialize unchanged.
     unsupported_scripts: tuple[str, ...] = ()
+    # The cited source's authority tier name, and whether the strict-mode
+    # authority floor was enforced on this call (ADR-0004). A STANDING signal,
+    # never an evidence judgement — the same distinction ``unsupported_scripts``
+    # draws for capability. A refusal with ``authority_floor_applied`` true says
+    # "what I found has no standing here", which is a different thing from "the
+    # evidence isn't there"; conflating the two is exactly how an out-of-
+    # jurisdiction citation stayed invisible behind 100% groundedness. Empty on
+    # every Result from an unranked corpus, so those serialize unchanged.
+    authority_tier: str = ""
+    authority_floor_applied: bool = False
     # Present only for the agentic deep strategy; ``None`` on the strict flow so
     # existing Results are byte-identical.
     loop: LoopSignals | None = None

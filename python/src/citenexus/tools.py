@@ -38,6 +38,10 @@ def build_tools(rag: CiteNexus) -> list[ToolSpec]:
                 "checksum": c.checksum,
                 "signal": c.signal.value,
                 "score": c.score,
+                # Caller-supplied source METADATA (ADR-0004) — opaque here, and
+                # not citable text: navigate-not-cite is untouched. The deep-ask
+                # loop needs it to know a passage's STANDING before pooling it.
+                "authority_meta": c.authority_meta,
             }
             for c in rag.retrieve(query, k=k)
         ]

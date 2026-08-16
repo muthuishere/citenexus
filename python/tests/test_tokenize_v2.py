@@ -14,12 +14,17 @@ words.
 
 from __future__ import annotations
 
+import itertools
+import unicodedata
+
 import pytest
 
 from citenexus.answer.verify import is_supported_v2
 from citenexus.tokenize import (
+    _SCRIPT_RANGES,
     SUPPORTED_SCRIPTS,
     TOKENIZER_VERSION,
+    script_of,
     scripts_in,
     tokenize,
     tokenize_v2,
@@ -35,6 +40,7 @@ SAMPLES: dict[str, str] = {
     "arabic": "لا يجوز للموظف إفشاء المعلومات السرية.",
     "devanagari": "कर्मचारी गोपनीय जानकारी प्रकट नहीं करेगा।",
     "tamil": "ஊழியர் ரகசியத் தகவலை வெளியிடக் கூடாது.",
+    "telugu": "ఉద్యోగి రహస్య సమాచారాన్ని వెల్లడించకూడదు.",
     "han": "员工不得披露机密信息。",
     "hiragana": "従業員は機密情報を開示してはならない。",
     "hangul": "직원은 기밀 정보를 공개해서는 안 된다.",
@@ -203,6 +209,15 @@ def test_scripts_in_reports_what_it_found() -> None:
         ("myanmar", "ဝန်ထမ်းသည် လျှို့ဝှက်ချက်ကို မဖော်ထုတ်ရ"),
         ("georgian", "თანამშრომელმა არ უნდა გაამჟღავნოს"),
         ("armenian", "Աշխատողը չպետք է բացահայտի"),
+        # Telugu's Indic neighbours. The range table NAMES them — which is what
+        # stops the next one reading as a neighbour plus "unknown", the way
+        # Telugu did — but none carries a golden fixture, so none is claimed.
+        ("gurmukhi", "ਕਰਮਚਾਰੀ ਗੁਪਤ ਜਾਣਕਾਰੀ ਜ਼ਾਹਰ ਨਹੀਂ ਕਰੇਗਾ"),
+        ("gujarati", "કર્મચારી ગોપનીય માહિતી જાહેર કરશે નહીં"),
+        ("oriya", "କର୍ମଚାରୀ ଗୋପନୀୟ ସୂଚନା ପ୍ରକାଶ କରିବେ ନାହିଁ"),
+        ("kannada", "ಉದ್ಯೋಗಿ ಗೌಪ್ಯ ಮಾಹಿತಿಯನ್ನು ಬಹಿರಂಗಪಡಿಸಬಾರದು"),
+        ("malayalam", "ജീവനക്കാരൻ രഹസ്യ വിവരങ്ങൾ വെളിപ്പെടുത്തരുത്"),
+        ("sinhala", "සේවකයා රහස්‍ය තොරතුරු හෙළි නොකළ යුතුය"),
     ],
 )
 def test_unclaimed_scripts_are_reported_not_silently_half_working(name: str, text: str) -> None:
@@ -218,6 +233,155 @@ def test_supported_text_reports_no_unsupported_script() -> None:
 
 def test_mixed_text_reports_only_the_unsupported_part() -> None:
     assert unsupported_scripts("see also បុគ្គលិក") == ("khmer",)
+
+
+# --------------------------------------------------------------------------- #
+# the range table itself — the layer Telugu fell through
+#
+# Telugu (U+0C00-U+0C7F) was not in `_SCRIPT_RANGES` at all. It therefore read as
+# a NEIGHBOUR plus "unknown", and still emitted six delimited tokens, so BM25
+# ranked a script no fixture had ever validated while `answer/flow.py` filtered
+# every Telugu passage out of the grounding set. These tests make both halves of
+# that impossible to repeat: a claimed script must classify to ITSELF over its
+# whole Unicode repertoire, and an unnamed script must not tokenize at all.
+# --------------------------------------------------------------------------- #
+
+
+def test_script_ranges_are_sorted_and_disjoint() -> None:
+    for prev, nxt in itertools.pairwise(_SCRIPT_RANGES):
+        assert prev[0] <= prev[1], prev
+        assert prev[1] < nxt[0], (prev, nxt)
+
+
+# Japanese genuinely mixes Han and Hiragana in one sentence; nothing else here
+# is legitimately multi-script.
+_EXPECTED_SAMPLE_SCRIPTS = {script: (script,) for script in SAMPLES} | {
+    "hiragana": ("han", "hiragana")
+}
+
+
+@pytest.mark.parametrize("script", sorted(SAMPLES))
+def test_each_sample_classifies_to_exactly_its_own_script(script: str) -> None:
+    """Not 'contains its script' — IS its script, with no second script and no
+    "unknown" riding along. Telugu's symptom was exactly that extra member:
+    ('devanagari', 'unknown')."""
+    found = scripts_in(SAMPLES[script])
+    assert found == _EXPECTED_SAMPLE_SCRIPTS[script]
+    assert set(found) <= SUPPORTED_SCRIPTS
+
+
+# The Unicode character name is the independent source of truth here: Python's
+# stdlib has no Script property, but every character in these scripts is named
+# after it ("TELUGU LETTER A", "CYRILLIC SMALL LETTER A"). Restricted to
+# characters that survive NFKC, because tokenize_v2 normalizes before it
+# classifies — a compatibility character never reaches the table.
+_NAME_PREFIX_TO_SCRIPT = {
+    "ARABIC": "arabic",
+    "BENGALI": "bengali",
+    "CJK": "han",
+    "CYRILLIC": "cyrillic",
+    "DEVANAGARI": "devanagari",
+    "GREEK": "greek",
+    "HANGUL": "hangul",
+    "HEBREW": "hebrew",
+    "HIRAGANA": "hiragana",
+    "KATAKANA": "katakana",
+    "LATIN": "latin",
+    "TAMIL": "tamil",
+    "TELUGU": "telugu",
+    "THAI": "thai",
+}
+
+
+def test_every_claimed_script_covers_its_whole_unicode_repertoire() -> None:
+    """A claimed script must classify to ITSELF for every character Unicode names
+    as belonging to it. This is the sweep that would have caught Telugu — it was
+    absent from the table entirely, so there was nothing to decline."""
+    assert set(_NAME_PREFIX_TO_SCRIPT.values()) == SUPPORTED_SCRIPTS
+    holes: list[tuple[str, str, str]] = []
+    for cp in range(0x110000):
+        ch = chr(cp)
+        if unicodedata.category(ch)[0] not in ("L", "N", "M"):
+            continue
+        if unicodedata.normalize("NFKC", ch) != ch:
+            continue
+        name = unicodedata.name(ch, "")
+        want = next(
+            (s for p, s in _NAME_PREFIX_TO_SCRIPT.items() if name.startswith(p + " ")),
+            None,
+        )
+        if want is None:
+            continue
+        got = script_of(ch)
+        if got != want:
+            holes.append((f"U+{cp:04X}", want, got))
+    assert holes == [], f"claimed scripts with uncovered characters: {holes[:10]}"
+
+
+_UNNAMED_SCRIPT_SAMPLES = [
+    "የሰራተኛው ሚስጥራዊ መረጃ",  # Ethiopic
+    "ᏗᏙᎳᏅᏍᏗ ᎠᏓᏅᏙ",  # Cherokee
+    "ཞིབ་འཇུག",  # Tibetan
+]
+
+
+@pytest.mark.parametrize("text", _UNNAMED_SCRIPT_SAMPLES)
+def test_a_script_absent_from_the_table_does_not_tokenize_at_all(text: str) -> None:
+    """The structural half of the fix. A script the table has never heard of has
+    no validated segmentation rule, so it produces NOTHING — BM25 cannot rank it
+    and the gate cannot accept it. ADR-0011: answering through an unvalidated
+    segmentation is worse than refusing."""
+    assert scripts_in(text) == ("unknown",)
+    assert unsupported_scripts(text) == ("unknown",)
+    assert tokenize_v2(text) == []
+
+
+@pytest.mark.parametrize("text", _UNNAMED_SCRIPT_SAMPLES)
+def test_an_unnamed_script_refuses_rather_than_rubber_stamping(text: str) -> None:
+    """Zero tokens must mean REFUSE, never vacuous-true: an empty claim has no
+    alignment, so the gate rejects even a verbatim quote of the passage."""
+    assert is_supported_v2(text, text) is False
+
+
+def test_an_unnamed_script_does_not_take_the_rest_of_the_sentence_with_it() -> None:
+    """Only the unknown run is dropped; the validated part still tokenizes, so a
+    stray character cannot silence an otherwise-supported passage."""
+    assert tokenize_v2("የሰራተኛው 2026 policy") == ["2026", "policy"]
+
+
+# --------------------------------------------------------------------------- #
+# Telugu — the regression this file exists for
+# --------------------------------------------------------------------------- #
+
+
+def test_telugu_tokenizes_and_classifies_as_telugu() -> None:
+    text = SAMPLES["telugu"]
+    assert scripts_in(text) == ("telugu",)  # was ('devanagari', 'unknown')
+    assert tokenize_v2(text) == [
+        "ఉద్యోగి",
+        "రహస్య",
+        "సమాచారాన్ని",
+        "వెల్లడించకూడదు",
+    ]
+    assert unsupported_scripts(text) == ()
+
+
+def test_telugu_is_delimited_not_bigram_indexed() -> None:
+    """Telugu writes spaces. Bigramming it would be the mirror defect."""
+    assert tokenize_v2("ఉద్యోగి రహస్య") == ["ఉద్యోగి", "రహస్య"]
+
+
+def test_the_measured_wrong_answer_can_now_be_cited() -> None:
+    """examples/multilingual: the Hyderabad annexure caps carry-forward at 5 days
+    and overrides the English handbook's 10. Telugu classified as unknown, so
+    `answer/flow.py` filtered the passage out of the grounding set and the
+    English "maximum of 10 days" was cited instead — grounded, correctly cited
+    and WRONG. The gate must accept the Telugu passage's own words."""
+    passage = "వాడని ఆర్జిత సెలవులో గరిష్ఠంగా 5 రోజులు మాత్రమే తదుపరి సెలవు సంవత్సరానికి బదిలీ చేయవచ్చు."
+    claim = "గరిష్ఠంగా 5 రోజులు బదిలీ చేయవచ్చు"
+    assert unsupported_scripts(passage) == ()
+    assert is_supported_v2(claim, passage) is True
+    assert is_supported_v2("గరిష్ఠంగా 10 రోజులు బదిలీ చేయవచ్చు", passage) is False
 
 
 # --------------------------------------------------------------------------- #

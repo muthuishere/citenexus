@@ -18,6 +18,14 @@ Two invariants carry the guarantee:
   call and the final ``generate()`` too, not just the between-hop check. A hung
   model call cannot exceed it, and an interrupted generation is DISCARDED (its
   partial text has no source span and never enters the pool or the answer).
+
+AUTHORITY (ADR-0004) enters at **pool admission**, hop by hop — not once at the
+end. The gate above is single-EU, so *any* pooled unit is on its own sufficient
+to carry a claim; a below-floor unit allowed into the pool would also occupy a
+``max_evidence_units`` slot, be shown to the decision model (where it can declare
+sufficiency and stop the search), and be able to manufacture a conflict. So the
+invariant is stated at the pool: **it contains only evidence that could
+legitimately be cited**, and no later stage needs to know authority exists.
 """
 
 from __future__ import annotations
@@ -31,6 +39,11 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from citenexus.answer.authority import (
+    INSUFFICIENT_AUTHORITY,
+    select_by_authority,
+    tier_of,
+)
 from citenexus.answer.conflict import (
     CONFLICT_TOP_K,
     ConflictPair,
@@ -52,8 +65,10 @@ from citenexus.answer.result import (
 )
 from citenexus.answer.segment import split_claims
 from citenexus.answer.verify import is_supported_v2
+from citenexus.domain.authority import AuthorityPolicy
 from citenexus.domain.trust import TrustMode
-from citenexus.lang.fallback import resolve_answer_language
+from citenexus.lang.fallback import resolve_requested_answer_language
+from citenexus.plugins import LanguageDetectorPlugin
 
 ToolSpec = dict[str, Any]
 
@@ -89,6 +104,10 @@ class _PooledEvidence:
     checksum: str | None
     signal: str
     score: float
+    #: Caller-supplied source metadata as canonical JSON (ADR-0004). Opaque:
+    #: only an ``AuthorityProfile`` reads it, and never the text above. ``""``
+    #: (a tool that does not report it, or a pre-feature corpus) ⇒ unranked.
+    authority_meta: str = ""
 
 
 class _LoopTimeout(Exception):
@@ -144,6 +163,7 @@ def _to_pooled(row: dict[str, Any]) -> _PooledEvidence | None:
         checksum=row.get("checksum"),
         signal=str(row.get("signal", "vector")),
         score=float(row.get("score", 0.0)),
+        authority_meta=str(row.get("authority_meta") or ""),
     )
 
 
@@ -158,12 +178,20 @@ class AgenticAnswerFlow:
         tools: Sequence[ToolSpec],
         budget: LoopBudget | None = None,
         default_answer_language: str = "en",
+        authority: AuthorityPolicy | None = None,
+        detector: LanguageDetectorPlugin | None = None,
     ) -> None:
         self._generator = generator
         self._decider = decider
         self._search = _find_search(tools)
         self._budget = budget or LoopBudget()
         self._default_answer_language = default_answer_language
+        # Used ONLY for ``answer_language="auto"`` -- the same rule as the strict
+        # flow, because a guarantee that holds on one strategy is not one.
+        self._detector = detector
+        # The SAME policy the strict flow takes (ADR-0004). ``default.v1`` with
+        # no floor is the default: every tier equal, nothing ever withheld.
+        self._authority = authority or AuthorityPolicy.unranked()
 
     def ask(
         self,
@@ -178,6 +206,7 @@ class AgenticAnswerFlow:
         query = question
         tool_calls = 0
         hops = 0
+        withheld = 0
         stop_reason = LoopStopReason.budget
 
         for _hop in range(budget.max_hops):
@@ -198,11 +227,19 @@ class AgenticAnswerFlow:
                 break
             tool_calls += 1
 
+            # AUTHORITY AT ADMISSION (ADR-0004). Standing is checked BEFORE the
+            # pool, so a below-floor unit never occupies a budget slot, never
+            # reaches the decision model, never enters the conflict window and
+            # can never be the "some single EU" that satisfies a claim. Applying
+            # it once at the end would be too late on all four counts.
+            admissible = [eu for eu in (_to_pooled(row) for row in rows) if eu is not None]
+            selection = select_by_authority(admissible, policy=self._authority, mode=mode)
+            withheld += len(selection.excluded)
+
             added = 0
             capped = False
-            for row in rows:
-                eu = _to_pooled(row)
-                if eu is None or eu.eu_id in pool:
+            for eu in selection.candidates:
+                if eu.eu_id in pool:
                     continue
                 pool[eu.eu_id] = eu
                 added += 1
@@ -212,9 +249,16 @@ class AgenticAnswerFlow:
             if capped:
                 stop_reason = LoopStopReason.budget
                 break
-            if added == 0:
+            if added == 0 and not selection.excluded:
                 # A hop that adds no unseen EU ends the loop (the deterministic
                 # default stop). Draft/model text is never poolable — only EUs.
+                #
+                # A hop whose rows were all WITHHELD for standing is excluded
+                # from this: "I found nothing" is not "what I found has no
+                # standing", and conflating them here would repeat, inside the
+                # loop, the very defect ADR-0004 exists to end. Such a hop falls
+                # through to the decider and may refine — still bounded by
+                # max_hops / max_tool_calls / timeout_s.
                 stop_reason = LoopStopReason.no_new_evidence
                 break
 
@@ -244,6 +288,7 @@ class AgenticAnswerFlow:
             stop_reason=stop_reason,
             hops=hops,
             tool_calls=tool_calls,
+            withheld=withheld,
         )
 
     def _finish(
@@ -257,13 +302,26 @@ class AgenticAnswerFlow:
         stop_reason: LoopStopReason,
         hops: int,
         tool_calls: int,
+        withheld: int,
     ) -> Result:
-        units = list(pool.values())
+        # Order the pool by descending tier (stable, so equal tiers keep pooling
+        # order). This is the same selection point, used for its ORDERING half:
+        # the generator sees the strongest standing first, and the single-EU gate
+        # attributes each claim to the most authoritative EU that supports it.
+        # Nothing is withheld here — admission already did that.
+        units = list(
+            select_by_authority(
+                list(pool.values()), policy=self._authority, mode=mode
+            ).candidates
+        )
+        floor_applied = withheld > 0
         languages = tuple(dict.fromkeys(e.language for e in units if e.language is not None))
-        language = resolve_answer_language(
-            detection=None,
-            answer_language=answer_language,
-            languages_in_evidence=languages,
+        # The caller's word, then the question, then the configured default --
+        # never the pool. ``languages`` stays a reported signal only.
+        language = resolve_requested_answer_language(
+            question,
+            answer_language,
+            detector=self._detector,
             default_answer_language=self._default_answer_language,
         )
         loop = LoopSignals(
@@ -273,11 +331,18 @@ class AgenticAnswerFlow:
             evidence_units=len(units),
         )
         if not units:
+            # An empty pool because the floor withheld everything is a DIFFERENT
+            # fact from an empty corpus, and says so — as in the strict flow, and
+            # as here, without ever calling the generator.
             return self._refuse(
                 mode=mode,
                 language=language,
-                reason="no sufficiently relevant evidence found",
+                reason=(
+                    INSUFFICIENT_AUTHORITY if floor_applied
+                    else "no sufficiently relevant evidence found"
+                ),
                 loop=loop,
+                authority_floor_applied=floor_applied,
             )
 
         passage = "\n".join(e.text for e in units)
@@ -294,6 +359,7 @@ class AgenticAnswerFlow:
                 language=language,
                 reason="generation exceeded the whole-loop timeout",
                 loop=loop.model_copy(update={"stop_reason": LoopStopReason.timeout}),
+                authority_floor_applied=floor_applied,
             )
 
         supported, removed = self._gate(answer_text, units)
@@ -303,6 +369,7 @@ class AgenticAnswerFlow:
                 language=language,
                 reason="no claim passed the per-claim single-EU faithfulness gate",
                 loop=loop,
+                authority_floor_applied=floor_applied,
             )
 
         decision = Decision.answered if removed == 0 else Decision.partial
@@ -354,6 +421,7 @@ class AgenticAnswerFlow:
                 units=units,
                 languages=languages,
                 loop=loop,
+                authority_floor_applied=floor_applied,
             )
         independent = [units[i] for i in collapse_near_duplicates([e.text for e in units])]
         signals = EvidenceSignals(
@@ -366,6 +434,14 @@ class AgenticAnswerFlow:
             conflicts_detected=len(conflict_pairs),
             languages_in_evidence=languages,
             loop=loop,
+            # The WEAKEST tier among the cited EUs. A pooled answer rests on all
+            # of its sources, so reporting the strongest would let one binding
+            # citation launder a weaker co-citation: under "never wrong", an
+            # answer's reported standing is the standing of its weakest support.
+            authority_tier=_weakest_tier(
+                [by_id[eu_id] for eu_id in used], self._authority
+            ),
+            authority_floor_applied=floor_applied,
         )
         return Result(
             answer=answer,
@@ -410,6 +486,7 @@ class AgenticAnswerFlow:
         units: Sequence[_PooledEvidence],
         languages: tuple[str, ...],
         loop: LoopSignals,
+        authority_floor_applied: bool = False,
     ) -> Result:
         """Strict abstention that cites both sides of the disagreement."""
         cited: list[SourceRef] = []
@@ -440,6 +517,7 @@ class AgenticAnswerFlow:
                 conflicts_detected=total_conflicts,
                 languages_in_evidence=languages,
                 loop=loop,
+                authority_floor_applied=authority_floor_applied,
             ),
             sources=tuple(cited),
             conflicts=describe_conflicts(touching, _documents(window)),
@@ -453,14 +531,26 @@ class AgenticAnswerFlow:
         language: str,
         reason: str,
         loop: LoopSignals,
+        authority_floor_applied: bool = False,
     ) -> Result:
         return Result(
             answer="I can't answer that from the available evidence.",
             answer_language=language,
             mode=mode,
-            evidence=EvidenceSignals(decision=Decision.refused, loop=loop),
+            evidence=EvidenceSignals(
+                decision=Decision.refused,
+                loop=loop,
+                authority_floor_applied=authority_floor_applied,
+            ),
             missing_evidence=(reason,),
         )
+
+
+def _weakest_tier(units: Sequence[_PooledEvidence], policy: AuthorityPolicy) -> str:
+    """The lowest-ranked tier NAME among the cited units ("" when unranked)."""
+    if not units:
+        return ""
+    return min((tier_of(unit, policy) for unit in units), key=lambda tier: tier.rank).name
 
 
 def _documents(units: Sequence[_PooledEvidence]) -> list[str]:

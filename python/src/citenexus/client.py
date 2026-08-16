@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -15,6 +15,7 @@ from citenexus.answer.result import Decision, Result
 from citenexus.config.schema import CiteNexusConfig
 from citenexus.config.signals import Signal, resolve_signals
 from citenexus.delete import DeleteResult
+from citenexus.domain.authority import AuthorityPolicy
 from citenexus.domain.partition import PartitionPath
 from citenexus.domain.trust import TrustMode
 from citenexus.embed import OpenAICompatibleEmbedding, embed_in_batches
@@ -30,6 +31,7 @@ from citenexus.ingest.pipeline import IngestPipeline, VisionDescriber
 from citenexus.ingest.result import IngestResult
 from citenexus.ingest.web import FetchTransport, crawl, fetch_url, is_url
 from citenexus.lang.detect import FastTextDetector
+from citenexus.lang.search import UnsupportedSearchLanguageError, resolve_search_languages
 from citenexus.memory import MemoryStore, MemoryTurn
 from citenexus.plugins.base import LanguageDetectorPlugin, RerankerPlugin, RetrieverPlugin
 from citenexus.retrieve.engine import RetrievalEngine
@@ -110,6 +112,31 @@ class _ZeroEmbedder:
         return [0.0]
 
 
+def _authority_policy(config: CiteNexusConfig) -> AuthorityPolicy:
+    """Build the ADR-0004 policy from the declarative config section.
+
+    ``default.v1`` (the default) returns the unranked policy, so a config that
+    never mentions authority produces exactly today's behaviour.
+    """
+    section = config.authority
+    if section.profile == "default.v1":
+        return AuthorityPolicy.unranked()
+    if section.profile == "ordered.v1":
+        return AuthorityPolicy.ordered(
+            section.tier_order,
+            minimum_tier=section.minimum_tier,
+            key=section.metadata_key,
+        )
+    raise ValueError(
+        f"unknown authority profile {section.profile!r} (expected 'default.v1' or 'ordered.v1')"
+    )
+
+
+# The search-language default. `("en",)` is today's behaviour exactly: one
+# English reformulation when a reformulator is configured, nothing otherwise.
+DEFAULT_SEARCH_LANGUAGES: tuple[str, ...] = ("en",)
+
+
 class CiteNexus:
     """The v0.1 public surface.
 
@@ -147,6 +174,7 @@ class CiteNexus:
         contextualizer: ContextualizerSeam | None = None,
         agentic_budget: LoopBudget | None = None,
         agentic_decider: DecisionModel | None = None,
+        authority: AuthorityPolicy | None = None,
     ) -> None:
         # A first-class S3 location carries endpoint + credential names and
         # derives BOTH storage halves; strings/paths keep the simple behavior.
@@ -206,10 +234,16 @@ class CiteNexus:
             retrievers=retrievers,
             reranker=reranker or _IdentityReranker(),
         )
+        # ADR-0004: source STANDING, applied after grounding. The default is
+        # ``default.v1`` with no floor -- every tier equal, nothing dropped.
+        self._authority = authority or AuthorityPolicy.unranked()
+        self._detector = detector
         self._answer = (
             AnswerFlow(
                 generator=generator,
                 default_answer_language=default_answer_language,
+                authority=self._authority,
+                detector=detector,
             )
             if generator is not None
             else None
@@ -408,7 +442,7 @@ class CiteNexus:
             detector=detector,
             backend=backend,
             storage_options=storage_options,
-            default_answer_language=config.multilingual.fallback_language,
+            default_answer_language=config.multilingual.resolved_default_answer_language,
             top_k=config.retrieval.top_k,
             memory_max_turns=config.memory.max_turns,
             sink=sink,
@@ -421,6 +455,7 @@ class CiteNexus:
             chunk_max_tokens=config.chunking.max_tokens,
             chunk_overlap=config.chunking.overlap,
             contextualizer=contextualizer,
+            authority=_authority_policy(config),
         )
 
     def ingest(
@@ -431,16 +466,29 @@ class CiteNexus:
         document_id: str | None = None,
         source_type: Any = None,
         acl: Any = None,
+        authority: Mapping[str, str] | None = None,
     ) -> IngestResult:
+        """Ingest one source.
+
+        ``authority`` is caller-supplied source METADATA (ADR-0004) -- e.g.
+        ``{"authority_tier": "controlling-statute", "jurisdiction": "CA"}``. It
+        is carried and persisted verbatim on the Evidence Unit rows and read only
+        by an ``AuthorityProfile`` at answer time; the library never parses it and
+        never derives standing from the document's text. Omitting it leaves the
+        document unranked, which is exactly the pre-ADR-0004 behaviour.
+        """
         # A URL is just another source: fetch it, then ingest as HTML.
         if text is None and is_url(source):
-            return self._ingest_url(source, document_id=document_id, acl=acl)
+            return self._ingest_url(
+                source, document_id=document_id, acl=acl, authority=authority
+            )
         result = self._ingest.ingest(
             source,
             text=text,
             document_id=document_id,
             source_type=source_type,
             acl=acl,
+            authority=authority,
         )
         if result.status == "ingested":
             self._refresh_incremental(result.document_id)
@@ -555,7 +603,14 @@ class CiteNexus:
         self._hooks.fire("on_delete", result)
         return result
 
-    def _ingest_url(self, url: str, *, document_id: str | None, acl: Any) -> IngestResult:
+    def _ingest_url(
+        self,
+        url: str,
+        *,
+        document_id: str | None,
+        acl: Any,
+        authority: Mapping[str, str] | None = None,
+    ) -> IngestResult:
         """Fetch a URL and ingest its body via the content-appropriate extractor."""
         from citenexus.extract.types import SourceType
 
@@ -566,6 +621,7 @@ class CiteNexus:
             document_id=document_id or url,
             source_type=source_type,
             acl=acl,
+            authority=authority,
         )
         if result.status == "ingested":
             self.refresh_slow_path()
@@ -578,6 +634,7 @@ class CiteNexus:
         max_pages: int = 50,
         max_depth: int = 3,
         acl: Any = None,
+        authority: Mapping[str, str] | None = None,
     ) -> list[IngestResult]:
         """Crawl a website (same-domain, capped) and ingest each page as HTML."""
         from citenexus.extract.types import SourceType
@@ -594,6 +651,7 @@ class CiteNexus:
                 document_id=page.url,
                 source_type=SourceType.html,
                 acl=acl,
+                authority=authority,
             )
             results.append(result)
         if any(r.status == "ingested" for r in results):
@@ -613,11 +671,20 @@ class CiteNexus:
         *,
         k: int | None = None,
         conversation_id: str | None = None,
+        search_languages: Sequence[str] = DEFAULT_SEARCH_LANGUAGES,
     ) -> list[Candidate]:
+        """Retrieve for ``question``, optionally fanned out across languages.
+
+        ``search_languages`` (ADR-0013) reformulates the question into each named
+        language and fuses every retrieval through the one RRF merge. The original
+        question is always issued too, so fan-out is strictly additive. A language
+        whose script the tokenizer does not claim raises rather than returning
+        nothing.
+        """
         candidates = self._retrieve.retrieve(
             self._retrieval_query(question, conversation_id=conversation_id),
             k or self._top_k,
-            extra_queries=self._extra_queries(question),
+            extra_queries=self._extra_queries(question, search_languages),
         )
         self._hooks.fire("on_retrieve", question, candidates)
         return candidates
@@ -631,6 +698,7 @@ class CiteNexus:
         answer_language: str | None = None,
         conversation_id: str | None = None,
         strategy: str = "strict",
+        search_languages: Sequence[str] = DEFAULT_SEARCH_LANGUAGES,
     ) -> Result:
         """Answer ``question``, cite or abstain.
 
@@ -638,8 +706,33 @@ class CiteNexus:
         ``strategy="deep"`` runs the bounded, library-scripted agentic loop
         (`answer/agentic.py`): gather verbatim EUs across hops, then answer through
         the per-claim single-EU gate. Budgets bound cost; only the gate bounds truth.
+
+        ``search_languages`` (ADR-0013) decides which languages the question is
+        *searched* in; ``answer_language`` decides which language it is *answered*
+        in, and the caller states it:
+
+        * an explicit code (``"ta"``) forces that language, unconditionally;
+        * ``"auto"`` detects it from the QUESTION, via the injected detector;
+        * unspecified (``None``) is the configured ``default_answer_language`` —
+          a fixed, predictable value, never an inference.
+
+        The evidence never votes. Deriving the answer language from the retrieved
+        pool stamped 15 of 22 English questions ``te``/``ta`` on
+        ``examples/multilingual/``, and ``search_languages`` fan-out would have
+        made that worse by design.
+
+        The two knobs are independent: a fan-out changes only which passages reach
+        the gate, and citations stay verbatim in their own source language.
         """
         if strategy == "deep":
+            # Deep-ask writes its own follow-up queries inside the loop; it does not
+            # go through the reformulation seam. Silently ignoring a fan-out request
+            # would search fewer languages than asked, so it is refused instead.
+            if tuple(search_languages) != tuple(DEFAULT_SEARCH_LANGUAGES):
+                raise UnsupportedSearchLanguageError(
+                    "search_languages is not supported by strategy='deep': the "
+                    "agentic loop issues its own queries. Use strategy='strict'."
+                )
             return self._deep_ask(
                 question,
                 mode=mode,
@@ -649,7 +742,7 @@ class CiteNexus:
         if strategy != "strict":
             raise ValueError(f"unknown ask strategy {strategy!r} (expected 'strict' or 'deep')")
         retrieval_query = self._retrieval_query(question, conversation_id=conversation_id)
-        extra_queries = self._extra_queries(question)
+        extra_queries = self._extra_queries(question, search_languages)
         # The EN reformulation also counts for the relevance gate: it is the same
         # question in the evidence's language. Citations and the faithfulness
         # gate stay exactly as strict — this only widens *relevance* matching.
@@ -694,6 +787,11 @@ class CiteNexus:
             tools=self.tools(),
             budget=self._agentic_budget or LoopBudget(),
             default_answer_language=self._default_answer_language,
+            detector=self._detector,
+            # The SAME policy object the strict flow got. A guarantee that holds
+            # on one strategy and not the other is not a guarantee, and deep-ask
+            # must not need its own ceremony to inherit it (ADR-0004).
+            authority=self._authority,
         )
         result = flow.ask(question, mode=mode, answer_language=answer_language)
         self._emit_generate(result)
@@ -716,16 +814,40 @@ class CiteNexus:
             return CompletionDecisionModel(generator)  # type: ignore[arg-type]
         return _SingleHopDecider()
 
-    def _extra_queries(self, question: str) -> tuple[str, ...]:
-        """The EN dual-query reformulation, when configured and useful.
+    def _extra_queries(
+        self,
+        question: str,
+        search_languages: Sequence[str] = DEFAULT_SEARCH_LANGUAGES,
+    ) -> tuple[str, ...]:
+        """One reformulation of ``question`` per requested search language.
 
-        Cached inside the reformulator, so ask/retrieve/evaluate share one model
-        call per distinct question. No reformulator, or nothing gained → ().
+        Cached inside the reformulator by (question, language), so
+        ask/retrieve/evaluate share one model call per pair. A reformulation that
+        fails, comes back empty, duplicates another, or equals the original
+        contributes nothing — retrieval then proceeds with fewer queries, never an
+        error. Ordering is the caller's ``search_languages`` order, so the issued
+        queries are deterministic and inspectable at the call site.
+
+        The capability check runs FIRST, so an unsupported language costs zero
+        model calls (ADR-0013).
         """
+        languages = resolve_search_languages(search_languages)
         if self._reformulator is None:
+            if len(languages) > 1:
+                raise UnsupportedSearchLanguageError(
+                    "search_languages requests "
+                    f"{len(languages)} languages but no reformulation endpoint is "
+                    "configured, so the fan-out would issue no extra queries and "
+                    "look like a search that simply found nothing. Enable the "
+                    "reformulation config section, or search one language."
+                )
             return ()
-        rewritten = self._reformulator.reformulate(question)
-        return (rewritten,) if rewritten else ()
+        rewritten: list[str] = []
+        for language in languages:
+            candidate = self._reformulator.reformulate(question, language.code)
+            if candidate and candidate != question and candidate not in rewritten:
+                rewritten.append(candidate)
+        return tuple(rewritten)
 
     def _emit_generate(self, result: Result) -> None:
         """Emit the answering-model telemetry event (§6c). No-op without a sink.
