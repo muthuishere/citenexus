@@ -10,6 +10,86 @@ Dist name on PyPI is **`citenexus`** (the import package is `citenexus`; see
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-08-16
+
+Evidence-integrity release. Three defects here produced output that *looked*
+trustworthy — verbatim-sourced, correctly cited, and wrong. Each is now closed.
+
+### Fixed
+
+- **The faithfulness gate accepted answers that asserted the opposite of their
+  source.** `is_supported` was set containment, and set containment is closed
+  under reordering ("The landlord shall indemnify the tenant" is the same token
+  set as its inverse) and under deletion (`not` is a token). Measured on
+  adversarial fixtures across five domains: **9 of 9 false answers accepted,
+  identically in Python, Go and JavaScript** — one specification defect three
+  implementations reproduced faithfully. Verification now requires the claim's
+  tokens in order within a bounded gap, and any polarity marker in the matched
+  span to survive into the claim. **BREAKING (behavioral):** answers whose
+  assertion does not follow from their citation are now rejected or trimmed. The
+  predicate is strictly narrower, so nothing new is admitted. (ADR-0009)
+- **`delete()` reported success while leaving the document's text in storage.**
+  Re-ingest overwrote the single-valued `document_id → checksum` map without
+  removing the prior blob, so revoke could only ever delete the *current* copy.
+  The manifest now remembers retired checksums and revoke sweeps all of them.
+  Blobs stranded by re-ingests predating this release are not recoverable — their
+  checksums are gone from the manifest by construction. (ADR-0008)
+- **Every non-Latin-script answer abstained**, including on a verbatim quote of
+  its own source, because the pinned tokenizer was `[a-z0-9]+` over `.lower()`.
+  The library advertised "multilingual"; the gate's multilingual coverage was
+  German. (ADR-0011)
+- **The published npm package threw on import.** Runtime modules read
+  `conformance/*.json` from disk, but only `dist/` was shipped, so the path
+  resolved to `node_modules/conformance`. Tables are now generated into the
+  bundle.
+
+### Added
+
+- **Conflict surfacing.** `EvidenceSignals.conflicts_detected` and
+  `Result.conflicts` were declared in the public contract and never written, so
+  every Result asserted "zero conflicts" meaning "we never looked". Contradiction
+  between grounded sources is now detected deterministically and **surfaced,
+  never resolved** — in strict mode a conflict touching the answer's own claim
+  abstains with both sides cited. Measured 0 false positives on 27 hard negatives
+  and 10 held-out cases. (ADR-0007)
+- **Near-duplicate collapse**, so `distinct_documents` stops counting mirrors of
+  one sentence as independent corroboration. Claims surface clones only.
+- **Per-claim verification with drop-not-fail.** A partly-supported answer
+  returns its supported claims instead of being discarded whole;
+  `Result.claims` and `unsupported_claims_removed` now carry real values.
+- **`tokenize_v2`** — NFKC, full case folding, Unicode category scan, character
+  bigrams for space-less scripts. **13 scripts claimed**, each backed by a golden
+  fixture; Khmer, Lao, Myanmar, Georgian and Armenian are deliberately not
+  claimed even though the bigram path works for them.
+- **`EvidenceSignals.unsupported_scripts`** — a capability signal, distinct from
+  "the evidence isn't there".
+- **`reconcile()` / `remediate()`** — diff the live index against a
+  caller-declared corpus manifest (orphans / missing / drifted, disjoint,
+  read-only), with remediation as a separate explicit call. (ADR-0008)
+- **Seven worked scenarios** in the docs, and a library-level adversarial stress
+  harness (`spikes/library-stress/`) kept green by CI.
+
+### Changed
+
+- Go promotes `golang.org/x/text` from indirect to **direct** (`go.sum`
+  unchanged) for full case folding. Pure Go — the ports gain no native
+  dependency.
+- `ProcessingManifest` is **deprecated**, not removed; it was never read or
+  written and `worker.queue.DurableQueue` owns that status set. Removal in 0.7 of
+  the successor line.
+- Docs now state script support explicitly per port rather than claiming
+  "multilingual".
+
+### Known limitations
+
+- The `(4, 8)` gap budget and the conflict detector's `max_residual = 1` are
+  pinned in conformance vectors but were fitted against **synthetic,
+  single-sentence, English** fixtures. They have not been re-measured on a live
+  corpus with real models.
+- The Go and JavaScript `Ask` flows still run the frozen v1 predicate; only the
+  exported gate functions moved to v2.
+
+
 ## [0.6.0] - 2026-07-08
 
 ### Added
