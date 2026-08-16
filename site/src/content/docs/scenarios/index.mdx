@@ -1,0 +1,69 @@
+---
+title: Which scenario?
+description: Seven worked builds — contract review, conflicting sources, regulated audit, right-to-erasure, multilingual desks, corpus evaluation, and a support assistant that refuses rather than invents.
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+Each scenario is a complete build, not a snippet: the problem, the code, what
+comes back, and — most importantly — **the specific failure it protects you
+from**. Start with the one whose failure mode you recognise.
+
+<CardGrid>
+	<Card title="Contract review" icon="document">
+		Answer clause questions with the exact quote, page and bbox. Protects
+		against: a confident answer that no clause actually supports.
+		[Read →](/citenexus/scenarios/contract-review/)
+	</Card>
+	<Card title="Conflicting sources" icon="warning">
+		Two documents assert opposite things. Protects against: rank order silently
+		deciding which truth you see.
+		[Read →](/citenexus/scenarios/conflicting-sources/)
+	</Card>
+	<Card title="Regulated audit" icon="approve-check">
+		Prove the index is derived from exactly the agreed corpus. Protects against:
+		citing a document nobody agreed was in scope.
+		[Read →](/citenexus/scenarios/regulated-audit/)
+	</Card>
+	<Card title="Right to erasure" icon="error">
+		Revoke a document and prove every byte is gone. Protects against: a delete
+		that reports success and leaves the text behind.
+		[Read →](/citenexus/scenarios/right-to-erasure/)
+	</Card>
+	<Card title="Multilingual desk" icon="translate">
+		Ask in one language over a corpus in another. Protects against: a translated
+		quote being passed off as the evidence.
+		[Read →](/citenexus/scenarios/multilingual-desk/)
+	</Card>
+	<Card title="Evaluate a corpus" icon="bars">
+		Score groundedness and abstention against a golden set. Protects against:
+		shipping a change that answers more and cites less.
+		[Read →](/citenexus/scenarios/evaluate-a-corpus/)
+	</Card>
+	<Card title="Support assistant" icon="comment">
+		A help-desk bot that says "I don't know" correctly. Protects against:
+		inventing a refund policy that never existed.
+		[Read →](/citenexus/scenarios/support-assistant/)
+	</Card>
+</CardGrid>
+
+## The shape every scenario shares
+
+```python
+from citenexus import CiteNexus
+from citenexus.embed.client import OpenAICompatibleEmbedding
+from citenexus.answer.generator import OpenAICompatibleGenerator
+
+rag = CiteNexus(
+    "./citenexus-data",                        # a local directory, or s3://bucket
+    embedder=OpenAICompatibleEmbedding(
+        base_url="http://localhost:11434/v1", model="bge-m3"),
+    generator=OpenAICompatibleGenerator(
+        base_url="http://localhost:11434/v1", model="qwen2.5"),
+)
+```
+
+Nothing is bundled. Every model is an injected OpenAI-compatible endpoint, so
+the same code runs against Ollama on your laptop, a self-hosted vLLM inside your
+VPC, or a hosted API — which is what makes an EU-sovereign or air-gapped
+deployment a configuration choice rather than a fork.

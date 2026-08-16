@@ -1,0 +1,97 @@
+---
+title: Regulated audit
+description: Prove the live index is derived from exactly the agreed corpus — find ghost documents, missing ingests and drifted content before an auditor does.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+**The failure this prevents:** an answer cites a document nobody agreed was in
+scope. It has a real document ID, a real page, a real bbox and a verbatim quote.
+At the point of use it is **indistinguishable** from a correct citation — and the
+cite-or-abstain guarantee still holds, because that guarantee is scoped to the
+index, while the auditor's question is scoped to the corpus.
+
+Every other freshness mechanism is *change-driven*: it reacts to an ingest, an
+update, a revoke. None of them notice an artifact that arrived by a path the
+change log never saw — a crashed ingest, a restored snapshot, a shared bucket
+prefix, a run against the wrong config.
+
+<Steps>
+
+1. **Declare the agreed corpus.** The manifest is authored by you, not derived
+   from the index — a manifest generated from the index could never disagree with
+   it, which is the entire point.
+
+   ```python
+   from citenexus.reconcile import CorpusManifest, CorpusEntry
+
+   manifest = CorpusManifest(
+       manifest_version="2026-08-16",
+       entries=(
+           CorpusEntry(document_id="policy-handbook", sha256="3c58d7e6…",
+                       version="4.1", current=True,
+                       effective_date="2026-01-01"),
+           CorpusEntry(document_id="pension-schedule", sha256="9a01bb2f…",
+                       version="2.0", current=True),
+       ),
+   )
+   ```
+
+2. **Reconcile. It reads; it changes nothing.**
+
+   ```python
+   report = rag.reconcile(manifest)
+
+   report.orphans    # indexed, NOT in the manifest  -> the ghost documents
+   report.missing    # in the manifest, NOT indexed  -> a failed ingest
+   report.drifted    # in both, content hash differs -> the source changed
+   ```
+
+   The three sets are disjoint, and running it twice on an unchanged index
+   produces an identical report. A clean corpus reports empty.
+
+3. **Remediate explicitly, never as a side effect.**
+
+   ```python
+   if report.orphans:
+       removal = rag.remediate(report)      # routes through the same revoke path
+       assert not rag.reconcile(manifest).orphans
+   ```
+
+</Steps>
+
+## Why remediation is a separate call
+
+A diagnostic that deletes is a diagnostic nobody dares run. Auto-remediation on a
+shared bucket is a data-loss footgun, so `reconcile()` is read-only by
+construction and `remediate()` is the deliberate second step. Removal goes
+through the existing revoke path — one deletion mechanism, not two.
+
+## Version supersession
+
+When the manifest designates one version of a document as current, earlier
+versions of the same `document_id` are reported as **drifted**, not as orphans.
+They are a known, declared state rather than something that snuck in.
+
+<Aside type="caution" title="What the report does not prove">
+The report is **document-keyed**. Byte-level orphans under `raw/` and
+`knowledge/` are outside its scope, and it says so rather than implying it proves
+storage is clean. Equally, the diagnostic is only as honest as the manifest: one
+rubber-stamped from a directory listing reproduces whatever is wrong in that
+directory. That is a process boundary a library cannot close.
+</Aside>
+
+## The audit artifact
+
+Each run appends to an append-only stream, so *"the index matched the agreed
+corpus at time T"* becomes an evidence artifact rather than a verbal assurance:
+
+```python
+from citenexus.reconcile import read_audit
+
+for entry in read_audit(rag):
+    print(entry)          # timestamp, manifest_version, counts per set
+```
+
+Pass `audit=False` for a strictly zero-write run when you need to prove the
+diagnostic touched nothing at all.

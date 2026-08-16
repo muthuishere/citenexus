@@ -18,7 +18,7 @@ graph retriever at ask time.
 rag = CiteNexus("./citenexus-data", embedder=..., generator=...,
                 signals=["embedding", "text", "graph"])
 rag.ingest("annual-report.pdf")
-answer = rag.ask("How is the CFO connected to the audit committee?")
+response = rag.ask("How is the CFO connected to the audit committee?")
 ```
 
 ## How the graph is built

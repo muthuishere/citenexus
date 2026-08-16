@@ -19,7 +19,7 @@ Declare the `wiki` signal. Pages are integrated per-document as you ingest
 rag = CiteNexus("./citenexus-data", embedder=..., generator=...,
                 signals=["embedding", "text", "wiki"])
 rag.ingest("handbook.pdf")
-answer = rag.ask("What's our policy on remote work?")
+response = rag.ask("What's our policy on remote work?")
 ```
 
 ## How it works

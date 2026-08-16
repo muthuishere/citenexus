@@ -38,12 +38,29 @@ macOS arm64, and windows x64 (`spikes/prebuilt-ffi/`); cross-compiling the full
 core and the packaging are still in progress.
 
 
-Evidence-first, multilingual, S3-native RAG for domains where a wrong answer is
-worse than no answer (legal, medical, finance/compliance, enterprise search).
+Evidence-first, multilingual, S3-native RAG for domains where a
+wrong answer is worse than no answer (legal, medical, finance/compliance,
+enterprise search).
 CiteNexus answers **only** from retrieved evidence — every claim is grounded in a
 bbox-cited source passage, and it refuses or states uncertainty when evidence is
 weak, missing, or conflicting. The guarantee is **"no ungrounded claim,"** not
 "zero hallucination."
+
+**Languages — 13 scripts in Python; Latin-script in Go and JS.** The Python
+reference supports Latin, Cyrillic, Greek, Han, Hiragana, Katakana, Hangul,
+Arabic, Hebrew, Devanagari, Bengali, Tamil and Thai — each backed by a golden
+conformance fixture, because a script is claimed only when its evidence exists.
+Space-less scripts (Han, Kana, Thai) are indexed by character bigrams, which do
+not cross script boundaries. Khmer, Lao, Myanmar, Georgian and Armenian are
+deliberately **not claimed**: a bigram path mechanically "works" for them, and
+answering through an unfixtured segmentation is worse than refusing.
+
+**The Go and JavaScript ports are still Latin-script only.** They run the frozen
+SPEC-PORTS-v1 §4 ASCII tokenizer (`[a-z0-9]+`), so non-Latin text yields no
+tokens there and abstains. In every port an unsupported script abstains with an
+explicit `unsupported_scripts` signal — a **capability gap, not an evidence
+judgement**. Background:
+[`docs/adr/0011-tokenizer-and-non-latin-scripts.md`](docs/adr/0011-tokenizer-and-non-latin-scripts.md).
 
 The library bundles **no models** — embedding, LLM, reranker, and vision are
 injected endpoints. CiteNexus owns orchestration, storage, retrieval, fusion,
@@ -79,7 +96,7 @@ rag = CiteNexus(
     generator=my_llm_endpoint,
 )
 rag.ingest("policy.pdf")                         # any supported input type
-answer = rag.ask("Can the employee disclose this information?")
+response = rag.ask("Can the employee disclose this information?")
 print(answer)                                    # grounded answer; .sources are bbox-cited
 ```
 

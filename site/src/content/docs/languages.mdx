@@ -1,14 +1,55 @@
 ---
 title: Languages & multilingual
-description: Answers come back in the question's language; cited passages stay verbatim in the source language, with any translation additive. Language is detected by fastText lid.176 (or an offline heuristic detector).
+description: Thirteen scripts in the Python reference, Latin-script in the Go and JS ports — answers come back in the question's language; cited passages stay verbatim in the source language, with any translation additive. Unsupported scripts abstain with an explicit capability signal. Language is detected by fastText lid.176 (or an offline heuristic detector).
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-CiteNexus is multilingual by design. Ask in French over an English corpus and the
-**answer** comes back in French — but the **citation** stays verbatim in English,
-because a translated quote is no longer the evidence. Any translation is additive
-and clearly marked.
+CiteNexus supports **13 scripts** in the Python reference. Ask in French over an
+English corpus and the **answer** comes back
+in French — but the **citation** stays verbatim in English, because a translated
+quote is no longer the evidence. Any translation is additive and clearly marked.
+
+Text in a script CiteNexus does not claim **abstains with an explicit
+`unsupported_scripts` signal** — a capability gap, never an evidence judgement.
+See [Script support](#script-support) below.
+
+## Script support
+
+| Script | Languages | Python | Go / JS |
+| --- | --- | --- | --- |
+| Latin | English, Dutch, German, French, Spanish, Portuguese, … | supported | supported |
+| Cyrillic | Russian, Ukrainian, … | supported | abstains |
+| Greek | Greek | supported | abstains |
+| Han | Chinese | supported (bigram) | abstains |
+| Hiragana / Katakana | Japanese | supported (bigram) | abstains |
+| Hangul | Korean | supported | abstains |
+| Arabic | Arabic | supported | abstains |
+| Hebrew | Hebrew | supported | abstains |
+| Devanagari | Hindi, Marathi, … | supported | abstains |
+| Bengali | Bengali | supported | abstains |
+| Tamil | Tamil | supported | abstains |
+| Thai | Thai | supported (bigram) | abstains |
+| Khmer, Lao, Myanmar, Georgian, Armenian | — | **not claimed** | abstains |
+
+Every claimed script is backed by a golden conformance fixture: a script is
+claimed only when its evidence exists, and the fixture generator fails if the two
+disagree in either direction.
+
+Khmer, Lao and Myanmar are **deliberately not claimed even though the bigram path
+mechanically works for them**. Answering through a segmentation no fixture has
+checked is worse than refusing — it is indistinguishable, at the point of use,
+from a verified answer.
+
+Space-less scripts (Han, Kana, Thai) are indexed by **character bigrams**, which
+do not cross script boundaries: Japanese `従業員は` yields `従業`, `業員`, `は`.
+
+<Aside type="caution" title="The Go and JavaScript ports are still ASCII-only">
+The ports run the frozen SPEC-PORTS-v1 §4 tokenizer (`[a-z0-9]+`), so non-Latin
+text yields no tokens there and abstains. Every other pinned algorithm remains at
+parity. Background:
+[ADR-0011](https://github.com/muthuishere/citenexus/blob/main/docs/adr/0011-tokenizer-and-non-latin-scripts.md).
+</Aside>
 
 ## The answer-language rule
 
@@ -21,8 +62,8 @@ The language of the answer is resolved by an ordered fallback chain:
 5. the client's `default_answer_language` (`"en"` by default).
 
 ```python
-answer = rag.ask("Quelle est la durée de conservation ?")          # answered in French
-answer = rag.ask("What is the retention period?", answer_language="de")  # forced to German
+response = rag.ask("Quelle est la durée de conservation ?")          # answered in French
+response = rag.ask("What is the retention period?", answer_language="de")  # forced to German
 ```
 
 On the `Result`, `answer_language` is the guaranteed answer language, and each

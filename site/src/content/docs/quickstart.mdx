@@ -55,16 +55,16 @@ JavaScript ship the same deterministic core (see the [concepts](/citenexus/conce
    ```python
    rag.ingest("employee-nda.pdf")               # a file on disk
 
-   answer = rag.ask("Can the employee disclose confidential information?")
+   response = rag.ask("Can the employee disclose confidential information?")
 
-   print(answer.answer)                         # the verbatim quote — or a refusal
-   print(answer.sources[0].document, answer.sources[0].page)
+   print(response.answer)                         # the verbatim quote — or a refusal
+   print(response.sources[0].document, response.sources[0].page)
    ```
 
 </Steps>
 
 <Aside type="tip" title="The refusal is the feature">
-If the evidence doesn't support the question, `answer.evidence.decision` is
+If the evidence doesn't support the question, `response.evidence.decision` is
 `refused` and no source is fabricated. That's the guarantee — read more under
 [Ask & abstain](/citenexus/ask/).
 </Aside>

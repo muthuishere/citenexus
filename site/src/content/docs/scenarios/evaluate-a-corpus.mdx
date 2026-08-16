@@ -1,0 +1,100 @@
+---
+title: Evaluate a corpus
+description: Score groundedness, citation and abstention against a golden set — so a change that answers more and cites less shows up as a regression instead of an improvement.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+**The failure this prevents:** you swap the embedding model, the answer rate goes
+up, everyone celebrates, and what actually happened is that the system started
+answering questions it should have refused. Answer rate on its own is a metric
+that rewards hallucination.
+
+<Steps>
+
+1. **Write a golden CSV.** The important rows are the ones where the correct
+   behaviour is **to refuse**.
+
+   ```csv
+   question,expected_support
+   "Can the employee disclose confidential information?","shall not disclose"
+   "What notice does termination require?","thirty days"
+   "What is the capital of France?",
+   ```
+
+   The blank `expected_support` on the third row is the point: nothing in the
+   corpus supports it, so an answer there is a failure even if the answer is
+   factually true.
+
+2. **Run it.**
+
+   ```python
+   report = rag.evaluate("golden.csv")
+
+   print(report.groundedness_rate)      # answers whose claims are supported
+   print(report.citation_rate)          # answers carrying a resolvable citation
+   print(report.expected_support_rate)  # answers matching the expected evidence
+   ```
+
+3. **Gate your CI on the direction of travel**, not on an absolute:
+
+   ```python
+   assert report.groundedness_rate >= baseline.groundedness_rate
+   assert report.citation_rate >= baseline.citation_rate
+   ```
+
+</Steps>
+
+## Why abstention rows are the ones that matter
+
+A model that answers everything scores well on any metric that only looks at
+answers. Rows with no expected support invert that: they are only passed by
+refusing. A change that makes the system more willing to answer will move them
+first, which is exactly the early warning you want.
+
+<Aside type="note" title="Per-claim scoring changes what a partial answer means">
+Verification is per atomic claim, so an answer can come back trimmed — its
+supported claims only, with `unsupported_claims_removed` counting the rest.
+Trimmed answers are scored on the claims they actually returned, not on what the
+model originally produced.
+</Aside>
+
+## Reading a regression
+
+When a row flips, the signals say why before you open anything:
+
+```python
+sig = response.evidence
+
+sig.decision                    # answered | refused | partial
+sig.supporting_sources          # 0 -> retrieval failed, not generation
+sig.distinct_documents          # 1 -> single-source, no corroboration
+sig.retrieval_score_spread      # near 0 -> everything ranked alike; ranking is not discriminating
+sig.unsupported_claims_removed  # >0 -> the generator over-reached and got trimmed
+sig.conflicts_detected          # >0 -> the corpus disagrees with itself
+sig.unsupported_scripts         # non-empty -> a capability gap, not an evidence gap
+```
+
+`supporting_sources = 0` and `unsupported_claims_removed > 0` are different
+bugs in different halves of the pipeline. The first is retrieval, the second is
+generation — and treating them the same is how teams spend a week tuning a
+prompt to fix an indexing problem.
+
+## Retrieval on its own
+
+`retrieve()` is the engine under `ask()`, exposed so you can measure ranking
+without a generator in the loop:
+
+```python
+for c in rag.retrieve("termination notice period", k=10):
+    print(f"{c.score:.4f}  {c.document_id}  {c.citable_text[:60]}")
+```
+
+If the right passage is not in the top-k here, no amount of prompt work will
+save the answer.
+
+## A worked example on a real corpus
+
+The [law worked example](/citenexus/benchmark-law/) runs this end to end against
+California landlord–tenant statutes with live models — including an honest look
+at where relevance-only ranking still falls short.
