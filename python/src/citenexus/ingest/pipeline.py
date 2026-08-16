@@ -18,7 +18,12 @@ from citenexus.ingest.result import IngestResult
 from citenexus.lang.detect import HeuristicDetector
 from citenexus.lang.fallback import resolve_answer_language
 from citenexus.storage.lance_store import LanceVectorStore, StorageOptions
-from citenexus.storage.manifest import EtagManifest, load_manifest, save_manifest
+from citenexus.storage.manifest import (
+    EtagManifest,
+    load_manifest,
+    record_tokenizer_version,
+    save_manifest,
+)
 from citenexus.storage.paths import Layer, layer_prefix, leaf_vector_uri, partition_segment
 from citenexus.telemetry.events import Stage, StageEvent
 from citenexus.vision.client import _VISION_PROMPT
@@ -211,6 +216,14 @@ class IngestPipeline:
 
         manifest.record(doc_id, checksum)
         save_manifest(self._backend, self._partition, self.ETAG, manifest)
+        # Stamp the tokenizer that built this partition's lexical terms, so an
+        # index left behind by an older tokenizer is detectable rather than
+        # silently returning nothing (ADR-0011).
+        record_tokenizer_version(self._backend, self._partition)
+        # COMMIT POINT above: the retired checksum is now durably recorded, so
+        # its blob is reachable (and revocable) even if this process dies here.
+        # Reclaiming it is a separate, restartable step for exactly that reason.
+        self._purge_superseded(manifest, doc_id, raw_prefix)
 
         return IngestResult(
             document_id=doc_id,
@@ -219,6 +232,31 @@ class IngestPipeline:
             n_units=len(units),
             enqueued_slow_path=enqueued,
         )
+
+    def _purge_superseded(self, manifest: EtagManifest, document_id: str, raw_prefix: str) -> None:
+        """Delete the raw blobs this document just retired, then forget them.
+
+        A re-ingest used to strand the previous blob: the etag map is
+        single-valued, so the old checksum was overwritten and nothing could name
+        those bytes again. Reclaiming them here keeps the bucket free of
+        unreachable copies of superseded document text — which for right-to-erasure
+        is a correctness property, not tidiness.
+
+        A retired checksum is deleted ONLY when no OTHER document currently owns
+        it (identical bytes share one content-addressed blob). That guard is what
+        makes this safe on a shared bucket: we delete nothing we cannot prove
+        belongs to this document alone. If the process dies mid-purge the retired
+        entries are still recorded, so the next ingest — or the revoke — finishes
+        the job.
+        """
+        stale = manifest.superseded_of(document_id)
+        if not stale:
+            return
+        for retired in stale:
+            if not manifest.owners_of(retired, excluding=document_id):
+                self._backend.delete_prefix(f"{raw_prefix}/{retired}")
+        manifest.clear_superseded(document_id)
+        save_manifest(self._backend, self._partition, self.ETAG, manifest)
 
     def _emit(self, stage: Stage, document_id: str, started: float) -> None:
         """Emit one ingest-stage telemetry event (§6c). No-op without a sink."""

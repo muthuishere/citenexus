@@ -54,6 +54,8 @@ from citenexus.wiki import LLMWikiDistiller, WikiDistiller, WikiRetriever, WikiS
 
 if TYPE_CHECKING:
     from citenexus.code import CodeFacade
+    from citenexus.reconcile.manifest import CorpusManifest
+    from citenexus.reconcile.report import ReconcileReport, RemediationReport
     from citenexus.schema import SchemaFacade
 
 
@@ -527,10 +529,15 @@ class CiteNexus:
         raw_prefix = layer_prefix(Layer.raw, self.partition)
         self._backend.delete_prefix(f"{raw_prefix}/images/{document_id}/")
 
-        # The raw blob is content-addressed and shared by identical bytes — delete
-        # it ONLY when no other document still owns the checksum (§1).
-        if not manifest.owners_of(checksum, excluding=document_id):
-            self._backend.delete_prefix(f"{raw_prefix}/{checksum}")
+        # Raw blobs are content-addressed and shared by identical bytes — delete
+        # one ONLY when no other document still owns the checksum (§1). Every
+        # checksum this document ever wrote is swept, not just the current one:
+        # a re-ingest retires the previous checksum into the manifest, and
+        # skipping those would leave the revoked document's earlier full text in
+        # the bucket while this call reported ``status="deleted"``.
+        for owned in (checksum, *manifest.superseded_of(document_id)):
+            if not manifest.owners_of(owned, excluding=document_id):
+                self._backend.delete_prefix(f"{raw_prefix}/{owned}")
 
         # Navigation must not point at revoked evidence.
         if Signal.graph in self.signals or Signal.community in self.signals:
@@ -787,6 +794,53 @@ class CiteNexus:
     def evaluate(self, csv_path: str | Path) -> EvaluationReport:
         self._require_answer()
         return Evaluator(self.ask).evaluate(csv_path)
+
+    def reconcile(self, manifest: CorpusManifest, *, audit: bool = True) -> ReconcileReport:
+        """Diff this partition's index against a caller-declared corpus (ADR-0008).
+
+        Answers the question the cite-or-abstain guarantee cannot: not "is this
+        citation faithful to the index" but "is this index derived from exactly
+        the corpus we agreed to". Returns three disjoint sets — ``orphans``
+        (indexed, undeclared), ``missing`` (declared current, not indexed), and
+        ``drifted`` (declared and indexed, hashes disagree, including a declared
+        version that has been superseded).
+
+        Read-only: it modifies no evidence layer and deletes nothing under any
+        circumstances. By default it appends one line to the append-only
+        reconciliation audit stream; ``audit=False`` writes nothing at all.
+
+        The report is document-keyed, and says so in its own ``scope`` field — an
+        empty report means the declared corpus and the index agree at document
+        level, not that the bucket is clean.
+        """
+        from citenexus.reconcile.engine import reconcile as _reconcile
+
+        return _reconcile(
+            backend=self._backend,
+            partition=self.partition,
+            store=self._store,
+            manifest=manifest,
+            audit=audit,
+        )
+
+    def remediate(self, report: ReconcileReport, *, audit: bool = True) -> RemediationReport:
+        """Act on a reconciliation report by revoking its ORPHANS — nothing else.
+
+        Deliberately separate from :meth:`reconcile`: nothing is ever deleted as
+        a side effect of a diagnostic. Removal goes through :meth:`delete`, so a
+        remediated orphan leaves nothing behind in any layer. ``missing`` and
+        ``drifted`` need an ingest and a re-ingest respectively — neither is a
+        deletion, so neither is touched.
+        """
+        from citenexus.reconcile.engine import remediate as _remediate
+
+        return _remediate(
+            backend=self._backend,
+            partition=self.partition,
+            revoker=self,
+            report=report,
+            audit=audit,
+        )
 
     def _require_answer(self) -> AnswerFlow:
         """The answer flow, or a clear error for search-only clients."""
