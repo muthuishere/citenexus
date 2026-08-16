@@ -78,6 +78,7 @@ export default defineConfig({
 					items: [
 						{ label: 'Bring your own models', slug: 'models' },
 						{ label: 'Custom endpoints & auth', slug: 'custom-endpoints' },
+						{ label: 'Provider contracts', slug: 'providers' },
 						{ label: 'Reranking & retrieval', slug: 'reranking' },
 						{ label: 'Ask & abstain', slug: 'ask' },
 						{ label: 'Authority — source standing', slug: 'authority' },

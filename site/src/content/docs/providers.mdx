@@ -1,0 +1,386 @@
+---
+title: Provider contracts — bring your own model
+description: Five published Protocols define the model seam. A provider satisfies them by shape alone — no CiteNexus base class to inherit, no socket to open. Python publishes all five; the Go and JS ports publish the two they consume.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="Requires 0.10.0 — not yet on PyPI or npm">
+This capability is on `main` and documented here, but the published packages are
+still **0.9.0**. Install from source until 0.10.0 ships.
+</Aside>
+
+CiteNexus bundles **no models**. That has always been the design — but for a long
+time "inject your own" meant *read our call sites and guess*. Embedding alone was
+injected through five different abstractions in the Python reference, no two
+agreeing on arity or return type, and the batch path was discovered at runtime by
+`getattr(embedder, "embed_many", None)`. A capability found by `getattr` is a
+capability no type checker can verify and no provider author knows to offer.
+
+There is now **one published place to look**: `citenexus.contracts`. Match a
+shape and you are a provider.
+
+## Structural, not nominal
+
+The contracts are `@runtime_checkable` `Protocol`s, and that choice is the whole
+point. An abstract base class would force `import citenexus` into a third party's
+own source and make this library a build-time dependency of anyone who wants to
+be compatible. A Protocol inverts it: **matching the shape is enough**.
+
+So an in-process model, a mock, a cached fixture, or an adapter someone else
+ships for a third library can satisfy every contract here without ever naming
+CiteNexus — and without opening a socket. Nothing in the contract module mentions
+a transport: `base_url`, `headers` and `transport` are *constructor* parameters of
+the shipped HTTP clients, never contract methods.
+
+That claim is asserted rather than assumed. `python/tests/test_third_party_provider.py`
+writes providers the way an outsider would, then proves:
+
+- their only library import is `citenexus.contracts`;
+- **nothing CiteNexus-owned appears in any provider's MRO**;
+- `socket.socket` is monkeypatched to explode for the duration of the end-to-end
+  run — these models are in-process, and any network call fails the test;
+- ingest → ask still reaches a cited, gate-approved answer.
+
+<Aside type="note" title="The Plugin ABCs did not go away">
+`citenexus.plugins.base` still defines nominal `abc.ABC` plugins, and they are
+still what the *registry* gates on at runtime — that job genuinely wants
+subclassing, because it also carries the `plugin_version` provenance stamp. The
+two layers coexist: ABCs are what the registry rejects against, Protocols are what
+a provider implements. Do not extend the ABCs to add a model.
+</Aside>
+
+## A complete provider, start to finish
+
+Two classes, no CiteNexus base class, no network. This is the shape of the real
+test, trimmed to the two seams you need for an answer:
+
+```python
+import hashlib
+import math
+import re
+from collections.abc import Sequence
+
+from citenexus import CiteNexus, EmbeddingProvider, GeneratorProvider, Vector
+
+_WORD = re.compile(r"\w+", re.UNICODE)
+
+
+def _tokens(text: str) -> list[str]:
+    return [m.group(0).lower() for m in _WORD.finditer(text)]
+
+
+class InProcessEmbedding:
+    """A hashing vectorizer that never leaves the process.
+
+    Batch is the primitive: a single text is a batch of one, not a second method.
+    """
+
+    def __init__(self, dim: int = 96) -> None:
+        self.dim = dim
+
+    def embed_many(self, texts: Sequence[str]) -> list[Vector]:
+        return [self._one(t) for t in texts]
+
+    def _one(self, text: str) -> Vector:
+        vec = [0.0] * self.dim
+        for tok in _tokens(text):
+            idx = int(hashlib.blake2s(tok.encode("utf-8")).hexdigest(), 16) % self.dim
+            vec[idx] += 1.0
+        norm = math.sqrt(sum(v * v for v in vec)) or 1.0
+        return [v / norm for v in vec]
+
+
+class ExtractiveGenerator:
+    """A model that quotes the passage, so it cannot hallucinate."""
+
+    def answer(self, question: str, passage: str, answer_language: str = "en") -> str:
+        wanted = set(_tokens(question))
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", passage) if s.strip()]
+        if not sentences:
+            return passage
+        return max(sentences, key=lambda s: len(wanted & set(_tokens(s))))
+
+
+# Shape alone is enough — this passes, and neither class imports a base class.
+assert isinstance(InProcessEmbedding(), EmbeddingProvider)
+assert isinstance(ExtractiveGenerator(), GeneratorProvider)
+
+rag = CiteNexus(
+    "./citenexus-data",
+    embedder=InProcessEmbedding(),
+    generator=ExtractiveGenerator(),
+)
+rag.ingest(
+    text=(
+        "The employee shall not disclose confidential information to any third party. "
+        "This obligation survives termination of employment for a period of five years."
+    ),
+    document_id="nda",
+)
+
+result = rag.ask("Can the employee disclose confidential information?")
+print(result.answer)                 # The employee shall not disclose confidential information to any third party.
+print(result.sources[0].document)    # nda
+```
+
+Note what the generator is *not* asked to do. It does not retrieve and it does not
+choose evidence — it is handed the passage the library already selected, plus the
+ISO code the answer must be in. And it is **not trusted**: whatever it returns
+goes through the [per-claim faithfulness gate](/citenexus/ask/) before it can
+become an answer. Which is why an extractive generator — one that quotes — is the
+best kind of generator, not a toy one.
+
+<Aside type="tip" title="A partial provider set is valid">
+Every seam is independently optional. Pass a generator and no embedder and you get
+a lexical-retrieval answer; pass an embedder and no generator and the deterministic
+fake generator fills in. The test suite pins both cases.
+</Aside>
+
+## The five contracts
+
+All five live in `citenexus.contracts` and are re-exported from the top-level
+`citenexus` package. Every one of them returns a value or raises — see
+[Failure must be sayable](#failure-must-be-sayable).
+
+| Contract | Method | Returns |
+| --- | --- | --- |
+| `EmbeddingProvider` | `embed_many(texts: Sequence[str])` | `list[Vector]` — one per input text, **in input order** |
+| `GeneratorProvider` | `answer(question, passage, answer_language="en")` | `str` |
+| `CompletionProvider` | `complete(prompt: str)` | `str` |
+| `VisionProvider` | `describe(image_region: Any)` | `Mapping[str, Any]` |
+| `RerankerProvider` | `rerank(query: str, candidates: Sequence[Candidate])` | `list[Candidate]` |
+
+`Vector` is `list[float]` — a plain dense vector. Sparse term weights are not part
+of this seam: the lexical signal is BM25 over stored Evidence Unit text and never
+touches the embedder.
+
+Where each one is used:
+
+- **`CompletionProvider`** is the deep-ask decision seam — one prompt in, one
+  string out. Deliberately *not* provider tool/function-calling: the library
+  scripts the loop and parses a small JSON decision off a plain completion, so the
+  model never owns control flow.
+- **`VisionProvider`** feeds the [conditional-vision path](/citenexus/vision/).
+  The returned mapping fills a figure Evidence Unit: `short_caption` (the only
+  required key), `detailed_description`, `objects`, `relationships`, `ocr_text`,
+  `data_values`, `image_type`. Unknown keys are ignored.
+- **`RerankerProvider`** may only **reorder or drop**. It can never introduce a
+  candidate retrieval did not produce, so a reranker cannot bypass the grounding
+  guarantee. See [Reranking & retrieval](/citenexus/reranking/).
+
+Two older shapes are published alongside them, named so they stop being anonymous:
+`SingleTextEmbedder` (`embed(text) -> Vector`) and `SequenceEmbedder`
+(`embed(texts) -> list[Vector]`). Both are **deprecated but fully supported** —
+`contracts.embed_texts()` is the one place the library decides how to talk to an
+embedder, and it falls back to the single-text shape. New providers should
+implement `EmbeddingProvider`: one request per Evidence Unit does not survive a
+real corpus.
+
+<Aside type="note" title="One rough edge, stated plainly">
+`CiteNexus(...)`'s `reranker=` parameter is still annotated `RerankerPlugin | None`
+— the nominal ABC. A structural reranker works at runtime, and the reference test
+injects one, but `mypy --strict` callers need a `# type: ignore[arg-type]` on that
+one argument until the annotation is widened. The other three are already typed
+against the contracts: `embedder=` accepts `EmbeddingProvider | SingleTextEmbedder`,
+`generator=` is `GeneratorProvider` under an alias, and so is `vision=`.
+</Aside>
+
+## The shipped clients are just providers too
+
+`OpenAICompatibleEmbedding`, `OpenAICompatibleGenerator`, `OpenAICompatibleVision`
+and `OpenAICompatibleReranker` are not privileged. Each one *declares* the matching
+contract, so `mypy --strict` checks the shipped clients against the published shape
+on every run — the docs cannot drift from the code. All four are now importable
+from the top-level package, which is what makes their common shape visible:
+
+```python
+from citenexus import (
+    CiteNexus,
+    OpenAICompatibleEmbedding,
+    OpenAICompatibleGenerator,
+    OpenAICompatibleReranker,
+    OpenAICompatibleVision,
+)
+
+rag = CiteNexus(
+    "./citenexus-data",
+    embedder=OpenAICompatibleEmbedding(base_url="…/v1", model="bge-m3"),
+    generator=OpenAICompatibleGenerator(base_url="…/v1", model="qwen2.5"),
+)
+```
+
+They share one constructor shape — keyword-only `base_url`, `model`, `transport`,
+`headers`, plus role-specific extras (`batch_size` on embedding, `temperature` /
+`max_tokens` on generation and vision, `mime_type` on vision). A custom provider
+drops into the **exact same slot**:
+
+```python
+rag = CiteNexus(
+    "./citenexus-data",
+    embedder=InProcessEmbedding(),                                    # yours
+    generator=OpenAICompatibleGenerator(base_url="…/v1", model="qwen2.5"),  # ours
+)
+```
+
+Mix freely. The library cannot tell the difference, and that is the test the
+contract has to pass. For auth on the shipped clients, see
+[Custom endpoints & auth](/citenexus/custom-endpoints/).
+
+## Why `embed_many` and not `embed`
+
+This looks like a naming quibble and is not.
+
+In Python, **`str` is itself a `Sequence[str]`**. A contract spelled
+`embed(texts: Sequence[str]) -> list[Vector]` therefore cannot be distinguished
+from the single-text shape `embed(text: str) -> Vector` — not by `isinstance`
+against a `runtime_checkable` Protocol, which only checks that a method of that
+name exists, and not by a type checker either, since passing a `str` where a
+`Sequence[str]` is expected is perfectly legal.
+
+The failure is silent, and it is the worst kind. A single-text embedder handed to
+a batch contract accepts the call, iterates the string character by character, and
+returns a list of floats where a list of vectors was promised. Nothing raises at
+the seam.
+
+`embed_many` is unambiguous — and it is not invented: it is the exact name ingest
+was already duck-typing for with `getattr`. Naming it turned a discovered
+capability into one a provider can *know about*.
+
+**The ports use the natural name**, because the hazard is a property of Python's
+`Sequence` protocol and does not exist there:
+
+- **Go** — `string` and `[]string` are unrelated types. The compiler rejects the
+  wrong one at the assignment, and a `x.(EmbeddingProvider)` type assertion cannot
+  match the single-text shape. `golang/contracts/contracts_test.go` proves this
+  rather than asserting it.
+- **TypeScript** — `string` is not assignable to `readonly string[]` under
+  `tsc --strict`, and at runtime the two seams are not even the same *kind* of
+  value: the single-text seam is a function, the batch contract is an object with
+  an `embed` method, so `typeof` discriminates them with certainty.
+
+Identical semantics across ports is the requirement. Identical identifiers is not.
+
+## Failure must be sayable
+
+Every contract, in every port, returns a value or fails loudly. **No sentinels.**
+
+| | Python | Go | JavaScript |
+| --- | --- | --- | --- |
+| success | return value | `(T, nil)` | resolved promise (or a plain value) |
+| failure | `raise` | `(zero, err)` | rejected promise / `throw` |
+
+A zero vector is **not** an error value. It is a valid embedding of something, and
+once written it is indistinguishable from a document that genuinely embeds near
+the origin — retrieval scores it `0.0000` with no error and no flag. This was a
+real bug, not a hypothetical: the Go seam used to be `Embed(text string) []float64`,
+with no way for a timed-out model to say so, and a reproduction indexed a
+polarity-flipped "may not disclose" clause as a zero vector while reporting
+success. An empty string is likewise an answer, not a failure.
+
+Belt as well as braces: in the Go and JS ports the ingest **write path** now
+refuses a vector outright — empty, wrong-dimension for the run, non-finite (JS),
+or all-zeros — because a seam that *can* report failure still does not stop a
+provider that returns a degenerate vector while reporting success. A failed embed
+is fail-closed and all-or-nothing: the ingest aborts and writes nothing.
+Skip-and-report was rejected, because a document missing one chunk is, at
+retrieval time, indistinguishable from a document that never contained that
+sentence.
+
+And a model failure is **not** an abstention. A refusal is a finding — *"we
+searched the evidence and it does not support an answer."* A timed-out embedding
+model is not a finding about the evidence, and dressing it as one is the same class
+of lie as the zero vector.
+
+<Aside type="tip" title="Sync, deliberately — and not a dead end">
+The Python contracts are synchronous. A sync **batch** contract does not exclude an
+async provider: run your own event loop inside `embed_many(texts)` and CiteNexus
+never sees a coroutine. What would exclude one is a sync *single-text* contract,
+where there is nothing to gather. Protocols compose, so an async seam can be
+published beside these later without forcing any provider to also offer a blocking
+method. The JS port already accepts either: every contract there returns
+`Awaitable<T> = T | Promise<T>`.
+</Aside>
+
+## Honest scope: five in Python, two in the ports
+
+**"Bring your own provider" is fully true in Python and partly true in Go and
+JavaScript.** Say it that way until it is true everywhere.
+
+| Seam | Python | Go | JavaScript |
+| --- | --- | --- | --- |
+| embedding | `EmbeddingProvider.embed_many` | `contracts.EmbeddingProvider.Embed` | `EmbeddingProvider.embed` |
+| generation | `GeneratorProvider.answer` | `contracts.GeneratorProvider.Answer` | `GeneratorProvider.answer` |
+| completion | `CompletionProvider.complete` | **not published** | **not published** |
+| vision | `VisionProvider.describe` | **not published** | **not published** |
+| reranking | `RerankerProvider.rerank` | **not published** | **not published** |
+
+The three withheld seams are **deferred, not refused**. Each port was checked
+against one question — *what here would consume it?* — and the answers were:
+
+- **completion** — neither port has a deep-ask decision loop. `golang/result/result.go`
+  says so outright: *"Deep-ask is Python-only today."* There is no loop to feed.
+- **vision** — neither port has a conditional-vision path, an `ImageRef`, or a
+  figure Evidence Unit.
+- **reranking** — `rerank` has zero hits in either port, tests included. Neither
+  has a `Candidate` type the contract could even be *spelled* in terms of without
+  first inventing the retrieval layer it reorders.
+
+A published contract asserts that implementing it makes the library use your
+provider. Publishing one for a seam with no call site would make that assertion
+falsely — the mirror image of the `getattr` problem. Each becomes a one-file
+addition the day a port grows a caller, and its shape is already settled by Python.
+
+Two further Python-only things, so their absence is not read as an oversight: the
+[authority policy](/citenexus/authority/) and the answer-language `"auto"`
+sentinel both live in the config layer, and neither port has a config layer or an
+`ask()` facade over one. The ports fix the answer language at `"en"` and still pass
+it through the contract, so a provider sees the same signature it sees in Python.
+
+### Where the ports inject
+
+The injection point is `answer.AskWith` in Go and `askWith` in JavaScript.
+`Ask` / `ask` keep their old signature and behaviour on purpose: they are pinned
+byte-for-byte by `conformance/cases/e2e_hermetic.json`. Every field of the provider
+set is optional — an absent provider falls back to the port's deterministic fake,
+so a partial set is valid.
+
+```go
+import (
+    "github.com/muthuishere/citenexus/golang/answer"
+    "github.com/muthuishere/citenexus/golang/contracts"
+)
+
+// Your type satisfies the contract by shape — asserted at COMPILE time.
+var _ contracts.EmbeddingProvider = (*MyEmbedding)(nil)
+
+res, err := answer.AskWith(corpus, "Can the employee disclose?", 5, answer.Providers{
+    Embedding: &MyEmbedding{},   // Embed(texts []string) ([][]float64, error)
+    Generator: &MyGenerator{},   // Answer(question, passage, answerLanguage string) (string, error)
+})
+if err != nil {
+    // A model failure is an error and a ZERO Result — never a refusal.
+}
+```
+
+```ts
+import { askWith } from "@muthuishere/citenexus";
+
+const res = await askWith(corpus, "Can the employee disclose?", {
+  embedding: { embed: async (texts) => myModel.encode([...texts]) },
+  generator: { answer: async (q, passage) => extractSentence(q, passage) },
+  topK: 5,
+});
+```
+
+Go's `contracts` package imports **nothing** — not even another CiteNexus package
+— and the JS `contracts.ts` module imports nothing at all, so implementing a
+contract costs a provider author one file's worth of reading and no dependency
+they did not already have.
+
+---
+
+Background: [ADR-0014 — the model seam is a contract, not an
+endpoint](https://github.com/muthuishere/citenexus/blob/main/docs/adr/0014-the-model-seam-is-a-contract-not-an-endpoint.md).
+Next: [Bring your own models](/citenexus/models/) for the shipped clients ·
+[Custom endpoints & auth](/citenexus/custom-endpoints/) for `${ENV}` auth.

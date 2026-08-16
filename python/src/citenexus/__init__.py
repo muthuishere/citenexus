@@ -48,7 +48,10 @@ from citenexus.retrieve.rerank import OpenAICompatibleReranker
 from citenexus.storage.location import S3
 from citenexus.vision.client import OpenAICompatibleVision
 
-__version__ = "0.2.0"
+# Kept in step with pyproject.toml [project].version by hand. It had drifted to
+# "0.2.0" while the package shipped 0.9.0 on PyPI -- caught while documenting the
+# provider contracts, one commit before tagging 0.10.0.
+__version__ = "0.10.0"
 
 __all__ = [
     "S3",
