@@ -10,6 +10,16 @@ Dist name on PyPI is **`citenexus`** (the import package is `citenexus`; see
 
 ## [Unreleased]
 
+### Docs
+
+- Documentation site rebuilt around the five classes of confidently-wrong answer;
+  repo docs (`README.md`, `CLAUDE.md`, this file, `docs/SPEC-v6.md`) reconciled
+  against source. Killed a long-standing false `ingest_async` claim, a "13
+  scripts" undercount, and a stale "the ports are ASCII-only" claim.
+
+> **Gap in this file:** `v0.7.0` and `v0.9.0` were tagged and released without
+> CHANGELOG entries. Their contents are recoverable only from git history.
+
 ## [0.10.1] - 2026-08-17
 
 Patch for a regression in 0.10.0: **the headline safety fix was not active in the
@@ -41,9 +51,24 @@ Go and JavaScript ports.**
 
 ### Known
 
-- Port parity is **predicate-only**. Neither port has `split_claims`, so
-  atomic-claim decomposition and drop-not-fail remain Python-only: a Go or JS
-  answer never comes back trimmed, it passes or refuses whole.
+- Port parity is **predicate-only**. Both ports *ship* claim segmentation
+  (`golang/answer/segment.go:144` `SplitClaims`, `js/src/answer/segment.ts:107`
+  `splitClaims`) but **nothing on the answer path calls it** — zero non-test
+  callers in either language. The port flows gate the whole answer string as a
+  single claim (`golang/answer/askwith.go:194`), so atomic-claim decomposition and
+  drop-not-fail remain Python-only: a Go or JS answer never comes back trimmed,
+  it passes or refuses whole.
+- Also Python-only: conflict detection (the ports declare `conflicts` and always
+  emit an empty list), the authority policy (the ports carry `authority_tier` /
+  `authority_floor_applied` for wire parity, with no selection logic), the
+  reranker, and the `search_languages` fan-out.
+- **The Go module is tagged separately.** `go get github.com/muthuishere/citenexus/golang@v0.10.1`
+  resolves the `golang/v0.10.1` tag; the bare `v0.10.1` tag is the Python/JS/Rust
+  release.
+- Registry versions are **not** uniform: PyPI `citenexus` 0.10.1 and npm
+  `@muthuishere/citenexus` 0.10.1 are current, but npm
+  `@muthuishere/citenexus-core` is at 0.8.0 and the crates.io `citenexus-core`
+  crate at 0.5.0, both behind this repo.
 
 
 ## [0.10.0] - 2026-08-16
@@ -94,14 +119,48 @@ trustworthy — verbatim-sourced, correctly cited, and wrong. Each is now closed
   returns its supported claims instead of being discarded whole;
   `Result.claims` and `unsupported_claims_removed` now carry real values.
 - **`tokenize_v2`** — NFKC, full case folding, Unicode category scan, character
-  bigrams for space-less scripts. **13 scripts claimed**, each backed by a golden
-  fixture; Khmer, Lao, Myanmar, Georgian and Armenian are deliberately not
-  claimed even though the bigram path works for them.
+  bigrams for space-less scripts. **14 scripts claimed** — Arabic, Bengali,
+  Cyrillic, Devanagari, Greek, Han, Hangul, Hebrew, Hiragana, Katakana, Latin,
+  Tamil, Telugu, Thai — each backed by a golden conformance fixture
+  (`conformance/cases/tokenize_v2.json`). An unclaimed script emits **zero
+  tokens** and refuses by name rather than ranking; Khmer, Lao, Myanmar, Georgian
+  and Armenian are deliberately not claimed even though the bigram path "works"
+  for them.
 - **`EvidenceSignals.unsupported_scripts`** — a capability signal, distinct from
   "the evidence isn't there".
 - **`reconcile()` / `remediate()`** — diff the live index against a
   caller-declared corpus manifest (orphans / missing / drifted, disjoint,
   read-only), with remediation as a separate explicit call. (ADR-0008)
+- **Authority floor.** `ingest(..., authority={...})` attaches a curator-asserted
+  tier; strict mode enforces a minimum and withholds grounded-but-unauthoritative
+  evidence *after* grounding and *before* generation — deliberately not fed into
+  fusion or rerank. Signals `authority_tier` / `authority_floor_applied`.
+  Measured on the live `examples/law-authority` corpus: out-of-jurisdiction
+  citations **4 → 0**, abstain-when-no-evidence **33% → 100%**, with groundedness
+  and citation at 100% throughout — which is the point: 100% groundedness with
+  four wrong-jurisdiction citations is why this had to exist. **Unranked by
+  default** (`AuthorityPolicy.unranked()`); nothing changes until you attach
+  tiers at ingest and set a floor. (ADR-0004)
+- **`search_languages` fan-out** — `ask(..., search_languages=("en","ta","te"))`
+  reformulates the query per language so an English question reaches a Tamil
+  annexure. Measured on a 12-document EN/TA/TE corpus, one live run per
+  configuration: answered-when-groundable **44% → 89%**, cited-the-right-document
+  **75% → 100%**, and abstain-when-ungroundable **unchanged at 100%** — it answers
+  roughly twice as often without answering one thing it shouldn't have.
+  Default `("en",)`; Python facade only. (ADR-0013)
+- **`citenexus.contracts`** — seven `runtime_checkable` Protocols
+  (`EmbeddingProvider`, `GeneratorProvider`, `CompletionProvider`,
+  `VisionProvider`, `RerankerProvider`, `SingleTextEmbedder`, `SequenceEmbedder`)
+  as the escape hatch for a model that cannot be made OpenAI-shaped. The
+  *documented* path is narrower and cheaper: keep the shipped client and swap
+  `transport=`, a keyword-only `Callable[[str, bytes, dict[str, str]], bytes]`
+  on all four clients, with tri-port equivalents (`models.Transport` in Go,
+  `Transport` in JS). (ADR-0014)
+- **Typed structural intake** — `rag.code.ingest_from(...)` and `rag.schema`,
+  each enforcing its own signals, with **explicit per-edge confidence** rather
+  than asserted graph edges.
+- **Deep-ask** — `ask(..., strategy="deep")` runs a budgeted agentic loop through
+  the same gate; `EvidenceSignals.loop` carries its accounting.
 - **Seven worked scenarios** in the docs, and a library-level adversarial stress
   harness (`spikes/library-stress/`) kept green by CI.
 
@@ -123,7 +182,28 @@ trustworthy — verbatim-sourced, correctly cited, and wrong. Each is now closed
   single-sentence, English** fixtures. They have not been re-measured on a live
   corpus with real models.
 - The Go and JavaScript `Ask` flows still run the frozen v1 predicate; only the
-  exported gate functions moved to v2.
+  exported gate functions moved to v2. **→ fixed in 0.10.1; if you are on
+  0.10.0 and call the Go or JS `Ask`/`ask`, you do not have this release's
+  headline fix.**
+- **Subject-scope applicability is open** (ADR-0012, *proposed*). Chunking severs
+  a precondition from the operative rule it governs: **8 of 11 operative EUs are
+  citable without the clause that governs them** (73% severance). Such an answer
+  clears the faithfulness gate *and* the authority floor and is still wrong for
+  the asker. Neither check catches it.
+- **`evaluate()` cannot score abstention** — a blank `expected` earns
+  expected-support only if the row was *answered*, so a correct refusal lowers
+  the rate. Drive `ask()` and assert `Decision.refused` instead.
+- **`evaluate()` does not fan out over `search_languages`**; the `("en",)`
+  default always applies inside it.
+- **`bbox` never reaches `Result.sources`.** It is captured at extraction, but no
+  `bbox=` is set anywhere on the answer path, so `SourceRef.bbox` is always
+  `None`. Citations resolve to **document + page**.
+- **`acl` is carried, not enforced.** Isolation comes from `PartitionPath` plus
+  the `allowed_partitions` pre-filter — not from `acl`.
+- All benchmark rates above are **single live runs** against a non-deterministic
+  model at temperature 0. An identical re-run moved rate metrics by one question;
+  only the safety metrics (0 out-of-jurisdiction citations, 100%
+  groundedness/citation, 100% abstain-when-no-evidence) reproduced.
 
 
 ## [0.6.0] - 2026-07-08
@@ -215,7 +295,7 @@ missing, or conflicting.
 ### Added
 
 - **Public client, three verbs** — `CiteNexus("s3://bucket", signals=[...])` with
-  `ingest()` / `ingest_async()`, `ask()` (strict cite-or-abstain default),
+  `ingest()` (synchronous), `ask()` (strict cite-or-abstain default),
   `retrieve()` (documents-only engine under `ask`), `stream()` (sentence-gated in
   strict mode), memory `recall()`, and `evaluate(csv)` with deterministic
   aggregate metrics and an append-only audit trail.
@@ -226,8 +306,9 @@ missing, or conflicting.
   Anthropic clients behind one injected seam; `from_config` factory; no bundled
   models anywhere (embedding / LLM / reranker / vision are injected endpoints).
 - **Universal ingest** — files, S3 prefixes, raw text, plus **web fetch and
-  same-domain crawl**; sync + async via a durable worker queue
-  (retry/backoff, DLQ, idempotent-by-hash, resume). Extractors for
+  same-domain crawl**. Ingest is synchronous; the durable worker queue
+  (`worker.queue.DurableQueue`) adds **durability, not concurrency** —
+  retry/backoff, DLQ, idempotent-by-hash, resume. Extractors for
   pdf/docx/pptx/html/md/txt/csv/images with unknown-type plain fallback.
 - **Chunking + contextual retrieval** — recursive structure-aware chunker with
   parent-child evidence building and LLM-contextualized chunks (Anthropic-style
@@ -263,5 +344,12 @@ missing, or conflicting.
   a tag-triggered release workflow publishing to PyPI via OIDC trusted
   publishing. Runnable multilingual example against local MinIO + Ollama.
 
-[Unreleased]: https://github.com/muthuishere/citenexus/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/muthuishere/citenexus/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/muthuishere/citenexus/releases/tag/v0.10.1
+[0.10.0]: https://github.com/muthuishere/citenexus/releases/tag/v0.10.0
+[0.6.0]: https://github.com/muthuishere/citenexus/releases/tag/v0.6.0
+[0.5.0]: https://github.com/muthuishere/citenexus/releases/tag/v0.5.0
+[0.4.0]: https://github.com/muthuishere/citenexus/releases/tag/v0.4.0
+[0.3.0]: https://github.com/muthuishere/citenexus/releases/tag/v0.3.0
+[0.2.1]: https://github.com/muthuishere/citenexus/releases/tag/v0.2.1
 [0.2.0]: https://github.com/muthuishere/citenexus/releases/tag/v0.2.0

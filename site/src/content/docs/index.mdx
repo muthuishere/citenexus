@@ -1,6 +1,6 @@
 ---
 title: CiteNexus
-description: An evidence-integrity layer for retrieval, in Go, JavaScript and Python. It proves an answer follows from a source that actually governs — the exact quote, page and bbox, in 14 scripts — and refuses when it can't. The guarantee is "no ungrounded claim."
+description: An evidence-integrity layer for retrieval, in Go, JavaScript and Python. It proves an answer follows from a source that actually governs — the exact quote and page, in 14 scripts — and refuses when it can't. The guarantee is "no ungrounded claim."
 template: splash
 head:
   - tag: title
@@ -152,7 +152,7 @@ no Dutch numbers on this page.*
 ## Five ways a grounded answer is still wrong
 
 Every one of these produces output where **every visible signal says trust me**:
-verbatim text, a real document, a page, a bbox, 100% groundedness. That is worse
+verbatim text, a real document, a page, 100% groundedness. That is worse
 than an obviously ungrounded answer, because there is nothing to notice. Each is
 closed by a deterministic check, and each was closed because it was **measured
 failing first**.
@@ -250,7 +250,7 @@ write-path check.*
 			<p class="cn-q">Can the employee disclose confidential information?</p>
 			<div class="cn-quote">“The employee shall not disclose confidential information.”</div>
 			<p class="cn-note">Verbatim from the source. Every word verifiable.</p>
-			<div class="cn-cite"><span>cited to</span><b>employee-nda.pdf</b><span>·</span><b>page 3</b><span>·</span><b>bbox [72,144,540,166]</b></div>
+			<div class="cn-cite"><span>cited to</span><b>employee-nda.pdf</b><span>·</span><b>page 3</b></div>
 		</div>
 	</div>
 	<div class="cn-card">
@@ -266,7 +266,7 @@ write-path check.*
 
 Answers are generated at temperature 0 from retrieved passages only, quoted
 verbatim, then checked claim by claim against the passage they cite. Nothing
-survives that check without a document, a page and a bbox behind it. Nothing
+survives that check without a document and a page behind it. Nothing
 survives it at all → the single pinned refusal string.
 
 <Tabs syncKey="lang">
