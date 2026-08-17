@@ -4,6 +4,7 @@ description: Score groundedness and citation against a golden set, and assert mu
 ---
 
 import { Aside, Steps } from '@astrojs/starlight/components';
+import FacadeNote from '../../../components/FacadeNote.astro';
 
 **The failure this prevents:** you swap the embedding model, the answer rate goes
 up, everyone celebrates, and what actually happened is that the system started
@@ -21,6 +22,8 @@ Must-refuse rows therefore do not belong in the CSV. Split the job: `evaluate()`
 scores the answerable rows, and you assert the refusals yourself. Everything
 below is built that way.
 </Aside>
+
+<FacadeNote />
 
 <Steps>
 

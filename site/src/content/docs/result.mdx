@@ -3,12 +3,19 @@ title: The Result object
 description: Every ask() returns a structured Result — the answer, the decision, per-claim verification, cited sources with page and verbatim passage, and a provenance chain. No scalar confidence; structured signals instead.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-`ask()` returns a `Result` — the same shape whether it answered or abstained.
-There is no scalar "confidence"; instead you get **structured signals** you can
-branch on and audit.
+An answer comes back as a `Result` — the same shape whether it answered or
+abstained. There is no scalar "confidence"; instead you get **structured signals**
+you can branch on and audit.
 
+`Result` is **field-for-field identical in all three ports** and serializes
+byte-compatibly (`conformance/cases/result_roundtrip.json` pins it), so the same
+reader works whichever language produced it. Python and JavaScript keep the wire
+names as-is; Go uses Go casing with matching `json` tags.
+
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
 from citenexus.answer.result import Result, Decision
 
@@ -23,10 +30,67 @@ if result.evidence.decision is Decision.answered:
 else:  # Decision.refused
     print("refused:", result.missing_evidence)
 ```
+</TabItem>
+<TabItem label="Go">
+```go
+import (
+	"fmt"
+
+	"github.com/muthuishere/citenexus/golang/answer"
+	"github.com/muthuishere/citenexus/golang/result"
+)
+
+res := answer.Ask(corpus, "What is the retention period?", answer.DefaultTopK)
+
+if res.Evidence.Decision == result.DecisionAnswered {
+	fmt.Println(res.Answer, "→", res.AnswerLanguage)
+	for _, src := range res.Sources {
+		// Page is *int — nil when the format has no pages.
+		fmt.Println(src.Document, src.PassageLanguage, src.Passage)
+	}
+	for _, c := range res.Claims {
+		fmt.Println(c.Claim, c.Supported, c.Sources) // sources = Evidence-Unit ids
+	}
+} else { // result.DecisionRefused
+	fmt.Println("refused:", res.MissingEvidence)
+}
+```
+</TabItem>
+<TabItem label="JavaScript">
+```ts
+import { ask, Decision } from "@muthuishere/citenexus";
+
+const res = ask(corpus, "What is the retention period?", 5);
+
+if (res.evidence.decision === Decision.answered) {
+  console.log(res.answer, "→", res.answer_language);
+  for (const src of res.sources) {
+    console.log(src.document, src.page, src.passage_language, src.passage);
+  }
+  for (const claim of res.claims) {
+    console.log(claim.claim, claim.supported, claim.sources); // sources = EU ids
+  }
+} else { // Decision.refused
+  console.log("refused:", res.missing_evidence);
+}
+```
+</TabItem>
+</Tabs>
+
+<Aside type="note" title="Where the Result comes from differs, the Result does not">
+In Python the `Result` is produced by the facade — `rag.ask(...)` over an ingested
+corpus, with retrieval, authority, conflict detection and per-claim verification
+behind it. In Go and JavaScript it is produced by the hermetic core flow
+(`answer.Ask` / `ask`) over an in-memory corpus you pass in. The **object** is the
+same; the pipeline that fills it is not. See
+[Ask & abstain](/citenexus/ask/) for what only the facade does.
+</Aside>
 
 ## `Result`
 
 Import: `from citenexus.answer.result import Result, EvidenceSignals, SourceRef, Claim, ProvenanceEntry, Decision`
+· Go `github.com/muthuishere/citenexus/golang/result` · JavaScript
+`import type { Result, EvidenceSignals, SourceRef, Claim, ProvenanceEntry } from "@muthuishere/citenexus"`
 
 | field | type | meaning |
 |---|---|---|
@@ -52,9 +116,16 @@ Whatever the answer language, `SourceRef.passage` stays **verbatim in the
 source's own language** — an English answer can carry a non-English quote.
 </Aside>
 
+The table above is the wire contract, so it reads the same in every port. Go
+spells the fields `Answer`, `AnswerLanguage`, `MissingEvidence`, … with `json`
+tags back to these names, and expresses "absent" as a nil pointer where Python
+uses `None` and TypeScript uses `null`; list fields are always initialized, so
+they serialize as `[]` and never as `null`.
+
 ## `Decision`
 
-`answered`, `refused`, `partial`.
+`answered`, `refused`, `partial` — `Decision.answered` in Python and JavaScript,
+`result.DecisionAnswered` in Go.
 
 <Aside type="note" title="What the current flow emits">
 The v0.2 extractive answer flow emits only `answered` or `refused`. `partial` is

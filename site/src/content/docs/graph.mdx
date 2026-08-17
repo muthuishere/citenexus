@@ -4,6 +4,7 @@ description: Build an entity graph over your evidence and retrieve through it â€
 ---
 
 import { Aside } from '@astrojs/starlight/components';
+import FacadeNote from '../../components/FacadeNote.astro';
 
 CiteNexus can build an **entity graph** over your corpus and retrieve through it â€”
 but the graph is *navigation over evidence*, never a citation itself. Every graph
@@ -16,6 +17,8 @@ edges are corpus-wide, so a per-ingest full rebuild would not scale. The rebuild
 is **lazy on the read path**: the first graph retrieval after an ingest brings the
 index up to date before it loads, so `ask()` always sees a graph consistent with
 every committed ingest.
+
+<FacadeNote />
 
 ```python
 rag = CiteNexus("./citenexus-data", embedder=..., generator=...,

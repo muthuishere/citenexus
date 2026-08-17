@@ -1,0 +1,199 @@
+---
+title: The deterministic core
+description: Chunking, the faithfulness gate, and claim segmentation — the three algorithms that exist byte-for-byte in Python, Go and JavaScript, pinned by shared conformance vectors. Same input, same output, whichever language you call from.
+---
+
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+Most of CiteNexus is the Python facade — ingest, retrieve, ask, evaluate, the
+config layer. This page is the part that is **not** Python: three pure functions
+that exist in Python, Go and JavaScript alike, take the same input, and return
+the same output, because a shared set of conformance vectors fails the build
+otherwise.
+
+| Algorithm | Python | Go | JavaScript | Pinned by |
+|---|---|---|---|---|
+| Chunking | `chunk_text` | `chunker.ChunkText` | `chunkText` | `conformance/cases/chunker.json` |
+| Faithfulness gate (v2) | `is_supported_v2`, `align` | `gate.IsSupportedV2`, `gate.Align` | `isSupportedV2`, `align` | `conformance/cases/faithful_v2.json` |
+| Claim segmentation | `split_claims` | `answer.SplitClaims` | `splitClaims` | `conformance/cases/segmentation.json` |
+
+The tokenizer underneath them ([14 scripts, one table](/citenexus/languages/))
+and [RRF fusion](/citenexus/reranking/) are pinned the same way.
+
+<Aside type="note" title="What a pinned vector actually buys you">
+These are not three implementations that happen to agree today. Each port reads
+the same JSON vectors in its own test suite, so a change that moves the output in
+one language and not the others fails there rather than surfacing as a corpus
+that chunks differently depending on which SDK ingested it.
+</Aside>
+
+## Chunking
+
+`chunk_text` splits text into bounded, overlapping, boundary-respecting chunks.
+Defaults are the same everywhere: `max_tokens = 450`, `overlap = 60`.
+
+<Tabs syncKey="lang">
+<TabItem label="Python">
+```python
+from citenexus.evidence.chunker import chunk_text
+
+chunk_text("one two three four five", max_tokens=3, overlap=1)
+# ['one\ntwo\nthree', 'three\nfour\nfive']
+```
+</TabItem>
+<TabItem label="Go">
+```go
+import "github.com/muthuishere/citenexus/golang/chunker"
+
+chunker.ChunkText("one two three four five", 3, 1)
+// ["one\ntwo\nthree" "three\nfour\nfive"]
+```
+</TabItem>
+<TabItem label="JavaScript">
+```ts
+import { chunkText } from "@muthuishere/citenexus";
+
+chunkText("one two three four five", 3, 1);
+// ['one\ntwo\nthree', 'three\nfour\nfive']
+```
+</TabItem>
+</Tabs>
+
+The only difference is call style: Python takes `max_tokens` / `overlap` as
+keyword-only arguments, Go and JavaScript take them positionally after the text.
+A `max_tokens` below `1` is an error in every port, and empty text yields an
+empty list rather than one empty chunk.
+
+## The faithfulness gate
+
+`is_supported_v2` is the predicate that stands between a caller and a lie: the
+claim's tokens must appear in the passage **in order**, preserving multiplicity,
+within a bounded interior gap, and every polarity marker inside the matched span
+must survive into the claim. See
+[the faithfulness gate](/citenexus/faithfulness/) for why set containment was not
+enough.
+
+<Tabs syncKey="lang">
+<TabItem label="Python">
+```python
+from citenexus.answer.verify import (
+    is_supported_v2, align, MAX_SINGLE_GAP, MAX_TOTAL_GAP,
+)
+from citenexus.tokenize import tokenize_v2
+
+is_supported_v2("notice period is 30 days", "The notice period is 30 days.")
+# True
+
+align(tokenize_v2("notice period is 30 days"),
+      tokenize_v2("The notice period is 30 days."))
+# Alignment(start=1, end=5, total_gap=0, max_gap=0)   — or None if it does not align
+
+MAX_SINGLE_GAP, MAX_TOTAL_GAP   # (4, 8)
+```
+</TabItem>
+<TabItem label="Go">
+```go
+import (
+	"github.com/muthuishere/citenexus/golang/gate"
+	"github.com/muthuishere/citenexus/golang/tokenize"
+)
+
+gate.IsSupportedV2("notice period is 30 days", "The notice period is 30 days.")
+// true
+
+al, ok := gate.Align(
+	tokenize.TokenizeV2("notice period is 30 days"),
+	tokenize.TokenizeV2("The notice period is 30 days."),
+)
+// {Start:1 End:5 TotalGap:0 MaxGap:0}, true
+
+gate.MaxSingleGap, gate.MaxTotalGap // 4, 8
+```
+</TabItem>
+<TabItem label="JavaScript">
+```ts
+import {
+  isSupportedV2, align, MAX_SINGLE_GAP, MAX_TOTAL_GAP, tokenizeV2,
+} from "@muthuishere/citenexus";
+
+isSupportedV2("notice period is 30 days", "The notice period is 30 days.");
+// true
+
+align(tokenizeV2("notice period is 30 days"),
+      tokenizeV2("The notice period is 30 days."));
+// { start: 1, end: 5, totalGap: 0, maxGap: 0 }   — or null if it does not align
+
+MAX_SINGLE_GAP, MAX_TOTAL_GAP;   // 4, 8
+```
+</TabItem>
+</Tabs>
+
+`align` reports **where** the claim matched, in passage-token indices, and how
+much it had to skip. Go returns `(Alignment, bool)`; Python returns
+`Alignment | None`; JavaScript returns `Alignment | null` — the same four numbers
+either way (`start`, `end`, `total_gap`/`TotalGap`/`totalGap`,
+`max_gap`/`MaxGap`/`maxGap`).
+
+<Aside type="caution" title="The gap budget is pinned, not configurable">
+`MAX_SINGLE_GAP = 4` and `MAX_TOTAL_GAP = 8` are constants in all three ports.
+A caller who could widen them would silently weaken the guarantee, and a
+conformance vector cannot pin a value the caller controls. Go exposes
+`AlignWithBudget` for the algorithm itself, but the *gate* — `IsSupportedV2` —
+always uses the pinned pair.
+</Aside>
+
+The frozen v1 predicate (`is_supported` / `gate.IsSupported` / `isSupported`) is
+still exported in every port so its vectors keep passing, but it is no longer
+what the answer path calls anywhere.
+
+## Claim segmentation
+
+`split_claims` breaks an answer into atomic claims — the unit the gate verifies.
+
+<Tabs syncKey="lang">
+<TabItem label="Python">
+```python
+from citenexus.answer.segment import split_claims
+
+split_claims("The notice period is 30 days. It may be extended.")
+# ['The notice period is 30 days.', 'It may be extended.']
+```
+</TabItem>
+<TabItem label="Go">
+```go
+import "github.com/muthuishere/citenexus/golang/answer"
+
+answer.SplitClaims("The notice period is 30 days. It may be extended.")
+// ["The notice period is 30 days." "It may be extended."]
+```
+</TabItem>
+<TabItem label="JavaScript">
+```ts
+import { splitClaims } from "@muthuishere/citenexus";
+
+splitClaims("The notice period is 30 days. It may be extended.");
+// ['The notice period is 30 days.', 'It may be extended.']
+```
+</TabItem>
+</Tabs>
+
+<Aside type="caution" title="The ports ship it, but do not yet run it">
+This is the one place the parity story has a seam, and it is worth stating
+plainly. `SplitClaims` / `splitClaims` are exported and vector-pinned, but
+neither port's answer flow calls them: `AskWith` / `askWith` verify the **whole
+answer as a single claim**. Only Python's flow splits an answer, verifies each
+claim, and drops the unsupported ones.
+
+The practical consequence: a Python answer can come back trimmed, with
+`unsupported_claims_removed` greater than zero. A Go or JavaScript answer
+**passes or refuses whole** — it is never trimmed. Both are safe, in the sense
+that nothing ungrounded is emitted; the port is simply stricter and blunter.
+</Aside>
+
+## What is *not* in the core
+
+Everything that needs orchestration. Ingestion, retrieval, the config layer, the
+authority floor, conflict detection, evaluation, graph and wiki, deep-ask and the
+`CiteNexus` class itself live only in Python — the ports have no facade to hang
+them on. [Install](/citenexus/install/) has the per-port surface;
+[Scope](/citenexus/scope/) has the boundary and why it is drawn there.

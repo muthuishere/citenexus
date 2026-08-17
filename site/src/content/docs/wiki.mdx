@@ -4,6 +4,7 @@ description: A distilled, cross-linked wiki over your corpus that you navigate t
 ---
 
 import { Aside } from '@astrojs/starlight/components';
+import FacadeNote from '../../components/FacadeNote.astro';
 
 The wiki is a distilled, `[[cross-linked]]` map of your corpus that you *navigate*
 to find evidence. It is the strongest expression of **navigate-not-cite**: a wiki
@@ -14,6 +15,8 @@ Evidence Units it points at, and only those are cited.
 
 Declare the `wiki` signal. Pages are integrated per-document as you ingest
 (Karpathy-style incremental upsert) and fully rebuilt on a slow-path refresh.
+
+<FacadeNote />
 
 ```python
 rag = CiteNexus("./citenexus-data", embedder=..., generator=...,

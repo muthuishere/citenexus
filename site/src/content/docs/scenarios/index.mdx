@@ -4,6 +4,7 @@ description: Eight worked builds — contract review, conflicting sources, regul
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
+import FacadeNote from '../../../components/FacadeNote.astro';
 
 Each scenario is a complete build, not a snippet: the problem, the code, what
 comes back, and — most importantly — **the specific failure it protects you
@@ -62,10 +63,11 @@ can plan against.
 
 ## The shape every scenario shares
 
+<FacadeNote />
+
 ```python
 from citenexus import CiteNexus
-from citenexus.embed.client import OpenAICompatibleEmbedding
-from citenexus.answer.generator import OpenAICompatibleGenerator
+from citenexus import OpenAICompatibleEmbedding, OpenAICompatibleGenerator
 
 rag = CiteNexus(
     "./citenexus-data",                        # a local directory, or s3://bucket

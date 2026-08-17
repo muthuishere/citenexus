@@ -3,7 +3,7 @@ title: Why did it abstain?
 description: Your first ask() came back refused. Six different things cause that, they mean six different things, and each one names itself in a field. Read the signal, then fix the right problem.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 
 A refusal is a successful outcome — it is the product working. But "I can't
 answer that from the available evidence." is the same sentence for several
@@ -11,6 +11,8 @@ different situations, and reaching for the wrong fix wastes a day.
 
 **Every refusal says why.** Read two things:
 
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
 response = rag.ask("Can the employee disclose this?")
 
@@ -18,6 +20,33 @@ print(response.evidence.decision)        # Decision.refused
 print(response.missing_evidence)         # ← the reason, in words
 print(response.evidence)                 # ← the structured signals
 ```
+</TabItem>
+<TabItem label="Go">
+```go
+import "github.com/muthuishere/citenexus/golang/answer"
+
+res := answer.Ask(corpus, "Can the employee disclose this?", answer.DefaultTopK)
+
+fmt.Println(res.Evidence.Decision)       // result.DecisionRefused
+fmt.Println(res.MissingEvidence)         // ← the reason, in words
+fmt.Printf("%+v\n", res.Evidence)        // ← the structured signals
+```
+</TabItem>
+<TabItem label="JavaScript">
+```ts
+import { ask } from "@muthuishere/citenexus";
+
+const res = ask(corpus, "Can the employee disclose this?");
+
+console.log(res.evidence.decision);      // Decision.refused
+console.log(res.missing_evidence);       // ← the reason, in words
+console.log(res.evidence);               // ← the structured signals
+```
+</TabItem>
+</Tabs>
+
+Only the producing line differs: Python retrieves from a store, the ports answer
+over an in-memory corpus. The refusal fields are the same three, in all three.
 
 `missing_evidence` is a tuple of strings on `Result`. `evidence` is the
 `EvidenceSignals` object. Between them, every refusal below is distinguishable

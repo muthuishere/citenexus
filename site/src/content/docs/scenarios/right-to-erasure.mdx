@@ -4,6 +4,7 @@ description: Revoke a document and prove every byte it ever wrote is gone — in
 ---
 
 import { Aside, Steps } from '@astrojs/starlight/components';
+import FacadeNote from '../../../components/FacadeNote.astro';
 
 **The failure this prevents:** `delete()` returns `status="deleted"`, and the
 document's text is still in your bucket. Not the current copy — an *earlier*
@@ -16,6 +17,8 @@ This was a real defect in CiteNexus, found by a spike and fixed. Documenting it
 here because the shape of the bug generalises to any content-addressed store.
 
 ## Revoking a document
+
+<FacadeNote />
 
 <Steps>
 

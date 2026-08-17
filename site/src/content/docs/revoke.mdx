@@ -4,12 +4,15 @@ description: delete() / revoke() surgically removes one ingested document and ev
 ---
 
 import { Aside } from '@astrojs/starlight/components';
+import FacadeNote from '../../components/FacadeNote.astro';
 
 Evidence changes. A contract is superseded, a source is retracted, a data
 subject asks to be forgotten. `delete()` (alias `revoke()`) is the exact inverse
 of `ingest()`: it removes **one** document and every artifact derived from it, so
 the document is no longer retrievable and no longer citable by `ask()` — while
 every other document stays intact and answerable.
+
+<FacadeNote />
 
 ```python
 rag.ingest(text="The employee shall not disclose…", document_id="nda-2021")

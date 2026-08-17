@@ -17,10 +17,17 @@ can defend.
    verbatim in the source's own language**, so an English answer can carry a
    Telugu citation.
 2. **Verify.** A grounding gate runs **per atomic claim**. Anything unsupported
-   is dropped before it reaches you — see the mechanism below.
+   is dropped before it reaches you — see the mechanism below, or
+   [the faithfulness gate](/citenexus/faithfulness/) for the full story of what
+   the old predicate let through.
 3. **Cite or abstain.** A surviving claim resolves to a document, a page, and the
    verbatim passage. If nothing supports the question, CiteNexus emits the single
    **pinned refusal string** — identical in every port — rather than guessing.
+
+Those three steps sit inside a longer pipeline — retrieve, fuse, rerank, ground,
+apply the authority floor, check for conflicts, then generate and gate. For where
+each stage runs and which module implements it, see
+[How it works](/citenexus/architecture/).
 
 ## What "verified" actually checks
 

@@ -41,6 +41,7 @@ export default defineConfig({
 						{ label: 'Install — Go, JS, Python', slug: 'install' },
 						{ label: 'How it works', slug: 'architecture' },
 						{ label: 'The guarantee, and its limits', slug: 'concepts' },
+						{ label: 'The deterministic core — all three ports', slug: 'deterministic-core' },
 					],
 				},
 				{

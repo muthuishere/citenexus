@@ -4,6 +4,7 @@ description: CiteNexus gives you the building blocks for tenant/RBAC isolation â
 ---
 
 import { Aside } from '@astrojs/starlight/components';
+import FacadeNote from '../../components/FacadeNote.astro';
 
 Multi-tenant and RBAC isolation is built on **partitions**. CiteNexus ships the
 composable pre-filter pieces â€” resolve a scope to a partition, hard-filter
@@ -34,6 +35,8 @@ Import: `from citenexus.access import resolve_scope, filter_partitions, allowed_
   keep all.
 
 ## The pattern
+
+<FacadeNote />
 
 ```python
 from citenexus.access import resolve_scope, filter_partitions

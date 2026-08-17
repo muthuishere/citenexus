@@ -4,9 +4,12 @@ description: Ingest a file, raw text, or a URL — each idempotent by content ha
 ---
 
 import { Aside } from '@astrojs/starlight/components';
+import FacadeNote from '../../components/FacadeNote.astro';
 
 Ingest a file, raw text, or a URL. Each call returns an `IngestResult` and is
 idempotent by content hash — re-ingesting an unchanged `document_id` does no work.
+
+<FacadeNote />
 
 ```python
 from citenexus.extract.types import SourceType

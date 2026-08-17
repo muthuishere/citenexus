@@ -3,7 +3,7 @@ title: Custom endpoints & auth
 description: Point CiteNexus at any provider — base URL, custom headers, custom auth — with secrets referenced as ${ENV} header templates that expand only at the request boundary. The secret's value never enters a client object, a config, a repr, or a log.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
 A model that *is* an HTTP endpoint is one you configure here. (It need not be:
 the model seam is a [published contract](/citenexus/providers/), and everything
@@ -16,19 +16,122 @@ before. The secret's *value* never lives on a client object, in a config, in a
 
 ## First-class auth on any model client
 
-Every direct client — `OpenAICompatibleEmbedding`, `OpenAICompatibleGenerator`,
-`OpenAICompatibleVision`, `OpenAICompatibleReranker` — is importable from the
-top-level package and takes a `headers=` of `${ENV}` templates plus any custom
-provider headers:
+`${ENV}` header auth is the **same mechanism in all three ports**: the template is
+held on the client, and the HTTP layer expands it at the request boundary — Python
+`HttpClient`, Go `models.HTTPClient.ResolveHeaders`, JavaScript
+`HttpClient.resolveHeaders`. Same embedding endpoint, one tab per language:
 
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
-from citenexus import OpenAICompatibleEmbedding, OpenAICompatibleVision
+from citenexus import OpenAICompatibleEmbedding
 
 embedder = OpenAICompatibleEmbedding(
     base_url="https://api.jina.ai/v1",
     model="jina-embeddings-v3",
-    headers={"Authorization": "Bearer ${JINA_API_KEY}"},   # expands at call time
+    headers={
+        "Authorization": "Bearer ${JINA_API_KEY}",   # expands at call time
+        "X-Tenant": "legal",                          # arbitrary provider header
+    },
 )
+vectors = embedder.embed_many(["hello"])
+```
+</TabItem>
+<TabItem label="Go">
+```go
+import "github.com/muthuishere/citenexus/golang/models"
+
+// A real net/http transport; timeout 0 means the 60s default.
+http := models.NewHTTPClient(nil, 0)
+
+embedder := models.NewOpenAIEmbedding(
+    "https://api.jina.ai/v1", "jina-embeddings-v3",
+    http.Transport(),
+    models.WithHeaders(map[string]string{
+        "Authorization": "Bearer ${JINA_API_KEY}", // expands at call time
+        "X-Tenant":      "legal",
+    }),
+)
+vectors, err := embedder.Embed([]string{"hello"})
+```
+</TabItem>
+<TabItem label="JavaScript">
+```ts
+import { HttpClient, OpenAIEmbedder } from "@muthuishere/citenexus";
+
+const http = new HttpClient();
+
+const embedder = new OpenAIEmbedder(
+  {
+    base_url: "https://api.jina.ai/v1",
+    model: "jina-embeddings-v3",
+    headers: {
+      Authorization: "Bearer ${JINA_API_KEY}",   // expands at call time
+      "X-Tenant": "legal",
+    },
+  },
+  (url, body, headers) => http.send(url, body, headers),
+);
+const vectors = await embedder.embed(["hello"]);
+```
+</TabItem>
+</Tabs>
+
+The same option carries a bare token under whatever header name a provider wants
+— `{"x-api-key": "${ACME_TOKEN}"}` — so a non-`Bearer` scheme needs no special
+support.
+
+Chat generation is the same shape in all three:
+
+<Tabs syncKey="lang">
+<TabItem label="Python">
+```python
+from citenexus import OpenAICompatibleGenerator
+
+generator = OpenAICompatibleGenerator(
+    base_url="https://api.openai.com/v1",
+    model="gpt-4o-mini",
+    headers={"Authorization": "Bearer ${OPENAI_API_KEY}"},
+)
+```
+</TabItem>
+<TabItem label="Go">
+```go
+generator := models.NewOpenAIChatGenerator(
+    "https://api.openai.com/v1", "gpt-4o-mini",
+    0.0, nil, // temperature, max_tokens (nil → omitted from the request)
+    http.Transport(),
+    models.WithHeaders(map[string]string{"Authorization": "Bearer ${OPENAI_API_KEY}"}),
+)
+```
+</TabItem>
+<TabItem label="JavaScript">
+```ts
+import { HttpClient, OpenAIChatGenerator } from "@muthuishere/citenexus";
+
+const generator = new OpenAIChatGenerator(
+  {
+    base_url: "https://api.openai.com/v1",
+    model: "gpt-4o-mini",
+    headers: { Authorization: "Bearer ${OPENAI_API_KEY}" },
+  },
+  (url, body, headers) => new HttpClient().send(url, body, headers),
+);
+```
+</TabItem>
+</Tabs>
+
+<Aside type="note" title="Which clients each port ships">
+Go and JavaScript publish an **embedding** client, an **OpenAI-compatible chat**
+generator, and a native **Anthropic** generator (`models.NewAnthropicGenerator` /
+`AnthropicGenerator`). The **vision** and **reranker** clients
+(`OpenAICompatibleVision`, `OpenAICompatibleReranker`) are Python-only — the ports
+publish no such contract, so there is no port tab to write for them.
+</Aside>
+
+```python
+# Python only — vision and reranking clients take the same headers= templates.
+from citenexus import OpenAICompatibleVision
 
 vision = OpenAICompatibleVision(
     base_url="https://api.internal.acme/v1",
@@ -48,7 +151,12 @@ the environment only inside the HTTP client, only for that one request, and head
 values are never logged. Reference the key by name — expand it at the edge.
 </Aside>
 
-## Typed provider endpoints
+## Typed provider endpoints — Python only
+
+Everything from here down belongs to the Python facade: `HttpEndpoint`, the typed
+subclasses, and `from_config` are the **config layer**, and the ports have no
+config layer to wire them into. In Go and JavaScript you construct the client
+directly, exactly as the tabs above show.
 
 For config-driven wiring, the typed `HttpEndpoint` subclasses carry the same
 `${ENV}` headers (and reusable defaults like the right base URL and auth style):
@@ -111,45 +219,49 @@ config = CiteNexusConfig(
 rag = CiteNexus.from_config(config)   # each client resolves ${ENV} headers at the edge
 ```
 
-## The same in every port
+## Driving the HTTP layer yourself
 
-`${ENV}` header auth is uniform across the Python, Go, and JavaScript clients — the
-value is always resolved by the HTTP client at the request boundary, never held on
-the client.
+If you would rather not use a shipped client, the HTTP layer is public on its own
+— the `${ENV}` expansion lives there, not in the clients:
 
-```go
-// Go — first-class headers via a functional option; HTTPClient expands ${ENV}.
-import "github.com/muthuishere/citenexus/golang/models"
+<Tabs syncKey="lang">
+<TabItem label="Python">
+```python
+from citenexus.http import HttpClient
 
-http := models.NewHTTPClient(nil, 0) // real net/http transport, expands ${ENV} at call time
-embed := models.NewOpenAIEmbedding("https://api.jina.ai/v1", "jina-embeddings-v3",
-    http.Transport(),
-    models.WithHeaders(map[string]string{"Authorization": "Bearer ${JINA_API_KEY}"}))
+client = HttpClient()                    # the client *is* the transport: __call__
+raw = client(
+    "https://api.jina.ai/v1/embeddings",
+    b'{"model": "jina-embeddings-v3", "input": ["hello"]}',
+    {"Authorization": "Bearer ${JINA_API_KEY}"},   # expanded inside the call
+)
 ```
-
+</TabItem>
+<TabItem label="Go">
+```go
+client := models.NewHTTPClient(nil, 0)
+raw, err := client.Do(
+    "https://api.jina.ai/v1/embeddings",
+    []byte(`{"model":"jina-embeddings-v3","input":["hello"]}`),
+    map[string]string{"Authorization": "Bearer ${JINA_API_KEY}"},
+)
+```
+</TabItem>
+<TabItem label="JavaScript">
 ```ts
-// JavaScript — headers on the client config; HttpClient.resolveHeaders expands ${ENV}.
-import { HttpClient } from "@muthuishere/citenexus";
-
 const http = new HttpClient();
-const headers = { Authorization: "Bearer ${JINA_API_KEY}" };
-
-// http.send resolves ${ENV} at the request boundary — the value never lands
-// on the config object you pass around.
-const vector = await http.send(
+const raw = await http.send(
   "https://api.jina.ai/v1/embeddings",
   JSON.stringify({ model: "jina-embeddings-v3", input: ["hello"] }),
-  headers,
+  { Authorization: "Bearer ${JINA_API_KEY}" },
 );
 ```
+</TabItem>
+</Tabs>
 
-<Aside type="caution" title="`OpenAIEmbedder` is not on the JavaScript public API">
-The class exists in the package source (`js/src/models/embed.ts`) but
-`js/src/index.ts` exports no `models/`, and `package.json` publishes only `.`,
-`./ffi`, `./ingest` and `./storage` — so it cannot be imported from
-`@muthuishere/citenexus`. `HttpClient` **is** exported, and it is what carries the
-`${ENV}` behaviour; drive it directly until the embedder is exported.
-</Aside>
+In every port the merge order is the same — `User-Agent` < client defaults <
+per-call headers, auth wins — and the templates stay unexpanded until the one
+call that sends them (`resolve_headers` / `ResolveHeaders` / `resolveHeaders`).
 
 `Transport` is `(url, body, headers) => string | Promise<string>`, so an async
 transport needs no cast — a consumer `await`s either. `HttpClient.send` is async

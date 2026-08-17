@@ -4,9 +4,12 @@ description: Score a corpus against a golden CSV — answered/refused counts plu
 ---
 
 import { Aside } from '@astrojs/starlight/components';
+import FacadeNote from '../../components/FacadeNote.astro';
 
 Prove the guarantee holds on *your* corpus. `evaluate()` runs each row of a golden
 CSV through `ask()` and returns an `EvaluationReport`.
+
+<FacadeNote />
 
 ```python
 from citenexus.evaluate import EvaluationReport

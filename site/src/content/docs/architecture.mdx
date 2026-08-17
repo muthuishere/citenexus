@@ -13,6 +13,15 @@ own signal, so a refusal can always be attributed.
 Module paths below are the Python reference (`python/src/citenexus/`), which
 doubles this page as a code map.
 
+<Aside type="note" title="Both pipelines are the Python facade's">
+Neither diagram is a port diagram. Go and JavaScript have no store, no manifest
+and no `ingest`/`ask` facade — they expose the deterministic **stages** these
+pipelines are built out of (chunking, the tokenizer, relevance overlap, the
+faithfulness gate, RRF, `Result`) plus a hermetic `Ask` / `ask` over an in-memory
+corpus. Which stages, and at what parity:
+[Deterministic core](/citenexus/deterministic-core/).
+</Aside>
+
 ## Ingest
 
 ```

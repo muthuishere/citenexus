@@ -3,7 +3,7 @@ title: Languages & multilingual
 description: Fourteen scripts, from one canonical table, in Python, Go and JavaScript alike — the caller states the answer language; cited passages stay verbatim in the source language, with any translation additive. Unsupported scripts and unsupported search languages refuse by name. Language is detected by fastText lid.176 (or an offline heuristic detector).
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
 CiteNexus supports **14 scripts**, and it is the same 14 in all three ports — the
 Unicode tokenizer (v2) reads its script table from one canonical source, so
@@ -57,13 +57,119 @@ from a verified answer.
 Space-less scripts (Han, Kana, Thai) are indexed by **character bigrams**, which
 do not cross script boundaries: Japanese `従業員は` yields `従業`, `業員`, `は`.
 
+## Reading the script table from code
+
+The three functions that answer *"can you read this?"* exist in every port, over
+the same table, and return the same answer for the same input:
+
+<Tabs syncKey="lang">
+<TabItem label="Python">
+```python
+from citenexus.tokenize import (
+    tokenize_v2, scripts_in, unsupported_scripts, SUPPORTED_SCRIPTS,
+)
+
+tokenize_v2("従業員は機密情報を開示してはならない")
+# ['従業', '業員', 'は', '機密', '密情', '情報', 'を', '開示', 'して', 'ては', 'はな', 'なら', 'らな', 'ない']
+
+scripts_in("従業員は")            # ('han', 'hiragana')
+unsupported_scripts("ಕನ್ನಡ")      # ('kannada',)  → a capability gap, by name
+len(SUPPORTED_SCRIPTS)            # 14
+```
+</TabItem>
+<TabItem label="Go">
+```go
+import "github.com/muthuishere/citenexus/golang/tokenize"
+
+tokenize.TokenizeV2("従業員は機密情報を開示してはならない")
+// [従業 業員 は 機密 密情 情報 を 開示 して ては はな なら らな ない]
+
+tokenize.ScriptsIn("従業員は")          // [han hiragana]
+tokenize.UnsupportedScripts("ಕನ್ನಡ")    // [kannada]
+len(tokenize.SupportedScripts())        // 14
+```
+</TabItem>
+<TabItem label="JavaScript">
+```ts
+import {
+  tokenizeV2, scriptsIn, unsupportedScripts, SUPPORTED_SCRIPTS,
+} from "@muthuishere/citenexus";
+
+tokenizeV2("従業員は機密情報を開示してはならない");
+// ['従業','業員','は','機密','密情','情報','を','開示','して','ては','はな','なら','らな','ない']
+
+scriptsIn("従業員は");             // ['han', 'hiragana']
+unsupportedScripts("ಕನ್ನಡ");       // ['kannada']
+SUPPORTED_SCRIPTS.size;            // 14
+```
+</TabItem>
+</Tabs>
+
+The token lists above are not illustrative — they are the output, and the same
+output, from all three. `TOKENIZER_VERSION` / `tokenize.TokenizerVersion` is `2`
+in each, and it is stamped on an index so a tokenizer/index mismatch is
+detectable rather than silent.
+
+## Answering in a non-Latin script
+
+The ports' `ask` flow runs the **v2 gate over the v2 tokenizer** — the
+relevance-overlap-v2 and faithfulness-v2 pair, the same pair Python uses
+(`HasRelevanceOverlapV2` + `IsSupportedV2` in Go, `hasRelevanceOverlapV2` +
+`isSupportedV2` in JavaScript) — so a Go or JavaScript answer
+grounded in a Japanese passage is emitted, not refused:
+
+<Tabs syncKey="lang">
+<TabItem label="Python">
+```python
+# The facade — retrieval, authority, conflicts and per-claim verification behind it.
+response = rag.ask("従業員は機密情報を開示できますか？", answer_language="auto")
+response.sources[0].passage   # verbatim Japanese
+```
+</TabItem>
+<TabItem label="Go">
+```go
+corpus := []answer.Doc{
+	{DocumentID: "handbook-ja", Text: "従業員は機密情報を開示してはならない。"},
+}
+res := answer.Ask(corpus, "従業員は機密情報を開示してはならない", answer.DefaultTopK)
+
+res.Evidence.Decision      // "answered"
+res.Sources[0].Passage     // 従業員は機密情報を開示してはならない。
+```
+</TabItem>
+<TabItem label="JavaScript">
+```ts
+const corpus = [
+  { document_id: "handbook-ja", text: "従業員は機密情報を開示してはならない。" },
+];
+const res = ask(corpus, "従業員は機密情報を開示してはならない", 5);
+
+res.evidence.decision;      // "answered"
+res.sources[0].passage;     // 従業員は機密情報を開示してはならない。
+```
+</TabItem>
+</Tabs>
+
+The hermetic port flow always reports `answer_language: "en"` and
+`passage_language: "en"` — it does no detection at all, and those fields are
+placeholders there, not a claim about the text. Language *detection* is the
+Python facade's job.
+
 <Aside type="note" title="What is still Python-only here">
-The 14-script tokenizer, BM25 and the v2 faithfulness predicate are at parity.
-ADR-0009's **per-claim** faithfulness gate is not: on the answer path only Python
-splits an answer into atomic claims and verifies each one, while the ports verify
-the whole answer as a single claim. `search_languages` fan-out, reformulation and
-the detector seam are Python-only too — the ports have no `ask()` facade to hang
-them on. Background:
+The 14-script tokenizer, BM25, the v2 faithfulness predicate **and the ports' ask
+path** are at parity — a Go or JavaScript answer over a non-Latin passage is
+emitted, not refused.
+
+What is not at parity is **atomic-claim decomposition**. `split_claims` /
+`SplitClaims` / `splitClaims` exists in all three
+([deterministic core](/citenexus/deterministic-core/)), but only Python's answer
+flow calls it: Python splits an answer into claims, verifies each, and drops the
+unsupported ones. A port verifies the whole answer as a single claim, so a port
+answer **passes or refuses whole — it is never trimmed**.
+
+`search_languages` fan-out, query reformulation, citation translation and the
+detector seam are Python-only too — the ports have no `ask()` facade to hang them
+on. Background:
 [ADR-0011](https://github.com/muthuishere/citenexus/blob/main/docs/adr/0011-tokenizer-and-non-latin-scripts.md).
 </Aside>
 
@@ -104,20 +210,45 @@ verifies the answer against the passage it cites.
 ### 2. Citation translation — additive, never in place
 
 ```python
-from citenexus.config.schema import LanguageConfig
+from citenexus.config.schema import MultilingualConfig
 
-LanguageConfig(translate_citations=True)   # default: False
+MultilingualConfig(translate_citations=True)   # default: False
 ```
 
 Even enabled, `SourceRef.passage` stays **verbatim in the source language**. The
 translation lands on a separate, clearly marked `translation` field. A translated
 quote is not the evidence, so it never overwrites the evidence.
 
+The field is on `SourceRef` in every port, so a reviewer reads the same two
+values wherever the answer was produced:
+
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
 src = response.sources[0]
 src.passage        # verbatim — this is what you show and what a reviewer diffs
 src.translation    # optional, marked, additive — a reading aid, not a citation
 ```
+</TabItem>
+<TabItem label="Go">
+```go
+src := res.Sources[0]
+src.Passage        // verbatim — this is what you show and what a reviewer diffs
+src.Translation    // *string, nil when absent — a reading aid, not a citation
+```
+</TabItem>
+<TabItem label="JavaScript">
+```ts
+const src = res.sources[0];
+src.passage;       // verbatim — this is what you show and what a reviewer diffs
+src.translation;   // string | null — a reading aid, not a citation
+```
+</TabItem>
+</Tabs>
+
+Only Python **populates** `translation`: filling it needs the reformulation
+endpoint and the config layer, and the ports have neither. They carry the field
+so the wire shape matches, and leave it empty.
 
 ### 3. Search-language fan-out — reformulation, per language, on demand
 

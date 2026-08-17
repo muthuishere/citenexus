@@ -4,6 +4,7 @@ description: Prove the live index is derived from exactly the agreed corpus — 
 ---
 
 import { Aside, Steps } from '@astrojs/starlight/components';
+import FacadeNote from '../../../components/FacadeNote.astro';
 
 **The failure this prevents:** an answer cites a document nobody agreed was in
 scope. It has a real document ID, a real page and a verbatim quote.
@@ -15,6 +16,8 @@ Every other freshness mechanism is *change-driven*: it reacts to an ingest, an
 update, a revoke. None of them notice an artifact that arrived by a path the
 change log never saw — a crashed ingest, a restored snapshot, a shared bucket
 prefix, a run against the wrong config.
+
+<FacadeNote />
 
 <Steps>
 
@@ -92,15 +95,26 @@ refuse below a floor: see
 ## The audit artifact
 
 Each run appends to an append-only stream, so *"the index matched the agreed
-corpus at time T"* becomes an evidence artifact rather than a verbal assurance:
+corpus at time T"* becomes an evidence artifact rather than a verbal assurance.
+It is a plain JSONL object in the store, one line per run, under the partition's
+`eval/` prefix — so reading it needs no API at all:
 
 ```python
-from citenexus.reconcile import read_audit
+import json
+from pathlib import Path
 
-# read_audit reads the stream directly from the backend for one partition.
-for entry in read_audit(rag._backend, rag.partition):
-    print(entry)          # timestamp, manifest_version, counts per set
+# eval/<partition>/reconcile_log.jsonl — here, the default workspace=default.
+log = Path("./citenexus-data/eval/workspace=default/reconcile_log.jsonl")
+
+for line in log.read_text(encoding="utf-8").splitlines():
+    print(json.loads(line))   # timestamp, manifest_version, counts per set
 ```
+
+That the artifact is readable with `json` and nothing else is the point: an
+auditor does not have to trust — or install — this library to read it. On S3 it
+is the same key under the bucket. There is no public accessor for the stream
+today; `citenexus.reconcile.read_audit` exists but takes the storage backend,
+which the client does not expose.
 
 Pass `audit=False` for a strictly zero-write run when you need to prove the
 diagnostic touched nothing at all.

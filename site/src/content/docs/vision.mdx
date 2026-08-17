@@ -4,6 +4,7 @@ description: Inject a vision model and figures inside your documents become cite
 ---
 
 import { Aside, Steps } from '@astrojs/starlight/components';
+import FacadeNote from '../../components/FacadeNote.astro';
 
 A chart or diagram carries evidence too. Inject a vision model and CiteNexus
 turns figures inside your documents into **figure Evidence Units** — searchable
@@ -17,6 +18,8 @@ model,"* never a verbatim source quote.
 
 Inject a `vision` describer. During ingest, qualifying figures are described and
 assembled into cited figure units automatically.
+
+<FacadeNote />
 
 ```python
 from citenexus import CiteNexus

@@ -4,11 +4,14 @@ description: How to ingest many documents today — an idempotent, resumable loo
 ---
 
 import { Aside } from '@astrojs/starlight/components';
+import FacadeNote from '../../components/FacadeNote.astro';
 
 `ingest()` handles one source at a time. To bring in a whole corpus today, loop —
 and because every ingest is **idempotent by content hash**, the loop is safe to
 re-run: unchanged documents return `status="unchanged"` and do no work, so a
 crashed or interrupted bulk run just resumes where it left off.
+
+<FacadeNote />
 
 ```python
 from pathlib import Path

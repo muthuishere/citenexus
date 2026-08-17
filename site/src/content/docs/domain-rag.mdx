@@ -4,10 +4,13 @@ description: The recipe for a high-stakes domain — curate authoritative source
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
+import FacadeNote from '../../components/FacadeNote.astro';
 
 CiteNexus is built for domains where a **wrong answer is worse than no answer** —
 legal, medical, finance, compliance. The recipe is the same across them: cite or
 abstain, and prove it on a golden set that rewards abstention.
+
+<FacadeNote />
 
 <Steps>
 
@@ -22,7 +25,9 @@ abstain, and prove it on a golden set that rewards abstention.
 
 2. **Keep strict mode.** It's the default, and it's the guarantee — the answer is
    generated only from retrieved passages and every claim is verified against its
-   citation. For a regulated surface, do **not** drop to `normal`/`exploratory`.
+   citation ([what that check actually
+   proves](/citenexus/faithfulness/)). For a regulated surface, do **not** drop
+   to `normal`/`exploratory`.
 
    ```python
    response = rag.ask("What is the maximum pediatric dose of drug X?")  # strict
@@ -61,6 +66,11 @@ abstain, and prove it on a golden set that rewards abstention.
    ```
 
 </Steps>
+
+The order those guards run in matters for a regulated surface — grounding first,
+then the authority floor, then the per-claim gate, and no stage can promote what
+an earlier one rejected. [How it works](/citenexus/architecture/) lays the
+pipeline out stage by stage.
 
 ## A real, measured example: law
 

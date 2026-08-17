@@ -4,11 +4,14 @@ description: Ask in one language over a corpus written in another — the answer
 ---
 
 import { Aside, Steps } from '@astrojs/starlight/components';
+import FacadeNote from '../../../components/FacadeNote.astro';
 
 **The failure this prevents:** a French-speaking analyst asks a question, the
 system answers in French, and the "quote" it shows is a French **translation** of
 an English clause. That translation is not the evidence. Nobody can diff it
 against the source, and the moment it is wrong there is nothing to catch it.
+
+<FacadeNote />
 
 <Steps>
 

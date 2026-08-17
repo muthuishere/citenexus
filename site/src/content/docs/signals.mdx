@@ -4,10 +4,13 @@ description: The signals you declare decide which indexes are built at ingest an
 ---
 
 import { Aside } from '@astrojs/starlight/components';
+import FacadeNote from '../../components/FacadeNote.astro';
 
 `signals` is CiteNexus's capability gate. It decides **which indexes are built**
 when you ingest and **which retrievers run** when you ask. Declaring fewer signals
 is how you keep ingest cheap and retrieval fast — you only build what you'll use.
+
+<FacadeNote />
 
 ```python
 from citenexus import CiteNexus
@@ -62,4 +65,9 @@ you want graph/wiki navigation over your evidence.
 The `embedding` signal only produces a working vector retriever when an
 `embedder` is also injected. With the signal but no embedder, retrieval falls
 back to lexical.
+
+Nothing raises — which is why this shows up later as an unexplained refusal:
+BM25 alone cannot bridge a paraphrase, so `ask()` reports *"no sufficiently
+relevant evidence found"*. It is the first thing to rule out in
+[Why did it abstain?](/citenexus/abstention/).
 </Aside>

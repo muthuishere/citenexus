@@ -3,7 +3,8 @@ title: Reranking & retrieval
 description: How CiteNexus retrieves — dense vector, lexical BM25, and structure retrievers fused with Reciprocal Rank Fusion (k=60), then optionally reranked by an injected cross-encoder. Control top_k per call.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+import FacadeNote from '../../components/FacadeNote.astro';
 
 Retrieval in CiteNexus is a fixed, auditable pipeline: several retrievers each
 produce a ranked list, the lists are merged with **Reciprocal Rank Fusion**, and
@@ -33,6 +34,8 @@ Which retrievers run is gated by the `signals` you declare on the client. Omit
 | Structure | `structure` | matches query terms to structure-node labels |
 | Graph | `graph` / `community` | matches query terms to entity-node labels and returns that node's Evidence Units (no edge walking — see [graph](/citenexus/graph/)) |
 | Wiki | `wiki` | distilled-wiki navigation (slow path) |
+
+<FacadeNote />
 
 ```python
 from citenexus import CiteNexus
@@ -94,12 +97,48 @@ rerank symbol either. Everything on this page below "The pipeline" describes the
 Python facade.
 </Aside>
 
-## RRF, directly
+## RRF, directly — in all three ports
 
-The fusion function is public and pure, if you fuse ranked lists yourself:
+The fusion function is public and pure, if you fuse ranked lists yourself. It is
+one of the algorithms pinned byte-for-byte across the ports
+(`conformance/cases/rrf.json`), so the fused order is identical in each:
 
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
 from citenexus.retrieve import rrf_fuse
 
-fused = rrf_fuse([list_a, list_b], k=60)   # merged by eu_id, descending fused score
+fused = rrf_fuse([list_a, list_b], k=60)   # lists of Candidate objects
 ```
+</TabItem>
+<TabItem label="Go">
+```go
+import "github.com/muthuishere/citenexus/golang/rrf"
+
+fused := rrf.Fuse([][]string{listA, listB}, rrf.DefaultK)  // DefaultK == 60
+// rrf.Fuse([][]string{{"a", "b"}, {"b", "c"}}, 60) → [b a c]
+```
+</TabItem>
+<TabItem label="JavaScript">
+```ts
+import { rrfFuse } from "@muthuishere/citenexus";
+
+const fused = rrfFuse([listA, listB], 60);
+// rrfFuse([["a", "b"], ["b", "c"]], 60) → ["b", "a", "c"]
+```
+</TabItem>
+</Tabs>
+
+<Aside type="note" title="Same ranking, two shapes">
+Python's `rrf_fuse` takes and returns **`Candidate` objects** — it is the fusion
+step inside `retrieve()`, so each hit keeps its `eu_id`, source signal,
+`document_id` and text attached through the merge. The Go
+and JavaScript `Fuse` / `rrfFuse` take and return **Evidence-Unit id strings**:
+they are the pure ranking primitive, and you rejoin the ids to your own rows. The
+scoring and the tie-break are the same in both shapes — `1 / (k + rank + 1)`
+summed across lists, descending score, ascending eu-id on a tie.
+
+Go also ships a core-backed `core.Fuse` (build tag `citenexus_ffi`) that shares
+one Rust implementation across the SDKs; the pure `rrf.Fuse` above is retained
+for the plain `go get` path and is byte-identical to it.
+</Aside>

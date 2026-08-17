@@ -187,7 +187,8 @@ sig.authority_floor_applied    # bool — the floor WITHHELD grounded evidence o
 
 `authority_floor_applied` is not "a floor was configured" — a signal that is true
 on every strict call tells you nothing. It means *"I had evidence and declined to
-cite it for lack of standing."*
+cite it for lack of standing."* It is also how you tell this refusal apart from
+the five others: see [Why did it abstain?](/citenexus/abstention/).
 
 Both fields are additive: no existing field on `EvidenceSignals` changed meaning
 or type, and both are empty on every Result from an unranked corpus.

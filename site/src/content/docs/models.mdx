@@ -3,16 +3,67 @@ title: Bring your own models
 description: Every model is injected — embedding, LLM, and optionally a reranker and vision. Nothing is bundled. The shipped clients speak the OpenAI API; the seam itself is a published contract, so an in-process model or a mock works just as well.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+import FacadeNote from '../../components/FacadeNote.astro';
 
 CiteNexus bundles **no models**. Embedding, LLM, and optionally a reranker and a
 vision model for figures are injected by you. The shipped clients speak the
 OpenAI API — nothing runs locally that you didn't wire up, and the key stays in
 your endpoint config.
 
-All four are importable from the top-level package and share one constructor
-shape (keyword-only `base_url`, `model`, `transport`, `headers`, plus
-role-specific extras):
+## The two clients every port ships
+
+Embedding and chat generation are the seams all three ports consume, so all three
+ship a client for them. Same endpoint, same `${ENV}` header convention, one tab
+per language:
+
+<Tabs syncKey="lang">
+<TabItem label="Python">
+```python
+from citenexus import OpenAICompatibleEmbedding, OpenAICompatibleGenerator
+
+embedder = OpenAICompatibleEmbedding(base_url="…/v1", model="bge-m3")
+generator = OpenAICompatibleGenerator(base_url="…/v1", model="qwen2.5")
+```
+</TabItem>
+<TabItem label="Go">
+```go
+import "github.com/muthuishere/citenexus/golang/models"
+
+// A real net/http transport; timeout 0 means the 60s default.
+http := models.NewHTTPClient(nil, 0)
+
+embedder := models.NewOpenAIEmbedding("…/v1", "bge-m3", http.Transport())
+generator := models.NewOpenAIChatGenerator(
+    "…/v1", "qwen2.5",
+    0.0, nil, // temperature, max_tokens (nil → omitted from the request)
+    http.Transport(),
+)
+```
+</TabItem>
+<TabItem label="JavaScript">
+```ts
+import { HttpClient, OpenAIChatGenerator, OpenAIEmbedder } from "@muthuishere/citenexus";
+
+const http = new HttpClient();
+const send = (url: string, body: string, headers: Record<string, string>) =>
+  http.send(url, body, headers);
+
+const embedder = new OpenAIEmbedder({ base_url: "…/v1", model: "bge-m3" }, send);
+const generator = new OpenAIChatGenerator({ base_url: "…/v1", model: "qwen2.5" }, send);
+```
+</TabItem>
+</Tabs>
+
+Auth on all three — `${ENV}` templates expanded at the request boundary, never
+stored — is in [Custom endpoints & auth](/citenexus/custom-endpoints/).
+
+## Reranker and vision, and wiring it all up
+
+The other two shipped clients, and the `CiteNexus(...)` constructor that consumes
+them, are Python. All four Python clients import from the top-level package and
+share one constructor shape (keyword-only `base_url`, `model`, `transport`,
+`headers`, plus role-specific extras):
 
 ```python
 from citenexus import (
@@ -30,6 +81,16 @@ rag = CiteNexus(
     vision=OpenAICompatibleVision(base_url="…/v1", model="qwen2.5-vl"),   # figures → cited evidence
 )
 ```
+
+<FacadeNote title="Python only — and for a reason, not an oversight">
+	<p>
+		Neither port has a reranker or vision client, because neither has a caller for one: there is
+		no retrieval layer to reorder and no figure Evidence Unit to describe, so a published client
+		would promise a capability that does not exist. The same goes for the
+		<code>CiteNexus(...)</code> wiring — it takes a store URI, and Python is the only port with a
+		store.
+	</p>
+</FacadeNote>
 
 Any endpoint that speaks the OpenAI API works — Ollama, OpenAI, a local vLLM or
 llama.cpp server, or Gemini's OpenAI-compatibility endpoint. The two shipped
@@ -53,6 +114,10 @@ The vision model is called through a two-phase seam: the core emits a descriptio
 assembled back into a cited figure Evidence Unit. The core never holds your API
 key.
 </Aside>
+
+Wiring a model that isn't one of the shipped clients — an in-process model, a
+mock, an SDK you already use — takes three steps and no `citenexus` import:
+[Bring your own model — how to](/citenexus/bring-your-own-model/).
 
 Go deeper on each: [Provider contracts](/citenexus/providers/) ·
 [Custom endpoints & auth](/citenexus/custom-endpoints/) ·

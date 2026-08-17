@@ -1,0 +1,34 @@
+---
+/**
+ * The one reusable "why is this page Python-only?" note.
+ *
+ * Placed ONCE per page, near the first facade code block. `CiteNexus`,
+ * `ingest`/`ask`/`evaluate`/`reconcile`/`delete` and the config layer exist only
+ * in the Python package, so those samples cannot honestly carry Go/JS tabs — the
+ * note states the reason instead of inventing a port symbol.
+ *
+ * Pass extra page-specific detail as children (a <p>…</p>).
+ */
+import { Aside } from '@astrojs/starlight/components';
+
+interface Props {
+	/** Overrides the default title where a page wants a sharper one. */
+	title?: string;
+}
+
+const { title = 'Python facade — Go and JavaScript have no equivalent' } = Astro.props;
+---
+
+<Aside type="note" title={title}>
+	<p>
+		<code>CiteNexus</code> and the <code>ingest</code> / <code>ask</code> /
+		<code>evaluate</code> / <code>reconcile</code> / <code>delete</code> verbs, plus the config
+		layer they read, are the <strong>Python facade</strong>. The Go and JavaScript packages ship
+		the <a href="/citenexus/deterministic-core/">deterministic core</a> instead — the
+		faithfulness gate, tokenizer, chunker, RRF and <code>Result</code>, at conformance parity —
+		and enter through <code>Ask</code> / <code>ask</code> over an in-memory corpus (<a
+			href="/citenexus/quickstart/">quickstart</a
+		>). The Python samples on this page have no port tab because there is nothing to put in it.
+	</p>
+	<slot />
+</Aside>

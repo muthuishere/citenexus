@@ -4,6 +4,7 @@ description: When two documents assert opposite things, surface both and abstain
 ---
 
 import { Aside } from '@astrojs/starlight/components';
+import FacadeNote from '../../../components/FacadeNote.astro';
 
 **The failure this prevents:** your corpus holds a filing and its restatement, or
 a 2019 policy and its 2026 replacement. Both are real, both are indexed, both are
@@ -12,6 +13,8 @@ tells the caller the other one exists.
 
 That is not hypothetical. Before conflict detection existed, this returned a
 confident, correctly-cited answer with `conflicts_detected = 0`:
+
+<FacadeNote />
 
 ```python
 rag.ingest(text="The dividend for the period was 12 cents per share.",
@@ -36,6 +39,12 @@ for src in response.sources:                 # BOTH sides are cited
 In `strict` mode an unresolved conflict that touches the answer's own claim is an
 **abstention with both sides cited**. "These sources disagree, here is each of
 them" is a defensible output. Silently picking one is not.
+
+This is the one refusal that does *not* emit the pinned refusal string — it says
+*"The available evidence disagrees, so I can't answer that."* and
+`evidence.conflicts_detected` is above zero. That pair is how you tell it apart
+from the other five ways `ask()` can refuse:
+[Why did it abstain?](/citenexus/abstention/)
 
 ## Choosing how much to enforce
 

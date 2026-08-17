@@ -6,9 +6,12 @@ description: Ingest a document, ask a question, read the cited answer — or the
 import { Tabs, TabItem, Steps, Aside } from '@astrojs/starlight/components';
 
 Point CiteNexus at your documents, bring your own models, and get answers that
-cite their source — or abstain. The batteries-included flow (models + storage +
-`ingest`/`ask`/`evaluate`) is shown in Python, the reference facade; Go and
-JavaScript ship the same deterministic core (see the [concepts](/citenexus/concepts/)).
+cite their source — or abstain. Steps 2–4 below are **Python only**: the
+batteries-included flow (models + storage + `ingest`/`ask`/`evaluate`) is the
+reference facade, and Go and JavaScript have no equivalent. What they ship
+instead is the same [deterministic core](/citenexus/deterministic-core/), entered
+through `Ask` / `ask` over an in-memory corpus —
+[their quickstart is further down this page](#the-same-guarantee-in-go-and-javascript).
 
 <Steps>
 
@@ -17,7 +20,7 @@ JavaScript ship the same deterministic core (see the [concepts](/citenexus/conce
    <Tabs syncKey="lang">
    <TabItem label="Go">
    ```sh
-   go get github.com/muthuishere/citenexus/golang
+   go get github.com/muthuishere/citenexus/golang@v0.10.1
    ```
    </TabItem>
    <TabItem label="JavaScript">
@@ -34,12 +37,15 @@ JavaScript ship the same deterministic core (see the [concepts](/citenexus/conce
 
 2. **Create the RAG over a local directory, with your models injected.** Nothing
    is bundled — point the embedder and generator at any OpenAI-compatible endpoint
-   (Ollama, OpenAI, a local vLLM, Gemini's compat endpoint).
+   (Ollama, OpenAI, a local vLLM, Gemini's compat endpoint). Every model client is
+   importable from the top-level package.
 
    ```python
-   from citenexus import CiteNexus
-   from citenexus.embed.client import OpenAICompatibleEmbedding
-   from citenexus.answer.generator import OpenAICompatibleGenerator
+   from citenexus import (
+       CiteNexus,
+       OpenAICompatibleEmbedding,
+       OpenAICompatibleGenerator,
+   )
 
    rag = CiteNexus(
        "./citenexus-data",                       # a local directory (or an S3 bucket)
@@ -76,10 +82,73 @@ JavaScript ship the same deterministic core (see the [concepts](/citenexus/conce
 If the evidence doesn't support the question, `response.evidence.decision` is
 `refused` and no source is fabricated. That's the guarantee — read more under
 [Ask & abstain](/citenexus/ask/).
+
+**If your very first `ask()` came back refused, that is expected and it is
+diagnosable.** Six distinct causes produce a refusal — an empty index, a missing
+embedder, an unclaimed script, the faithfulness gate, the authority floor, a
+conflict — and each one names itself in `missing_evidence` and on
+`response.evidence`. Match yours against the index in
+[Why did it abstain?](/citenexus/abstention/) before changing anything.
 </Aside>
+
+## The same guarantee in Go and JavaScript
+
+The ports' quickstart is a **different shape, not a translation** of the one
+above. There is no `CiteNexus` facade, no `ingest()`, no config file: you hand
+`Ask` an in-memory corpus and read the same cite-or-abstain `Result` back. It
+runs on a plain `go get` / `npm install` — no native library, no build tag.
+
+<Tabs syncKey="lang">
+<TabItem label="Go">
+```go
+import "github.com/muthuishere/citenexus/golang/answer"
+
+corpus := []answer.Doc{
+	{DocumentID: "employee-nda", Text: "The employee shall not disclose confidential information."},
+}
+
+res := answer.Ask(corpus, "Can the employee disclose confidential information?", answer.DefaultTopK)
+fmt.Println(res.Evidence.Decision)  // "answered" | "refused"
+fmt.Println(res.Answer)             // the verbatim quote — or the pinned refusal
+```
+
+`Ask` runs the flow on deterministic in-process fakes, so it needs no endpoint.
+To put your own models behind it, use `answer.AskWith(corpus, question, topK,
+answer.Providers{Embedding: …, Generator: …})`.
+</TabItem>
+<TabItem label="JavaScript">
+```ts
+import { ask } from "@muthuishere/citenexus"
+
+const corpus = [
+  { document_id: "employee-nda", text: "The employee shall not disclose confidential information." },
+]
+
+const res = ask(corpus, "Can the employee disclose confidential information?")
+console.log(res.evidence.decision)  // "answered" | "refused"
+console.log(res.answer)             // the verbatim quote — or the pinned refusal
+```
+
+`ask` runs on deterministic in-process fakes and needs no endpoint. To inject
+your own, `await askWith(corpus, question, { embedding, generator })`.
+</TabItem>
+<TabItem label="Python">
+The Python flow is the one above — `CiteNexus` + `ingest` / `ask` / `evaluate`,
+with your models injected and storage on disk or S3. The hermetic
+`ask`-over-a-corpus surface that Go and JavaScript expose is what Python's
+facade wraps.
+</TabItem>
+</Tabs>
+
+Reading files (PDF/DOCX/HTML/…) into a store from Go or JavaScript is a separate,
+opt-in path: it lives behind the native FFI bindings (Go build tag
+`citenexus_ffi`, the JS `/ffi` subpath) and needs the Rust cdylib built first —
+see [Install](/citenexus/install/).
 
 ## Next
 
+- [How it works](/citenexus/architecture/) — what each of those three calls
+  actually did, stage by stage.
 - Store your corpus on [S3 / MinIO](/citenexus/s3/) instead of a local folder.
 - [Bring your own models](/citenexus/models/) — embedding, LLM, reranker, vision.
 - [Ingest anything](/citenexus/ingest/) — a file, raw text, an image, or a URL,

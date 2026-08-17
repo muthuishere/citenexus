@@ -15,6 +15,10 @@ hero:
       link: /citenexus/concepts/
       icon: right-arrow
       variant: minimal
+    - text: How it works
+      link: /citenexus/architecture/
+      icon: right-arrow
+      variant: minimal
     - text: GitHub
       link: https://github.com/muthuishere/citenexus
       icon: external
@@ -57,6 +61,11 @@ questions:
 ```python
 rag.ask(question, search_languages=("en", "ta", "te"))   # default: ("en",)
 ```
+
+Python, and only Python: `ask()` and the search-language fan-out are the facade.
+Go and JavaScript ship the [deterministic core](/citenexus/deterministic-core/) —
+the same 14-script tokenizer and the same gate — with no facade to hang a
+fan-out on. Their entry point is [further down this page](#the-primitive-underneath-cite-or-abstain).
 
 Measured over a **12-document English/Tamil/Telugu corpus**, one live run per
 configuration (Jina embeddings + reranker, Gemini at temperature 0):
@@ -120,7 +129,8 @@ containment and a polarity guard, so an answer that reuses the passage's
 vocabulary to assert the opposite is rejected. Unsupported claims are **dropped**
 — `unsupported_claims_removed` counts them — and the answer keeps what survives
 rather than collapsing whole. False rejection on a legitimate-support control
-set: **0 of 30**.
+set: **0 of 30**. The nine attacks, the predicate that replaced set containment,
+and the pinned gap budget: **[The faithfulness gate →](/citenexus/faithfulness/)**
 
 ### 2. Two sources disagree, and rank order quietly picks one
 
@@ -268,15 +278,16 @@ shared
 [`conformance/`](https://github.com/muthuishere/citenexus/tree/main/conformance)
 suite — see the full Python setup in the [Quickstart](/citenexus/quickstart/).
 
-**Parity status.** Python's answer flow is *ahead* of the ports on two counts.
-It runs the per-claim, order- and polarity-aware gate, so an answer that reuses
-the passage's words to assert the opposite is rejected; Go and JavaScript ship
-that predicate (`IsSupportedV2` / `isSupportedV2`) but their `ask` path still
-calls the frozen v1 containment gate over the ASCII v1 tokenizer — so a verbatim
-non-Latin quote still refuses there. The Unicode tokenizer itself **is** at
-parity: all three carry the same 14-script table and use it for BM25 and content
-overlap. Every other pinned algorithm remains byte-for-byte identical; the ports
-land once the new conformance vectors are in.
+**Parity status.** The order- and polarity-aware predicate
+(`is_supported_v2` / `IsSupportedV2` / `isSupportedV2`) ships in all three
+languages and **all three `ask` paths now call it**, over the same 14-script
+Unicode tokenizer. What is still Python-only is *granularity*: Python splits an
+answer into atomic claims and gates each one, keeping the survivors and counting
+the rest in `unsupported_claims_removed`, while Go and JavaScript gate the whole
+answer as a single claim — so an answer there is all-or-nothing and cannot come
+back trimmed. Every other pinned algorithm is byte-for-byte identical. What each
+guard is and where it sits: [how it works](/citenexus/architecture/) and
+[the faithfulness gate](/citenexus/faithfulness/).
 </Aside>
 
 ## What this does not solve
@@ -336,10 +347,9 @@ metrics; treat the rates as illustrations.
 </CardGrid>
 
 <Aside type="caution" title="Version">
-Everything on this page is `0.10.0`, which is **not yet published**. The packages
-on PyPI, npm and crates.io are still `0.9.0`. Build from
-[source](https://github.com/muthuishere/citenexus) to run the multilingual
-fan-out, the authority floor, or the per-claim gate today.
+Everything on this page is `0.10.1`, published on **PyPI**, **npm** and the Go
+module proxy. The Go module lives in a subdirectory, so it carries its own tag
+prefix — `go get github.com/muthuishere/citenexus/golang@v0.10.1`.
 </Aside>
 
 Start with the failure you recognise — **[all nine scenarios

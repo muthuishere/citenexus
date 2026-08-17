@@ -3,7 +3,8 @@ title: Provider contracts — bring your own model
 description: Five published Protocols define the model seam. A provider satisfies them by shape alone — no CiteNexus base class to inherit, no socket to open. Python publishes all five; the Go and JS ports publish the two they consume.
 ---
 
-import { Aside, Steps } from '@astrojs/starlight/components';
+import { Aside, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+import FacadeNote from '../../components/FacadeNote.astro';
 
 CiteNexus bundles **no models**. That has always been the design — but for a long
 time "inject your own" meant *read our call sites and guess*. Embedding alone was
@@ -14,6 +15,11 @@ capability no type checker can verify and no provider author knows to offer.
 
 There is now **one published place to look**: `citenexus.contracts`. Match a
 shape and you are a provider.
+
+This page is the reference — every contract, its exact signature, and the
+reasoning behind each. If you just want to plug a model in and move on, the
+three-step version is [Bring your own model — how
+to](/citenexus/bring-your-own-model/).
 
 ## Structural, not nominal
 
@@ -100,7 +106,13 @@ class ExtractiveGenerator:
 # Shape alone is enough — this passes, and neither class imports a base class.
 assert isinstance(InProcessEmbedding(), EmbeddingProvider)
 assert isinstance(ExtractiveGenerator(), GeneratorProvider)
+```
 
+The same two seams exist in Go and JavaScript, spelled for those languages —
+[Where the ports inject](#where-the-ports-inject) has the tabs. What comes next
+does not:
+
+```python
 rag = CiteNexus(
     "./citenexus-data",
     embedder=InProcessEmbedding(),
@@ -118,6 +130,14 @@ result = rag.ask("Can the employee disclose confidential information?")
 print(result.answer)                 # The employee shall not disclose confidential information to any third party.
 print(result.sources[0].document)    # nda
 ```
+
+<FacadeNote>
+	<p>
+		The provider classes above port cleanly. The <code>CiteNexus(...)</code> + <code>ingest</code> +
+		<code>ask</code> tail does not: the ports have no store and no facade, so they inject into
+		<code>answer.AskWith</code> / <code>askWith</code> over an in-memory corpus instead.
+	</p>
+</FacadeNote>
 
 Note what the generator is *not* asked to do. It does not retrieve and it does not
 choose evidence — it is handed the passage the library already selected, plus the
@@ -334,12 +354,30 @@ it through the contract, so a provider sees the same signature it sees in Python
 
 ### Where the ports inject
 
-The injection point is `answer.AskWith` in Go and `askWith` in JavaScript.
-`Ask` / `ask` keep their old signature and behaviour on purpose: they are pinned
+The injection point differs by port, because what consumes the provider differs.
+In Python it is the `CiteNexus(...)` constructor, which owns a store; in Go and
+JavaScript it is `answer.AskWith` / `askWith` over an in-memory corpus. `Ask` /
+`ask` keep their old signature and behaviour on purpose: they are pinned
 byte-for-byte by `conformance/cases/e2e_hermetic.json`. Every field of the provider
 set is optional — an absent provider falls back to the port's deterministic fake,
 so a partial set is valid.
 
+<Tabs syncKey="lang">
+<TabItem label="Python">
+```python
+from citenexus import CiteNexus
+
+# Shape alone is enough — asserted at RUNTIME by @runtime_checkable Protocols.
+rag = CiteNexus(
+    "./citenexus-data",
+    embedder=MyEmbedding(),    # embed_many(texts) -> list[Vector]
+    generator=MyGenerator(),   # answer(question, passage, answer_language="en") -> str
+)
+# A model failure raises — never a refusal.
+result = rag.ask("Can the employee disclose?")
+```
+</TabItem>
+<TabItem label="Go">
 ```go
 import (
     "github.com/muthuishere/citenexus/golang/answer"
@@ -357,16 +395,25 @@ if err != nil {
     // A model failure is an error and a ZERO Result — never a refusal.
 }
 ```
-
+</TabItem>
+<TabItem label="JavaScript">
 ```ts
 import { askWith } from "@muthuishere/citenexus";
 
+// topK rides inside the provider set here, not as a positional argument.
 const res = await askWith(corpus, "Can the employee disclose?", {
   embedding: { embed: async (texts) => myModel.encode([...texts]) },
   generator: { answer: async (q, passage) => extractSentence(q, passage) },
   topK: 5,
 });
+// A model failure rejects the promise — never a refusal.
 ```
+</TabItem>
+</Tabs>
+
+The Python tab is the odd one out and stays that way: it takes a **store URI**
+because Python is the only port that has a store. The two provider seams
+themselves are the same shape in all three.
 
 Go's `contracts` package imports **nothing** — not even another CiteNexus package
 — and the JS `contracts.ts` module imports nothing at all, so implementing a

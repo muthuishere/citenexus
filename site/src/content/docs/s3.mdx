@@ -4,9 +4,12 @@ description: Point CiteNexus at an S3 (or MinIO) bucket. Credentials come from t
 ---
 
 import { Aside } from '@astrojs/starlight/components';
+import FacadeNote from '../../components/FacadeNote.astro';
 
 Point CiteNexus at a bucket with the `S3` location. `endpoint_url` targets MinIO
 or any S3-compatible store; omit it for AWS.
+
+<FacadeNote />
 
 ```python
 from citenexus import CiteNexus, S3

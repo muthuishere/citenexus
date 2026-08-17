@@ -4,11 +4,14 @@ description: ask() answers only from retrieved passages, quoted verbatim, with e
 ---
 
 import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+import FacadeNote from '../../components/FacadeNote.astro';
 
 Strict by default: the answer is generated **only** from retrieved passages,
 quoted verbatim in the source language, and every claim is checked against its
 citation. When nothing supports the question, CiteNexus refuses instead of
 guessing.
+
+<FacadeNote />
 
 ```python
 from citenexus.answer.result import Decision
@@ -42,6 +45,11 @@ ask(question, *, mode=TrustMode.strict, k=None, answer_language=None,
 
 Today the flow emits `answered` or `refused` (`partial` is a reserved `Decision`
 value). See [The Result object](/citenexus/result/) for the full return shape.
+
+When the decision is `refused`, `missing_evidence` says which of the six refusal
+paths you hit — thin retrieval, the faithfulness gate, the authority floor, an
+unclaimed script on the question or on the corpus, or a conflict. Read them off
+in [Why did it abstain?](/citenexus/abstention/).
 
 <Aside type="note" title="No bbox on the answer path">
 `SourceRef` declares a `bbox` field, but it is **always `None` on a `Result`
@@ -79,6 +87,11 @@ response = rag.ask("Summarize the risk factors.", mode=TrustMode.exploratory)
 "No ungrounded claim" is the strict-mode contract. `normal` and `exploratory`
 trade strictness for coverage — use them deliberately, not as the default for a
 legal or medical surface.
+
+The trust modes above are Python-only in a stronger sense than the rest of this
+page: Go and JavaScript define **`TrustMode.strict` alone**
+(`golang/result/result.go`, `js/src/result/result.ts`). There is no `normal` and
+no `exploratory` to select, so there is no port tab to write for this block.
 </Aside>
 
 <Aside type="caution" title="Verbatim beats the answer language">
