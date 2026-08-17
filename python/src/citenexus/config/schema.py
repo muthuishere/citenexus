@@ -20,6 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from citenexus.config.signals import Signal
 from citenexus.domain.trust import TrustMode
 from citenexus.http import HttpEndpoint
+from citenexus.lang.codes import Language, LanguageLike
 
 
 class _Section(BaseModel):
@@ -255,17 +256,20 @@ class MultilingualConfig(_Section):
     # the name that says so. The old key keeps working — configs in the field set
     # it, and a silent regression to "en" on upgrade would be worse than a
     # deprecated alias.
-    default_answer_language: str = "en"
-    fallback_language: str = "en"
+    # Both accept a plain code or a ``Language`` member — they are the same
+    # value; ``Language`` is a ``StrEnum``, so config files, env overrides and
+    # ``model_dump_json`` are all unchanged.
+    default_answer_language: LanguageLike = Language.ENGLISH
+    fallback_language: LanguageLike = Language.ENGLISH
     # The answer is always returned in the query's language (§11) — regenerate on
     # mismatch; citations stay verbatim and are never translated in place.
     answer_in_query_language: bool = True
     translate_citations: bool = False
 
     @property
-    def resolved_default_answer_language(self) -> str:
+    def resolved_default_answer_language(self) -> LanguageLike:
         """The effective default: the new knob, else the deprecated alias."""
-        if self.default_answer_language != "en":
+        if self.default_answer_language != Language.ENGLISH:
             return self.default_answer_language
         return self.fallback_language
 

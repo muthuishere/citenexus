@@ -23,6 +23,9 @@ export * from "./chunker/chunker.js";
 export { blockBuilderEuIds, chunkedBuilderEuIds, sha256Hex } from "./euid/euid.js";
 export type { Block } from "./euid/euid.js";
 export * from "./lang/lang.js";
+// The named code sets (Language / Script). A const object + union type, never a
+// TS enum — a plain string stays assignable at every call site (see codes.ts).
+export * from "./lang/codes.js";
 export * from "./result/result.js";
 export * from "./answer/answer.js";
 // ADR-0009 guarded claim segmentation (tier-1 scanner over a tier-2 table).

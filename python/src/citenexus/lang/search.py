@@ -32,6 +32,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
+from citenexus.lang.codes import Language, LanguageLike, Script, ScriptLike
 from citenexus.tokenize import SUPPORTED_SCRIPTS
 
 __all__ = [
@@ -46,12 +47,12 @@ __all__ = [
 class SearchLanguage:
     """One searchable language: its code, its prompt-facing name, its script(s)."""
 
-    code: str
+    code: Language
     name: str
-    scripts: tuple[str, ...]
+    scripts: tuple[Script, ...]
 
     @property
-    def unsupported(self) -> tuple[str, ...]:
+    def unsupported(self) -> tuple[Script, ...]:
         """The scripts this language needs that ADR-0011 does not claim."""
         return tuple(s for s in self.scripts if s not in SUPPORTED_SCRIPTS)
 
@@ -60,7 +61,7 @@ class SearchLanguage:
         return not self.unsupported
 
 
-def _lang(code: str, name: str, *scripts: str) -> tuple[str, SearchLanguage]:
+def _lang(code: Language, name: str, *scripts: Script) -> tuple[Language, SearchLanguage]:
     return code, SearchLanguage(code=code, name=name, scripts=scripts)
 
 
@@ -68,52 +69,56 @@ def _lang(code: str, name: str, *scripts: str) -> tuple[str, SearchLanguage]:
 # CANNOT serve. A language must be nameable to be refused by name; dropping
 # Telugu from the table would turn a precise "telugu is not supported" into a
 # vague "unknown language code", which is a worse answer to the same question.
-SEARCH_LANGUAGES: Mapping[str, SearchLanguage] = dict(
+# Keyed by ``LanguageLike`` (``Language | str``) on purpose: the runtime keys ARE
+# ``Language`` members, but the annotation must keep ``SEARCH_LANGUAGES["ta"]``
+# type-checking for every caller who already writes the plain code. Narrowing the
+# key type to ``Language`` would make a published, working call site a type error.
+SEARCH_LANGUAGES: Mapping[LanguageLike, SearchLanguage] = dict(
     (
         # --- latin ---------------------------------------------------------
-        _lang("en", "English", "latin"),
-        _lang("fr", "French", "latin"),
-        _lang("de", "German", "latin"),
-        _lang("es", "Spanish", "latin"),
-        _lang("pt", "Portuguese", "latin"),
-        _lang("it", "Italian", "latin"),
-        _lang("nl", "Dutch", "latin"),
-        _lang("pl", "Polish", "latin"),
-        _lang("tr", "Turkish", "latin"),
-        _lang("vi", "Vietnamese", "latin"),
-        _lang("id", "Indonesian", "latin"),
-        _lang("sw", "Swahili", "latin"),
+        _lang(Language.ENGLISH, "English", Script.LATIN),
+        _lang(Language.FRENCH, "French", Script.LATIN),
+        _lang(Language.GERMAN, "German", Script.LATIN),
+        _lang(Language.SPANISH, "Spanish", Script.LATIN),
+        _lang(Language.PORTUGUESE, "Portuguese", Script.LATIN),
+        _lang(Language.ITALIAN, "Italian", Script.LATIN),
+        _lang(Language.DUTCH, "Dutch", Script.LATIN),
+        _lang(Language.POLISH, "Polish", Script.LATIN),
+        _lang(Language.TURKISH, "Turkish", Script.LATIN),
+        _lang(Language.VIETNAMESE, "Vietnamese", Script.LATIN),
+        _lang(Language.INDONESIAN, "Indonesian", Script.LATIN),
+        _lang(Language.SWAHILI, "Swahili", Script.LATIN),
         # --- other claimed scripts ------------------------------------------
-        _lang("ru", "Russian", "cyrillic"),
-        _lang("uk", "Ukrainian", "cyrillic"),
-        _lang("el", "Greek", "greek"),
-        _lang("he", "Hebrew", "hebrew"),
-        _lang("ar", "Arabic", "arabic"),
-        _lang("fa", "Persian", "arabic"),
-        _lang("ur", "Urdu", "arabic"),
-        _lang("hi", "Hindi", "devanagari"),
-        _lang("mr", "Marathi", "devanagari"),
-        _lang("ne", "Nepali", "devanagari"),
-        _lang("bn", "Bengali", "bengali"),
-        _lang("as", "Assamese", "bengali"),
-        _lang("ta", "Tamil", "tamil"),
-        _lang("th", "Thai", "thai"),
-        _lang("ko", "Korean", "hangul"),
-        _lang("zh", "Chinese", "han"),
-        _lang("ja", "Japanese", "han", "hiragana", "katakana"),
+        _lang(Language.RUSSIAN, "Russian", Script.CYRILLIC),
+        _lang(Language.UKRAINIAN, "Ukrainian", Script.CYRILLIC),
+        _lang(Language.GREEK, "Greek", Script.GREEK),
+        _lang(Language.HEBREW, "Hebrew", Script.HEBREW),
+        _lang(Language.ARABIC, "Arabic", Script.ARABIC),
+        _lang(Language.PERSIAN, "Persian", Script.ARABIC),
+        _lang(Language.URDU, "Urdu", Script.ARABIC),
+        _lang(Language.HINDI, "Hindi", Script.DEVANAGARI),
+        _lang(Language.MARATHI, "Marathi", Script.DEVANAGARI),
+        _lang(Language.NEPALI, "Nepali", Script.DEVANAGARI),
+        _lang(Language.BENGALI, "Bengali", Script.BENGALI),
+        _lang(Language.ASSAMESE, "Assamese", Script.BENGALI),
+        _lang(Language.TAMIL, "Tamil", Script.TAMIL),
+        _lang(Language.THAI, "Thai", Script.THAI),
+        _lang(Language.KOREAN, "Korean", Script.HANGUL),
+        _lang(Language.CHINESE, "Chinese", Script.HAN),
+        _lang(Language.JAPANESE, "Japanese", Script.HAN, Script.HIRAGANA, Script.KATAKANA),
         # --- known, NAMED, and not supported (ADR-0011 has no fixture) --------
-        _lang("te", "Telugu", "telugu"),
-        _lang("kn", "Kannada", "kannada"),
-        _lang("ml", "Malayalam", "malayalam"),
-        _lang("gu", "Gujarati", "gujarati"),
-        _lang("pa", "Punjabi", "gurmukhi"),
-        _lang("or", "Odia", "oriya"),
-        _lang("si", "Sinhala", "sinhala"),
-        _lang("km", "Khmer", "khmer"),
-        _lang("lo", "Lao", "lao"),
-        _lang("my", "Burmese", "myanmar"),
-        _lang("ka", "Georgian", "georgian"),
-        _lang("hy", "Armenian", "armenian"),
+        _lang(Language.TELUGU, "Telugu", Script.TELUGU),
+        _lang(Language.KANNADA, "Kannada", Script.KANNADA),
+        _lang(Language.MALAYALAM, "Malayalam", Script.MALAYALAM),
+        _lang(Language.GUJARATI, "Gujarati", Script.GUJARATI),
+        _lang(Language.PUNJABI, "Punjabi", Script.GURMUKHI),
+        _lang(Language.ODIA, "Odia", Script.ORIYA),
+        _lang(Language.SINHALA, "Sinhala", Script.SINHALA),
+        _lang(Language.KHMER, "Khmer", Script.KHMER),
+        _lang(Language.LAO, "Lao", Script.LAO),
+        _lang(Language.BURMESE, "Burmese", Script.MYANMAR),
+        _lang(Language.GEORGIAN, "Georgian", Script.GEORGIAN),
+        _lang(Language.ARMENIAN, "Armenian", Script.ARMENIAN),
     )
 )
 
@@ -129,13 +134,19 @@ class UnsupportedSearchLanguageError(ValueError):
     behaving; ``language`` and ``script`` are carried for programmatic handling.
     """
 
-    def __init__(self, message: str, *, language: str | None = None, script: str | None = None):
+    def __init__(
+        self,
+        message: str,
+        *,
+        language: LanguageLike | None = None,
+        script: ScriptLike | None = None,
+    ):
         super().__init__(message)
         self.language = language
         self.script = script
 
 
-def resolve_search_languages(codes: Iterable[str]) -> tuple[SearchLanguage, ...]:
+def resolve_search_languages(codes: Iterable[LanguageLike]) -> tuple[SearchLanguage, ...]:
     """The requested search languages, in caller order, de-duplicated.
 
     Raises ``UnsupportedSearchLanguageError`` — before any model call is made —
@@ -159,7 +170,7 @@ def resolve_search_languages(codes: Iterable[str]) -> tuple[SearchLanguage, ...]
         if missing:
             raise UnsupportedSearchLanguageError(
                 f"search language {code!r} ({language.name}) is written in "
-                f"{missing[0]!r}, which this tokenizer does not claim (ADR-0011). "
+                f"{str(missing[0])!r}, which this tokenizer does not claim (ADR-0011). "
                 "Searching it would return plausible-looking results for a script "
                 "the library makes no claim about, so it is refused instead. "
                 f"Claimed scripts: {', '.join(sorted(SUPPORTED_SCRIPTS))}",

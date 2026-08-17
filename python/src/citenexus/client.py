@@ -31,6 +31,7 @@ from citenexus.http import Transport as ChatTransport
 from citenexus.ingest.pipeline import IngestPipeline, VisionDescriber
 from citenexus.ingest.result import IngestResult
 from citenexus.ingest.web import FetchTransport, crawl, fetch_url, is_url
+from citenexus.lang.codes import Language, LanguageLike
 from citenexus.lang.detect import FastTextDetector
 from citenexus.lang.search import UnsupportedSearchLanguageError, resolve_search_languages
 from citenexus.memory import MemoryStore, MemoryTurn
@@ -104,7 +105,7 @@ def _authority_policy(config: CiteNexusConfig) -> AuthorityPolicy:
 
 # The search-language default. `("en",)` is today's behaviour exactly: one
 # English reformulation when a reformulator is configured, nothing otherwise.
-DEFAULT_SEARCH_LANGUAGES: tuple[str, ...] = ("en",)
+DEFAULT_SEARCH_LANGUAGES: tuple[Language, ...] = (Language.ENGLISH,)
 
 
 class CiteNexus:
@@ -126,7 +127,7 @@ class CiteNexus:
         detector: LanguageDetectorPlugin | None = None,
         backend: StorageBackend | None = None,
         storage_options: StorageOptions | None = None,
-        default_answer_language: str = "en",
+        default_answer_language: LanguageLike = Language.ENGLISH,
         top_k: int = 5,
         memory_max_turns: int = 20,
         sink: TelemetrySink | None = None,
@@ -638,7 +639,7 @@ class CiteNexus:
         *,
         k: int | None = None,
         conversation_id: str | None = None,
-        search_languages: Sequence[str] = DEFAULT_SEARCH_LANGUAGES,
+        search_languages: Sequence[LanguageLike] = DEFAULT_SEARCH_LANGUAGES,
     ) -> list[Candidate]:
         """Retrieve for ``question``, optionally fanned out across languages.
 
@@ -662,10 +663,10 @@ class CiteNexus:
         *,
         mode: TrustMode = TrustMode.strict,
         k: int | None = None,
-        answer_language: str | None = None,
+        answer_language: LanguageLike | None = None,
         conversation_id: str | None = None,
         strategy: str = "strict",
-        search_languages: Sequence[str] = DEFAULT_SEARCH_LANGUAGES,
+        search_languages: Sequence[LanguageLike] = DEFAULT_SEARCH_LANGUAGES,
     ) -> Result:
         """Answer ``question``, cite or abstain.
 
@@ -740,7 +741,7 @@ class CiteNexus:
         question: str,
         *,
         mode: TrustMode,
-        answer_language: str | None,
+        answer_language: LanguageLike | None,
         conversation_id: str | None,
     ) -> Result:
         """Run the agentic deep-ask loop over this client's tools + generator."""
@@ -784,7 +785,7 @@ class CiteNexus:
     def _extra_queries(
         self,
         question: str,
-        search_languages: Sequence[str] = DEFAULT_SEARCH_LANGUAGES,
+        search_languages: Sequence[LanguageLike] = DEFAULT_SEARCH_LANGUAGES,
     ) -> tuple[str, ...]:
         """One reformulation of ``question`` per requested search language.
 
@@ -853,7 +854,7 @@ class CiteNexus:
         *,
         mode: TrustMode = TrustMode.strict,
         k: int | None = None,
-        answer_language: str | None = None,
+        answer_language: LanguageLike | None = None,
         conversation_id: str | None = None,
     ) -> Sequence[str]:
         result = self.ask(

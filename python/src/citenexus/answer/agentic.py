@@ -67,6 +67,7 @@ from citenexus.answer.segment import split_claims
 from citenexus.answer.verify import is_supported_v2
 from citenexus.domain.authority import AuthorityPolicy
 from citenexus.domain.trust import TrustMode
+from citenexus.lang.codes import Language, LanguageLike
 from citenexus.lang.fallback import resolve_requested_answer_language
 from citenexus.plugins import LanguageDetectorPlugin
 
@@ -177,7 +178,7 @@ class AgenticAnswerFlow:
         decider: DecisionModel,
         tools: Sequence[ToolSpec],
         budget: LoopBudget | None = None,
-        default_answer_language: str = "en",
+        default_answer_language: LanguageLike = Language.ENGLISH,
         authority: AuthorityPolicy | None = None,
         detector: LanguageDetectorPlugin | None = None,
     ) -> None:
@@ -198,7 +199,7 @@ class AgenticAnswerFlow:
         question: str,
         *,
         mode: TrustMode = TrustMode.strict,
-        answer_language: str | None = None,
+        answer_language: LanguageLike | None = None,
     ) -> Result:
         budget = self._budget
         deadline = time.monotonic() + budget.timeout_s
@@ -297,7 +298,7 @@ class AgenticAnswerFlow:
         pool: dict[str, _PooledEvidence],
         *,
         mode: TrustMode,
-        answer_language: str | None,
+        answer_language: LanguageLike | None,
         deadline: float,
         stop_reason: LoopStopReason,
         hops: int,
@@ -310,9 +311,7 @@ class AgenticAnswerFlow:
         # attributes each claim to the most authoritative EU that supports it.
         # Nothing is withheld here — admission already did that.
         units = list(
-            select_by_authority(
-                list(pool.values()), policy=self._authority, mode=mode
-            ).candidates
+            select_by_authority(list(pool.values()), policy=self._authority, mode=mode).candidates
         )
         floor_applied = withheld > 0
         languages = tuple(dict.fromkeys(e.language for e in units if e.language is not None))
@@ -338,7 +337,8 @@ class AgenticAnswerFlow:
                 mode=mode,
                 language=language,
                 reason=(
-                    INSUFFICIENT_AUTHORITY if floor_applied
+                    INSUFFICIENT_AUTHORITY
+                    if floor_applied
                     else "no sufficiently relevant evidence found"
                 ),
                 loop=loop,
@@ -438,9 +438,7 @@ class AgenticAnswerFlow:
             # of its sources, so reporting the strongest would let one binding
             # citation launder a weaker co-citation: under "never wrong", an
             # answer's reported standing is the standing of its weakest support.
-            authority_tier=_weakest_tier(
-                [by_id[eu_id] for eu_id in used], self._authority
-            ),
+            authority_tier=_weakest_tier([by_id[eu_id] for eu_id in used], self._authority),
             authority_floor_applied=floor_applied,
         )
         return Result(

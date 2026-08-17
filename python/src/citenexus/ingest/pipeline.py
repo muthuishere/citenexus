@@ -23,6 +23,7 @@ from citenexus.evidence.structure import build_structure
 from citenexus.extract.dispatch import extract
 from citenexus.extract.types import SourceType
 from citenexus.ingest.result import IngestResult
+from citenexus.lang.codes import Language, LanguageLike
 from citenexus.lang.detect import HeuristicDetector
 from citenexus.lang.fallback import resolve_answer_language
 from citenexus.storage.lance_store import LanceVectorStore, StorageOptions
@@ -107,7 +108,7 @@ class IngestPipeline:
         signals: Iterable[str | Signal] | None = None,
         storage_options: StorageOptions | None = None,
         queue: DurableQueue | None = None,
-        default_answer_language: str = "en",
+        default_answer_language: LanguageLike = Language.ENGLISH,
         vision: VisionDescriber | None = None,
         vision_prefilter: VisionPrefilterConfig | None = None,
         vector_store: VectorStore | None = None,

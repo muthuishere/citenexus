@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict
 
 from citenexus.domain.trust import TrustMode
 from citenexus.evidence.unit import BBox
+from citenexus.lang.codes import LanguageLike, ScriptLike
 
 
 class Decision(StrEnum):
@@ -64,7 +65,7 @@ class EvidenceSignals(BaseModel):
     all_claims_verified: bool = False
     unsupported_claims_removed: int = 0
     conflicts_detected: int = 0
-    languages_in_evidence: tuple[str, ...] = ()
+    languages_in_evidence: tuple[LanguageLike, ...] = ()
     # Scripts present in the question or the evidence that the tokenizer does not
     # claim to support (ADR-0011). A CAPABILITY signal, never an evidence
     # judgement: a refusal carrying a non-empty value here means "I cannot read
@@ -72,7 +73,7 @@ class EvidenceSignals(BaseModel):
     # Returning the evidence-absent refusal for a capability gap is exactly what
     # let the ASCII-only tokenizer hide. Empty on every Latin-script Result, so
     # existing Results serialize unchanged.
-    unsupported_scripts: tuple[str, ...] = ()
+    unsupported_scripts: tuple[ScriptLike, ...] = ()
     # The cited source's authority tier name, and whether the strict-mode
     # authority floor was enforced on this call (ADR-0004). A STANDING signal,
     # never an evidence judgement — the same distinction ``unsupported_scripts``
@@ -96,7 +97,7 @@ class SourceRef(BaseModel):
 
     document: str
     passage: str
-    passage_language: str
+    passage_language: LanguageLike
     page: int | None = None
     bbox: BBox | None = None
     source_uri: str | None = None
@@ -140,7 +141,7 @@ class Result(BaseModel):
     answer: str
     # The query language L. The answer is guaranteed to be in this language (§11);
     # independent of the evidence languages.
-    answer_language: str
+    answer_language: LanguageLike
     mode: TrustMode
     evidence: EvidenceSignals
     claims: tuple[Claim, ...] = ()

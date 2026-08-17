@@ -29,6 +29,7 @@ from citenexus.answer.verify import has_relevance_overlap_v2, is_supported_v2
 from citenexus.contracts import GeneratorProvider
 from citenexus.domain.authority import AuthorityPolicy
 from citenexus.domain.trust import TrustMode
+from citenexus.lang.codes import Language, LanguageLike, ScriptLike
 from citenexus.lang.fallback import resolve_requested_answer_language
 from citenexus.plugins import LanguageDetectorPlugin
 from citenexus.retrieve.types import Candidate
@@ -49,9 +50,9 @@ _MAX_GENERATION_ATTEMPTS = 5
 def refusal(
     *,
     mode: TrustMode,
-    answer_language: str,
+    answer_language: LanguageLike,
     reason: str,
-    unsupported: tuple[str, ...] = (),
+    unsupported: tuple[ScriptLike, ...] = (),
     authority_floor_applied: bool = False,
     unreachable: tuple[str, ...] = (),
 ) -> Result:
@@ -129,8 +130,7 @@ def _unreachable_note(blocked: Sequence[tuple[Candidate, tuple[str, ...]]]) -> t
         f"{document} ({', '.join(sorted(scripts))})" for document, scripts in by_document.items()
     )
     return (
-        f"{len(by_document)} candidate document(s) could not be read and were "
-        f"excluded: {named}",
+        f"{len(by_document)} candidate document(s) could not be read and were excluded: {named}",
     )
 
 
@@ -141,7 +141,7 @@ class AnswerFlow:
         self,
         *,
         generator: Generator,
-        default_answer_language: str = "en",
+        default_answer_language: LanguageLike = Language.ENGLISH,
         authority: AuthorityPolicy | None = None,
         detector: LanguageDetectorPlugin | None = None,
     ) -> None:
@@ -160,7 +160,7 @@ class AnswerFlow:
         candidates: Sequence[Candidate],
         *,
         mode: TrustMode = TrustMode.strict,
-        answer_language: str | None = None,
+        answer_language: LanguageLike | None = None,
         evidence_query: str | None = None,
     ) -> Result:
         relevance_query = evidence_query or question
@@ -427,7 +427,7 @@ def _describe(pairs: Sequence[ConflictPair], window: Sequence[Candidate]) -> tup
 def _conflict_abstention(
     *,
     mode: TrustMode,
-    answer_language: str,
+    answer_language: LanguageLike,
     window: Sequence[Candidate],
     touching: Sequence[ConflictPair],
     total_conflicts: int,

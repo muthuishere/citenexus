@@ -52,8 +52,10 @@ from citenexus.extract.types import (
 )
 from citenexus.graph.distill import _PROMPT as _GRAPH_DISTILL_PROMPT
 from citenexus.graph.store import build_comention_graph
+from citenexus.lang.codes import Language, Script
 from citenexus.lang.detect import LanguageResult
-from citenexus.lang.fallback import resolve_answer_language
+from citenexus.lang.fallback import AUTO_ANSWER_LANGUAGE, resolve_answer_language
+from citenexus.lang.search import SEARCH_LANGUAGES
 from citenexus.retrieve.fusion import rrf_fuse
 from citenexus.retrieve.reformulate import _PROMPT as _REFORMULATE_PROMPT
 from citenexus.retrieve.types import Candidate, RetrievalSignal
@@ -1353,6 +1355,7 @@ def generate() -> dict[str, str]:
         "cases/vision_orchestration.json": _render(_vision_orchestration_cases()),
         "cases/multilingual.json": _render(_multilingual_cases()),
         "cases/tokenize_v2.json": _render(_tokenize_v2_cases()),
+        "cases/languages.json": _render(_language_code_cases()),
     }
 
 
@@ -1476,6 +1479,49 @@ def _tokenize_v2_cases() -> dict[str, Any]:
         "supported": supported,
         "unclaimed": unclaimed,
         "unicode": [{"input": text, "tokens": tokenize_v2(text)} for text in _V2_UNICODE_INPUTS],
+    }
+
+
+# --------------------------------------------------------------------------- #
+# cases/languages.json — the NAMED code sets (change: language-enums).
+#
+# Python's `Language` / `Script`, Go's `lang.Language` / `lang.Script` and JS's
+# `Language` / `Script` const objects each assert themselves against this file,
+# so the 41 codes cannot diverge across ports by review error. Exactly the pin
+# `cases/tokenize_v2.json` already gives the script CLAIM — this one covers the
+# whole naming vocabulary, including the languages we deliberately REFUSE.
+#
+# `supported` is derived, never hand-listed: it is `SearchLanguage.is_supported`,
+# i.e. every script the language needs is in ADR-0011's fixture-backed claim.
+# --------------------------------------------------------------------------- #
+
+
+def _language_code_cases() -> dict[str, Any]:
+    languages = [
+        {
+            "code": str(entry.code),
+            "name": entry.name,
+            "scripts": [str(s) for s in entry.scripts],
+            "supported": entry.is_supported,
+        }
+        for entry in SEARCH_LANGUAGES.values()
+    ]
+    codes = {row["code"] for row in languages}
+    members = {m.value for m in Language} - {str(AUTO_ANSWER_LANGUAGE)}
+    if codes != members:  # one definition, mechanically enforced
+        raise AssertionError(f"Language members diverged from SEARCH_LANGUAGES: {codes ^ members}")
+    named = {s for row in languages for s in row["scripts"]}
+    if not named <= {m.value for m in Script}:
+        raise AssertionError(f"search table names a script Script does not: {named}")
+    return {
+        # The one value of answer_language that is NOT a language, and is
+        # deliberately absent from the table below.
+        "auto_sentinel": str(AUTO_ANSWER_LANGUAGE),
+        "scripts": sorted(m.value for m in Script),
+        "supported_scripts": sorted(SUPPORTED_SCRIPTS),
+        "continuous_scripts": sorted(CONTINUOUS_SCRIPTS),
+        # Caller order preserved: the table is read top-to-bottom by every port.
+        "languages": languages,
     }
 
 

@@ -32,21 +32,22 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from citenexus.lang.codes import Language, LanguageLike
 from citenexus.lang.detect import LanguageResult
 from citenexus.plugins import LanguageDetectorPlugin
 
 # The one value of ``answer_language`` that is not a language: "detect it from my
 # question". It never reaches `resolve_answer_language` and is never returned.
-AUTO_ANSWER_LANGUAGE = "auto"
+AUTO_ANSWER_LANGUAGE: Language = Language.AUTO
 
 
 def resolve_answer_language(
     *,
     detection: LanguageResult | None,
-    answer_language: str | None = None,
-    conversation_language: str | None = None,
-    languages_in_evidence: Sequence[str] | None = None,
-    default_answer_language: str = "en",
+    answer_language: LanguageLike | None = None,
+    conversation_language: LanguageLike | None = None,
+    languages_in_evidence: Sequence[LanguageLike] | None = None,
+    default_answer_language: LanguageLike = Language.ENGLISH,
 ) -> str:
     """Pick the answer language by the §11a chain (question only).
 
@@ -70,11 +71,11 @@ def resolve_answer_language(
 
 def resolve_requested_answer_language(
     question: str,
-    answer_language: str | None,
+    answer_language: LanguageLike | None,
     *,
     detector: LanguageDetectorPlugin | None = None,
-    conversation_language: str | None = None,
-    default_answer_language: str = "en",
+    conversation_language: LanguageLike | None = None,
+    default_answer_language: LanguageLike = Language.ENGLISH,
 ) -> str:
     """Resolve a caller's ``answer_language`` request, understanding ``"auto"``.
 
@@ -102,7 +103,9 @@ def resolve_requested_answer_language(
     )
 
 
-def flag_code_mixing(candidates: Sequence[tuple[str, float]], *, strong: float = 0.40) -> bool:
+def flag_code_mixing(
+    candidates: Sequence[tuple[LanguageLike, float]], *, strong: float = 0.40
+) -> bool:
     """True when the top-2 language candidates are both strong (code-mixed).
 
     When two languages both clear ``strong`` there is no single reliable label, so

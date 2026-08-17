@@ -37,6 +37,12 @@ from citenexus.http import (
     OpenAIHttpEndpoint,
     OpenRouterHttpEndpoint,
 )
+
+# The named code sets. Both are ``StrEnum``, so ``Language.TAMIL == "ta"`` and a
+# plain ``"ta"`` remains equally correct at every entry point -- the enums are a
+# convenience for discovery and autocomplete, never a migration.
+from citenexus.lang.codes import Language, LanguageCode, Script, ScriptCode
+from citenexus.lang.search import UnsupportedSearchLanguageError
 from citenexus.reconcile import (
     CorpusEntry,
     CorpusManifest,
@@ -68,6 +74,8 @@ __all__ = [
     "Hooks",
     "HttpClient",
     "HttpEndpoint",
+    "Language",
+    "LanguageCode",
     "OllamaHttpEndpoint",
     "OpenAICompatibleEmbedding",
     "OpenAICompatibleGenerator",
@@ -78,8 +86,11 @@ __all__ = [
     "ReconcileReport",
     "RemediationReport",
     "RerankerProvider",
+    "Script",
+    "ScriptCode",
     "SequenceEmbedder",
     "SingleTextEmbedder",
+    "UnsupportedSearchLanguageError",
     "Vector",
     "VisionProvider",
     "__version__",
