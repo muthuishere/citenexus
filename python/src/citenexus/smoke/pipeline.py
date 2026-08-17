@@ -13,7 +13,7 @@ from citenexus.answer.result import (
     SourceRef,
 )
 from citenexus.answer.segment import split_claims
-from citenexus.answer.verify import content_tokens, is_supported_v2
+from citenexus.answer.verify import has_relevance_overlap_v2, is_supported_v2
 from citenexus.domain.trust import TrustMode
 from citenexus.storage.lance_store import LanceVectorStore, StorageOptions
 from citenexus.storage.manifest import (
@@ -89,8 +89,15 @@ class SmokePipeline:
         """Answer grounded in retrieved evidence, or refuse if there is none."""
         qvec = self._embedder.embed(question)
         hits = self._store.search(qvec, limit=self._top_k)
-        q_terms = content_tokens(question)
-        grounded = [h for h in hits if q_terms & content_tokens(str(h["text"]))]
+        # The relevance gate must be the Unicode-aware one (ADR-0011), the same
+        # predicate `answer/flow.py:216` uses. The frozen v1 `content_tokens` is
+        # ASCII-only by contract, so it tokenized every non-Latin question to the
+        # empty set and this path refused a Japanese question that grounds
+        # perfectly against its own passage -- a false abstention, and a
+        # divergence from the Go and JS ports, which already use v2. Measured
+        # over conformance/cases/e2e_hermetic.json: v1 and v2 agree on all 48
+        # question/document pairs, so no pinned vector moves.
+        grounded = [h for h in hits if has_relevance_overlap_v2(question, str(h["text"]))]
         if not grounded:
             return self._refuse(mode)
 
