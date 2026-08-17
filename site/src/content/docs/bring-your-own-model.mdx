@@ -1,165 +1,215 @@
 ---
-title: Bring your own model — how to
-description: Three steps to plug any embedder, generator, reranker or vision model into CiteNexus — pick a contract, implement one method, pass it to the constructor. No HTTP required, no citenexus import required.
+title: Bring your own model — swap the transport
+description: One line brings any model into CiteNexus. Keep the shipped client, replace the function that moves bytes, and an in-process ONNX model, a llama.cpp binding, a local daemon or a test fixture answers where HTTP used to. No server, no socket, no contract to implement.
 ---
 
-import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 import FacadeNote from '../../components/FacadeNote.astro';
 
-CiteNexus bundles no models. Every model seam is a **published contract**, and
-anything matching the shape works — an HTTP client, an in-process model, a cached
-fixture, a mock in a test.
+CiteNexus bundles no models. The shipped clients — `OpenAICompatibleEmbedding`,
+`OpenAICompatibleGenerator`, `OpenAICompatibleVision`, `OpenAICompatibleReranker`
+— already know how to talk to a model. What they do **not** need to know is
+whether the bytes travel over a socket.
 
-This is the short path. For the reasoning behind the seam, the deprecated
-shapes, batching, and the failure semantics in full, see
-[Provider contracts](/citenexus/providers/). For wiring a *hosted* endpoint with
-auth headers, see [Custom endpoints & auth](/citenexus/custom-endpoints/).
+So bring your own model by changing that one thing: **swap the transport.**
+
+```python
+gen = OpenAICompatibleGenerator(
+    base_url="http://in-process.invalid",   # never dialled — see below
+    model="qwen2.5-1.5b",
+    transport=my_transport,                 # <- this line, and nothing else
+)
+```
+
+`Transport` is
+`Callable[[str, bytes, dict[str, str]], bytes]` — `(url, json body, headers) -> response bytes`
+([`citenexus/http.py`](https://github.com/muthuishere/citenexus/blob/main/python/src/citenexus/http.py)).
+It is a **plain callable**: there is no class to subclass and no `citenexus`
+base to import. A function works. All four clients take it as a keyword-only
+`transport=` argument.
 
 <FacadeNote />
 
-<Steps>
+## What you write, and what the client keeps doing
 
-1. **Pick your contract.**
+You move bytes. The client keeps doing everything else — and that is the whole
+argument for this design:
 
-   All five live in `citenexus.contracts` and are re-exported from the top-level
-   `citenexus` package.
+| The client still does | You do not reimplement |
+| --- | --- |
+| Builds the OpenAI-shaped request body | message roles, the pinned grounded-answer system prompt, `temperature` / `max_tokens`, embedding batching |
+| Applies headers | `User-Agent`, merge order, per-call auth winning over defaults |
+| Expands `${ENV}` secrets **at the request boundary** | see [Custom endpoints & auth](/citenexus/custom-endpoints/) |
+| Parses the OpenAI-shaped response | `choices[0].message.content`, `data[*].embedding`, error semantics |
 
-   | Contract | The one method you implement |
-   | --- | --- |
-   | `EmbeddingProvider` | `embed_many(texts: Sequence[str]) -> list[Vector]` |
-   | `GeneratorProvider` | `answer(question: str, passage: str, answer_language: str = "en") -> str` |
-   | `CompletionProvider` | `complete(prompt: str) -> str` |
-   | `VisionProvider` | `describe(image_region: Any) -> Mapping[str, Any]` |
-   | `RerankerProvider` | `rerank(query: str, candidates: Sequence[Candidate]) -> list[Candidate]` |
+Contrast that with writing a provider from scratch, where all four of those
+columns become yours to get right and keep right.
 
-   `Vector` is `list[float]`. Every contract **returns a value or raises** — none
-   defines a sentinel, because a zero vector is a valid embedding and an empty
-   string is a valid answer. If your provider cannot fulfil a call, raise.
+## A generator
 
-2. **Implement the method.**
+The request the client hands you is already OpenAI-shaped, so the last message
+is the prompt. Return an OpenAI-shaped response and you are done.
 
-   They are `@runtime_checkable` `Protocol`s, not ABCs: **matching the shape is
-   enough.** You do not have to subclass anything, and you do not have to import
-   CiteNexus into your provider's source at all. Nothing in a contract mentions a
-   transport, so a provider that never opens a socket satisfies it.
+```python
+import json
 
-   ```python
-   from collections.abc import Sequence
-
-   class MyEmbedder:                       # no base class, no citenexus import
-       def embed_many(self, texts: Sequence[str]) -> list[list[float]]:
-           return [self._vector(t) for t in texts]   # one per input, in input order
-
-       def _vector(self, text: str) -> list[float]:
-           ...
+from citenexus import OpenAICompatibleGenerator
 
 
-   class MyGenerator:
-       def answer(self, question: str, passage: str, answer_language: str = "en") -> str:
-           # Extractive is the best kind: whatever you return still has to clear
-           # the per-claim faithfulness gate before it can be emitted.
-           ...
-   ```
+class OnnxTransport:
+    def __init__(self, model):
+        self.model = model
 
-   Batching is the primitive on purpose: `embed_many` takes the whole list, so
-   one request per Evidence Unit is not what a real corpus costs you.
+    def __call__(self, url: str, body: bytes, headers: dict) -> bytes:
+        req = json.loads(body)                       # OpenAI-shaped, built by the client
+        prompt = req["messages"][-1]["content"]
+        return json.dumps({"choices": [{"message": {"content": self.model(prompt)}}]}).encode()
 
-3. **Pass it to `CiteNexus(...)`.**
 
-   ```python
-   from citenexus import CiteNexus
+gen = OpenAICompatibleGenerator(
+    base_url="http://in-process.invalid",
+    model="qwen2.5-1.5b",
+    transport=OnnxTransport(model),
+)
 
-   rag = CiteNexus("./citenexus-data", embedder=MyEmbedder(), generator=MyGenerator())
-   ```
+gen.answer(
+    "Can the employee disclose?",
+    "The employee shall not disclose confidential information.",
+)
+# 'The employee shall not disclose confidential information.'
+```
 
-   The keyword-only injection points are `embedder=`, `generator=`, `reranker=`,
-   `vision=`, `detector=` and `agentic_decider=`.
+A class is used here only because this transport carries state (the loaded
+model). A bare function with the same signature is equally valid.
 
-</Steps>
+## An embedder
 
-## A partial set is a valid set
+The embedding response shape is `{"data": [{"embedding": [...]}, ...]}`, one
+entry per input, **in input order**. `input` may be a string or a list, so
+normalise it:
 
-You do not have to supply all of them.
+```python
+import json
 
-- **Generator, no embedder** — retrieval falls back to lexical (BM25) and `ask()`
-  still answers. This case is pinned by the test suite.
-- **Embedder, no generator** — the Python facade becomes search-only:
-  `retrieve()` works, `ask()` raises `ValueError`. (The Go and JS ports differ
-  here — they fall back to a deterministic fake generator.)
+from citenexus import OpenAICompatibleEmbedding
 
-## Two rough edges, stated plainly
 
-<Aside type="caution" title="Only two seams are annotated against the contracts">
-`embedder=` and `generator=` are typed against the published contracts.
-`reranker=` is still annotated with the nominal `RerankerPlugin` ABC and
-`vision=` with an internal alias — a structural provider works at runtime and the
-reference test injects one, but a `mypy --strict` caller needs
-`# type: ignore[arg-type]` on those arguments until the annotations are widened.
+class OnnxEmbedTransport:
+    def __call__(self, url, body, headers):
+        req = json.loads(body)
+        texts = req["input"] if isinstance(req["input"], list) else [req["input"]]
+        return json.dumps({"data": [{"embedding": embed(t)} for t in texts]}).encode()
+
+
+emb = OpenAICompatibleEmbedding(
+    base_url="http://in-process.invalid",
+    model="bge-m3",
+    transport=OnnxEmbedTransport(),
+)
+
+emb.embed_many(["hello", "hello world"])
+# with a toy embed(t) = [len(t), 1.0, 0.5]:
+# [[5.0, 1.0, 0.5], [11.0, 1.0, 0.5]]
+```
+
+Batching stays the client's job: `embed_many` hands your transport the whole
+list in one request, so a real corpus does not cost you one round trip per
+Evidence Unit.
+
+<Aside type="tip" title="No network, no server — verified by construction">
+Both snippets above were run with `socket.socket` replaced by a function that
+raises, and both produced the output shown. `base_url` is still required and is
+still passed to your transport as `url`, but nothing dials it. That is what
+makes transport-swapping the natural path for an **in-process ONNX or
+llama.cpp model**, a **local daemon** speaking some other protocol, or a
+**deterministic test fixture**.
 </Aside>
 
-There is **no `completion=` parameter.** `CompletionProvider` is the deep-ask
-decision seam and enters through `agentic_decider=`; if you leave that unset,
-CiteNexus wraps your generator, which is why a generator used with
-`strategy="deep"` should implement `complete()` as well as `answer()`.
+## Then pass the client to `CiteNexus(...)`
 
-## Go and JavaScript
+Nothing downstream changes — a transport-swapped client is still just a client:
 
-The ports publish **two** contracts — embedding and generation — and the
-injection point is `AskWith` / `askWith`. There is no vision, completion or
-reranker seam in either port. The batch method is the same primitive, spelled
-differently per language.
+```python
+from citenexus import CiteNexus
+
+rag = CiteNexus("./citenexus-data", embedder=emb, generator=gen)
+```
+
+The keyword-only injection points are `embedder=`, `generator=`, `reranker=`,
+`vision=`, `detector=` and `agentic_decider=`. A **partial set is valid**: a
+generator with no embedder falls back to lexical (BM25) retrieval and `ask()`
+still answers.
+
+And the model is still **not trusted**: whatever your transport returns goes
+through the [per-claim faithfulness gate](/citenexus/ask/) before it can become
+an answer.
+
+## Go and JavaScript have the same seam
+
+Both ports carry a `Transport` seam of the same shape, verified by running the
+equivalent of the snippets above. The one honest difference: in Go and
+JavaScript `transport` is a **required positional constructor argument** — there
+is no default — whereas Python defaults it to real HTTP. The payload type
+differs too: Go passes `[]byte` and returns `([]byte, error)`, JavaScript passes
+a `string` and returns `string | Promise<string>`.
 
 <Tabs syncKey="lang">
+<TabItem label="Python">
+```python
+# (url, body: bytes, headers) -> bytes ; keyword-only, defaults to real HTTP
+gen = OpenAICompatibleGenerator(
+    base_url="http://in-process.invalid", model="qwen2.5-1.5b",
+    transport=OnnxTransport(model),
+)
+```
+</TabItem>
 <TabItem label="Go">
 ```go
-// golang/contracts
-type EmbeddingProvider interface {
-	Embed(texts []string) ([][]float64, error)
-}
-type GeneratorProvider interface {
-	Answer(question, passage, answerLanguage string) (string, error)
+// models.Transport = func(url string, body []byte, headers map[string]string) ([]byte, error)
+inProcess := func(url string, body []byte, headers map[string]string) ([]byte, error) {
+    return []byte(`{"choices":[{"message":{"content":"..."}}]}`), nil
 }
 
-res, err := answer.AskWith(corpus, question, answer.DefaultTopK, answer.Providers{
-	Embedding: myEmbedder,
-	Generator: myGenerator,
-})
+gen := models.NewOpenAIChatGenerator(
+    "http://in-process.invalid", "qwen2.5-1.5b", 0, nil,
+    inProcess, // required argument — models.NewHTTPClient(...).Transport() is the real-HTTP one
+)
+out, err := gen.Answer(question, passage, "en")
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```ts
-// @muthuishere/citenexus — contracts
-interface EmbeddingProvider {
-  embed(texts: readonly string[]): Awaitable<Vector[]>
-}
-interface GeneratorProvider {
-  answer(question: string, passage: string, answerLanguage?: string): Awaitable<string>
-}
-
-const res = await askWith(corpus, question, {
-  embedding: myEmbedder,
-  generator: myGenerator,
-})
-```
-</TabItem>
-<TabItem label="Python">
-```python
-from citenexus import CiteNexus
-
-rag = CiteNexus("./citenexus-data", embedder=MyEmbedder(), generator=MyGenerator())
-response = rag.ask("Can the employee disclose this?")
+// Transport = (url, body: string, headers) => string | Promise<string>
+const gen = new OpenAIChatGenerator(
+  { base_url: "http://in-process.invalid", model: "qwen2.5-1.5b" },
+  (url, body, headers) => {
+    const req = JSON.parse(body);
+    return JSON.stringify({
+      choices: [{ message: { content: myModel(req.messages.at(-1).content) } }],
+    });
+  }, // required argument — `new HttpClient().send` is the real-HTTP one
+);
+const out = await gen.answer(question, passage, "en");
 ```
 </TabItem>
 </Tabs>
 
-Both ports accept a partial set: a nil/omitted field falls back to the port's
-deterministic hermetic fake. JS providers may be async — `askWith` returns a
-`Promise`, while the batteries-free `ask` stays synchronous.
+## When this is not enough
+
+Transport-swapping assumes your model can be made to **look OpenAI-shaped** —
+you parse an OpenAI request and return an OpenAI response, whatever happens in
+between. That covers in-process models, local daemons, SDK wrappers and
+fixtures.
+
+If your model cannot be adapted to that shape at all, there is a second, lower
+level: implement one of the five published Protocols directly. That is the
+reference path, not the recommended one — see [Provider
+contracts](/citenexus/providers/).
 
 ## Next
 
-- [Provider contracts](/citenexus/providers/) — the full reference: structural
-  typing, the deprecated single-text shapes, failure semantics, per-port scope.
-- [Custom endpoints & auth](/citenexus/custom-endpoints/) — `${ENV}` header
-  templates for hosted models, expanded only at the HTTP boundary.
+- [Custom endpoints & auth](/citenexus/custom-endpoints/) — when the model *is*
+  an HTTP endpoint: `${ENV}` header templates, expanded only at the boundary.
 - [Models & endpoints](/citenexus/models/) — the clients CiteNexus already ships.
+- [Provider contracts](/citenexus/providers/) — the contracts reference, for a
+  model that is not OpenAI-shaped at all.

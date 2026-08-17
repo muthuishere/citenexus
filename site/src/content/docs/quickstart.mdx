@@ -150,7 +150,9 @@ see [Install](/citenexus/install/).
 - [How it works](/citenexus/architecture/) — what each of those three calls
   actually did, stage by stage.
 - Store your corpus on [S3 / MinIO](/citenexus/s3/) instead of a local folder.
-- [Bring your own models](/citenexus/models/) — embedding, LLM, reranker, vision.
+- [Models & endpoints](/citenexus/models/) — embedding, LLM, reranker, vision.
+- [Bring your own model](/citenexus/bring-your-own-model/) — a model that isn't
+  an HTTP endpoint? Keep the same client, swap the `transport=` callable.
 - [Ingest anything](/citenexus/ingest/) — a file, raw text, an image, or a URL,
   one source per call (there is no "ingest the whole bucket" call); `crawl()`
   walks a whole site.

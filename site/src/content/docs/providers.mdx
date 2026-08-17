@@ -1,10 +1,23 @@
 ---
-title: Provider contracts — bring your own model
-description: Five published Protocols define the model seam. A provider satisfies them by shape alone — no CiteNexus base class to inherit, no socket to open. Python publishes all five; the Go and JS ports publish the two they consume.
+title: Provider contracts — the reference
+description: The five published Protocols behind the model seam, for reference. To bring your own model, swap the transport instead — implement a contract only if your model cannot be made OpenAI-shaped at all.
 ---
 
 import { Aside, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 import FacadeNote from '../../components/FacadeNote.astro';
+
+<Aside type="caution" title="This is not the way to bring your own model">
+**Swap the transport first.** Keep a shipped client and replace the one function
+that moves bytes — the client keeps building the OpenAI-shaped request, applying
+headers, expanding `${ENV}` secrets and parsing the response, and your model
+answers with no server and no socket. That is one line, and it is the documented
+path: **[Bring your own model — swap the
+transport](/citenexus/bring-your-own-model/)**.
+
+Implement a contract on this page only if your model **cannot be made
+OpenAI-shaped at all** — not even by a transport that translates in both
+directions.
+</Aside>
 
 CiteNexus bundles **no models**. That has always been the design — but for a long
 time "inject your own" meant *read our call sites and guess*. Embedding alone was
@@ -16,10 +29,10 @@ capability no type checker can verify and no provider author knows to offer.
 There is now **one published place to look**: `citenexus.contracts`. Match a
 shape and you are a provider.
 
-This page is the reference — every contract, its exact signature, and the
-reasoning behind each. If you just want to plug a model in and move on, the
-three-step version is [Bring your own model — how
-to](/citenexus/bring-your-own-model/).
+This page is that **reference** — every contract, its exact signature, and the
+reasoning behind each. It documents what the shipped clients themselves declare
+and what `python/tests/test_third_party_provider.py` exercises. It is the lower
+level, underneath the transport seam, and most callers never need it.
 
 ## Structural, not nominal
 
@@ -226,9 +239,14 @@ rag = CiteNexus(
 ```
 
 They share one constructor shape — keyword-only `base_url`, `model`, `transport`,
-`headers`, plus role-specific extras (`batch_size` on embedding, `temperature` /
-`max_tokens` on generation and vision, `mime_type` on vision). A custom provider
-drops into the **exact same slot**:
+`headers`, plus role-specific extras. That shared `transport` is why bringing
+your own model rarely needs this page at all: keep the client, replace the
+callable, and the client's request shaping, headers, `${ENV}` expansion and
+response parsing all still apply — [swap the
+transport](/citenexus/bring-your-own-model/). The role-specific extras are
+`batch_size` on embedding, `temperature` / `max_tokens` on generation and vision,
+and `mime_type` on vision. A contract-implementing provider drops into the
+**exact same slot**:
 
 ```python
 rag = CiteNexus(
@@ -424,5 +442,7 @@ they did not already have.
 
 Background: [ADR-0014 — the model seam is a contract, not an
 endpoint](https://github.com/muthuishere/citenexus/blob/main/docs/adr/0014-the-model-seam-is-a-contract-not-an-endpoint.md).
-Next: [Bring your own models](/citenexus/models/) for the shipped clients ·
+Next: [Bring your own model — swap the
+transport](/citenexus/bring-your-own-model/) (start here) ·
+[Models & endpoints](/citenexus/models/) for the shipped clients ·
 [Custom endpoints & auth](/citenexus/custom-endpoints/) for `${ENV}` auth.

@@ -368,10 +368,11 @@ metrics; treat the rates as illustrations.
 
 <CardGrid>
 	<Card title="Bring your own model" icon="setting">
-		Five published provider contracts — embedding, generation, completion,
-		vision, reranking. They are `Protocol`s, not base classes: a provider
-		**does not import or subclass CiteNexus**.
-		[Provider contracts →](/citenexus/providers/)
+		One line: **swap the transport**. Keep the shipped client — it still
+		builds the request, applies headers, expands `${ENV}` and parses the
+		response — and pass a callable that moves the bytes. An in-process ONNX
+		model needs no server and no socket.
+		[Swap the transport →](/citenexus/bring-your-own-model/)
 	</Card>
 	<Card title="One core, three languages" icon="seti:go">
 		Every deterministic decision is byte-for-byte identical across Go,

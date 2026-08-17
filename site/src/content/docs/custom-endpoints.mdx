@@ -5,11 +5,11 @@ description: Point CiteNexus at any provider — base URL, custom headers, custo
 
 import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-A model that *is* an HTTP endpoint is one you configure here. (It need not be:
-the model seam is a [published contract](/citenexus/providers/), and everything
-on this page — `base_url`, `headers`, `transport` — belongs to the shipped HTTP
-clients rather than to the contract. A provider that never opens a socket ignores
-all of it.) Auth is a **header template**: you write `"Bearer ${OPENAI_API_KEY}"`, and the `${ENV_VAR}` is
+A model that *is* an HTTP endpoint is one you configure here. (It need not be —
+if your model runs in-process, keep the same client and [swap the
+transport](/citenexus/bring-your-own-model/); `base_url` and `headers` are then
+just values your own callable receives and can ignore.)
+Auth is a **header template**: you write `"Bearer ${OPENAI_API_KEY}"`, and the `${ENV_VAR}` is
 expanded from the process environment **at the moment the request is sent** — never
 before. The secret's *value* never lives on a client object, in a config, in a
 `repr`, or in a log. Only the `${NAME}` placeholder is ever held.
@@ -276,6 +276,7 @@ providers are covered by a header key of your choice (`"x-api-key": "${TOKEN}"`)
 `auth_header`/`auth_scheme` are rarely needed.
 </Aside>
 
-Writing a model that is not an HTTP endpoint at all — in-process, a mock, an
-adapter for a third library? None of this page applies:
-[Provider contracts](/citenexus/providers/).
+Writing a model that is not an HTTP endpoint at all — in-process, a local
+daemon, an adapter for a third library, a fixture? Keep these same clients and
+replace one callable: [Bring your own model — swap the
+transport](/citenexus/bring-your-own-model/).

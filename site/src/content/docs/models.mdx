@@ -1,6 +1,6 @@
 ---
 title: Bring your own models
-description: Every model is injected — embedding, LLM, and optionally a reranker and vision. Nothing is bundled. The shipped clients speak the OpenAI API; the seam itself is a published contract, so an in-process model or a mock works just as well.
+description: Every model is injected — embedding, LLM, and optionally a reranker and vision. Nothing is bundled. The shipped clients speak the OpenAI API; swap their transport and the same clients drive an in-process model or a fixture instead.
 ---
 
 import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
@@ -100,12 +100,12 @@ Jina + Gemini**, which is the cheap default stack. For an all-local run,
 reranker `xitao/bge-reranker-v2-m3` (note the `xitao/` prefix).
 
 <Aside type="tip" title="An endpoint is one option, not the requirement">
-The model seam is a **published contract**, not a URL. `base_url`, `headers` and
-`transport` are constructor parameters of *these* clients — they appear in no
-contract method — so an in-process model, a mock, or a cached fixture satisfies
-the same seam without opening a socket. The shipped clients above are ordinary
-providers with no privileges. See
-[Provider contracts](/citenexus/providers/).
+A model that isn't an HTTP endpoint uses the **same clients** — you just swap
+what moves the bytes. Every client takes a keyword-only
+`transport=(url, body, headers) -> bytes`; replace it and an in-process model, a
+local daemon, or a fixture answers, while the client still builds the request,
+applies headers, expands `${ENV}` and parses the response. One line: [Bring your
+own model — swap the transport](/citenexus/bring-your-own-model/).
 </Aside>
 
 <Aside type="note" title="Vision is host-fulfilled">
@@ -115,11 +115,11 @@ assembled back into a cited figure Evidence Unit. The core never holds your API
 key.
 </Aside>
 
-Wiring a model that isn't one of the shipped clients — an in-process model, a
-mock, an SDK you already use — takes three steps and no `citenexus` import:
-[Bring your own model — how to](/citenexus/bring-your-own-model/).
+Wiring a model these clients can't reach over HTTP — an in-process ONNX or
+llama.cpp model, a local daemon, an SDK you already use, a test fixture — is one
+line, `transport=`: [Bring your own model — swap the
+transport](/citenexus/bring-your-own-model/).
 
-Go deeper on each: [Provider contracts](/citenexus/providers/) ·
-[Custom endpoints & auth](/citenexus/custom-endpoints/) ·
+Go deeper on each: [Custom endpoints & auth](/citenexus/custom-endpoints/) ·
 [Reranking & retrieval](/citenexus/reranking/) ·
 [Vision — figures as cited evidence](/citenexus/vision/).
