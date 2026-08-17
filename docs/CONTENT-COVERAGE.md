@@ -1,5 +1,13 @@
 # Content-coverage matrix
 
+> 🛑 **STALE — superseded by
+> [`CONTENT-COVERAGE-2026-07-08.md`](CONTENT-COVERAGE-2026-07-08.md).** Row 5 of
+> this file says the §9 vision pre-filter "is never called from
+> `ingest/pipeline.py`". That has not been true since 2026-07-09: `decide()` is
+> imported at `ingest/pipeline.py:41` and called at `:345-349`, and
+> `_persist_image_bytes` stamps `ImageRef.blob_key` so the image path reaches
+> `describe_image`. Kept for history; read the dated file for current coverage.
+
 Traced by hand from the actual code path — extractor → evidence-builder →
 retrieval/answer/citation — not from what the plugin protocols *allow*. Three
 questions per content type:

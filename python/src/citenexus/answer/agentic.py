@@ -95,7 +95,15 @@ class LoopBudget(BaseModel):
 
 @dataclass(frozen=True)
 class _PooledEvidence:
-    """One deduped, verbatim Evidence Unit gathered by the loop."""
+    """One deduped Evidence Unit gathered by the loop.
+
+    Mirrors ``retrieve.types.Candidate``'s two-text split, and for the same reason
+    (0697c41): ``text`` is what the EU was INDEXED as — under contextual retrieval
+    (spec §7) that carries a small model's situating blurb, which is a ranking and
+    *navigation* aid and NOT the source's words. ``citable_text`` is the verbatim
+    chunk, and it is the only text that may be generated from, verified against,
+    or attributed to the document.
+    """
 
     eu_id: str
     text: str
@@ -109,6 +117,19 @@ class _PooledEvidence:
     #: only an ``AuthorityProfile`` reads it, and never the text above. ``""``
     #: (a tool that does not report it, or a pre-feature corpus) ⇒ unranked.
     authority_meta: str = ""
+    #: The VERBATIM chunk as written by the source. ``None`` for a legacy index
+    #: with no ``passage`` column, or a third-party tool that does not report one.
+    passage: str | None = None
+
+    @property
+    def citable_text(self) -> str:
+        """The text that may be quoted, generated from, and verified against.
+
+        Falls back to ``text`` when no ``passage`` was reported — un-migrated, not
+        broken, exactly as ``Candidate.citable_text`` does. Re-ingest to get the
+        guarantee.
+        """
+        return self.passage if self.passage is not None else self.text
 
 
 class _LoopTimeout(Exception):
@@ -165,6 +186,7 @@ def _to_pooled(row: dict[str, Any]) -> _PooledEvidence | None:
         signal=str(row.get("signal", "vector")),
         score=float(row.get("score", 0.0)),
         authority_meta=str(row.get("authority_meta") or ""),
+        passage=(str(passage) if (passage := row.get("passage")) is not None else None),
     )
 
 
@@ -345,7 +367,11 @@ class AgenticAnswerFlow:
                 authority_floor_applied=floor_applied,
             )
 
-        passage = "\n".join(e.text for e in units)
+        # Generate from `citable_text` -- the VERBATIM chunks -- exactly as the
+        # strict flow does (`answer/flow.py`). Handing the generator the enriched
+        # `text` invites it to answer in the context model's words, which are then
+        # gated against themselves and cited to the customer.
+        passage = "\n".join(e.citable_text for e in units)
         try:
             answer_text = _run_bounded(
                 lambda: self._generator.answer(question, passage, language),
@@ -382,7 +408,7 @@ class AgenticAnswerFlow:
         sources = tuple(
             SourceRef(
                 document=by_id[eu_id].document_id or eu_id,
-                passage=by_id[eu_id].text,
+                passage=by_id[eu_id].citable_text,
                 passage_language=by_id[eu_id].language or "und",
                 page=by_id[eu_id].page,
             )
@@ -405,7 +431,7 @@ class AgenticAnswerFlow:
         # so it is *more* likely than a single-shot retrieval to hold two
         # passages that disagree. Detection reports and never resolves.
         window = units[:CONFLICT_TOP_K]
-        conflict_pairs = find_conflicts([e.text for e in window])
+        conflict_pairs = find_conflicts([e.citable_text for e in window])
         touching = tuple(
             pair
             for pair in conflict_pairs
@@ -423,7 +449,7 @@ class AgenticAnswerFlow:
                 loop=loop,
                 authority_floor_applied=floor_applied,
             )
-        independent = [units[i] for i in collapse_near_duplicates([e.text for e in units])]
+        independent = [units[i] for i in collapse_near_duplicates([e.citable_text for e in units])]
         signals = EvidenceSignals(
             decision=decision,
             supporting_sources=len(used),
@@ -466,7 +492,7 @@ class AgenticAnswerFlow:
         supported: list[tuple[str, _PooledEvidence]] = []
         removed = 0
         for claim in split_claims(answer_text):
-            source = next((eu for eu in units if is_supported_v2(claim, eu.text)), None)
+            source = next((eu for eu in units if is_supported_v2(claim, eu.citable_text)), None)
             if source is not None:
                 supported.append((claim, source))
             else:
@@ -497,12 +523,12 @@ class AgenticAnswerFlow:
                 cited.append(
                     SourceRef(
                         document=unit.document_id or unit.eu_id,
-                        passage=unit.text,
+                        passage=unit.citable_text,
                         passage_language=unit.language or "und",
                         page=unit.page,
                     )
                 )
-        independent = [units[i] for i in collapse_near_duplicates([e.text for e in units])]
+        independent = [units[i] for i in collapse_near_duplicates([e.citable_text for e in units])]
         return Result(
             answer="The available evidence disagrees, so I can't answer that.",
             answer_language=language,

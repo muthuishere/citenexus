@@ -1207,6 +1207,7 @@ def _conflict_cases() -> dict[str, Any]:
         HARD_NEGATIVES,
         HELDOUT_CONFLICTS,
         HELDOUT_NEGATIVES,
+        NON_LATIN,
         TRUE_CONFLICTS,
         UNRELATED,
     )
@@ -1235,6 +1236,30 @@ def _conflict_cases() -> dict[str, Any]:
         "unrelated": _pairs(UNRELATED),
         "heldout_conflicts": _pairs(HELDOUT_CONFLICTS),
         "heldout_negatives": _pairs(HELDOUT_NEGATIVES),
+        # ADR-0011. Conflict ran on the FROZEN v1 tokenizer until this bucket
+        # existed, and v1 is ASCII-only by contract — so nearly every pair here
+        # scored "no conflict" before a single rule ran, and a Tamil or Telugu
+        # corpus holding a filing plus its restatement produced a confident,
+        # correctly-cited, one-sided answer with conflicts_detected=0. Moving to
+        # tokenize_v2 fixed Tamil, Telugu and Arabic; Japanese and Chinese stayed
+        # inert for a SECOND reason — two Unicode-blind guards (the number
+        # pattern's letter boundary, and the identifier exception in the content
+        # filter) treated kana/kanji/Han as identifier context, so a digit
+        # written flush against a character never became a value. Both are now
+        # ASCII-scoped. The expected `rule` is asserted from INTENT in the source
+        # fixture, not echoed from the detector, so a port cannot pass by
+        # reproducing a bug.
+        "non_latin": [
+            {
+                "domain": domain,
+                "label": label,
+                "left": left,
+                "right": right,
+                "conflict": rule is not None,
+                "rule": rule,
+            }
+            for domain, label, left, right, rule in NON_LATIN
+        ],
         "near_duplicates": [
             {
                 "label": label,
@@ -1356,6 +1381,7 @@ def generate() -> dict[str, str]:
         "cases/multilingual.json": _render(_multilingual_cases()),
         "cases/tokenize_v2.json": _render(_tokenize_v2_cases()),
         "cases/languages.json": _render(_language_code_cases()),
+        "cases/vector_validation.json": _render(_vector_validation_cases()),
     }
 
 
@@ -1532,6 +1558,163 @@ def main() -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
         print(f"wrote {path.relative_to(_REPO_ROOT.parent)}")
+
+
+# --------------------------------------------------------------------------- #
+# cases/vector_validation.json — what a VALID EMBEDDING BATCH is (ADR-0010 t1).
+#
+# The contract every port enforces before a vector may be indexed or scored. It
+# exists because the three ports disagreed: Python validated NOTHING (a provider
+# returning fewer vectors than texts shifted every text->vector pairing and
+# silently corrupted the index), Go rejected empty/dimension/zero, and JS
+# rejected those PLUS non-finite — so two ports pinned "byte-for-byte identical"
+# did not agree on what a valid vector is.
+#
+# `expect` is the CONTRACT: ports read it, they must never re-derive it by
+# calling the code under test. Re-derivation is exactly how this class of bug
+# survived — a test that asks the implementation what it does can only ever agree
+# with it.
+#
+# The REJECTION ORDER is pinned, not incidental. Several cases below fail more
+# than one rule at once (`dimension-beats-non-finite`, `non-finite-beats-zero`,
+# `empty-beats-dimension`), and they are the cases that catch a port that has all
+# five rules but applies them in a different sequence — which reports a different
+# error for the same vector, so a caller cannot act on the message.
+#
+# NUMBER ENCODING: JSON has no NaN/Infinity literal, so a non-finite component is
+# written as one of the strings "NaN" / "Infinity" / "-Infinity". Every port
+# decodes those three tokens and nothing else. The `non_vector` bucket is
+# deliberately exempt — it carries RAW JSON that is not a numeric array at all,
+# so no decoding is applied to it and no case in it uses those tokens.
+# --------------------------------------------------------------------------- #
+
+#: The rejection reasons, in the order they are applied. A port must both reject
+#: the same vectors AND report the same reason.
+_VECTOR_REASONS = ["non_vector", "empty", "dimension", "non_finite", "zero"]
+
+_NAN = "NaN"
+_INF = "Infinity"
+_NEG_INF = "-Infinity"
+
+#: (name, vector, dim, valid, reason) over numeric vectors — every port.
+_VECTOR_CHECK_CASES: list[tuple[str, list[Any], int, bool, str | None]] = [
+    # --- accepted -----------------------------------------------------------
+    ("ok-first-vector-defines-dim", [0.1, 0.2, 0.3], 0, True, None),
+    ("ok-dim-matches-run", [0.1, 0.2, 0.3], 3, True, None),
+    ("ok-single-component", [1.0], 0, True, None),
+    ("ok-single-component-dim-1", [1.0], 1, True, None),
+    ("ok-negative-components", [-1.0, -2.0], 2, True, None),
+    ("ok-mixed-sign", [-1.0, 0.0, 1.0], 3, True, None),
+    ("ok-one-tiny-signal-among-zeros", [0.0, 0.0, 0.0, 1e-09], 4, True, None),
+    ("ok-large-magnitude", [1e300, -1e300], 2, True, None),
+    ("ok-high-dimension", [0.0] * 1023 + [1.0], 1024, True, None),
+    # --- empty --------------------------------------------------------------
+    ("empty-vector-dim-undefined", [], 0, False, "empty"),
+    # Order: empty is reported as EMPTY, never as a 0-vs-3 dimension mismatch.
+    ("empty-beats-dimension", [], 3, False, "empty"),
+    # --- dimension ----------------------------------------------------------
+    ("dim-too-short", [1.0, 2.0], 3, False, "dimension"),
+    ("dim-too-long", [1.0, 2.0, 3.0, 4.0], 3, False, "dimension"),
+    ("dim-off-by-one-long", [1.0, 2.0], 1, False, "dimension"),
+    # Order: a ragged vector is reported by its dimension, not by its contents.
+    ("dimension-beats-non-finite", [_NAN, 1.0], 3, False, "dimension"),
+    ("dimension-beats-zero", [0.0, 0.0], 3, False, "dimension"),
+    # --- non-finite ---------------------------------------------------------
+    ("nan-first-component", [_NAN, 1.0, 2.0], 3, False, "non_finite"),
+    ("nan-last-component", [1.0, 2.0, _NAN], 3, False, "non_finite"),
+    ("nan-only-component", [_NAN], 0, False, "non_finite"),
+    ("positive-infinity", [_INF, 1.0, 2.0], 3, False, "non_finite"),
+    ("negative-infinity", [1.0, _NEG_INF, 2.0], 3, False, "non_finite"),
+    ("all-non-finite", [_NAN, _INF, _NEG_INF], 3, False, "non_finite"),
+    # Order: NaN among zeros is NON-FINITE, not zero — the components are not
+    # all zero, so the zero rule does not even apply, but a port that tested
+    # "any non-zero component" instead of "all zero" would report it as zero.
+    ("non-finite-beats-zero", [0.0, 0.0, _NAN], 3, False, "non_finite"),
+    # --- zero ---------------------------------------------------------------
+    ("all-zeros-dim-undefined", [0.0, 0.0, 0.0], 0, False, "zero"),
+    ("all-zeros-dim-matches", [0.0, 0.0, 0.0], 3, False, "zero"),
+    # The exact shape of ingest/pipeline.py's _PLACEHOLDER_VECTOR. Written by the
+    # library itself when no embedder is configured, and never scored — but a
+    # PROVIDER handing this back is claiming it embedded the text.
+    ("all-zeros-single-component", [0.0], 0, False, "zero"),
+    # -0.0 == 0.0 in IEEE-754, so a vector of negative zeros carries no signal
+    # either. A port comparing bit patterns rather than values gets this wrong.
+    ("negative-zeros", [-0.0, -0.0], 0, False, "zero"),
+    ("mixed-signed-zeros", [0.0, -0.0, 0.0], 3, False, "zero"),
+    ("all-zeros-high-dimension", [0.0] * 64, 64, False, "zero"),
+]
+
+#: Payloads that are not numeric arrays at all. Python and JS both accept `any`
+#: from an untyped provider and must refuse; Go's []float64 makes these
+#: unrepresentable, so its replay asserts the bucket's shape and documents why it
+#: cannot execute the cases. RAW JSON — the NaN/Infinity string encoding used by
+#: `check_vector` does NOT apply here.
+_VECTOR_NON_VECTOR_CASES: list[tuple[str, Any, int]] = [
+    ("null", None, 0),
+    ("string", "0.1,0.2", 0),
+    ("bare-number", 1.0, 0),
+    ("object", {"0": 1.0}, 0),
+    ("object-embedding-envelope", {"embedding": [1.0, 2.0]}, 0),
+    ("array-of-strings", ["1.0", "2.0"], 0),
+    ("array-with-null", [1.0, None], 0),
+    ("array-with-string", [1.0, "2.0"], 0),
+    ("nested-array", [[1.0, 2.0]], 0),
+    ("array-of-booleans", [True, False], 0),
+]
+
+#: (name, texts, vectors, valid, reason) for the batch-arity contract — the rule
+#: whose absence in Python silently mis-paired a real corpus.
+_VECTOR_ARITY_CASES: list[tuple[str, int, int, bool, str | None]] = [
+    ("ok-one-for-one", 1, 1, True, None),
+    ("ok-many-for-many", 5, 5, True, None),
+    ("ok-empty-batch", 0, 0, True, None),
+    ("ok-large-batch", 64, 64, True, None),
+    ("short-by-one", 3, 2, False, "cardinality"),
+    ("short-by-many", 64, 1, False, "cardinality"),
+    ("short-to-empty", 2, 0, False, "cardinality"),
+    ("long-by-one", 2, 3, False, "cardinality"),
+    ("long-by-many", 1, 4, False, "cardinality"),
+]
+
+
+def _encode_vector_component(value: Any) -> Any:
+    """Numbers stay numbers; NaN/±Inf become their pinned string tokens."""
+    if isinstance(value, str):
+        return value
+    return float(value)
+
+
+def _vector_validation_cases() -> dict[str, Any]:
+    """The cross-port contract for "a valid embedding batch"."""
+    return {
+        "reason_order": list(_VECTOR_REASONS),
+        "non_finite_tokens": [_NAN, _INF, _NEG_INF],
+        "check_vector": [
+            {
+                "name": name,
+                "vector": [_encode_vector_component(v) for v in vector],
+                "dim": dim,
+                "valid": valid,
+                "reason": reason,
+            }
+            for name, vector, dim, valid, reason in _VECTOR_CHECK_CASES
+        ],
+        "non_vector": [
+            {"name": name, "vector": payload, "dim": dim, "valid": False,
+             "reason": "non_vector"}
+            for name, payload, dim in _VECTOR_NON_VECTOR_CASES
+        ],
+        "batch_arity": [
+            {
+                "name": name,
+                "texts": texts,
+                "vectors": vectors,
+                "valid": valid,
+                "reason": reason,
+            }
+            for name, texts, vectors, valid, reason in _VECTOR_ARITY_CASES
+        ],
+    }
 
 
 if __name__ == "__main__":

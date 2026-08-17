@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from citenexus.contracts import SequenceEmbedder, Vector
+from citenexus.contracts import SequenceEmbedder, Vector, check_batch_arity
 
 DEFAULT_BATCH_SIZE = 64
 
@@ -25,5 +25,14 @@ def embed_in_batches(
         raise ValueError("batch_size must be >= 1")
     out: list[list[float]] = []
     for start in range(0, len(texts), batch_size):
-        out.extend(plugin.embed(texts[start : start + batch_size]))
+        batch = texts[start : start + batch_size]
+        vectors = list(plugin.embed(batch))
+        # PER BATCH, not just on the total. A batch that is short by one and a
+        # later batch that is long by one net out to the right TOTAL count, so a
+        # whole-call arity check passes while every pairing from the first short
+        # batch onward is shifted -- an index that is not broken but plausibly
+        # wrong forever. Measured: with batch_size=2 over four evidence units,
+        # three of four queries then retrieved the wrong passage, with no error.
+        check_batch_arity(len(batch), len(vectors))
+        out.extend(vectors)
     return out

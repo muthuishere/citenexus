@@ -9,9 +9,12 @@ consumes.
 
 NAVIGATE-NOT-CITE HOLDS ACROSS THE TOOLS: ``wiki_index``/``wiki_page``/
 ``graph_neighbors`` return navigation data (summaries, links, refs); the only
-quotable text comes from ``search_evidence``/``get_evidence``, and that text is
-the VERBATIM stored Evidence Unit with its provenance — never model-written
-wiki prose. An agent can wander the wiki freely and still can't cite it.
+quotable text comes from ``search_evidence``/``get_evidence``, and it is the
+``passage`` field of those rows — the VERBATIM stored Evidence Unit with its
+provenance, never model-written wiki prose. Their ``text`` field is the INDEXED
+string, which under contextual retrieval (spec §7) carries a small model's
+situating blurb: navigation and relevance only, never a citation and never gate
+input (0697c41). An agent can wander the wiki freely and still can't cite it.
 """
 
 from __future__ import annotations
@@ -31,7 +34,15 @@ def build_tools(rag: CiteNexus) -> list[ToolSpec]:
         return [
             {
                 "eu_id": c.eu_id,
+                # NAVIGATION vs CITATION (0697c41). `text` is what the EU was
+                # INDEXED as -- under contextual retrieval (spec §7) it carries a
+                # small model's situating blurb. That helps a navigating loop judge
+                # relevance, so it stays; but it is NOT the source's words.
                 "text": c.text,
+                # The VERBATIM chunk, and the ONLY string that may be quoted,
+                # attributed, or fed to the faithfulness gate. Equals `text` on a
+                # legacy index with no `passage` column (re-ingest to fix).
+                "passage": c.citable_text,
                 "document_id": c.document_id,
                 "page": c.page,
                 "language": c.language,
@@ -56,9 +67,14 @@ def build_tools(rag: CiteNexus) -> list[ToolSpec]:
     def get_evidence(eu_id: str) -> dict[str, Any] | None:
         for row in rag._store.scan():
             if str(row.get("eu_id")) == eu_id:
+                # Same split as `search_evidence`: the indexed string may carry the
+                # context model's blurb, `passage` is the source's own words.
+                text = row.get("text")
+                passage = row.get("passage")
                 return {
                     "eu_id": eu_id,
-                    "text": row.get("text"),
+                    "text": text,
+                    "passage": passage if passage is not None else text,
                     "document_id": row.get("document_id"),
                     "page": row.get("page"),
                     "language": row.get("language"),
@@ -93,8 +109,9 @@ def build_tools(rag: CiteNexus) -> list[ToolSpec]:
             "name": "search_evidence",
             "description": (
                 "Hybrid search over the corpus (vector+BM25+structure+graph+wiki, "
-                "RRF-fused). Returns VERBATIM evidence rows with provenance — the "
-                "only quotable text."
+                "RRF-fused). Each row carries `passage` — the VERBATIM source text, "
+                "the only quotable string — plus `text`, the indexed string (which "
+                "may carry a retrieval blurb) for judging relevance only."
             ),
             "parameters": {
                 "type": "object",
@@ -145,8 +162,9 @@ def build_tools(rag: CiteNexus) -> list[ToolSpec]:
         {
             "name": "get_evidence",
             "description": (
-                "Fetch one Evidence Unit by eu_id: the VERBATIM source text with "
-                "page, checksum and raw object provenance. This is what you cite."
+                "Fetch one Evidence Unit by eu_id: `passage` is the VERBATIM "
+                "source text — that is what you cite — alongside page, checksum "
+                "and raw object provenance."
             ),
             "parameters": {
                 "type": "object",

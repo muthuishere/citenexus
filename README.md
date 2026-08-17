@@ -318,17 +318,18 @@ network, no extra dep) is the offline/test default.
 |---|---|
 | text (BM25) · structure · graph · wiki · vector · RRF fusion | ✅ shipped, zero-model tier included |
 | ask/stream/evaluate with per-claim faithfulness gate (ADR-0009) | ✅ shipped (generator required; `ask`/`stream`/`evaluate` raise without one — `retrieve()` does not) |
-| Conflict surfacing — detected, surfaced, **never resolved** (ADR-0007) | ✅ shipped **Python only**; the ports declare `conflicts` and always emit empty |
+| Conflict surfacing — detected, surfaced, **never resolved** (ADR-0007) | ✅ shipped **at parity** in Python, Go and JS (`answer/conflict.py`, `golang/answer/conflict.go`, `js/src/answer/conflict.ts`), wired onto the ask path (`golang/answer/askwith.go:157`, `js/src/answer/answer.ts:97`) and pinned by 102 cases in `conformance/cases/conflict.json`. **Inert on non-Latin scripts in all three** — see Known limits |
 | Authority floor over curator-asserted tiers (ADR-0004) | ✅ shipped, **unranked by default** — attach `authority=` at ingest and set a floor. Python only; ports carry the signals for wire parity, no selection logic |
 | 14-script Unicode tokenizer + BM25 + gate predicate (ADR-0011) | ✅ shipped **at parity** in Python, Go and JS |
 | `search_languages` cross-lingual fan-out (ADR-0013) | ✅ shipped, Python facade only; **`evaluate()` does not fan out** |
 | `reconcile()` / `remediate()` — diff the index against a declared corpus manifest (ADR-0008) | ✅ shipped (orphans / missing / drifted; remediation is a separate explicit call) |
 | `delete()` / revoke | ✅ shipped and **fixed in 0.10.0** — it used to report success while leaving the pre-re-ingest blob in storage. Blobs stranded by earlier re-ingests are unrecoverable |
-| Structural code + schema intake (`rag.code`, `rag.schema`) | ✅ shipped, with **explicit per-edge confidence** rather than asserted edges |
+| Structural code + schema intake (`rag.code`, `rag.schema`) | ✅ intake shipped — source becomes citable Evidence Units. ⚠️ **The per-edge confidence label is declared but never populated**: `EdgeConfidence` (`python/src/citenexus/graph/store.py:44`) is constructed nowhere, `GraphEdge.confidence` (`:66`) is always `None`, and the Go/JS fields are always nil/null (`golang/graph/graph.go:41`) |
 | Deep-ask agentic loop (`strategy="deep"`) | ✅ shipped, budgeted, through the same gate |
 | Atomic-claim decomposition + drop-not-fail | ⚠️ **Python only.** The ports ship `SplitClaims`/`splitClaims` but nothing calls it — a port answer passes or refuses **whole** |
 | `bbox` on `Result.sources` | ❌ captured at extraction, **never carried onto the answer path** — `SourceRef.bbox` is always `None`. Cite to document + page |
-| `acl` as tenant isolation | ❌ **carried, not enforced.** Isolation is `PartitionPath` + the `allowed_partitions` pre-filter |
+| `acl` as tenant isolation | ❌ **carried, not enforced** — threaded onto `EvidenceUnit.acl` (`evidence/unit.py:91`) and read by nothing |
+| `allowed_partitions` as tenant isolation | ❌ **not wired.** `filter_partitions` (`access/prefilter.py:39`) has zero callers outside `access/` and its tests; `allowed_partitions` (`config/schema.py:282`) is read by nothing; retrieval does no partition filtering. The isolation that **is** real is physical: one client is bound to one `PartitionPath` and every storage key is prefixed with it (`storage/paths.py:27-39`). One client per tenant isolates; one client serving several tenants does not |
 | `citenexus verify` — standalone faithfulness-gate CLI + CI Action | ✅ shipped, Python only |
 | Table extraction (structured `table` evidence blocks) | ✅ shipped for **CSV, PDF, DOCX, PPTX, HTML, XLSX** — ruled/aligned tables become citable `EUType.table` rows |
 | Image-to-text via injected vision model (describe → citable figure EU) | ✅ shipped end-to-end — extractors persist image bytes at ingest and the §9 `decide()` pre-filter routes each image (skip / ocr / vision) |
@@ -343,7 +344,10 @@ network, no extra dep) is the offline/test default.
 | LLM-as-judge · MCP server | ⏳ later (config sections reserved) |
 
 Full block-by-block trace (captured → carried as a typed unit → actually
-citable), including the gaps above: [`docs/CONTENT-COVERAGE.md`](docs/CONTENT-COVERAGE.md).
+citable), including the gaps above:
+[`docs/CONTENT-COVERAGE-2026-07-08.md`](docs/CONTENT-COVERAGE-2026-07-08.md).
+(The undated `docs/CONTENT-COVERAGE.md` is the **earlier** pass and is stale on
+vision — it is kept for history and now says so at the top.)
 
 Or wire real OpenAI-compatible endpoints from typed config — one call builds the
 embedding / answering-LLM / reranker plugins (answers stay temperature-0):
@@ -389,11 +393,33 @@ We would rather say "don't know" than be wrong, and that applies to our own docs
   `answer/verify.py:135-136`) and conflict's `MAX_RESIDUAL = 1`
   (`answer/conflict.py:84`) were swept on **synthetic, single-sentence, English**
   fixtures and have never been re-measured on a live non-English corpus.
+- **Conflict detection is inert on non-Latin scripts — in all three ports.**
+  Through the current release, all three import the frozen **v1** tokenizer,
+  documented as "ASCII only, by contract" (`tokenize.py:77`), because
+  byte-identical parity with Python was the deliverable. Measured:
+  `detect_conflict("The notice period is 30 days.", "…60 days.")` returns
+  `rule='value', detail='30 vs 60'`; the identical contradiction in Tamil or
+  Telugu returns `None`, because v1 drops every non-Latin word and
+  `MIN_CONTENT = 3` is never met. So the *unsurfaced conflict* failure class is
+  closed for English and **open for every non-Latin corpus**, and it fails
+  silently — you cannot tell "no conflict" from "could not look". A move to the
+  v2 tokenizer plus 22 non-Latin conformance cases is in progress and **not yet
+  released**; treat this gap as open until a changelog entry says otherwise.
 - **Port parity is predicate-only.** Both ports ship `SplitClaims`/`splitClaims`
   but nothing on the answer path calls it, so atomic-claim decomposition and
   drop-not-fail are effectively Python-only — a Go or JS answer passes or refuses
-  **whole**, never trimmed. Conflict detection, authority, reranking and the
-  language fan-out are Python-only outright.
+  **whole**, never trimmed. Authority, reranking and the language fan-out are
+  Python-only outright. Conflict detection **is no longer** on that list: it is
+  native and byte-identical in all three ports.
+- **No graph edge carries a confidence.** `EdgeConfidence` is declared
+  (`graph/store.py:44`) and never constructed; every edge ships `None`. The
+  "labelled, not asserted" property claimed for `rag.code` / `rag.schema` is a
+  design intent, not a shipped property.
+- **There is no answer-language *enforcement*.** The answer language is an
+  instruction passed to the generator (`answer/flow.py:308`); the returned text
+  is never checked against it and never regenerated on mismatch. Any doc claiming
+  "regenerate-on-mismatch" (including `docs/SPEC-v6.md`) describes the spec, not
+  the code.
 - **`evaluate()` does not fan out over `search_languages`**, so it always runs at
   the `("en",)` default — which is why the multilingual example's
   `library_evaluate` disagrees with its own harness. It also **cannot score
@@ -406,12 +432,16 @@ We would rather say "don't know" than be wrong, and that applies to our own docs
   citations, 100% groundedness/citation, 100% abstain-when-no-evidence. Treat the
   rates as directions, not rates you can plan against. The corpora are small and
   authored; these are demonstrations, not a benchmark suite.
-- **`bbox` never reaches `Result.sources`**, and **`acl` enforces nothing** — see
-  the capability table above.
+- **`bbox` never reaches `Result.sources`** (`SourceRef.bbox` is always `None`,
+  `answer/result.py:102`), and **neither `acl` nor `allowed_partitions` enforces
+  anything** — see the capability table above.
 
 ## Status
 
-Spec-driven via **OpenSpec**, built foundation-first. **0.10.1** is current.
+Spec-driven via **OpenSpec**, built foundation-first. The repo is at **0.11.0**
+(`python/pyproject.toml:5`, `js/package.json:3`, `rust/Cargo.toml:3`); **0.10.1**
+is the last release verified present on PyPI / npm / the Go tag, and registry
+versions are not uniform (see `CHANGELOG.md`).
 L0–L5 are shipped and L6 partially: the public client exposes `ingest()`,
 `retrieve()`, `ask()` (incl. `strategy="deep"`), `stream()`, `recall()`,
 `delete()`, `reconcile()`/`remediate()`, `evaluate(csv)`, and the typed

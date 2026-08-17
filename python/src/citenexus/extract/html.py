@@ -134,9 +134,7 @@ class HtmlExtractor(ExtractorPlugin):
                 continue
             header = tuple(rows[0])
             for row_index, row in enumerate(rows[1:]):
-                rendered = ", ".join(
-                    f"{col}: {val}" for col, val in zip(header, row, strict=False)
-                )
+                rendered = ", ".join(f"{col}: {val}" for col, val in zip(header, row, strict=False))
                 table_rows.append((header, row_index, rendered))
 
         # <figcaption> (a figure's real caption text — distinct from a vision

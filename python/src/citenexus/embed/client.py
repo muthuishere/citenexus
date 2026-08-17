@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping, Sequence
 
-from citenexus.contracts import EmbeddingProvider, Vector
+from citenexus.contracts import EmbeddingProvider, Vector, check_batch_arity
 from citenexus.embed.batcher import DEFAULT_BATCH_SIZE, embed_in_batches
 from citenexus.http import DEFAULT_TRANSPORT, Transport
 from citenexus.plugins.base import EmbeddingPlugin
@@ -75,7 +75,20 @@ class OpenAICompatibleEmbedding(EmbeddingPlugin, EmbeddingProvider):
         body = json.dumps({"model": self._model, "input": list(texts)}).encode("utf-8")
         raw = self._transport(self._endpoint, body, self._headers())
         payload = json.loads(raw)
-        return [[float(x) for x in item["embedding"]] for item in payload["data"]]
+        items = list(payload["data"])
+        # HONOUR ``index``. The OpenAI embeddings response defines ``index`` as
+        # "the index of the embedding in the list of embeddings" precisely because
+        # ``data`` is not promised in request order -- batching proxies, async
+        # workers and load balancers all reorder it. Reading positionally and
+        # discarding ``index`` silently pairs each text with another text's
+        # vector: same count, same dimensions, same scores, wrong evidence. Sort
+        # by it when every item carries one; fall back to wire order when the
+        # endpoint omits it entirely (some OpenAI-compatible servers do).
+        if all(isinstance(item.get("index"), int) for item in items):
+            items.sort(key=lambda item: int(item["index"]))
+        vectors = [[float(x) for x in item["embedding"]] for item in items]
+        check_batch_arity(len(texts), len(vectors))
+        return vectors
 
     def embed_many(self, texts: Sequence[str]) -> list[Vector]:
         """The `EmbeddingProvider` contract: every text, in order, batched.

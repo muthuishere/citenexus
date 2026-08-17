@@ -43,6 +43,7 @@ const VECTORS = loadCase<{
   unrelated: PairCase[];
   heldout_conflicts: PairCase[];
   heldout_negatives: PairCase[];
+  non_latin: PairCase[];
   near_duplicates: DuplicateCase[];
   identifier_tokenization: PairCase[];
 }>("conflict.json");
@@ -55,6 +56,7 @@ const EXPECTED_COUNTS: Record<string, number> = {
   unrelated: 22,
   heldout_conflicts: 5,
   heldout_negatives: 10,
+  non_latin: 30,
   near_duplicates: 9,
   identifier_tokenization: 2,
 };
@@ -65,6 +67,9 @@ const PAIR_BUCKETS = [
   "unrelated",
   "heldout_conflicts",
   "heldout_negatives",
+  // ADR-0011. Every non-Latin vector in this bucket scored "no conflict"
+  // while conflict ran on the frozen, ASCII-only v1 tokenizer.
+  "non_latin",
 ] as const;
 
 describe("conflict.json bucket shape", () => {
@@ -73,7 +78,7 @@ describe("conflict.json bucket shape", () => {
       Object.entries(VECTORS).map(([k, v]) => [k, (v as unknown[]).length]),
     );
     expect(sizes).toEqual(EXPECTED_COUNTS);
-    expect(Object.values(EXPECTED_COUNTS).reduce((a, b) => a + b, 0)).toBe(102);
+    expect(Object.values(EXPECTED_COUNTS).reduce((a, b) => a + b, 0)).toBe(132);
   });
 });
 

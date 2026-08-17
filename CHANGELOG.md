@@ -10,6 +10,65 @@ Dist name on PyPI is **`citenexus`** (the import package is `citenexus`; see
 
 ## [Unreleased]
 
+### Added
+
+- **Conflict detection (ADR-0007) is native in all three ports, byte-identical**
+  (`d519550`). `golang/answer/conflict.go` and `js/src/answer/conflict.ts` now
+  implement the full pairwise algorithm and near-duplicate collapse against the
+  same tier-2 tables as `python/src/citenexus/answer/conflict.py`, and both are
+  wired onto the shipped ask path (`golang/answer/askwith.go:157,164`,
+  `js/src/answer/answer.ts:97-98`). Pinned by 102 cases in
+  `conformance/cases/conflict.json` as of `070dcf4` (27 true conflicts, 27 hard
+  negatives, 22 unrelated, 5 + 10 held-out, 9 near-duplicates, 2
+  identifier-tokenization).
+  **This supersedes the "Python-only" conflict note under 0.10.1 below** — that
+  note was accurate for its release and is left unedited as history.
+
+### Docs
+
+- **Three false capability claims removed from `CLAUDE.md`, `README.md` and this
+  file.** Each was written from memory, against this repo's own rule, and each is
+  now stated with the `file:line` that disproves it:
+  - *"Isolation comes from `PartitionPath` + the `allowed_partitions`
+    pre-filter."* **False.** `filter_partitions` (`access/prefilter.py:39`) has
+    zero callers outside `access/` and its own tests; `allowed_partitions`
+    (`config/schema.py:282`) is read by nothing; `grep allowed_partition golang/
+    js/src/` is empty; retrieval does no partition or ACL filtering. The
+    isolation that is real is **physical** — one client is bound to one
+    `PartitionPath` and every storage key is prefixed with it
+    (`storage/paths.py:27-39`). One client per tenant isolates; one client
+    serving several tenants has no isolation at all.
+  - *"every graph edge carries an explicit confidence."* **False.**
+    `EdgeConfidence` (`graph/store.py:44`) is never constructed in `python/src/`,
+    `golang/` or `js/src/`; `GraphEdge.confidence` (`:66`) is always `None` and
+    the Go/JS fields always nil/null (`golang/graph/graph.go:41`).
+  - *"answer-language invariant, regenerate-on-mismatch."* **False.**
+    `answer/flow.py:308` passes `language` to the generator as an instruction;
+    the returned text's language is never verified. `grep -rni regenerat
+    python/src/` has one hit and it is a comment (`config/schema.py:264`).
+    `docs/SPEC-v6.md` still *specifies* the enforcement; the code does not
+    implement it, and the spec now says so inline.
+- **New documented gap: conflict detection is inert on non-Latin scripts, in all
+  three ports.** Through `070dcf4` all three import the frozen **v1** tokenizer,
+  documented at `tokenize.py:77` as "ASCII only, by contract". Measured on that
+  tree: `detect_conflict("The notice period is 30 days.", "…60 days.")` →
+  `rule='value', detail='30 vs 60'`; the same contradiction in Tamil or Telugu →
+  `None`, because v1 drops every non-Latin word and `MIN_CONTENT = 3` is never
+  met. Byte-identical parity was the deliverable, so the ports reproduce the
+  defect exactly. **A fix is in flight and uncommitted at the time of writing** —
+  all three ports moved to `tokenize_v2` and `conformance/cases/conflict.json`
+  gained a 22-case `non_latin` bucket (124 total) — so this entry records the
+  gap, not its closure. Whoever lands that work owns the "Fixed" entry.
+- Facade verb line citations in `CLAUDE.md` were off by one on **every** entry
+  and are corrected against `client.py` at `070dcf4`; likewise the tokenizer,
+  gate and `bbox` citations.
+- Two read-only audits added under `docs/`:
+  [`docs/PARITY-AUDIT-2026-08-17.md`](docs/PARITY-AUDIT-2026-08-17.md) (tri-port
+  capability matrix, execution-verified) and
+  [`docs/DETERMINISTIC-UTILITIES-2026-08-17.md`](docs/DETERMINISTIC-UTILITIES-2026-08-17.md)
+  (algorithm inventory, divergence audit, proposed shape). The parity audit
+  predates `d519550` and carries a staleness banner.
+
 ## [0.11.0] - 2026-08-17
 
 ### Added
@@ -224,6 +283,12 @@ trustworthy — verbatim-sourced, correctly cited, and wrong. Each is now closed
   `None`. Citations resolve to **document + page**.
 - **`acl` is carried, not enforced.** Isolation comes from `PartitionPath` plus
   the `allowed_partitions` pre-filter — not from `acl`.
+  > **Correction (2026-08-17), left in place because it is a safety claim:** the
+  > second half of that sentence was false when written. The pre-filter is not
+  > wired (`access/prefilter.py:39` has zero callers outside `access/` and its
+  > tests; `config/schema.py:282` is read by nothing). Isolation is physical —
+  > one client, one `PartitionPath`, one storage prefix — and nothing else. See
+  > `[Unreleased] → Docs`.
 - All benchmark rates above are **single live runs** against a non-deterministic
   model at temperature 0. An identical re-run moved rate metrics by one question;
   only the safety metrics (0 out-of-jurisdiction citations, 100%

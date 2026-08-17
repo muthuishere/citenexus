@@ -39,7 +39,16 @@ from citenexus.answer.tables import (
     MEASUREMENT_UNITS,
 )
 from citenexus.answer.verify import _STOPWORDS
-from citenexus.tokenize import tokenize
+
+# v2, not v1. The frozen v1 tokenizer is ASCII-only by contract
+# (``tokenize.py:77``), so every non-Latin passage collapsed to its digits alone:
+# a Tamil or Telugu contradiction produced fewer than ``MIN_CONTENT`` content
+# tokens and ``detect_conflict`` returned "no conflict" before a single rule ran.
+# A one-sided, confidently-cited answer over a corpus that contains both sides is
+# the exact failure ADR-0007 exists to prevent, so conflict runs on the
+# Unicode-aware tokenizer (ADR-0011). All 102 committed vectors are unchanged by
+# the swap — measured, not assumed.
+from citenexus.tokenize import tokenize_v2
 
 __all__ = [
     "CONFLICT_TOP_K",
@@ -105,10 +114,51 @@ CONFLICT_TOP_K = 6
 # that told them apart.
 _MEASUREMENT_RE = re.compile(r"^[0-9]+[a-z]*$")
 
+# ...and the identifier exception is ASCII, for the same reason the letter
+# boundary in ``_features`` is. ``tokenize_v2`` emits CHARACTER BIGRAMS for CJK, so
+# 「通知期間は30日です。」 tokenizes as は3 / 30 / 日, and its 60-day counterpart as
+# は6 / 60 / 日. ``_MEASUREMENT_RE`` correctly drops the bare 30 and 60, but は3
+# and は6 are letter-leading-with-digit, so the identifier exception kept BOTH in
+# the content set — a two-token divergence manufactured out of one number, which
+# is above ``MAX_RESIDUAL`` and kills the value rule that the number itself would
+# have fired. A mixed-script token carrying an ASCII digit is a tokenizer
+# artifact, never an identifier: the identifiers the exception exists for
+# ("p50", "ipv4") are ASCII by construction.
+_ASCII_DIGITS = frozenset("0123456789")
+
+
+def _is_tokenizer_digit_artifact(token: str) -> bool:
+    """True for a digit-bearing token that is not pure ASCII (a CJK bigram)."""
+    return any(c in _ASCII_DIGITS for c in token) and any(c > "\x7f" for c in token)
+
+
 # RE2-compatible: no lookaround, no backreferences, no backtracking. The
 # letter-boundary check that RE2 would need lookbehind for is done in code below,
 # precisely so this pattern ports unchanged.
 _NUMBER_RE = re.compile(r"([0-9][0-9,]*(?:\.[0-9]+)?)\s*([a-z]+|%)?")
+
+# The letter-boundary guard applied to those matches (in ``_features``) is
+# LATIN-ONLY, deliberately, and this is the one place the two facts have to be
+# held together:
+#
+# * the identifiers it protects are ASCII by construction — "p50", "p99",
+#   "ipv4", "ipv6", "sec4", "http2". The text is already lowercased where the
+#   check runs, so ``a``-``z`` covers every ASCII letter that can reach it, and
+#   the digits it guards are the ASCII ``[0-9]`` the pattern itself matched;
+# * ``str.isalpha()`` / ``unicode.IsLetter`` / ``\p{L}`` are also TRUE for kana,
+#   kanji and Han. Japanese and Chinese do not put spaces around numbers, so in
+#   「通知期間は30日です。」 the kana は sits flush against the 3, the number was
+#   discarded as an "identifier", ``numbers`` came back empty, and the value rule
+#   never ran. The SAME sentence with a non-letter separator (「通知期間: 30日」)
+#   did fire — measured. Two of the world's largest written languages were inert
+#   for the one conflict rule that is otherwise script-independent, which is
+#   exactly the one-sided-answer failure ADR-0007 exists to prevent.
+#
+# Narrowing to ASCII keeps every identifier case working (they are all ASCII)
+# and lets CJK numbers parse. It also widens the value rule to any other script
+# that writes a letter flush against a digit; that is the intended direction —
+# the guard exists to protect ASCII identifiers, not to suppress non-Latin text.
+_IDENTIFIER_PREFIX = frozenset("abcdefghijklmnopqrstuvwxyz_")
 
 _ANTONYMS: frozenset[tuple[str, str]] = frozenset(
     pair for a, b in CONFLICT_ANTONYMS for pair in ((a, b), (b, a))
@@ -118,7 +168,7 @@ _ANTONYMS: frozenset[tuple[str, str]] = frozenset(
 def _fold(token: str) -> str:
     """Fold a regular English plural / third-person -s onto its base form.
 
-    The pinned SPEC-PORTS-v1 tokenizer does **not** stem, and this does not
+    The pinned tokenizer (v2, ADR-0011) does **not** stem, and this does not
     change it: folding happens inside the comparison only, and no other gate sees
     it. Without it, morphology alone defeats the residual guard on true
     contradictions that are otherwise word-identical — "requires"/"require",
@@ -185,12 +235,12 @@ def _normalize_number(raw: str) -> str:
 
 def _features(text: str) -> _Features:
     lowered = text.lower()
-    tokens = tuple(tokenize(lowered))
+    tokens = tuple(tokenize_v2(lowered))
     numbers: set[str] = set()
     units: set[str] = set()
     for match in _NUMBER_RE.finditer(lowered):
         start = match.start(1)
-        if start > 0 and (lowered[start - 1].isalpha() or lowered[start - 1] == "_"):
+        if start > 0 and lowered[start - 1] in _IDENTIFIER_PREFIX:
             continue  # "p50", "ipv4": an identifier, not a measured value
         numbers.add(_normalize_number(match.group(1)))
         unit = match.group(2)
@@ -207,6 +257,7 @@ def _features(text: str) -> _Features:
         if token not in _STOPWORDS
         and token not in CONFLICT_NEGATIONS
         and not _MEASUREMENT_RE.match(token)
+        and not _is_tokenizer_digit_artifact(token)
     }
     reported = any(
         (tokens[i], tokens[i + 1]) in CONFLICT_REPORT_BIGRAMS for i in range(len(tokens) - 1)
@@ -283,7 +334,7 @@ def is_near_duplicate(left: str, right: str) -> str | None:
     """
     if detect_conflict(left, right) is not None:
         return None  # conflict first, always: a contradiction is never a clone
-    left_tokens, right_tokens = tokenize(left), tokenize(right)
+    left_tokens, right_tokens = tokenize_v2(left), tokenize_v2(right)
     if left_tokens == right_tokens:
         return "exact"  # covers whitespace, punctuation and case variants
     a, b = _features(left), _features(right)

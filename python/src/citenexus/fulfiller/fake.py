@@ -19,9 +19,7 @@ def _canned(request: ModelRequest) -> JsonObject:
         return {"data": [{"embedding": [0.0, float(i)]} for i in range(count)]}
     if request.kind == "rerank":
         docs = request.body.get("documents", [])
-        return {
-            "results": [{"index": i, "relevance_score": 1.0 - i} for i in range(len(docs))]
-        }
+        return {"results": [{"index": i, "relevance_score": 1.0 - i} for i in range(len(docs))]}
     # generate + vision share the chat-completion shape.
     return {"choices": [{"message": {"content": f"fake {request.kind} answer"}}]}
 

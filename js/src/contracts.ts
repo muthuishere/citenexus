@@ -208,9 +208,23 @@ export function isZeroVector(vec: readonly number[]): boolean {
  * id or "question" on the ask path). `dim` is the dimensionality established by
  * this run — 0 for the first vector, which defines it.
  *
- * Four rejections: not a vector at all; empty; inconsistent dimension; non-finite;
- * and all-zeros — the silent poison ADR-0014 names, which cosine scores as 0 with
- * no error and no flag.
+ * Five rejections, in THIS order — the order is part of the contract, not an
+ * implementation detail. A vector can fail more than one rule at once, and three
+ * ports that disagree about which error to report are three ports that disagree
+ * about the contract. It is pinned by `conformance/cases/vector_validation.json`,
+ * replayed by `python/tests/conformance/test_vector_validation_vectors.py`,
+ * `golang/contracts/vector_validation_test.go` and `contracts.vector.test.ts`.
+ *
+ *   1. not a vector at all — a payload that is not an array of numbers. Go needs
+ *      no equivalent: `[]float64` makes it unrepresentable, which is why the
+ *      conformance vector keeps these cases in their own bucket.
+ *   2. empty — unguarded it surfaces much later as a dimension error deep inside
+ *      the store, misattributed to storage rather than to the model.
+ *   3. inconsistent dimension — one run's vectors must be mutually comparable.
+ *   4. non-finite — NaN/±Inf. Every comparison with NaN is false, so ranking
+ *      comes to depend on the sort algorithm rather than on the data.
+ *   5. all-zeros — the silent poison ADR-0014 names, which cosine scores as 0
+ *      with no error and no flag.
  *
  * Lives here, not in `ingest/`, so the write path and the ask path cannot
  * diverge on what "a vector we refuse to index" means.

@@ -9,6 +9,18 @@
 > **v5 adds the sixth retrieval signal — an LLM-derived wiki/navigation layer (the "compile sources into cross-referenced pages + index, navigate then read" idea, credited to Andrej Karpathy's LLM-Wiki) — reimplemented S3/Lance-native, not filesystem-based, with a navigate-not-cite rule that resolves every wiki hit down to bbox-cited EUs. Disambiguated from graph community summaries. Adds a `lint` maintenance pass and a backend-agnostic store seam. And it reworks the public API for a DHH-style convention-over-configuration surface: `pip install` → ingest → answer in a few lines, conversation-id native, defaults that just work, depth available but never required. Bakes in the **answer-language invariant**: the answer is always returned in the query's language (enforced, regenerate-on-mismatch — not configurable away), while citations stay verbatim in the source language.**
 > **v6 consolidates the public surface to three verbs — `client` (construct, with a `signals=[...]` capability declaration), `ingest` (any input type — pdf/docx/pptx/image/txt/html/md/csv or raw plain content; sync or async), and `ask` (grounded, optionally streamed, conversation-native) — plus `evaluate(csv)` → score. The client declares which of the six signals it uses (ingest builds and ask queries only those); an optional `citenexus.validate.yaml` allow-list warns (never errors) on divergence. Language detection is now a defined method (fastText lid.176 + confidence threshold + fallback chain, §11a), not an assumption. All three verbs plus evaluate are fully audited.**
 
+> **Read the banners above as spec history, not as a status report.** They state
+> what each revision *specified*. Three of those statements are **not implemented**
+> at `070dcf4`, and each is flagged inline where it is normatively stated below:
+> the `allowed_partitions` hard pre-filter (§Core 8 — built at
+> `access/prefilter.py:39`, zero callers), the answer-language
+> regenerate-on-mismatch enforcement (§Core 4 — `answer/flow.py:308` instructs,
+> never verifies), and **async ingest** (v6 banner, "sync or async" — there is no
+> `ingest_async` in `python/`, `golang/`, `js/` or `rust/`; `ingest()` is
+> synchronous and the worker queue buys durability, not concurrency, and is not
+> reachable from the `CiteNexus` constructor). `CLAUDE.md → Known gaps` is the
+> maintained list.
+
 **Terminology:** the atomic retrievable object is the **Evidence Unit (EU)**. The system is evidence-first end to end: Evidence Units → Evidence Retrieval → Evidence Verification → Evidence Signals → provenance-chained Answer. ("Knowledge graph" keeps its industry name; EUs feed it.) The retrieval layer fuses **six signals**: embedding (dense), lexical (sparse), graph, graph-community, structure, and wiki-navigation (§10b) — all resolving to citable EUs.
 
 ---
@@ -63,7 +75,13 @@ each section. Key invariants the implementation MUST hold (do not drift from the
 3. **S3 is the source of truth; all indexes are rebuildable caches** (§2). Every artifact
    carries a `produced_by` provenance stamp; a model/plugin swap rebuilds only stale
    layers per the dependency DAG (§4c).
-4. **Answer-language invariant** (§11): the answer is returned in the **caller-stated**
+4. **Answer-language invariant** (§11) — ⚠️ **specified, NOT implemented.** There
+   is no mismatch check and no regeneration anywhere in `python/src/`:
+   `answer/flow.py:308` passes `language` to the generator as an *instruction* and
+   the returned text is never verified against it (`grep -rni regenerat
+   python/src/` → one comment, `config/schema.py:264`). The rung-resolution chain
+   below **is** implemented (`lang/fallback.py`). As specified: the answer is
+   returned in the **caller-stated**
    language, enforced by regenerate-on-mismatch; citations stay **verbatim** in the
    source language, never translated in place. *Stated precisely* — it resolves down a
    four-rung chain: explicit `answer_language="xx"` → `"auto"` (detects the language
@@ -96,6 +114,14 @@ each section. Key invariants the implementation MUST hold (do not drift from the
 8. **Physical partitioning** by a declared, variable-depth hierarchy; isolation by partition
    selection; finer authorization delegated to an external operator-managed store, consumed
    as a hard `allowed_partitions` pre-filter (§6b, §7c).
+   ⚠️ **Half implemented.** Physical partitioning is real and load-bearing —
+   every storage key is prefixed with the client's `PartitionPath`
+   (`storage/paths.py:27-39`, used at `client.py:165,545,547`,
+   `ingest/pipeline.py:128,188`). The **`allowed_partitions` pre-filter is not
+   wired**: `access/prefilter.py:39` and `access/scope.py:20` have zero callers
+   outside `access/` and its tests, `config/schema.py:282` is read by nothing,
+   and `grep allowed_partition golang/ js/src/` is empty. A single client serving
+   several tenants is therefore **not** isolated.
 
 **§11a Script Support — what "multilingual" means today.** The per-script support
 matrix below is part of §11a. A script is *supported* only where an answer in

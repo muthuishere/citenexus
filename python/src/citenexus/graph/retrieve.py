@@ -62,6 +62,13 @@ class GraphRetriever(RetrieverPlugin):
                     signal=RetrievalSignal.graph,
                     document_id=row.get("document_id"),
                     text=row.get("text"),
+                    # The VERBATIM chunk, carried like every other retriever
+                    # (0697c41). Without it this signal's candidate falls back to
+                    # the ENRICHED `text`, and because RRF keeps the highest-scoring
+                    # payload per eu_id, a graph hit can displace a vector hit that
+                    # did carry `passage` -- re-opening the blurb-as-citation hole
+                    # on the strict path too.
+                    passage=row.get("passage"),
                     page=_page(row.get("page")),
                     language=row.get("language"),
                     checksum=row.get("checksum"),

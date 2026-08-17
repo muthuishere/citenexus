@@ -164,9 +164,7 @@ class PostgresVectorStore:
         conn = self._connection()
         try:
             with conn.cursor() as cur:
-                cur.execute(
-                    f"DELETE FROM {self._table} WHERE document_id = %s", (document_id,)
-                )
+                cur.execute(f"DELETE FROM {self._table} WHERE document_id = %s", (document_id,))
             conn.commit()
         except Exception as error:
             if _is_missing_table(error):

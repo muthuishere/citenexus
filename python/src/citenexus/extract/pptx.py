@@ -70,9 +70,7 @@ class PptxExtractor(ExtractorPlugin):
                     if blob:
                         image_bytes[image_id] = blob
                 if shape.has_table:
-                    rows = [
-                        [cell.text.strip() for cell in row.cells] for row in shape.table.rows
-                    ]
+                    rows = [[cell.text.strip() for cell in row.cells] for row in shape.table.rows]
                     if len(rows) < 2:
                         continue
                     header = tuple(rows[0])

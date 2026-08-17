@@ -58,6 +58,7 @@ package contracts
 import (
 	"errors"
 	"fmt"
+	"math"
 )
 
 // Vector is one dense embedding. Named so the contracts read as intent rather
@@ -193,13 +194,29 @@ func IsZeroVector(vec []float64) bool {
 // id or "question" on the ask path). dim is the dimensionality already
 // established by this run — 0 for the first vector, which defines it.
 //
-// Three rejections:
+// Four rejections, in THIS order — the order is part of the contract, not an
+// implementation detail. A vector can fail more than one rule at once, and three
+// ports that disagree about which error to report are three ports that disagree
+// about the contract. It is pinned by conformance/cases/vector_validation.json,
+// which python/tests/conformance/test_vector_validation_vectors.py,
+// contracts/vector_validation_test.go and js/src/contracts.vector.test.ts all
+// replay.
 //
 //   - empty/nil — no vector at all; unguarded it surfaces later as a dimension
 //     mismatch deep inside the store, misattributed to storage rather than the model.
 //   - wrong dimension — one run's vectors must be mutually comparable.
+//   - non-finite — NaN and ±Inf. Every comparison with NaN is false, so it does
+//     not merely score badly: it makes the RANKING depend on the sort algorithm
+//     rather than on the data, and the corpus ranks differently on different runs
+//     with nothing reporting a fault. This rejection was MISSING here while JS
+//     had it (js/src/contracts.ts), so the two "byte-identical" ports disagreed
+//     about what a valid vector is. Added to close that divergence.
 //   - all zeros — the silent poison ADR-0014 names. Cosine against it does not
 //     fail, it just ranks meaninglessly.
+//
+// Go needs no "not a vector at all" rejection: []float64 makes it
+// unrepresentable. Python and JS, both dynamically typed, carry one — which is
+// why the conformance vector keeps those cases in their own bucket.
 func CheckVector(label string, vec []float64, dim int) error {
 	if len(vec) == 0 {
 		return fmt.Errorf("embedder returned an empty vector for %s", label)
@@ -207,6 +224,11 @@ func CheckVector(label string, vec []float64, dim int) error {
 	if dim > 0 && len(vec) != dim {
 		return fmt.Errorf(
 			"embedder returned a %d-dim vector for %s; this run is %d-dim", len(vec), label, dim)
+	}
+	for _, v := range vec {
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			return fmt.Errorf("embedder returned a non-finite vector for %s", label)
+		}
 	}
 	if IsZeroVector(vec) {
 		return fmt.Errorf(

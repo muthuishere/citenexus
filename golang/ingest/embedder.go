@@ -56,15 +56,17 @@ func isZeroVector(vec []float64) bool { return contracts.IsZeroVector(vec) }
 // must not poison the corpus.
 //
 // dim is the dimensionality already established by this ingest run (0 for the
-// first vector, which defines it). Three rejections:
+// first vector, which defines it). Four rejections, in this pinned order:
 //
 //   - empty/nil — no vector at all; unguarded it becomes a dimension mismatch
 //     deep inside the store, misattributed to storage rather than to the model.
 //   - wrong dimension — the run's vectors must be mutually comparable.
+//   - non-finite — NaN/±Inf, which make ranking depend on the sort algorithm
+//     rather than on the data.
 //   - all zeros — the silent poison ADR-0014 names. Cosine against it does not
 //     raise, it just ranks meaninglessly.
 //
-// The three rejections themselves live in contracts.CheckVector so the ingest
+// The four rejections themselves live in contracts.CheckVector so the ingest
 // write path and the ask path cannot diverge on what "a vector we refuse to
 // index" means; ingest only adds its own prefix to the message.
 func checkVector(euID string, vec []float64, dim int) error {

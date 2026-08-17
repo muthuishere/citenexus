@@ -44,7 +44,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/muthuishere/citenexus/golang/gate"
@@ -61,6 +60,32 @@ import (
 // 200 ms" vs "The p99 latency budget is 900 ms"), because the digit filter ate
 // the one word that told them apart.
 var measurementRE = regexp.MustCompile(`^[0-9]+[a-z]*$`)
+
+// isTokenizerDigitArtifact mirrors Python's _is_tokenizer_digit_artifact: a
+// digit-bearing token that is not pure ASCII.
+//
+// The identifier exception above is ASCII, for the same reason the letter
+// boundary below is. tokenize.TokenizeV2 emits CHARACTER BIGRAMS for CJK, so
+// 「通知期間は30日です。」 tokenizes as は3 / 30 / 日, and its 60-day counterpart as
+// は6 / 60 / 日. measurementRE correctly drops the bare 30 and 60, but は3 and は6
+// are letter-leading-with-digit, so the identifier exception kept BOTH in the
+// content set — a two-token divergence manufactured out of one number, which is
+// above MaxResidual and kills the value rule that the number itself would have
+// fired. A mixed-script token carrying an ASCII digit is a tokenizer artifact,
+// never an identifier: the identifiers the exception exists for ("p50", "ipv4")
+// are ASCII by construction.
+func isTokenizerDigitArtifact(token string) bool {
+	hasDigit, hasNonASCII := false, false
+	for _, r := range token {
+		if r >= '0' && r <= '9' {
+			hasDigit = true
+		}
+		if r > 0x7f {
+			hasNonASCII = true
+		}
+	}
+	return hasDigit && hasNonASCII
+}
 
 // pythonSpace is Python's re \s for str, spelled out.
 //
@@ -81,6 +106,32 @@ const pythonSpace = `\x{09}-\x{0d}\x{1c}-\x{20}\x{85}\x{a0}\x{1680}\x{2000}-\x{2
 // need lookbehind for is done in CODE below, precisely so this pattern stays
 // backtracking-free.
 var numberRE = regexp.MustCompile(`([0-9][0-9,]*(?:\.[0-9]+)?)[` + pythonSpace + `]*([a-z]+|%)?`)
+
+// isIdentifierPrefix mirrors Python's `_IDENTIFIER_PREFIX`. The letter-boundary
+// guard is LATIN-ONLY, deliberately, and this is the one place the two facts
+// have to be held together:
+//
+//   - the identifiers it protects are ASCII by construction — "p50", "p99",
+//     "ipv4", "ipv6", "sec4", "http2". The text is already lowercased where the
+//     check runs, so a–z covers every ASCII letter that can reach it, and the
+//     digits it guards are the ASCII [0-9] the pattern itself matched;
+//   - unicode.IsLetter (like Python's str.isalpha and JS's \p{L}) is also TRUE
+//     for kana, kanji and Han. Japanese and Chinese do not put spaces around
+//     numbers, so in 「通知期間は30日です。」 the kana は sits flush against the 3,
+//     the number was discarded as an "identifier", numbers came back empty, and
+//     the value rule never ran. The SAME sentence with a non-letter separator
+//     (「通知期間: 30日」) did fire — measured. Two of the world's largest written
+//     languages were inert for the one conflict rule that is otherwise
+//     script-independent, which is exactly the one-sided-answer failure ADR-0007
+//     exists to prevent.
+//
+// Narrowing to ASCII keeps every identifier case working (they are all ASCII)
+// and lets CJK numbers parse. It also widens the value rule to any other script
+// that writes a letter flush against a digit; that is the intended direction —
+// the guard exists to protect ASCII identifiers, not to suppress non-Latin text.
+func isIdentifierPrefix(r rune) bool {
+	return (r >= 'a' && r <= 'z') || r == '_'
+}
 
 // ConflictFinding is why two passages were judged to disagree. It never says
 // which one is right.
@@ -137,7 +188,7 @@ func loadFolded() {
 // foldConflictToken folds a regular English plural / third-person -s onto its
 // base form.
 //
-// The pinned SPEC-PORTS-v1 tokenizer does NOT stem, and this does not change it:
+// The pinned tokenizer (v2, ADR-0011) does NOT stem, and this does not change it:
 // folding happens inside the comparison only, and no other gate sees it. Without
 // it, morphology alone defeats the residual guard on true contradictions that
 // are otherwise word-identical — "requires"/"require", "conserves"/"conserve",
@@ -184,7 +235,7 @@ func normalizeConflictNumber(raw string) string {
 func conflictFeaturesOf(text string) conflictFeatures {
 	loadFolded()
 	lowered := strings.ToLower(text)
-	tokens := tokenize.Tokenize(lowered)
+	tokens := tokenize.TokenizeV2(lowered)
 
 	numbers := map[string]struct{}{}
 	units := map[string]struct{}{}
@@ -192,7 +243,7 @@ func conflictFeaturesOf(text string) conflictFeatures {
 		start := m[2] // group 1 start
 		if start > 0 {
 			prev, _ := utf8.DecodeLastRuneInString(lowered[:start])
-			if unicode.IsLetter(prev) || prev == '_' {
+			if isIdentifierPrefix(prev) {
 				continue // "p50", "ipv4": an identifier, not a measured value
 			}
 		}
@@ -226,6 +277,9 @@ func conflictFeaturesOf(text string) conflictFeatures {
 			continue
 		}
 		if measurementRE.MatchString(token) {
+			continue
+		}
+		if isTokenizerDigitArtifact(token) {
 			continue
 		}
 		content[foldConflictToken(token)] = struct{}{}
@@ -348,7 +402,7 @@ func IsNearDuplicate(left, right string) (string, bool) {
 		// conflict first, always: a contradiction is never a clone
 		return "", false
 	}
-	leftTokens, rightTokens := tokenize.Tokenize(left), tokenize.Tokenize(right)
+	leftTokens, rightTokens := tokenize.TokenizeV2(left), tokenize.TokenizeV2(right)
 	if slicesEqual(leftTokens, rightTokens) {
 		return "exact", true // covers whitespace, punctuation and case variants
 	}

@@ -13,7 +13,7 @@ import (
 // surfacing (ADR-0010 tier 1: native in Python, Go and JS, byte-identical).
 // python/tests/answer/test_conflict_conformance.py holds the reference to
 // exactly this file; this holds the Go port to it, reading the committed JSON as
-// opaque data and asserting every one of its 102 vectors — verdict AND rule
+// opaque data and asserting every one of its 132 vectors — verdict AND rule
 // name.
 
 type conflictVector struct {
@@ -32,6 +32,9 @@ var conflictPairBuckets = []string{
 	"unrelated",
 	"heldout_conflicts",
 	"heldout_negatives",
+	// ADR-0011. Every non-Latin vector in this bucket scored "no conflict"
+	// while conflict ran on the frozen, ASCII-only v1 tokenizer.
+	"non_latin",
 }
 
 // expectedConflictCounts pins the bucket sizes. A vector silently dropped from a
@@ -42,6 +45,7 @@ var expectedConflictCounts = map[string]int{
 	"unrelated":               22,
 	"heldout_conflicts":       5,
 	"heldout_negatives":       10,
+	"non_latin":               30,
 	"near_duplicates":         9,
 	"identifier_tokenization": 2,
 }
@@ -69,8 +73,8 @@ func TestConflictVectorBucketNamesAndSizes(t *testing.T) {
 		}
 		total += want
 	}
-	if total != 102 {
-		t.Fatalf("pinned bucket sizes sum to %d, want 102", total)
+	if total != 132 {
+		t.Fatalf("pinned bucket sizes sum to %d, want 132", total)
 	}
 }
 
@@ -167,8 +171,9 @@ func TestConflictFoldIsOneRuleNotAStemmer(t *testing.T) {
 	}
 }
 
-// TestConflictUnicodeSpaceBetweenNumberAndUnit is the one behaviour NO
-// conformance vector covers, because all 102 use an ASCII space.
+// TestConflictUnicodeSpaceBetweenNumberAndUnit sweeps the Unicode spaces. One
+// NBSP vector now ships in the non_latin bucket; every other vector uses an
+// ASCII space, and the narrow/thin/ideographic spellings are covered only here.
 //
 // Python's `\s` (and JavaScript's) is Unicode-aware; Go's RE2 `\s` is
 // [\t\n\f\r ] and nothing else. A non-breaking or narrow no-break space between

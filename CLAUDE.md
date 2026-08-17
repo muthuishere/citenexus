@@ -51,31 +51,51 @@ it** — a CLI, an Action, a dashboard are thin surfaces *on top of* the library
 
 - **At parity.** Tokenizer v2, BM25, RRF, the chunker, and the ADR-0009
   faithfulness predicate are pinned byte-for-byte in Python, Go and JS, over the
-  **same 14 scripts** (`python/src/citenexus/tokenize.py:214-231`,
-  `golang/tokenize/scripts.json`, `js/src/gen/tables.ts:141-155`,
+  **same 14 scripts** (`python/src/citenexus/tokenize.py:226-243`,
+  `golang/tokenize/scripts.json`, `js/src/gen/tables.ts:142-156`,
   `conformance/cases/tokenize_v2.json:3`). Since 0.10.1 the ports' `ask` path
-  genuinely calls v2 (`golang/answer/askwith.go:167`, `js/src/answer/answer.ts:94,247`);
-  the frozen v1 predicate has zero non-test callers.
+  genuinely calls v2 (`golang/answer/askwith.go:189`,
+  `js/src/answer/answer.ts:201,363`); the frozen v1 predicate has zero non-test
+  callers (`grep 'IsSupported('` / `'isSupported('` outside the declaration and
+  tests returns nothing).
+- **Conflict detection is also at parity, since `d519550`.** ADR-0007 is native
+  in all three ports — `python/src/citenexus/answer/conflict.py`,
+  `golang/answer/conflict.go`, `js/src/answer/conflict.ts` — and wired onto the
+  shipped ask path (`golang/answer/askwith.go:157,164`,
+  `js/src/answer/answer.ts:97-98`), pinned by the **102** cases in
+  `conformance/cases/conflict.json` at `070dcf4` (27 true conflicts, 27 hard
+  negatives, 22 unrelated, 5+10 held-out, 9 near-duplicates, 2
+  identifier-tokenization; an uncommitted change adds a 22-case `non_latin`
+  bucket → 124 — count the file, don't quote this number).
+  The old "the ports set `Conflicts: []string{}` and nothing more" line was true
+  through 0.11.0 and is now wrong — do not restate it.
 - **Predicate-only, though.** `SplitClaims` / `splitClaims` *exist* in both ports
-  (`golang/answer/segment.go:144`, `js/src/answer/segment.ts:107`) but have **zero
-  non-test callers** — the ports gate the whole answer string as one claim
-  (`askwith.go:194`). So atomic-claim decomposition and drop-not-fail are
-  effectively Python-only: a port answer passes or refuses **whole**, never trimmed.
-- **Python-only, full stop.** Conflict detection (the ports set
-  `Conflicts: []string{}` and nothing more), the authority policy (ports carry
-  `authority_tier` / `authority_floor_applied` for wire parity, no selection
-  logic), the reranker, and the `search_languages` fan-out.
+  (`golang/answer/segment.go:144`, `js/src/answer/segment.ts:107`) but still have
+  **zero non-test callers** (re-checked at `070dcf4`) — the ports gate the whole
+  answer string as one claim (`golang/answer/askwith.go:189`, single-element
+  `Claims` at `:238`; `js/src/answer/answer.ts:219,381`). So atomic-claim
+  decomposition and drop-not-fail are effectively Python-only: a port answer
+  passes or refuses **whole**, never trimmed.
+- **Python-only, full stop.** The authority policy (ports carry `authority_tier` /
+  `authority_floor_applied` for wire parity, no selection logic), the reranker,
+  and the `search_languages` fan-out (`grep search_languages golang/ js/src/` is
+  empty).
 
 **Is not:**
 - **Not a code-comprehension product.** Structural code and schema *intake* does
-  ship (`rag.code.ingest_from(...)`, `rag.schema`, `client.py:481,494`) — source
-  becomes citable Evidence Units and every graph edge carries an **explicit
-  confidence** (`graph/store.py`) rather than being asserted. What stays out is
-  the *product*: repo chat, call-graph analytics, IDE surfaces, god-nodes.
+  ship (`rag.code.ingest_from(...)`, `rag.schema`, `client.py:482,495`) — source
+  becomes citable Evidence Units. What stays out is the *product*: repo chat,
+  call-graph analytics, IDE surfaces, god-nodes.
   *Background (2026-07-11):* a spike showed tree-sitter's name-based call
-  resolution produced ~3× more guessed than reliable edges — which is why edges
-  are labelled, not trusted, and why precise call-graph analytics belongs to a
-  separate product that *consumes* CiteNexus.
+  resolution produced ~3× more guessed than reliable edges — which is why precise
+  call-graph analytics belongs to a separate product that *consumes* CiteNexus.
+  **The edge-confidence label this section used to lean on does not exist yet.**
+  `EdgeConfidence` is declared (`graph/store.py:44`) and `GraphEdge.confidence`
+  defaults to `None` (`:66`), but `grep 'EdgeConfidence\.'` over `python/src/`,
+  `golang/` and `js/src/` returns **nothing** — no producer ever sets it, and
+  `graph/distill.py:161-165` (the path `rag.code` rebuilds through) sets
+  `relation=` only. Every shipped edge carries `None`. Go and JS are the same
+  (`golang/graph/graph.go:41` `Confidence *string`, always nil). See "Known gaps".
 - **Not a memory / "brain."** That moved out to its own Go repo (`../brain`);
   CiteNexus stays pure RAG.
 - **Not a model host.** No bundled embedding / LLM / reranker / vision — all
@@ -105,7 +125,7 @@ Worked examples:
 |---|---|---|---|
 | New extractor (audio→transcript, epub, xlsx) | ✅ artifact | ✅ citable | **in** |
 | Better fusion / reranker / new eval metric | ✅ grounding | ✅ | **in** |
-| Structural code/schema intake, edges labelled with confidence | ✅ artifact | ✅ confidence, not assertion | **in** (shipped: `rag.code`, `rag.schema`) |
+| Structural code/schema intake, edges labelled with confidence | ✅ artifact | ⚠️ the label is **not populated** (`graph/store.py:44,66`) — gate 2 was passed on a promise, not a fact | **in, but the rationale is outstanding** (shipped: `rag.code`, `rag.schema`) |
 | Call-graph analytics / god-nodes asserted as fact | ✅ artifact | ❌ guessed edges | **out** |
 | CLI / dashboard / agent skill / MCP UX | ❌ a surface | — | **out** |
 | "Chat with your repo" app, graphify competitor | ❌ product | — | **out** |
@@ -118,8 +138,12 @@ Worked examples:
   Every capability is one change: `/opsx:propose` → write delta-spec + tasks →
   implement → `/opsx:apply` → `/opsx:archive` (folds the delta into the living
   spec under `openspec/specs/`). OpenSpec owns the spec system — we do **not**
-  run a second `docs/specs/` flow alongside it. `docs/` holds only `SPEC-v6.md`
-  + ADRs. **How to run it so context stays cheap (commit + `/clear` at every
+  run a second `docs/specs/` flow alongside it. `docs/` holds `SPEC-v6.md`, the
+  ADRs, and **dated point-in-time audits** (`CONTENT-COVERAGE-*.md`,
+  `PARITY-AUDIT-2026-08-17.md`, `DETERMINISTIC-UTILITIES-2026-08-17.md`) — an
+  audit is a snapshot of one tree, carries its commit SHA in its header, and is
+  never the living answer: this file and the ADRs are.
+  **How to run it so context stays cheap (commit + `/clear` at every
   phase boundary): [`docs/OPENSPEC-WORKFLOW.md`](docs/OPENSPEC-WORKFLOW.md).**
 - **Test-driven, genuinely.** Red → green → refactor per change. Spec tables are
   fixtures: the §4c rebuild matrix, §9 vision decision table, and §11a language
@@ -235,11 +259,13 @@ abstain-when-no-evidence). Never quote a rate from these without that caveat.
 
 Each L is one or more OpenSpec changes, built test-first, then archived.
 
-**Status: L0–L5 shipped; L6 partially.** Released **0.10.1** (2026-08-17) to PyPI
-`citenexus`, npm `@muthuishere/citenexus`, and Go `golang/v0.10.1`. The
-`citenexus-core` crate on crates.io is **behind** the repo (0.5.0 vs 0.10.1) and
-npm `@muthuishere/citenexus-core` is at 0.8.0 — don't claim one version across
-every registry. Shipped since the plan below was written: ADR-0004 authority
+**Status: L0–L5 shipped; L6 partially.** The repo is at **0.11.0**
+(`python/pyproject.toml:5`, `js/package.json:3`, `rust/Cargo.toml:3`); the last
+release verified against PyPI / npm / the Go tag was **0.10.1** (2026-08-17). The
+`citenexus-core` crate on crates.io was at 0.5.0 and npm
+`@muthuishere/citenexus-core` at 0.8.0 when last checked — **don't claim one
+version across every registry, and don't claim 0.11.0 is published until you have
+checked the registry.** Shipped since the plan below was written: ADR-0004 authority
 floor, ADR-0007 conflict surfacing, ADR-0008 corpus reconciliation + the revoke
 fix, ADR-0009 per-claim faithfulness, ADR-0011 Unicode tokenizer, ADR-0013
 `search_languages` fan-out, ADR-0014 the transport seam, `rag.code`/`rag.schema`,
@@ -260,7 +286,7 @@ and the deep-ask agentic loop (`strategy="deep"`).
   (durable queue, retry/backoff, DLQ, idempotent-by-hash, resume) ·
   `telemetry-cost` (one event stream, two views) · `access-prefilter`
   (scope→partitions, `allowed_partitions` hard pre-filter, `acl` carried-not-
-  enforced) · **`smoke-e2e`** (stub ingest→vector→ask over fakes, kept green by
+  enforced — **built but never wired; see "Known gaps"**) · **`smoke-e2e`** (stub ingest→vector→ask over fakes, kept green by
   every later layer — the mitigation for foundation-first drift risk).
 - **L3 — Ingest & extraction:** `ingest-pipeline` (universal intake:
   files/prefix/raw, sync+async, signal-gated, idempotent) · `extractors`
@@ -274,12 +300,18 @@ and the deep-ask agentic loop (`strategy="deep"`).
   down-to-EU invariant).
 - **L5 — Answer, verify, eval (the guarantee):** `answer-flow-strict` (temp-0
   grounded, per-claim faithfulness gate, cite-or-abstain, structured signals,
-  conflict surfacing, **answer-language invariant** regenerate-on-mismatch,
-  citations verbatim) · `evaluate-and-judge` (`evaluate(csv)` front door +
+  conflict surfacing, answer-language **instruction**, citations verbatim) ·
+  `evaluate-and-judge` (`evaluate(csv)` front door +
   groundedness/citation/refusal/per-language metrics + append-only audit + offline
   judge baseline). ✅ shipped — the gate is now ADR-0009's ordered, gap-bounded,
   polarity-guarded predicate per **atomic claim** with drop-not-fail
-  (`answer/verify.py:221`, `answer/segment.py:57`, `answer/flow.py:299-313`).
+  (`answer/verify.py:221`, `answer/segment.py:57`, `answer/flow.py:307-313`).
+  **Correction:** this line used to claim an "answer-language invariant,
+  regenerate-on-mismatch". There is no such check. `flow.py:308` passes
+  `language` to `self._generator.answer(...)` — an *instruction* — and the
+  returned text's language is never verified; `grep -rni regenerat python/src/`
+  has exactly one hit and it is a comment (`config/schema.py:264`). SPEC-v6 §Core
+  4 still specifies the enforcement; the code does not implement it.
 - **L6 — v0.2/v0.3 breadth (later):** graph (extractor/resolve/lance/traverse/
   Leiden community) · wiki (distill/index/store/lint, navigate-not-cite) ·
   streaming (token / sentence-gated) · conversation memory (partition/acl-scoped)
@@ -307,13 +339,15 @@ and resume, with a non-sleeping executor. It is wired into `IngestPipeline`
 (`ingest/pipeline.py:231-237`) but **not reachable from the `CiteNexus`
 constructor** — there is no `queue=` parameter (`client.py:117-152`).
 
-Facade verbs actually on the client (`client.py`): `ingest` :432, `code` :481,
-`schema` :494, `delete` :512, `retrieve` :635, `ask` :659, `stream` :850,
-`evaluate` :883, `reconcile` :887, `remediate` :915, `recall` :944.
+Facade verbs actually on the client (`client.py`, re-checked at `070dcf4` — the
+previous list was off by one on every entry): `ingest` :433, `code` :482,
+`schema` :495, `delete` :513, `retrieve` :636, `ask` :660, `stream` :851,
+`evaluate` :884, `reconcile` :888, `remediate` :916, `recall` :945.
 `ask()` also takes `strategy=` ("strict" | "deep") and `search_languages=`
-(default `("en",)`, `client.py:107`). `retrieve()` (documents only) is the public
-engine under `ask()` — the eval surface and the small-model escape hatch.
-`ask()`/`stream()`/`evaluate()` **raise** without a generator (`client.py:934`);
+(default `(Language.ENGLISH,)`, `DEFAULT_SEARCH_LANGUAGES` at `client.py:108`).
+`retrieve()` (documents only) is the public engine under `ask()` — the eval
+surface and the small-model escape hatch. `ask()`/`stream()`/`evaluate()`
+**raise** without a generator (`_require_answer`, `client.py:935-941`);
 `retrieve()` works without one.
 
 ## Known gaps — state these, never quietly drop them
@@ -329,18 +363,64 @@ engine under `ask()` — the eval surface and the small-model escape hatch.
   and conflict's `MAX_RESIDUAL = 1` (`answer/conflict.py:84`) were swept on
   **synthetic, single-sentence, English** fixtures and never re-measured on a live
   non-English corpus.
+- **Conflict detection was INERT on non-Latin scripts in all three ports — and is
+  being fixed in the working tree as this is written (2026-08-17). Verify before
+  you rely on either state.**
+  - **At committed `070dcf4`:** `answer/conflict.py` imported the **v1**
+    tokenizer, which `tokenize.py:77` documents as "ASCII only, by contract", and
+    Go and JS imported the same v1 tokenizer because byte-identical parity with
+    Python was the deliverable. Measured on that tree:
+    `detect_conflict("The notice period is 30 days.", "…60 days.")` →
+    `ConflictFinding(rule='value', detail='30 vs 60')`; the identical
+    contradiction in Tamil or Telugu → `None`. v1 drops every non-Latin word
+    (`tokenize("அறிவிப்பு காலம் 30 நாட்கள்.")` → `['30']`), so `MIN_CONTENT = 3`
+    fails before any rule can run. It failed **silently** — a caller could not
+    tell "no conflict" from "could not look".
+  - **In the uncommitted working tree:** all three ports have moved to v2
+    (`python/src/citenexus/answer/conflict.py:51` `tokenize_v2`,
+    `golang/answer/conflict.go:187,351` `tokenize.TokenizeV2`,
+    `js/src/answer/conflict.ts:55` `tokenizeV2`), and
+    `conformance/cases/conflict.json` gained a **`non_latin` bucket of 22 cases**
+    (124 total, up from 102). Re-measured on that tree: the Tamil and Telugu
+    contradictions now both return `rule='value', detail='30 vs 60'`.
+  - **Do not write either state into a released doc without re-checking `git
+    log`.** The fix is another agent's in-flight work; it is not committed and its
+    cross-port conformance run is not this agent's to certify.
+- **No graph edge carries a confidence.** `EdgeConfidence` (`graph/store.py:44`)
+  is never constructed anywhere in `python/src/`, `golang/` or `js/src/`;
+  `GraphEdge.confidence` (`:66`) is always `None` and the Go/JS fields are always
+  nil/null (`golang/graph/graph.go:41`). `graph/distill.py:161-165` sets
+  `relation=` only. Until a producer populates it, the "labelled, not asserted"
+  justification for admitting `rag.code` / `rag.schema` into the core is a
+  **design intent, not a shipped property**.
+- **There is no `allowed_partitions` enforcement, in any port.**
+  `filter_partitions` (`access/prefilter.py:39`) and `resolve_scope`
+  (`access/scope.py:20`) have **zero callers outside `access/` and its own
+  tests**; `allowed_partitions` exists only as a config field
+  (`config/schema.py:282`) that nothing reads; `grep allowed_partition golang/
+  js/src/` is empty; `python/src/citenexus/retrieve/` does no partition or ACL
+  filtering at all. What *does* isolate is **physical, by construction**: one
+  client is bound to one `PartitionPath` and every key it touches is prefixed
+  with it (`storage/paths.py:27-39`, used at `client.py:165,545,547`,
+  `ingest/pipeline.py:128,188`), so a client for partition P cannot read
+  partition Q's LanceDB directory or Postgres table. **A single client serving
+  several tenants has no isolation whatsoever** — the pre-filter that was
+  supposed to provide it is inert. Never document `acl` *or* `allowed_partitions`
+  as tenant isolation; document one-client-per-partition.
+- **`acl` is carried, not enforced.** It is threaded from `ingest(acl=…)`
+  (`client.py:440`) onto `EvidenceUnit.acl` (`evidence/unit.py:91`) and read by
+  nothing; `grep -i acl golang/ js/src/` is empty, so the ports do not even carry
+  it.
 - **`evaluate()` does not fan out over `search_languages`.** It calls
-  `Evaluator(self.ask)` with a one-arg callable (`client.py:883-885`,
-  `evaluate.py:74`), so the `("en",)` default always applies — which is why the
+  `Evaluator(self.ask)` with a one-arg callable (`client.py:884-886`,
+  `evaluate.py:72`), so the `("en",)` default always applies — which is why the
   multilingual example's `library_evaluate` disagrees with its own harness.
 - **`evaluate()` cannot score abstention.** A blank `expected` earns
-  expected-support **iff the row was answered** (`evaluate.py:76-77`). To gate on
+  expected-support **iff the row was answered** (`evaluate.py:76-78`). To gate on
   must-refuse rows, drive `ask()` and assert `Decision.refused`.
 - **`bbox` is captured at extraction but never reaches `Result.sources`.**
   `grep 'bbox=' python/src/citenexus/answer/` is empty; `SourceRef.bbox` is
-  always `None` (`answer/result.py:101`). Cite to **document + page**, not bbox.
-- **`acl` is carried, not enforced.** Isolation comes from `PartitionPath` +
-  the `allowed_partitions` pre-filter. Never document `acl` as tenant isolation.
+  always `None` (`answer/result.py:102`). Cite to **document + page**, not bbox.
 
 ## Open decisions
 

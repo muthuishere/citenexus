@@ -66,9 +66,7 @@ def to_markdown(doc: ExtractedDoc) -> str:
             header = block.structure_path
             run: list[ExtractedBlock] = []
             while (
-                i < n
-                and blocks[i].kind is BlockKind.table
-                and blocks[i].structure_path == header
+                i < n and blocks[i].kind is BlockKind.table and blocks[i].structure_path == header
             ):
                 run.append(blocks[i])
                 i += 1

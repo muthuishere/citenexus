@@ -19,6 +19,7 @@ from collections.abc import Sequence
 from typing import TypeVar
 
 from citenexus.answer.decision import LoopDecision
+from citenexus.contracts import is_zero_vector as _is_zero_vector
 from citenexus.tokenize import tokenize, tokenize_v2
 
 T = TypeVar("T")
@@ -34,16 +35,17 @@ __all__ = [
 ]
 
 
-def is_zero_vector(vec: Sequence[float]) -> bool:
-    """Is ``vec`` the all-zeros vector — i.e. an embedding that carries no signal?
-
-    Cosine similarity against a zero vector does not raise; it just ranks
-    meaninglessly. A retrieval test built on one therefore *passes or fails at
-    random while appearing to measure something*. Exposed so any test that
-    embeds non-English text can assert the vector is real before drawing a
-    conclusion from its rank.
-    """
-    return all(v == 0.0 for v in vec)
+#: Is ``vec`` the all-zeros vector — i.e. an embedding that carries no signal?
+#:
+#: An ALIAS of ``citenexus.contracts.is_zero_vector``, not a second definition.
+#: This function used to live here, in ``testing/``, which is where a real
+#: write-path guard sat misfiled as a test helper — and is a large part of why
+#: the shipped Python write path had no vector guard at all while Go and JS both
+#: did. It has been promoted to ``contracts``, beside ``check_vector``, so the
+#: fakes, the write path and the ask path share ONE definition and the two
+#: cannot drift apart. Kept importable from here: 0.x policy is
+#: deprecated-not-removed for anything with a public appearance.
+is_zero_vector = _is_zero_vector
 
 
 class FakeEmbedding:

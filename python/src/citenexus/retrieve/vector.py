@@ -11,7 +11,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from citenexus.contracts import EmbeddingProvider, SingleTextEmbedder, embed_one
+from citenexus.contracts import (
+    EmbeddingProvider,
+    SingleTextEmbedder,
+    check_vector,
+    embed_one,
+)
 from citenexus.plugins.base import RetrieverPlugin
 from citenexus.retrieve.types import Candidate, RetrievalSignal
 
@@ -51,7 +56,15 @@ class VectorRetriever(RetrieverPlugin):
 
     def retrieve(self, query: str, k: int) -> list[Candidate]:
         # A single text is a batch of one — the contract has no second method.
-        vector = embed_one(self._embedder, query)
+        # The query vector is held to the SAME definition of a valid embedding as
+        # an indexed one (contracts.check_vector, pinned by
+        # conformance/cases/vector_validation.json). A degenerate query vector is
+        # not a smaller problem than a degenerate stored one: cosine against the
+        # origin, or against NaN, does not raise — it ranks meaninglessly and
+        # returns a confident, well-cited answer built on an arbitrary passage.
+        # dim=0 because a query defines its own run: there is nothing here that
+        # knows the index's dimensionality.
+        vector = check_vector("question", embed_one(self._embedder, query), 0)
         hits = self._store.search(vector, limit=k)
         candidates: list[Candidate] = []
         for hit in hits:

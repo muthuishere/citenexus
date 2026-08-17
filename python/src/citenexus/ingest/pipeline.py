@@ -13,6 +13,7 @@ from citenexus.contracts import (
     EmbeddingProvider,
     SingleTextEmbedder,
     VisionProvider,
+    check_batch,
     embed_texts,
 )
 from citenexus.domain.authority import encode_authority_meta
@@ -200,7 +201,9 @@ class IngestPipeline:
         # embedding/text signal → embed + upsert into the leaf vector store.
         if Signal.embedding in self._signals or Signal.text in self._signals:
             started = time.perf_counter()
-            vectors = self._embed_texts([eu.text for eu in units])
+            vectors = self._embed_texts(
+                [eu.text for eu in units], labels=[eu.eu_id for eu in units]
+            )
             rows = [
                 {
                     "eu_id": eu.eu_id,
@@ -399,19 +402,31 @@ class IngestPipeline:
         except Exception:
             return None
 
-    def _embed_texts(self, texts: list[str]) -> list[list[float]]:
+    def _embed_texts(self, texts: list[str], labels: list[str]) -> list[list[float]]:
         """All EU vectors — one batched call when the provider offers the contract.
 
         Batching is chosen by ``isinstance(embedder, EmbeddingProvider)``, not by
         probing for an attribute name: ADR-0014's point is that a capability found
         by ``getattr`` is one no provider knows to offer.
 
+        Every returned vector is then run through ``check_batch`` — the same
+        definition of "a valid embedding batch" that Go's ``ingest`` loop and JS's
+        ``ingest()`` enforce, pinned by
+        ``conformance/cases/vector_validation.json``. Failure is FAIL-CLOSED: the
+        error propagates before any row is upserted, because a corpus missing one
+        unit is indistinguishable at retrieval time from a corpus that never
+        contained that sentence. ``labels`` carries the ``eu_id``s so the error
+        names the offending unit rather than the run.
+
         With no embedder at all, rows still need a vector column, so each EU gets
-        the placeholder that is never searched.
+        the placeholder that is never searched. The placeholder is deliberately
+        NOT validated: it is a known, documented, single-dimension zero that the
+        library writes itself and never scores, not something a provider handed
+        us claiming to be an embedding.
         """
         if self._embedder is None:
             return [list(_PLACEHOLDER_VECTOR) for _ in texts]
-        return embed_texts(self._embedder, texts)
+        return check_batch(labels, embed_texts(self._embedder, texts))
 
     def _detect_language(self, doc: Any) -> str:
         text = " ".join(block.text for block in doc.blocks)[:2000]

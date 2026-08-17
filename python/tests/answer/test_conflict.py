@@ -267,6 +267,143 @@ DUPLICATE_CASES: list[tuple[str, str, str, bool]] = [
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Non-Latin scripts (ADR-0011).
+#
+# Until conflict moved off the frozen v1 tokenizer, 21 of the 22 pairs below
+# produced `None` — v1 is ASCII-only by contract, so a Tamil sentence tokenized
+# to `['30']` alone, `MIN_CONTENT` failed, and detection returned "no conflict"
+# before a single rule ran. (The trailing NBSP vector is Latin script and always
+# worked; it is here because no vector covered non-ASCII whitespace.)
+#
+# A corpus holding both a filing and its restatement therefore produced a
+# confident, correctly-cited, ONE-SIDED answer with conflicts_detected=0.
+#
+# What this set pins is deliberately UNEVEN, because the truth is uneven:
+#
+#   * the VALUE rule is script-independent once tokenization works — it compares
+#     digits and units, not words — so it fires in all four scripts here,
+#     Japanese subject to the digit-adjacency caveat below;
+#   * the NEGATION and ANTONYM rules are backed by ENGLISH WORDLISTS
+#     (`conformance/conflict.json` → `languages: ["en"]`), so they do NOT fire
+#     outside Latin script and no tokenizer change can make them. The
+#     `english-table` vectors below pin that gap as a KNOWN MISS rather than
+#     leaving it undocumented; closing it means adding per-language polarity
+#     tables, which is a specification decision, not a port fix.
+#   * a digit written flush against a letter used to be read as an IDENTIFIER,
+#     not a value ("p50"), because `str.isalpha()` / `unicode.IsLetter` / `\p{L}`
+#     are TRUE for kana, kanji and Han. In spaceless scripts that cost ALL the
+#     recall: 「通知期間は30日」 has a kana directly before the 3, so Japanese and
+#     Chinese were inert for the one rule that is otherwise script-independent.
+#     Both guards involved are now ASCII-scoped — the identifiers they protect
+#     ("p50", "ipv4") are ASCII by construction — and the flush cases are pinned
+#     alongside their hard negatives in both scripts;
+#   * FULL-WIDTH digits (U+FF10-U+FF19) are still missed, in both scripts,
+#     and are pinned as such. `_NUMBER_RE` matches ASCII [0-9] on the RAW string
+#     while tokenize_v2 NFKC-normalises internally.
+#
+# The negatives are the load-bearing half, as everywhere else in this file: a
+# detector that only ever says "conflict" is as useless as one that never does.
+#
+#: (domain, label, a, b, expected rule or None)
+NonLatinCase = tuple[str, str, str, str, str | None]
+
+NON_LATIN: list[NonLatinCase] = [
+    # ── Tamil ──
+    ("legal-ta", "value",
+     "அறிவிப்பு காலம் 30 நாட்கள் ஆகும்.",
+     "அறிவிப்பு காலம் 60 நாட்கள் ஆகும்.", "value"),
+    ("finance-ta", "value percent",
+     "வட்டி விகிதம் 5 சதவீதம் ஆகும்.",
+     "வட்டி விகிதம் 9 சதவீதம் ஆகும்.", "value"),
+    ("legal-ta", "english-table: negation does not fire in tamil",
+     "ஊழியர் ரகசியத் தகவலை வெளியிடலாம்.",
+     "ஊழியர் ரகசியத் தகவலை வெளியிடக் கூடாது.", None),
+    ("legal-ta", "english-table: antonym does not fire in tamil",
+     "மண்டல விலக்கு சபையால் அங்கீகரிக்கப்பட்டது.",
+     "மண்டல விலக்கு சபையால் நிராகரிக்கப்பட்டது.", None),
+    ("legal-ta", "hard negative: different subject, same shape",
+     "அறிவிப்பு காலம் 30 நாட்கள் ஆகும்.",
+     "வாடகை தொகை 60 ரூபாய் ஆகும்.", None),
+    ("legal-ta", "hard negative: added scope qualifier",
+     "அறிவிப்பு காலம் 30 நாட்கள் ஆகும்.",
+     "முதல் ஆண்டில் அறிவிப்பு காலம் 60 நாட்கள் ஆகும்.", None),
+    # ── Telugu ──
+    ("legal-te", "value",
+     "నోటీసు వ్యవధి 30 రోజులు ఉంటుంది.",
+     "నోటీసు వ్యవధి 60 రోజులు ఉంటుంది.", "value"),
+    ("finance-te", "value millions",
+     "బాధ్యత పరిమితి 5 మిలియన్లు.",
+     "బాధ్యత పరిమితి 2 మిలియన్లు.", "value"),
+    ("legal-te", "english-table: negation does not fire in telugu",
+     "మధ్యవర్తిత్వం అవసరం.",
+     "మధ్యవర్తిత్వం అవసరం లేదు.", None),
+    ("legal-te", "hard negative: different subject, same shape",
+     "నోటీసు వ్యవధి 30 రోజులు ఉంటుంది.",
+     "అద్దె మొత్తం 60 రూపాయలు ఉంటుంది.", None),
+    ("legal-te", "hard negative: added scope qualifier",
+     "నోటీసు వ్యవధి 30 రోజులు ఉంటుంది.",
+     "మొదటి సంవత్సరంలో నోటీసు వ్యవధి 60 రోజులు ఉంటుంది.", None),
+    # ── Japanese (spaceless: bigram-segmented, digit adjacency matters) ──
+    ("legal-ja", "value, number separated by punctuation",
+     "通知期間: 30日", "通知期間: 60日", "value"),
+    # The flush-digit case, and the reason this bucket exists at all. Japanese
+    # does not put spaces around numbers, so the kana は sits directly against
+    # the 3. TWO Unicode-blind guards conspired to make that inert, and both are
+    # now ASCII-scoped: the letter-boundary guard discarded the number as an
+    # "identifier" (は is `\p{L}`), and the identifier exception in the content
+    # filter kept the bigrams は3 and は6 as two divergent content tokens
+    # manufactured out of one number. Recorded as a KNOWN MISS until then.
+    ("legal-ja", "value, kana flush against the digit",
+     "通知期間は30日です。", "通知期間は60日です。", "value"),
+    ("legal-ja", "hard negative: flush digit, different subject",
+     "通知期間は30日です。", "賃料は60円です。", None),
+    ("legal-ja", "hard negative: flush digit, added scope qualifier",
+     "通知期間は30日です。", "初年度の通知期間は60日です。", None),
+    # Full-width digits remain a KNOWN MISS, pinned both flush and separated.
+    # `_NUMBER_RE` runs on the RAW lowercased string and matches ASCII [0-9],
+    # while tokenize_v2 NFKC-normalises internally — so a full-width 30 reaches the token
+    # stream as "30" but never reaches `numbers` at all. Fixing it means folding
+    # the number path too; NFKC in general is not offset-preserving and turns
+    # ² into 2 and ㎎ into mg, so it is a separate, separately-measured change.
+    ("legal-ja", "KNOWN MISS: full-width digits are not matched by the number pattern",
+     "通知期間: ３０日", "通知期間: ６０日", None),
+    ("legal-ja", "KNOWN MISS: full-width digits, kana flush against the digit",
+     "通知期間は３０日です。", "通知期間は６０日です。", None),
+    ("legal-ja", "hard negative: different subject, same shape",
+     "通知期間: 30日", "賃料: 60円", None),
+    ("legal-ja", "hard negative: added scope qualifier",
+     "通知期間: 30日", "初年度の通知期間: 60日", None),
+    # ── Chinese (spaceless, no kana: every character is `\p{L}` Han) ──
+    ("legal-zh", "value, character flush against the digit",
+     "通知期限是30天。", "通知期限是60天。", "value"),
+    ("finance-zh", "value percent, flush against the digit",
+     "年利率是5%。", "年利率是9%。", "value"),
+    ("legal-zh", "hard negative: different subject, same shape",
+     "通知期限是30天。", "租金是60元。", None),
+    ("legal-zh", "hard negative: added scope qualifier",
+     "通知期限是30天。", "第一年的通知期限是60天。", None),
+    ("legal-zh", "KNOWN MISS: full-width digits are not matched by the number pattern",
+     "通知期限是３０天。", "通知期限是６０天。", None),
+    # ── Arabic (right-to-left, Latin digits) ──
+    ("legal-ar", "value",
+     "مدة الإشعار هي 30 يوما.", "مدة الإشعار هي 60 يوما.", "value"),
+    ("finance-ar", "value millions",
+     "حد المسؤولية هو 5 ملايين.", "حد المسؤولية هو 2 ملايين.", "value"),
+    ("legal-ar", "english-table: negation does not fire in arabic",
+     "التحكيم مطلوب في هذه الاتفاقية.",
+     "التحكيم غير مطلوب في هذه الاتفاقية.", None),
+    ("legal-ar", "hard negative: different subject, same shape",
+     "مدة الإشعار هي 30 يوما.", "مبلغ الإيجار هو 60 جنيها.", None),
+    ("legal-ar", "hard negative: added scope qualifier",
+     "مدة الإشعار هي 30 يوما.", "في السنة الأولى مدة الإشعار هي 60 يوما.", None),
+    # ── Latin script, non-ASCII whitespace: the case no vector covered ──
+    ("medical", "non-breaking space between value and unit",
+     "The maximum daily dose for adult patients is 12\u00a0mg.",
+     "The maximum daily dose for adult patients is 30\u00a0mg.", "value"),
+]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # The measurement that decides the design
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -298,6 +435,56 @@ def test_true_conflicts_are_detected(
     domain: str, label: str, left: str, right: str
 ) -> None:
     assert detect_conflict(left, right) is not None, f"{domain}/{label}"
+
+
+@pytest.mark.parametrize(("domain", "label", "left", "right", "rule"), NON_LATIN)
+def test_non_latin_scripts(
+    domain: str, label: str, left: str, right: str, rule: str | None
+) -> None:
+    """Verdict AND rule, asserted from intent — never echoed from the detector.
+
+    Every non-Latin vector here returned ``None`` while conflict ran on the
+    frozen, ASCII-only v1 tokenizer.
+    """
+    finding = detect_conflict(left, right)
+    assert (finding.rule if finding else None) == rule, f"{domain}/{label}: got {finding}"
+    swapped = detect_conflict(right, left)
+    assert (swapped is not None) is (rule is not None), f"{domain}/{label}: asymmetric"
+
+
+def test_non_latin_set_discriminates() -> None:
+    """The set must contain both verdicts, or it proves nothing.
+
+    A detector that always says "conflict" is as useless as one that never does,
+    so the non-Latin bucket is only evidence if it carries real declines too.
+    """
+    fires = [c for c in NON_LATIN if c[4] is not None]
+    declines = [c for c in NON_LATIN if c[4] is None]
+    assert len(fires) >= 6, "too few positives to show the tokenizer fix works"
+    assert len(declines) >= 6, "too few negatives to show the detector still declines"
+    assert {c[0].rsplit("-", 1)[-1] for c in NON_LATIN} >= {"ta", "te", "ja", "zh", "ar"}
+    # The spaceless scripts carry their OWN positives AND their own negatives.
+    # A flush-digit fix that only ever fired would be a false-abstention engine.
+    for script in ("ja", "zh"):
+        rows = [c for c in NON_LATIN if c[0].endswith(script)]
+        assert any(c[4] is not None for c in rows), f"{script}: no positive"
+        assert any(c[4] is None and "KNOWN MISS" not in c[1] for c in rows), (
+            f"{script}: no real hard negative"
+        )
+
+
+def test_non_latin_polarity_rules_are_english_only() -> None:
+    """Negation and antonym are ENGLISH wordlists, and no tokenizer fixes that.
+
+    ``conformance/conflict.json`` declares ``languages: ["en"]``. The vectors
+    labelled ``english-table`` are true contradictions that the detector cannot
+    see, recorded as a known miss rather than papered over with invented table
+    entries. Closing it means per-language polarity tables — a specification
+    decision, not a port fix.
+    """
+    english_table = [c for c in NON_LATIN if c[1].startswith("english-table")]
+    assert len(english_table) == 4
+    assert all(detect_conflict(c[2], c[3]) is None for c in english_table)
 
 
 def test_heldout_recall_is_recorded_not_asserted_perfect() -> None:

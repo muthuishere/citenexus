@@ -737,6 +737,248 @@
       "rule": null
     }
   ],
+  "non_latin": [
+    {
+      "domain": "legal-ta",
+      "label": "value",
+      "left": "அறிவிப்பு காலம் 30 நாட்கள் ஆகும்.",
+      "right": "அறிவிப்பு காலம் 60 நாட்கள் ஆகும்.",
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "finance-ta",
+      "label": "value percent",
+      "left": "வட்டி விகிதம் 5 சதவீதம் ஆகும்.",
+      "right": "வட்டி விகிதம் 9 சதவீதம் ஆகும்.",
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "legal-ta",
+      "label": "english-table: negation does not fire in tamil",
+      "left": "ஊழியர் ரகசியத் தகவலை வெளியிடலாம்.",
+      "right": "ஊழியர் ரகசியத் தகவலை வெளியிடக் கூடாது.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal-ta",
+      "label": "english-table: antonym does not fire in tamil",
+      "left": "மண்டல விலக்கு சபையால் அங்கீகரிக்கப்பட்டது.",
+      "right": "மண்டல விலக்கு சபையால் நிராகரிக்கப்பட்டது.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal-ta",
+      "label": "hard negative: different subject, same shape",
+      "left": "அறிவிப்பு காலம் 30 நாட்கள் ஆகும்.",
+      "right": "வாடகை தொகை 60 ரூபாய் ஆகும்.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal-ta",
+      "label": "hard negative: added scope qualifier",
+      "left": "அறிவிப்பு காலம் 30 நாட்கள் ஆகும்.",
+      "right": "முதல் ஆண்டில் அறிவிப்பு காலம் 60 நாட்கள் ஆகும்.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal-te",
+      "label": "value",
+      "left": "నోటీసు వ్యవధి 30 రోజులు ఉంటుంది.",
+      "right": "నోటీసు వ్యవధి 60 రోజులు ఉంటుంది.",
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "finance-te",
+      "label": "value millions",
+      "left": "బాధ్యత పరిమితి 5 మిలియన్లు.",
+      "right": "బాధ్యత పరిమితి 2 మిలియన్లు.",
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "legal-te",
+      "label": "english-table: negation does not fire in telugu",
+      "left": "మధ్యవర్తిత్వం అవసరం.",
+      "right": "మధ్యవర్తిత్వం అవసరం లేదు.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal-te",
+      "label": "hard negative: different subject, same shape",
+      "left": "నోటీసు వ్యవధి 30 రోజులు ఉంటుంది.",
+      "right": "అద్దె మొత్తం 60 రూపాయలు ఉంటుంది.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal-te",
+      "label": "hard negative: added scope qualifier",
+      "left": "నోటీసు వ్యవధి 30 రోజులు ఉంటుంది.",
+      "right": "మొదటి సంవత్సరంలో నోటీసు వ్యవధి 60 రోజులు ఉంటుంది.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal-ja",
+      "label": "value, number separated by punctuation",
+      "left": "通知期間: 30日",
+      "right": "通知期間: 60日",
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "legal-ja",
+      "label": "value, kana flush against the digit",
+      "left": "通知期間は30日です。",
+      "right": "通知期間は60日です。",
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "legal-ja",
+      "label": "hard negative: flush digit, different subject",
+      "left": "通知期間は30日です。",
+      "right": "賃料は60円です。",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal-ja",
+      "label": "hard negative: flush digit, added scope qualifier",
+      "left": "通知期間は30日です。",
+      "right": "初年度の通知期間は60日です。",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal-ja",
+      "label": "KNOWN MISS: full-width digits are not matched by the number pattern",
+      "left": "通知期間: ３０日",
+      "right": "通知期間: ６０日",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal-ja",
+      "label": "KNOWN MISS: full-width digits, kana flush against the digit",
+      "left": "通知期間は３０日です。",
+      "right": "通知期間は６０日です。",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal-ja",
+      "label": "hard negative: different subject, same shape",
+      "left": "通知期間: 30日",
+      "right": "賃料: 60円",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal-ja",
+      "label": "hard negative: added scope qualifier",
+      "left": "通知期間: 30日",
+      "right": "初年度の通知期間: 60日",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal-zh",
+      "label": "value, character flush against the digit",
+      "left": "通知期限是30天。",
+      "right": "通知期限是60天。",
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "finance-zh",
+      "label": "value percent, flush against the digit",
+      "left": "年利率是5%。",
+      "right": "年利率是9%。",
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "legal-zh",
+      "label": "hard negative: different subject, same shape",
+      "left": "通知期限是30天。",
+      "right": "租金是60元。",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal-zh",
+      "label": "hard negative: added scope qualifier",
+      "left": "通知期限是30天。",
+      "right": "第一年的通知期限是60天。",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal-zh",
+      "label": "KNOWN MISS: full-width digits are not matched by the number pattern",
+      "left": "通知期限是３０天。",
+      "right": "通知期限是６０天。",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal-ar",
+      "label": "value",
+      "left": "مدة الإشعار هي 30 يوما.",
+      "right": "مدة الإشعار هي 60 يوما.",
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "finance-ar",
+      "label": "value millions",
+      "left": "حد المسؤولية هو 5 ملايين.",
+      "right": "حد المسؤولية هو 2 ملايين.",
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "legal-ar",
+      "label": "english-table: negation does not fire in arabic",
+      "left": "التحكيم مطلوب في هذه الاتفاقية.",
+      "right": "التحكيم غير مطلوب في هذه الاتفاقية.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal-ar",
+      "label": "hard negative: different subject, same shape",
+      "left": "مدة الإشعار هي 30 يوما.",
+      "right": "مبلغ الإيجار هو 60 جنيها.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal-ar",
+      "label": "hard negative: added scope qualifier",
+      "left": "مدة الإشعار هي 30 يوما.",
+      "right": "في السنة الأولى مدة الإشعار هي 60 يوما.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "medical",
+      "label": "non-breaking space between value and unit",
+      "left": "The maximum daily dose for adult patients is 12 mg.",
+      "right": "The maximum daily dose for adult patients is 30 mg.",
+      "conflict": true,
+      "rule": "value"
+    }
+  ],
   "near_duplicates": [
     {
       "label": "exact duplicate",
