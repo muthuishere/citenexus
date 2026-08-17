@@ -32,6 +32,14 @@ import {
   TrustMode,
   type Result,
 } from "../result/result.js";
+// ADR-0007 conflict surfacing, native per port (ADR-0010 tier 1).
+import {
+  CONFLICT_TOP_K,
+  collapseNearDuplicates,
+  describeConflicts,
+  findConflicts,
+  type ConflictPair,
+} from "./conflict.js";
 
 /** One document in the corpus to index and search. */
 export interface CorpusDoc {
@@ -42,6 +50,12 @@ export interface CorpusDoc {
 /** The pinned refusal string (§7); identical across every port. */
 export const REFUSAL_ANSWER = "I can't answer that from the available evidence.";
 
+/** The pinned ADR-0007 conflict abstention (`answer/flow.py:463`). A DIFFERENT
+ *  string from `REFUSAL_ANSWER` on purpose: "the evidence isn't there" and
+ *  "the evidence contradicts itself" are different findings, and collapsing
+ *  them would hide the one the caller can actually act on. */
+export const CONFLICT_REFUSAL_ANSWER = "The available evidence disagrees, so I can't answer that.";
+
 interface Row {
   euId: string;
   documentId: string;
@@ -50,14 +64,98 @@ interface Row {
   order: number;
 }
 
-function refuse(): Result {
+function refuse(conflictsDetected = 0): Result {
   return result({
     answer: REFUSAL_ANSWER,
     answerLanguage: "en",
     mode: TrustMode.strict,
-    evidence: evidenceSignals({ decision: Decision.refused }),
+    evidence: evidenceSignals({ decision: Decision.refused, conflictsDetected }),
     missingEvidence: ["no sufficiently relevant evidence found"],
   });
+}
+
+/** What ADR-0007 asks of one post-fusion candidate set. Both questions come
+ *  from the SAME pairwise comparison, and conflict is asked first: a one-word
+ *  change is a duplicate only when that word is neither a value nor a polarity
+ *  marker, and collapsing a contradiction into a corroboration is the worst
+ *  outcome this can produce. */
+interface ConflictContext {
+  /** The first CONFLICT_TOP_K candidates — the pairwise comparison window, and
+   *  the index space every `ConflictPair` refers to. */
+  window: Row[];
+  pairs: ConflictPair[];
+  /** Candidates left after surface-clone collapse. Feeds the corroboration
+   *  signals only: clones ingested under different document ids are one piece
+   *  of evidence, not N. */
+  independent: Row[];
+}
+
+function conflictContext(grounded: readonly Row[]): ConflictContext {
+  const window = grounded.slice(0, CONFLICT_TOP_K);
+  return {
+    window,
+    pairs: findConflicts(window.map((row) => row.text)),
+    independent: collapseNearDuplicates(grounded.map((row) => row.text)).map(
+      (i) => grounded[i] as Row,
+    ),
+  };
+}
+
+/**
+ * Strict-mode abstention that cites BOTH sides of the disagreement.
+ *
+ * A refusal that hides the evidence is only marginally better than a confident
+ * pick: the caller cannot check the library's reasoning or resolve the conflict
+ * themselves. Both passages are returned as sources, verbatim, and neither is
+ * named the winner.
+ */
+function conflictAbstention(
+  ctx: ConflictContext,
+  touching: readonly ConflictPair[],
+  answerLanguage: string,
+): Result {
+  const cited = [];
+  const seen = new Set<string>();
+  for (const pair of touching) {
+    for (const candidate of [ctx.window[pair.left] as Row, ctx.window[pair.right] as Row]) {
+      if (seen.has(candidate.euId)) continue;
+      seen.add(candidate.euId);
+      cited.push(
+        sourceRef({
+          document: candidate.documentId,
+          passage: candidate.text,
+          passageLanguage: answerLanguage,
+        }),
+      );
+    }
+  }
+  return result({
+    answer: CONFLICT_REFUSAL_ANSWER,
+    answerLanguage,
+    mode: TrustMode.strict,
+    evidence: evidenceSignals({
+      decision: Decision.refused,
+      supportingSources: ctx.independent.length,
+      distinctDocuments: new Set(ctx.independent.map((row) => row.documentId)).size,
+      conflictsDetected: ctx.pairs.length,
+      languagesInEvidence: [answerLanguage],
+    }),
+    sources: cited,
+    conflicts: describeConflicts(
+      touching,
+      ctx.window.map((row) => row.documentId),
+    ),
+    missingEvidence: ["cited sources disagree and the conflict is unresolved"],
+  });
+}
+
+/** Pairs whose two sides include the passage we are about to cite. An
+ *  unresolved conflict touching the answer's own claim is not answerable in
+ *  strict mode: the honest output is "these sources disagree, here are both",
+ *  not a coin flip on rank order. This can only ever produce MORE abstention,
+ *  so it cannot admit an ungrounded claim. */
+function touchingPairs(pairs: readonly ConflictPair[], topIndex: number): ConflictPair[] {
+  return pairs.filter((pair) => pair.left === topIndex || pair.right === topIndex);
 }
 
 /**
@@ -88,21 +186,34 @@ export function ask(corpus: readonly CorpusDoc[], question: string, topK = 5): R
   const grounded = ranked.filter((row) => hasRelevanceOverlapV2(question, row.text));
   if (grounded.length === 0) return refuse();
 
+  // Conflict detection runs over the grounded candidates, before anything is
+  // generated (ADR-0007). It reports and never resolves: picking a winner by
+  // rank, recency or score is a policy decision belonging to the caller and to
+  // authority (ADR-0004), and rank order deciding which of two contradictory
+  // truths the caller sees is the defect this closes.
+  const ctx = conflictContext(grounded);
+
   const top = grounded[0]!;
+  const topIndex = 0;
   const passage = top.text;
   const answer = llm.answer(question, passage);
-  if (!isSupportedV2(answer, passage)) return refuse(); // cite-or-drop: never ungrounded
+  // cite-or-drop: never ungrounded
+  if (!isSupportedV2(answer, passage)) return refuse(ctx.pairs.length);
 
-  const distinctDocuments = new Set(grounded.map((row) => row.documentId)).size;
+  const touching = touchingPairs(ctx.pairs, topIndex);
+  if (touching.length > 0) return conflictAbstention(ctx, touching, "en");
+
+  const distinctDocuments = new Set(ctx.independent.map((row) => row.documentId)).size;
   return result({
     answer,
     answerLanguage: "en",
     mode: TrustMode.strict,
     evidence: evidenceSignals({
       decision: Decision.answered,
-      supportingSources: grounded.length,
+      supportingSources: ctx.independent.length,
       distinctDocuments,
       allClaimsVerified: true,
+      conflictsDetected: ctx.pairs.length,
       languagesInEvidence: ["en"],
     }),
     claims: [claim({ claim: answer, supported: true, sources: [top.euId] })],
@@ -237,25 +348,34 @@ export async function askWith(
   const grounded = ranked.filter((row) => hasRelevanceOverlapV2(question, row.text));
   if (grounded.length === 0) return refuse();
 
+  // ADR-0007, exactly as in `ask` above — the conflict check does not soften
+  // because the caller supplied the model.
+  const ctx = conflictContext(grounded);
+
   const top = grounded[0]!;
+  const topIndex = 0;
   const passage = top.text;
   const answer = await generator.answer(question, passage, ANSWER_LANGUAGE);
 
   // The faithfulness gate runs on injected output exactly as it runs on the
   // fake's — this gate is the product, and it does not soften because the caller
   // supplied the model.
-  if (!isSupportedV2(answer, passage)) return refuse();
+  if (!isSupportedV2(answer, passage)) return refuse(ctx.pairs.length);
 
-  const distinctDocuments = new Set(grounded.map((row) => row.documentId)).size;
+  const touching = touchingPairs(ctx.pairs, topIndex);
+  if (touching.length > 0) return conflictAbstention(ctx, touching, ANSWER_LANGUAGE);
+
+  const distinctDocuments = new Set(ctx.independent.map((row) => row.documentId)).size;
   return result({
     answer,
     answerLanguage: ANSWER_LANGUAGE,
     mode: TrustMode.strict,
     evidence: evidenceSignals({
       decision: Decision.answered,
-      supportingSources: grounded.length,
+      supportingSources: ctx.independent.length,
       distinctDocuments,
       allClaimsVerified: true,
+      conflictsDetected: ctx.pairs.length,
       languagesInEvidence: [ANSWER_LANGUAGE],
     }),
     claims: [claim({ claim: answer, supported: true, sources: [top.euId] })],

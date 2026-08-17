@@ -57,6 +57,11 @@ tasks:
       - task: typecheck
       - task: test
 
+  gen:conflict-tables:
+    desc: Regenerate the per-port ADR-0007 conflict tables from conformance/conflict.json
+    cmds:
+      - uv run python scripts/gen_conflict_tables.py
+
   build:
     desc: Build the wheel + sdist
     cmds:

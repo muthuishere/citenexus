@@ -30,6 +30,10 @@ export * from "./result/result.js";
 export * from "./answer/answer.js";
 // ADR-0009 guarded claim segmentation (tier-1 scanner over a tier-2 table).
 export * from "./answer/segment.js";
+// ADR-0007 conflict surfacing + near-duplicate collapse (tier-1 set arithmetic
+// over the tier-2 tables in gen/conflict_tables.ts). Pure ESM, no native
+// dependency: it runs unchanged in a browser or a Cloudflare Worker.
+export * from "./answer/conflict.js";
 export * from "./graph/graph.js";
 export * from "./structure/structure.js";
 export * from "./fakes/fakes.js";

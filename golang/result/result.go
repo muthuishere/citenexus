@@ -13,6 +13,14 @@ package result
 // cannot ground an answer (§7).
 const RefusalAnswer = "I can't answer that from the available evidence."
 
+// ConflictRefusalAnswer is the pinned strict-mode abstention emitted when the
+// cited evidence CONTRADICTS itself (ADR-0007). It is a different refusal from
+// RefusalAnswer on purpose: "the evidence isn't there" and "the evidence is
+// there and it disagrees with itself" are different findings, and collapsing
+// them would hide the second. Byte-identical to the Python reference
+// (citenexus.answer.flow._conflict_abstention).
+const ConflictRefusalAnswer = "The available evidence disagrees, so I can't answer that."
+
 // Decision is the outcome recorded on the evidence signals.
 type Decision string
 

@@ -43,6 +43,16 @@ func loadStopwords() map[string]struct{} {
 	return stopwords
 }
 
+// IsStopword reports whether token is in the pinned SPEC-PORTS-v1 §10 stopword
+// set. Exported so ADR-0007 conflict detection can filter on the RAW token
+// without keeping a second copy of the list: the conflict rules need membership,
+// not a tokenized set, and two copies of a pinned table is exactly how a port
+// drifts.
+func IsStopword(token string) bool {
+	_, ok := loadStopwords()[token]
+	return ok
+}
+
 // ContentTokens returns the meaning-bearing token set: tokenize(text) minus the
 // pinned stopword set. Used by the relevance gate.
 func ContentTokens(text string) map[string]struct{} {

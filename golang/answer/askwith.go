@@ -144,7 +144,29 @@ func AskWith(corpus []Doc, question string, topK int, providers Providers) (resu
 		return result.Refused(result.TrustModeStrict), nil
 	}
 
+	// Conflict detection runs over the grounded candidates, BEFORE anything is
+	// generated (ADR-0007), exactly as the Python reference does in
+	// answer/flow.py. It reports and never resolves: picking a winner by rank,
+	// recency or score is a policy decision belonging to the caller and to
+	// authority (ADR-0004), and rank order deciding which of two contradictory
+	// truths the caller sees is the defect this closes.
+	window := grounded
+	if k := ConflictTopK(); k < len(window) {
+		window = window[:k]
+	}
+	conflictPairs := FindConflicts(textsOf(window))
+
+	// Near-duplicate collapse feeds the corroboration signals only. The same
+	// pairwise comparison that finds "same subject, opposite polarity" finds
+	// "same subject, same text" — clones ingested under different document ids —
+	// and those are one piece of evidence, not N.
+	independent := make([]row, 0, len(grounded))
+	for _, i := range CollapseNearDuplicates(textsOf(grounded)) {
+		independent = append(independent, grounded[i])
+	}
+
 	top := grounded[0]
+	const topIndex = 0 // this port generates from the first grounded candidate only
 	passage := top.text
 	ans, err := generator.Answer(question, passage, answerLanguage)
 	if err != nil {
@@ -165,7 +187,29 @@ func AskWith(corpus []Doc, question string, topK int, providers Providers) (resu
 	// marker. gate.IsSupported stays exported and frozen for the conformance
 	// vectors; it is no longer what stands between a caller and a lie.
 	if !gate.IsSupportedV2(ans, passage) {
-		return result.Refused(result.TrustModeStrict), nil
+		refusal := result.Refused(result.TrustModeStrict)
+		// The gate owns this refusal, but the conflict count is a signal about
+		// the evidence pool and it was already computed. Python carries it onto
+		// the same refusal (flow.py's gate-failure Result).
+		refusal.Evidence.ConflictsDetected = len(conflictPairs)
+		return refusal, nil
+	}
+
+	// TrustMode coupling. An unresolved conflict touching the answer's own claim
+	// — one whose two sides include the passage we are about to cite — is not
+	// answerable in strict mode: the honest output is "these sources disagree,
+	// here are both", not a coin flip on rank order. This can only ever produce
+	// MORE abstention, so it cannot admit an ungrounded claim. Go is strict-only,
+	// so unlike Python there is no normal/exploratory branch that surfaces the
+	// conflict alongside an answer.
+	touching := make([]ConflictPair, 0, len(conflictPairs))
+	for _, pair := range conflictPairs {
+		if pair.Left == topIndex || pair.Right == topIndex {
+			touching = append(touching, pair)
+		}
+	}
+	if len(touching) > 0 {
+		return conflictAbstention(window, touching, len(conflictPairs), independent), nil
 	}
 
 	distinct := make(map[string]struct{}, len(grounded))
@@ -195,6 +239,74 @@ func AskWith(corpus []Doc, question string, topK int, providers Providers) (resu
 		Conflicts:       []string{},
 		Provenance:      []result.ProvenanceEntry{},
 	}, nil
+}
+
+// textsOf is the citable text of each row, in order. The Python reference
+// compares `citable_text` — the VERBATIM chunk — never the contextualized text;
+// this port has no contextual-retrieval layer, so row.text IS the verbatim
+// chunk.
+func textsOf(rows []row) []string {
+	out := make([]string, len(rows))
+	for i, r := range rows {
+		out[i] = r.text
+	}
+	return out
+}
+
+// conflictAbstention is the strict-mode abstention that CITES BOTH SIDES of the
+// disagreement.
+//
+// A refusal that hides the evidence is only marginally better than a confident
+// pick: the caller cannot check the library's reasoning or resolve the conflict
+// themselves. Both passages are returned as sources, verbatim.
+func conflictAbstention(window []row, touching []ConflictPair, totalConflicts int, independent []row) result.Result {
+	documents := make([]string, len(window))
+	for i, r := range window {
+		documents[i] = r.documentID
+	}
+
+	cited := []result.SourceRef{}
+	seen := map[string]struct{}{}
+	for _, pair := range touching {
+		for _, r := range [2]row{window[pair.Left], window[pair.Right]} {
+			if _, ok := seen[r.euID]; ok {
+				continue
+			}
+			seen[r.euID] = struct{}{}
+			cited = append(cited, result.SourceRef{
+				Document:        r.documentID,
+				Passage:         r.text,
+				PassageLanguage: answerLanguage,
+			})
+		}
+	}
+
+	distinct := map[string]struct{}{}
+	for _, r := range independent {
+		distinct[r.documentID] = struct{}{}
+	}
+
+	return result.Result{
+		Answer:         result.ConflictRefusalAnswer,
+		AnswerLanguage: answerLanguage,
+		Mode:           result.TrustModeStrict,
+		Evidence: result.EvidenceSignals{
+			Decision:          result.DecisionRefused,
+			SupportingSources: len(independent),
+			DistinctDocuments: len(distinct),
+			// RetrievalScoreSpread stays 0: this port's answered path does not
+			// populate it either, and inventing a number on one path only would
+			// make the two disagree about what the field means.
+			ConflictsDetected:   totalConflicts,
+			LanguagesInEvidence: []string{answerLanguage},
+			UnsupportedScripts:  []string{},
+		},
+		Claims:          []result.Claim{},
+		Sources:         cited,
+		MissingEvidence: []string{"cited sources disagree and the conflict is unresolved"},
+		Conflicts:       DescribeConflicts(touching, documents),
+		Provenance:      []result.ProvenanceEntry{},
+	}
 }
 
 // dot is the cosine of two already-L2-normalized vectors, guarded against a
