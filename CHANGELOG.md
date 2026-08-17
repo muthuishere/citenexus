@@ -10,6 +10,42 @@ Dist name on PyPI is **`citenexus`** (the import package is `citenexus`; see
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-08-17
+
+Patch for a regression in 0.10.0: **the headline safety fix was not active in the
+Go and JavaScript ports.**
+
+### Fixed
+
+- **The Go and JS `ask` paths still ran the frozen v1 faithfulness predicate.**
+  Python's flow used `is_supported_v2`; `golang/answer/askwith.go` and
+  `js/src/answer/answer.ts` called `IsSupported`/`isSupported` — set containment,
+  the predicate that accepted **9 of 9** adversarial false answers. `IsSupportedV2`
+  existed in both ports with zero callers on the answer path. 0.10.0 shipped to
+  three registries claiming a fix that two of three ports did not have. If you are
+  on 0.10.0 and use the Go or JavaScript `Ask`/`ask`, **upgrade**.
+- **The ports refused every non-Latin question**, regardless of evidence. v1
+  containment runs over the v1 ASCII tokenizer, so on the ask path both the
+  relevance gate and the containment gate tokenized non-Latin text to the empty
+  set — `isSupported(passage, passage)` was false for a verbatim quote of itself.
+  Over-determined, not degraded.
+- **`js/src/index.ts` never re-exported the model clients**, so the documented
+  `import { OpenAIEmbedder } from "@muthuishere/citenexus"` was an ImportError.
+
+### Changed
+
+- The cross-language stress probes now drive the **flow** (`Ask`/`askWith`), not
+  the predicate. They previously called the function directly and reported 0/9
+  while the shipped path emitted 9/9 — a probe that passes while the product is
+  broken. They now exit non-zero on a hole or a blind control.
+
+### Known
+
+- Port parity is **predicate-only**. Neither port has `split_claims`, so
+  atomic-claim decomposition and drop-not-fail remain Python-only: a Go or JS
+  answer never comes back trimmed, it passes or refuses whole.
+
+
 ## [0.10.0] - 2026-08-16
 
 Evidence-integrity release. Three defects here produced output that *looked*
