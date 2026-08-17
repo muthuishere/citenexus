@@ -3,8 +3,7 @@ title: Cross-lingual corpus
 description: The authoritative clause is written in a script the query shares no token with, so a reachable-but-superseded document answers instead — verbatim, correctly cited, and wrong. search_languages fans the question out across the languages the corpus is actually written in.
 ---
 
-import { Aside, Steps } from '@astrojs/starlight/components';
-import FacadeNote from '../../../components/FacadeNote.astro';
+import { Aside, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 
 **The failure this prevents:** an employee at the Hyderabad office asks how much
 unused leave they may carry forward. The answer comes back *"a maximum of 10
@@ -23,8 +22,8 @@ and [Authority](/citenexus/authority/): there, the wrong document was *reachable
 and shouldn't have been*; here, the right document was **unreachable**, and no
 ordering over what you retrieved can rescue a passage you never retrieved.
 
-<FacadeNote />
-
+<Tabs syncKey="lang">
+<TabItem label="Python">
 <Steps>
 
 1. **Configure a reformulator.** The fan-out rewrites the question into each
@@ -64,17 +63,157 @@ ordering over what you retrieved can rescue a passage you never retrieved.
    ```
 
 </Steps>
+</TabItem>
+<TabItem label="Go">
+**There is no query fan-out in this port** — `search_languages`, the
+reformulation seam and the `ask()` facade they hang off are Python-only, so a Go
+caller cannot rewrite an English question into Telugu. Nothing here closes the
+cross-script recall gap for you.
+
+What Go *does* have is the half underneath it, and it is worth running, because
+it shows both the capability and the gap in one program: the 14-script tokenizer
+and the v2 gate answer a Telugu question over a Telugu clause **verbatim**, while
+the English form of the same question refuses.
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/muthuishere/citenexus/golang/answer"
+	"github.com/muthuishere/citenexus/golang/tokenize"
+)
+
+func main() {
+	fmt.Println(tokenize.SupportedScripts()) // the 14 claimed scripts
+	fmt.Println(tokenize.TokenizeV2("హైదరాబాద్ ఉద్యోగులు రోజులు"))
+	fmt.Println(tokenize.UnsupportedScripts("ការជូនដំណឹង")) // [khmer] — a capability gap
+
+	corpus := []answer.Doc{
+		{DocumentID: "09-te-hyderabad-annexure", Text: "హైదరాబాద్ కార్యాలయ ఉద్యోగులు సెలవును బదిలీ చేయవచ్చు."},
+		{DocumentID: "01-en-handbook", Text: "Employees may carry forward a maximum of ten days of earned leave."},
+	}
+
+	res := answer.Ask(corpus, "హైదరాబాద్ ఉద్యోగులు సెలవును బదిలీ చేయవచ్చా?", answer.DefaultTopK)
+	fmt.Println(res.Evidence.Decision)          // answered
+	fmt.Println(res.Answer)                     // the Telugu clause, verbatim
+	fmt.Println(res.Sources[0].Document)        // 09-te-hyderabad-annexure
+	fmt.Println(res.Sources[0].PassageLanguage) // "en" — hardcoded in this port
+
+	// The same question in English shares no token with Telugu prose:
+	crossScript := answer.Ask(corpus[:1], "How many days of leave may a Hyderabad employee carry forward?", answer.DefaultTopK)
+	fmt.Println(crossScript.Evidence.Decision) // refused
+}
+```
+
+```text
+[arabic bengali cyrillic devanagari greek han hangul hebrew hiragana katakana latin tamil telugu thai]
+[హైదరాబాద్ ఉద్యోగులు రోజులు]
+[khmer]
+answered
+హైదరాబాద్ కార్యాలయ ఉద్యోగులు సెలవును బదిలీ చేయవచ్చు.
+09-te-hyderabad-annexure
+en
+refused
+```
+
+That last `refused` **is this page's failure, reproduced in Go** — and here it is
+the safe half of it, because the corpus held nothing else to answer from. Add the
+English handbook back and the wrong-but-grounded answer returns. Until fan-out
+exists here, issue the question in each of your corpus's languages yourself and
+merge the `Result`s.
+
+Note also `PassageLanguage` prints `en` on a Telugu passage: this port does no
+language detection and hardcodes the field. Read the passage, not the field.
+</TabItem>
+<TabItem label="JavaScript">
+**There is no query fan-out in this port** — `search_languages` and the
+reformulation seam are Python-only. What JavaScript has is the tokenizer and gate
+underneath, which answer a Telugu question over a Telugu clause verbatim, and
+refuse the English form of the same question:
+
+```js
+import { ask, tokenizeV2, unsupportedScripts, SUPPORTED_SCRIPTS } from "@muthuishere/citenexus"
+
+console.log([...SUPPORTED_SCRIPTS])                      // the 14 claimed scripts
+console.log(tokenizeV2("హైదరాబాద్ ఉద్యోగులు రోజులు"))
+console.log(unsupportedScripts("ការជូនដំណឹង"))            // [ 'khmer' ] — a capability gap
+
+const corpus = [
+  { document_id: "09-te-hyderabad-annexure", text: "హైదరాబాద్ కార్యాలయ ఉద్యోగులు సెలవును బదిలీ చేయవచ్చు." },
+  { document_id: "01-en-handbook", text: "Employees may carry forward a maximum of ten days of earned leave." },
+]
+
+const res = ask(corpus, "హైదరాబాద్ ఉద్యోగులు సెలవును బదిలీ చేయవచ్చా?")
+console.log(res.evidence.decision)             // answered
+console.log(res.answer)                        // the Telugu clause, verbatim
+console.log(res.sources[0].document)           // 09-te-hyderabad-annexure
+console.log(res.sources[0].passage_language)   // "en" — hardcoded in this port
+
+// The same question in English shares no token with Telugu prose:
+const crossScript = ask([corpus[0]], "How many days of leave may a Hyderabad employee carry forward?")
+console.log(crossScript.evidence.decision)     // refused
+```
+
+```text
+[
+  'arabic',   'bengali',
+  'cyrillic', 'devanagari',
+  'greek',    'han',
+  'hangul',   'hebrew',
+  'hiragana', 'katakana',
+  'latin',    'tamil',
+  'telugu',   'thai'
+]
+[ 'హైదరాబాద్', 'ఉద్యోగులు', 'రోజులు' ]
+[ 'khmer' ]
+answered
+హైదరాబాద్ కార్యాలయ ఉద్యోగులు సెలవును బదిలీ చేయవచ్చు.
+09-te-hyderabad-annexure
+en
+refused
+```
+
+The final `refused` is this page's failure reproduced in JavaScript. Until
+fan-out exists here, ask the question once per corpus language and merge the
+`Result`s. And `passage_language` reads `en` on a Telugu passage — no language
+detection in this port, so read the passage itself.
+</TabItem>
+</Tabs>
 
 ## Searching a language is a capability claim, so it is checked first
 
 An unsupported language **raises before any model call is spent** — it does not
 return an empty list, and it does not abstain.
 
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
 rag.ask(q, search_languages=("en", "kn"))
 # UnsupportedSearchLanguageError: search language 'kn' (Kannada) is written in
 # 'kannada', which this tokenizer does not claim (ADR-0011).
 ```
+</TabItem>
+<TabItem label="Go">
+There is no `search_languages` to check, so there is no error to raise. The
+equivalent check you can make **before** asking is on the tokenizer:
+
+```go
+tokenize.UnsupportedScripts("ಕನ್ನಡ") // [kannada] — do not ask; you will get an
+                                     // evidence-absent refusal that hides this
+```
+</TabItem>
+<TabItem label="JavaScript">
+There is no `search_languages` to check, so there is no error to raise. Make the
+equivalent check on the tokenizer **before** asking:
+
+```js
+unsupportedScripts("ಕನ್ನಡ")   // [ 'kannada' ] — do not ask; you will get an
+                              // evidence-absent refusal that hides this
+```
+</TabItem>
+</Tabs>
 
 That is deliberate. Returning `[]` for a language the tokenizer cannot segment is
 indistinguishable from *"the corpus does not contain this"*, and routing a
@@ -194,11 +333,6 @@ question is already in — yielding up to three extra queries. A reformulation
 that fails, comes back empty, or duplicates the original contributes nothing —
 retrieval proceeds with fewer queries rather than erroring.
 
-<Aside type="note" title="What the ports do and don't have here">
-The ports are **not** Latin-only: Go and JavaScript ship the same 14-script
-Unicode tokenizer as Python, from the same canonical script table, and it drives
-BM25 and the v2 faithfulness predicate in both. What they do not have is this
-page's subject — `search_languages`, the reformulation seam and the `ask()`
-facade they hang off are Python-only, so this benchmark is Python. See
-[Languages & multilingual](/citenexus/languages/).
-</Aside>
+The benchmark above is Python, because the fan-out it measures is Python. See
+[Languages & multilingual](/citenexus/languages/) for the script matrix all three
+share.

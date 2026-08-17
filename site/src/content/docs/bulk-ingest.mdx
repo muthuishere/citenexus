@@ -3,42 +3,175 @@ title: Bulk & batch ingest
 description: How to ingest many documents today — an idempotent, resumable loop keyed by content hash — and where CiteNexus is heading on job-based batch ingest with a durable queue.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
-import FacadeNote from '../../components/FacadeNote.astro';
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-`ingest()` handles one source at a time. To bring in a whole corpus today, loop —
-and because every ingest is **idempotent by content hash**, the loop is safe to
-re-run: unchanged documents return `status="unchanged"` and do no work, so a
-crashed or interrupted bulk run just resumes where it left off.
+Ingest handles one source at a time. To bring in a whole corpus today, loop —
+and because the loop is keyed on a **content hash**, it is safe to re-run:
+unchanged documents do no work, so a crashed or interrupted bulk run just resumes
+where it left off. Python gets that hash check from the store's manifest; Go and
+JavaScript have no store on the plain `go get` / `npm install` surface, so they
+compute the same hash themselves with `euid.Checksum` / `sha256Hex`.
 
-<FacadeNote />
-
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
 from pathlib import Path
 
-sources = list(Path("corpus").rglob("*.pdf")) + list(Path("corpus").rglob("*.docx"))
+def run(root):
+    ingested = skipped = 0
+    for path in sorted(Path(root).rglob("*.txt")):
+        r = rag.ingest(str(path), document_id=path.stem)
+        if r.status == "ingested":
+            ingested += 1
+        else:                   # "unchanged" — content hash matched, no work done
+            skipped += 1
+    print(f"{ingested} ingested, {skipped} unchanged")
 
-ingested = skipped = 0
-for path in sources:
-    r = rag.ingest(str(path), document_id=path.stem)
-    if r.status == "ingested":
-        ingested += 1
-    else:                       # "unchanged" — content hash matched, no work done
-        skipped += 1
-print(f"{ingested} ingested, {skipped} unchanged")
+run("corpus")    #  2 ingested, 0 unchanged
+run("corpus")    #  0 ingested, 2 unchanged   ← re-run is free
 ```
+</TabItem>
+<TabItem label="Go">
+```go
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/muthuishere/citenexus/golang/answer"
+	"github.com/muthuishere/citenexus/golang/chunker"
+	"github.com/muthuishere/citenexus/golang/euid"
+)
+
+// One pass over a directory. euid.Checksum is the same content hash Python's
+// ingest() keys idempotency on — so a re-run costs nothing and an interrupted
+// run resumes. `seen` is your manifest; persist it if the process restarts.
+func buildCorpus(root string, seen map[string]string) ([]answer.Doc, int, int) {
+	var corpus []answer.Doc
+	ingested, skipped := 0, 0
+	_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".txt") {
+			return nil
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		id := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+		sum := euid.Checksum(string(raw))
+		if prev, ok := seen[id]; ok && prev == sum {
+			skipped++ // unchanged — same bytes under the same id, no work
+			return nil
+		}
+		seen[id] = sum
+		for i, chunk := range chunker.ChunkText(string(raw), chunker.DefaultMaxTokens, chunker.DefaultOverlap) {
+			corpus = append(corpus, answer.Doc{DocumentID: fmt.Sprintf("%s::%d", id, i), Text: chunk})
+		}
+		ingested++
+		return nil
+	})
+	return corpus, ingested, skipped
+}
+
+seen := map[string]string{}
+corpus, ingested, skipped := buildCorpus("corpus", seen)
+fmt.Printf("%d ingested, %d unchanged, %d docs\n", ingested, skipped, len(corpus))
+//  2 ingested, 0 unchanged, 2 docs
+
+_, ingested2, skipped2 := buildCorpus("corpus", seen)   // re-run: nothing to do
+fmt.Printf("%d ingested, %d unchanged\n", ingested2, skipped2)
+//  0 ingested, 2 unchanged
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { readdirSync, readFileSync } from "node:fs";
+import { basename, extname, join } from "node:path";
+import { ask, chunkText, sha256Hex } from "@muthuishere/citenexus";
+
+// sha256Hex is the same content hash Python's ingest() keys idempotency on — so
+// a re-run costs nothing and an interrupted run resumes. `seen` is your
+// manifest; persist it if the process restarts.
+function buildCorpus(root, seen) {
+  const corpus = [];
+  let ingested = 0, skipped = 0;
+  for (const name of readdirSync(root)) {
+    if (extname(name) !== ".txt") continue;
+    const raw = readFileSync(join(root, name), "utf8");
+    const id = basename(name, extname(name));
+    const sum = sha256Hex(raw);
+    if (seen.get(id) === sum) { skipped++; continue; }   // unchanged — no work
+    seen.set(id, sum);
+    chunkText(raw).forEach((text, i) => corpus.push({ document_id: `${id}::${i}`, text }));
+    ingested++;
+  }
+  return { corpus, ingested, skipped };
+}
+
+const seen = new Map();
+const first = buildCorpus("corpus", seen);
+console.log(`${first.ingested} ingested, ${first.skipped} unchanged, ${first.corpus.length} docs`);
+//  2 ingested, 0 unchanged, 2 docs
+
+const again = buildCorpus("corpus", seen);              // re-run: nothing to do
+console.log(`${again.ingested} ingested, ${again.skipped} unchanged`);
+//  0 ingested, 2 unchanged
+```
+</TabItem>
+</Tabs>
 
 This is the "resumable by construction" pattern: content-hash idempotency is the
 same mechanism a job queue would use for dedup, so re-running the loop is your
 retry.
 
+## Then ask over the whole corpus
+
+<Tabs syncKey="lang">
+<TabItem label="Python">
+```python
+print(rag.ask("How many days of annual leave?").evidence.decision)   # answered
+```
+</TabItem>
+<TabItem label="Go">
+```go
+res := answer.Ask(corpus, "How many days of annual leave?", answer.DefaultTopK)
+fmt.Println(res.Evidence.Decision, "|", res.Sources[0].Document)
+//  answered | leave::0
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const res = ask(first.corpus, "How many days of annual leave?");
+console.log(res.evidence.decision, "|", res.sources[0].document);
+//  answered | leave::0
+```
+</TabItem>
+</Tabs>
+
 ## Web pages in bulk
 
+<Tabs syncKey="lang">
+<TabItem label="Python">
 For a site, `crawl()` does a same-domain breadth-first walk, ingesting each page:
 
 ```python
 results = rag.crawl("https://docs.example.com", max_pages=200, max_depth=4)
 ```
+</TabItem>
+<TabItem label="Go">
+No crawler in the Go port. Fetch each page with `net/http` and run its body
+through the same `euid.Checksum` → `chunker.ChunkText` → `[]answer.Doc` loop as a
+file; the URL is the `document_id`, and the checksum dedups a page whose content
+did not change between runs.
+</TabItem>
+<TabItem label="JavaScript">
+No crawler in the JavaScript port. `fetch()` each page and run its body through
+the same `sha256Hex` → `chunkText` → corpus loop as a file; the URL is the
+`document_id`, and the hash dedups a page whose content did not change between
+runs.
+</TabItem>
+</Tabs>
 
 ## Where batch ingest is heading
 
@@ -56,4 +189,7 @@ client can never hand the pipeline one, and that branch never runs. Ingest (and
 slow-path graph/wiki work) therefore happens **inline**. A first-class,
 job-based `ingest_batch(...) → job id → poll` API is on the roadmap — until then,
 the idempotent loop above is the supported bulk path.
+
+The Go and JavaScript ports have **no queue subsystem at all** — the loops above
+are the whole story there, and parallelising them is your scheduler's job.
 </Aside>

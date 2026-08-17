@@ -3,19 +3,20 @@ title: Conflicting sources
 description: When two documents assert opposite things, surface both and abstain rather than letting retrieval rank decide which truth the caller sees.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
-import FacadeNote from '../../../components/FacadeNote.astro';
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 
 **The failure this prevents:** your corpus holds a filing and its restatement, or
 a 2019 policy and its 2026 replacement. Both are real, both are indexed, both are
 grounded. Whichever one happens to rank first becomes the answer — and nothing
 tells the caller the other one exists.
 
-That is not hypothetical. Before conflict detection existed, this returned a
-confident, correctly-cited answer with `conflicts_detected = 0`:
+That is not hypothetical. Before conflict detection existed, the corpus below
+returned a confident, correctly-cited answer with `conflicts_detected = 0`.
+Python abstains on it now; **Go and JavaScript still answer**, and their tabs
+show exactly that:
 
-<FacadeNote />
-
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
 rag.ingest(text="The dividend for the period was 12 cents per share.",
            document_id="filing-q1")
@@ -23,22 +24,103 @@ rag.ingest(text="The dividend for the period was 30 cents per share.",
            document_id="filing-q1-restated")
 
 response = rag.ask("What was the dividend per share for the period?")
-```
 
-## What happens now
-
-```python
 print(response.evidence.decision)            # refused
+print(response.answer)
 print(response.conflicts)
-# ('value: filing-q1-restated vs filing-q1 (30 vs 12)',)
 
 for src in response.sources:                 # BOTH sides are cited
     print(src.document, "—", src.passage)
 ```
 
+```text
+refused
+The available evidence disagrees, so I can't answer that.
+('value: filing-q1-restated vs filing-q1 (30 vs 12)',)
+filing-q1-restated — The dividend for the period was 30 cents per share.
+filing-q1 — The dividend for the period was 12 cents per share.
+```
+
 In `strict` mode an unresolved conflict that touches the answer's own claim is an
 **abstention with both sides cited**. "These sources disagree, here is each of
 them" is a defensible output. Silently picking one is not.
+</TabItem>
+<TabItem label="Go">
+**Conflict detection does not exist in this port.** Go declares `conflicts` and
+`conflicts_detected` for wire parity and implements no detection, so on this
+corpus it does the thing the page opens by warning about: it answers, from
+whichever side ranked first. That is worth seeing rather than being told.
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/muthuishere/citenexus/golang/answer"
+)
+
+func main() {
+	corpus := []answer.Doc{
+		{DocumentID: "filing-q1", Text: "The dividend for the period was 12 cents per share."},
+		{DocumentID: "filing-q1-restated", Text: "The dividend for the period was 30 cents per share."},
+	}
+
+	res := answer.Ask(corpus, "What was the dividend for the period?", answer.DefaultTopK)
+
+	fmt.Println(res.Evidence.Decision)          // answered  <- Python refuses here
+	fmt.Println(res.Answer)                     // one side, quoted verbatim
+	fmt.Println(res.Evidence.ConflictsDetected) // 0 — no detection in this port
+	fmt.Println(res.Sources[0].Document)
+}
+```
+
+```text
+answered
+The dividend for the period was 12 cents per share.
+0
+filing-q1
+```
+
+What Go **does** give you on the same corpus is the rest of the guarantee: the
+answer is verbatim from a real document, it passed the faithfulness gate, and an
+unsupported question still refuses. What it cannot tell you is that the other
+filing exists. Until detection lands here, compare `Evidence.DistinctDocuments`
+yourself, or run conflict-sensitive corpora through Python.
+</TabItem>
+<TabItem label="JavaScript">
+**Conflict detection does not exist in this port.** JavaScript declares
+`conflicts` / `conflicts_detected` for wire parity and implements no detection,
+so it answers where Python abstains:
+
+```js
+import { ask } from "@muthuishere/citenexus"
+
+const corpus = [
+  { document_id: "filing-q1", text: "The dividend for the period was 12 cents per share." },
+  { document_id: "filing-q1-restated", text: "The dividend for the period was 30 cents per share." },
+]
+
+const res = ask(corpus, "What was the dividend for the period?")
+
+console.log(res.evidence.decision)           // answered  <- Python refuses here
+console.log(res.answer)                      // one side, quoted verbatim
+console.log(res.evidence.conflicts_detected) // 0 — no detection in this port
+console.log(res.sources[0].document)
+```
+
+```text
+answered
+The dividend for the period was 12 cents per share.
+0
+filing-q1
+```
+
+The cite-or-abstain guarantee still holds — the quote is verbatim, the gate ran,
+an unsupported question refuses. The **conflict** is the part that is silent.
+Send conflict-sensitive corpora through Python until detection ships here.
+</TabItem>
+</Tabs>
 
 This is the one refusal that does *not* emit the pinned refusal string — it says
 *"The available evidence disagrees, so I can't answer that."* and
@@ -48,6 +130,8 @@ from the other five ways `ask()` can refuse:
 
 ## Choosing how much to enforce
 
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
 from citenexus.domain.trust import TrustMode
 
@@ -55,6 +139,19 @@ rag.ask(q, mode=TrustMode.strict)        # conflict on the claim -> abstain, cit
 rag.ask(q, mode=TrustMode.normal)        # answer, but surface the conflict
 rag.ask(q, mode=TrustMode.exploratory)   # record only
 ```
+</TabItem>
+<TabItem label="Go">
+There is **one mode in this port and it is `strict`** — `result.TrustModeStrict`
+is the only `TrustMode` constant Go defines, and `Ask` takes no mode argument.
+With no conflict detection there is nothing for `normal` to surface, so the knob
+would be decoration.
+</TabItem>
+<TabItem label="JavaScript">
+There is **one mode in this port and it is `strict`** — `TrustMode` exports the
+single value `"strict"`, and `ask` takes no mode argument. With no conflict
+detection there is nothing for `normal` to surface.
+</TabItem>
+</Tabs>
 
 Use `strict` where a wrong answer is worse than none. Use `normal` when a human
 reads every answer anyway and wants the flag, not the block.
@@ -75,13 +172,10 @@ exactly three rules, tried in order:
    **Dates participate only when they read as digit-leading numbers** (`2019`);
    there is no date rule as such, and no date parsing.
 
-<Aside type="caution" title="Detection is Python-only today">
-Conflict detection ships in the **Python** implementation. Go and JavaScript
-declare the `conflicts` / `conflicts_detected` fields for wire parity but
-implement no detection. The golden vectors are published
-(`conformance/cases/conflict.json`) precisely so the ports can be held to them
-when they do — but a Go or JS `ask()` will report `conflicts_detected = 0` on a
-corpus Python flags.
+<Aside type="caution" title="Why the golden vectors exist anyway">
+The golden vectors are published (`conformance/cases/conflict.json`) precisely so
+the ports can be held to them when detection lands — the run above in the Go and
+JavaScript tabs is what "no detection" looks like today.
 </Aside>
 
 It deliberately **does not resolve**. Deciding *which* of two contradictory
@@ -132,10 +226,25 @@ The same comparison, inverted, catches near-duplicates. One sentence mirrored
 across five document IDs used to report `distinct_documents = 5` — five
 independent confirmations of a fact that had exactly one source.
 
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
 response.evidence.distinct_documents   # 1, not 5
 response.evidence.supporting_sources   # 1
 ```
+</TabItem>
+<TabItem label="Go">
+Duplicate collapsing rides on the same comparison as conflict detection, so it is
+**Python-only too**. On five mirrored documents Go reports
+`Evidence.DistinctDocuments == 5` — five counts of one fact. Deduplicate the
+`[]answer.Doc` slice yourself before you pass it in.
+</TabItem>
+<TabItem label="JavaScript">
+Duplicate collapsing is **Python-only**, for the same reason as conflict
+detection. Five mirrored documents give `evidence.distinct_documents === 5` here.
+Deduplicate the corpus array before passing it to `ask`.
+</TabItem>
+</Tabs>
 
 This claims **surface clones only**. Telling a genuinely independent restatement
 apart from a paraphrase of the same origin is not decidable from text —

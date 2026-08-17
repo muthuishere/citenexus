@@ -1,0 +1,124 @@
+---
+/**
+ * Override of Starlight's `SiteTitle` — the stock wordmark, plus a small version
+ * pill so a reader immediately knows which release these docs describe.
+ *
+ * The version is resolved at BUILD TIME from the release-managed manifests
+ * (python/pyproject.toml + js/package.json, cross-checked). It is never
+ * hardcoded here — see ./version.mjs for why that matters.
+ *
+ * The pill is a sibling of the title link, not nested inside it: `.title-wrapper`
+ * in Starlight's Header is a flex container, and nesting <a> in <a> is invalid.
+ */
+import { logos } from 'virtual:starlight/user-images';
+import config from 'virtual:starlight/user-config';
+// @ts-ignore - virtual module registered by astro.config.mjs (citenexus:version plugin)
+import { CITENEXUS_VERSION, CITENEXUS_RELEASE_URL } from 'virtual:citenexus/version';
+
+const { siteTitle, siteTitleHref } = Astro.locals.starlightRoute;
+---
+
+<a href={siteTitleHref} class="site-title sl-flex">
+	{
+		config.logo && logos.dark && (
+			<>
+				<img
+					class:list={{ 'light:sl-hidden print:hidden': !('src' in config.logo) }}
+					alt={config.logo.alt}
+					src={logos.dark.src}
+					width={logos.dark.width}
+					height={logos.dark.height}
+				/>
+				{/* Show light alternate if a user configure both light and dark logos. */}
+				{!('src' in config.logo) && (
+					<img
+						class="dark:sl-hidden print:block"
+						alt={config.logo.alt}
+						src={logos.light?.src}
+						width={logos.light?.width}
+						height={logos.light?.height}
+					/>
+				)}
+			</>
+		)
+	}
+	<span class:list={{ 'sr-only': config.logo?.replacesTitle }} translate="no">
+		{siteTitle}
+	</span>
+</a>
+
+<a
+	class="cn-version"
+	href={CITENEXUS_RELEASE_URL}
+	title={`CiteNexus ${CITENEXUS_VERSION} — view the release notes`}
+	translate="no"
+>
+	<span class="sr-only">Documentation for version</span>v{CITENEXUS_VERSION}
+</a>
+
+<style>
+	/* Verbatim from Starlight's SiteTitle so the wordmark is unchanged. */
+	@layer starlight.core {
+		.site-title {
+			align-items: center;
+			gap: var(--sl-nav-gap);
+			font-size: var(--sl-text-h4);
+			font-weight: 600;
+			color: var(--sl-color-text-accent);
+			text-decoration: none;
+			white-space: nowrap;
+			min-width: 0;
+		}
+		span {
+			overflow: hidden;
+		}
+		img {
+			height: calc(var(--sl-nav-height) - 2 * var(--sl-nav-pad-y));
+			width: auto;
+			max-width: 100%;
+			object-fit: contain;
+			object-position: 0 50%;
+		}
+	}
+
+	/* Secondary to the wordmark: mono, small, hairline-bordered, gray-not-accent. */
+	.cn-version {
+		flex-shrink: 0;
+		align-self: center;
+		margin-inline-start: 0.5rem;
+		padding: 0.05rem 0.4rem;
+		border: 1px solid var(--sl-color-hairline);
+		border-radius: 999px;
+		background: var(--sl-color-bg-inline-code);
+		color: var(--sl-color-gray-3);
+		font-family: var(--sl-font-mono);
+		font-size: var(--sl-text-xs);
+		font-weight: 500;
+		line-height: 1.5;
+		letter-spacing: 0.01em;
+		text-decoration: none;
+		white-space: nowrap;
+	}
+
+	.cn-version:hover,
+	.cn-version:focus-visible {
+		border-color: var(--sl-color-accent);
+		color: var(--sl-color-text-accent);
+	}
+
+	/* Narrow viewports: the wordmark keeps priority, the pill just gets tighter. */
+	@media (max-width: 30rem) {
+		.cn-version {
+			margin-inline-start: 0.35rem;
+			padding-inline: 0.3rem;
+		}
+	}
+
+	@media print {
+		.cn-version {
+			border-color: #999;
+			color: #333;
+			background: none;
+		}
+	}
+</style>

@@ -3,36 +3,133 @@ title: File-based storage
 description: Use a local directory as the CiteNexus store. Ingest individual files, raw text, or a URL — each idempotent by content hash.
 ---
 
-import FacadeNote from '../../components/FacadeNote.astro';
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-Pass a local path as the store. CiteNexus keeps its index (vectors, manifests,
-provenance) under that directory. Ingest individual files, raw text, or a URL.
+Keep the index on local disk. In Python the directory **is** the store: pass a
+path and CiteNexus writes vectors, manifests, structure, and provenance under it.
+Go and JavaScript have no managed store on the plain `go get` / `npm install`
+surface, so the local directory is yours — load it into a corpus and persist that
+corpus yourself.
 
-<FacadeNote>
-	<p>
-		File ingest specifically: the ports do have one, but it is <strong>native-only</strong> — Go
-		behind the <code>citenexus_ffi</code> build tag, JavaScript on the
-		<code>@muthuishere/citenexus/ingest</code> subpath, both needing the Rust cdylib. Neither
-		reaches it from a plain <code>go get</code> / <code>npm install</code>, and neither has an
-		<code>ask()</code> over the resulting store, so there is no port version of this page's flow.
-	</p>
-</FacadeNote>
-
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
 from citenexus import CiteNexus
 
 rag = CiteNexus("./citenexus-data", embedder=..., generator=...)
 
-rag.ingest("contracts/nda.pdf")              # PDF, DOCX, PPTX, XLSX, HTML, MD, CSV, TXT
+rag.ingest("corpus/nda.txt")                 # PDF, DOCX, PPTX, XLSX, HTML, MD, CSV, TXT
 rag.ingest(text="Clause 4: 90 days notice.", document_id="clause-4")
+
+print(rag.ask("What notice does termination require?").evidence.decision)   # answered
 ```
 
+The directory now holds the index — vectors, manifests, structure, and (when the
+signals are on) graph and wiki:
+
+```
+vector/workspace=default/lancedb/evidence_units.lance/…
+manifests/workspace=default/etag_manifest.json
+knowledge/workspace=default/structure/nda.json
+graph/workspace=default/graph.json
+```
+</TabItem>
+<TabItem label="Go">
+```go
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/muthuishere/citenexus/golang/answer"
+	"github.com/muthuishere/citenexus/golang/chunker"
+)
+
+// No managed store here: load the directory into a corpus and persist that.
+func loadDir(root string) []answer.Doc {
+	var corpus []answer.Doc
+	entries, _ := os.ReadDir(root)
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".txt") {
+			continue
+		}
+		raw, err := os.ReadFile(filepath.Join(root, e.Name()))
+		if err != nil {
+			continue
+		}
+		id := strings.TrimSuffix(e.Name(), filepath.Ext(e.Name()))
+		for i, chunk := range chunker.ChunkText(string(raw), chunker.DefaultMaxTokens, chunker.DefaultOverlap) {
+			corpus = append(corpus, answer.Doc{DocumentID: fmt.Sprintf("%s::%d", id, i), Text: chunk})
+		}
+	}
+	return corpus
+}
+
+blob, _ := json.Marshal(loadDir("corpus"))
+os.MkdirAll("citenexus-data", 0o755)
+os.WriteFile("citenexus-data/corpus.json", blob, 0o644)
+
+// A later process reads it straight back — Doc is plain JSON.
+var reloaded []answer.Doc
+back, _ := os.ReadFile("citenexus-data/corpus.json")
+json.Unmarshal(back, &reloaded)
+
+res := answer.Ask(reloaded, "What notice does termination require?", answer.DefaultTopK)
+fmt.Println(len(reloaded), "docs |", res.Evidence.Decision, "|", res.Sources[0].Document)
+//  2 docs | answered | nda::0
+```
+
+A **real** on-disk Lance index does exist for Go — `storage.LanceVectorStore`,
+compiled only with the `citenexus_ffi` build tag over the Rust cdylib. It is not
+on the plain `go get` surface, and there is no `Ask` over it.
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { basename, extname, join } from "node:path";
+import { ask, chunkText } from "@muthuishere/citenexus";
+
+// No managed store here: load the directory into a corpus and persist that.
+function loadDir(root) {
+  const corpus = [];
+  for (const name of readdirSync(root)) {
+    if (extname(name) !== ".txt") continue;
+    const raw = readFileSync(join(root, name), "utf8");
+    const id = basename(name, extname(name));
+    chunkText(raw).forEach((text, i) => corpus.push({ document_id: `${id}::${i}`, text }));
+  }
+  return corpus;
+}
+
+mkdirSync("citenexus-data", { recursive: true });
+writeFileSync("citenexus-data/corpus.json", JSON.stringify(loadDir("corpus")));
+
+// A later process reads it straight back — the corpus is plain JSON.
+const reloaded = JSON.parse(readFileSync("citenexus-data/corpus.json", "utf8"));
+
+const res = ask(reloaded, "What notice does termination require?");
+console.log(reloaded.length, "docs |", res.evidence.decision, "|", res.sources[0].document);
+//  2 docs | answered | nda::0
+```
+
+A **real** on-disk Lance index does exist for JavaScript — on the
+`@muthuishere/citenexus/ingest` subpath over the Rust cdylib. It is not on the
+plain `npm install` surface, and there is no `ask` over it.
+</TabItem>
+</Tabs>
+
+<Aside type="note" title="A store, not a watched folder">
 The local path is the **store** — where the index is written — not a folder that
-gets auto-scanned. Each source is ingested individually — there is no
-"ingest this folder" call. Ingest is idempotent by **content hash**: the manifest
-records a SHA-256 per `document_id`, and re-ingesting that id with identical bytes
-returns `status="unchanged"` and does no work. Re-running your ingest script only
-processes what actually changed.
+gets auto-scanned. Each source is ingested individually; there is no
+"ingest this folder" call. In Python, ingest is idempotent by **content hash**:
+the manifest records a SHA-256 per `document_id`, and re-ingesting that id with
+identical bytes returns `status="unchanged"` and does no work, so re-running your
+script only processes what actually changed. In Go and JavaScript you get the
+same property by keeping the hash yourself — see
+[bulk & batch ingest](/citenexus/bulk-ingest/).
+</Aside>
 
 See [Ingest anything](/citenexus/ingest/) for the full intake surface (including
 `crawl()`), or switch to [S3-native storage](/citenexus/s3/) for a shared bucket.

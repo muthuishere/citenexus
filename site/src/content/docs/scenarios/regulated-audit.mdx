@@ -3,8 +3,7 @@ title: Regulated audit
 description: Prove the live index is derived from exactly the agreed corpus — find ghost documents, missing ingests and drifted content before an auditor does.
 ---
 
-import { Aside, Steps } from '@astrojs/starlight/components';
-import FacadeNote from '../../../components/FacadeNote.astro';
+import { Aside, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 
 **The failure this prevents:** an answer cites a document nobody agreed was in
 scope. It has a real document ID, a real page and a verbatim quote.
@@ -17,8 +16,8 @@ update, a revoke. None of them notice an artifact that arrived by a path the
 change log never saw — a crashed ingest, a restored snapshot, a shared bucket
 prefix, a run against the wrong config.
 
-<FacadeNote />
-
+<Tabs syncKey="lang">
+<TabItem label="Python">
 <Steps>
 
 1. **Declare the agreed corpus.** The manifest is authored by you, not derived
@@ -62,6 +61,30 @@ prefix, a run against the wrong config.
    ```
 
 </Steps>
+</TabItem>
+<TabItem label="Go">
+**`reconcile()` and `remediate()` do not exist in this port** — and neither does
+the thing they audit. Go holds no index, no manifest and no store: the corpus is
+the `[]answer.Doc` slice the caller builds for each `Ask`, so there is no gap
+between "the agreed corpus" and "what is indexed" for a reconciliation to find.
+
+That is not the same as the problem going away. It **moves the whole audit into
+your code**: whatever assembles that slice is now the thing an auditor has to
+trust, and it is the thing that must be able to prove which documents it put in.
+If you need the diagnostic itself — orphans, missing, drifted, and the
+append-only audit line — the index has to be Python's.
+</TabItem>
+<TabItem label="JavaScript">
+**`reconcile()` and `remediate()` do not exist in this port**, because there is no
+index to reconcile: JavaScript takes the corpus as an argument to `ask` and stores
+nothing between calls.
+
+The audit obligation does not disappear, it relocates — the code that builds the
+corpus array becomes the thing an auditor checks, and it must be able to say which
+documents it included and why. For the orphan / missing / drifted report and its
+append-only log, use the Python index.
+</TabItem>
+</Tabs>
 
 ## Why remediation is a separate call
 
@@ -99,6 +122,8 @@ corpus at time T"* becomes an evidence artifact rather than a verbal assurance.
 It is a plain JSONL object in the store, one line per run, under the partition's
 `eval/` prefix — so reading it needs no API at all:
 
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
 import json
 from pathlib import Path
@@ -109,6 +134,20 @@ log = Path("./citenexus-data/eval/workspace=default/reconcile_log.jsonl")
 for line in log.read_text(encoding="utf-8").splitlines():
     print(json.loads(line))   # timestamp, manifest_version, counts per set
 ```
+</TabItem>
+<TabItem label="Go">
+Nothing in this port writes the stream, because nothing in it reconciles. The
+artifact is plain JSONL in the store, though, so **reading** one that a Python
+run produced needs no CiteNexus at all — `bufio.Scanner` plus `encoding/json`
+over the same file or S3 key. That portability is the point of the format.
+</TabItem>
+<TabItem label="JavaScript">
+Nothing in this port writes the stream, because nothing in it reconciles. Reading
+a stream a Python run produced needs no CiteNexus — the file is plain JSONL, so
+`readFile` + `split("\n")` + `JSON.parse` is the whole reader. That is deliberate:
+an auditor should not have to install a library to read the evidence.
+</TabItem>
+</Tabs>
 
 That the artifact is readable with `json` and nothing else is the point: an
 auditor does not have to trust — or install — this library to read it. On S3 it

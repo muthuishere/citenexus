@@ -3,8 +3,7 @@ title: Evaluate a corpus
 description: Score groundedness and citation against a golden set, and assert must-refuse rows separately — because evaluate() scores a correct refusal as a miss, not a pass.
 ---
 
-import { Aside, Steps } from '@astrojs/starlight/components';
-import FacadeNote from '../../../components/FacadeNote.astro';
+import { Aside, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 
 **The failure this prevents:** you swap the embedding model, the answer rate goes
 up, everyone celebrates, and what actually happened is that the system started
@@ -23,8 +22,8 @@ scores the answerable rows, and you assert the refusals yourself. Everything
 below is built that way.
 </Aside>
 
-<FacadeNote />
-
+<Tabs syncKey="lang">
+<TabItem label="Python">
 <Steps>
 
 1. **Write a golden CSV of rows the corpus *can* answer.** The column the library
@@ -75,6 +74,87 @@ below is built that way.
    ```
 
 </Steps>
+</TabItem>
+<TabItem label="Go">
+**`evaluate()` does not exist in this port** — there is no CSV front door, no
+`groundedness_rate` and no audit log. But re-read the warning at the top of this
+page: the half of the job that actually protects you is the **must-refuse
+assertions**, and those are a plain loop over `Ask`. That much is real here, and
+it runs:
+
+```go
+package main
+
+import (
+	"fmt"
+	"os"
+
+	"github.com/muthuishere/citenexus/golang/answer"
+	"github.com/muthuishere/citenexus/golang/result"
+)
+
+func main() {
+	corpus := []answer.Doc{
+		{DocumentID: "help/returns", Text: "Unopened items may be returned within 30 days of delivery."},
+	}
+	mustRefuse := []string{
+		"What is the capital of France?",         // not in the corpus at all
+		"What is the maximum security deposit?",  // adjacent topic, no clause
+	}
+
+	for _, q := range mustRefuse {
+		res := answer.Ask(corpus, q, answer.DefaultTopK)
+		if res.Evidence.Decision != result.DecisionRefused {
+			fmt.Println("REGRESSION: answered a must-refuse row:", q)
+			os.Exit(1)
+		}
+		fmt.Println("refused, as required:", q)
+	}
+}
+```
+
+```text
+refused, as required: What is the capital of France?
+refused, as required: What is the maximum security deposit?
+```
+
+The **rates** are what you lose: to compute groundedness or citation rate you
+would have to aggregate `Result`s yourself, and the scoring rules (and the
+`expected` subset check) live only in Python.
+</TabItem>
+<TabItem label="JavaScript">
+**`evaluate()` does not exist in this port** — no CSV front door, no rates, no
+audit log. The must-refuse gate — the half this page argues matters most — is a
+plain loop over `ask`, and it works here:
+
+```js
+import assert from "node:assert/strict"
+import { ask, Decision } from "@muthuishere/citenexus"
+
+const corpus = [
+  { document_id: "help/returns", text: "Unopened items may be returned within 30 days of delivery." },
+]
+const MUST_REFUSE = [
+  "What is the capital of France?",        // not in the corpus at all
+  "What is the maximum security deposit?", // adjacent topic, no clause
+]
+
+for (const q of MUST_REFUSE) {
+  const res = ask(corpus, q)
+  assert.equal(res.evidence.decision, Decision.refused, q)
+  console.log("refused, as required:", q)
+}
+```
+
+```text
+refused, as required: What is the capital of France?
+refused, as required: What is the maximum security deposit?
+```
+
+The **rates** are what you lose: aggregating `Result`s into groundedness /
+citation / expected-support numbers is Python-only.
+</TabItem>
+</Tabs>
 
 ## Why the must-refuse list is the one that matters
 
@@ -109,6 +189,8 @@ options, drive `ask()` in a loop and aggregate yourself.
 
 When a row flips, the signals say why before you open anything:
 
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
 sig = response.evidence
 
@@ -121,6 +203,46 @@ sig.conflicts_detected          # >0 -> the corpus disagrees with itself
 sig.unsupported_scripts         # non-empty -> a capability gap, not an evidence gap
 sig.authority_floor_applied     # True -> a refusal may mean "no standing", not "no evidence"
 ```
+</TabItem>
+<TabItem label="Go">
+`EvidenceSignals` is conformance-pinned, so every field above exists here with the
+same meaning:
+
+```go
+sig := res.Evidence
+
+sig.Decision                 // answered | refused | partial
+sig.SupportingSources        // 0 -> retrieval failed, not generation
+sig.DistinctDocuments        // 1 -> single-source, no corroboration
+sig.RetrievalScoreSpread     // near 0 -> ranking is not discriminating
+sig.UnsupportedClaimsRemoved // >0 -> the generator over-reached and got trimmed
+```
+
+**Three of them are always zero in this port** and diagnose nothing:
+`ConflictsDetected` (no detection), `UnsupportedScripts` (never populated on a
+`Result` — call `tokenize.UnsupportedScripts` instead) and
+`AuthorityFloorApplied` (authority selection runs in the Python `ask()` facade).
+They are carried for wire parity, not as signals you can read.
+</TabItem>
+<TabItem label="JavaScript">
+`EvidenceSignals` is conformance-pinned, so the fields are the same:
+
+```js
+const sig = res.evidence
+
+sig.decision                    // answered | refused | partial
+sig.supporting_sources          // 0 -> retrieval failed, not generation
+sig.distinct_documents          // 1 -> single-source, no corroboration
+sig.retrieval_score_spread      // near 0 -> ranking is not discriminating
+sig.unsupported_claims_removed  // >0 -> the generator over-reached and got trimmed
+```
+
+**Three are always zero/empty here** and diagnose nothing:
+`conflicts_detected` (no detection), `unsupported_scripts` (never populated on a
+`Result` — call `unsupportedScripts()` instead) and `authority_floor_applied`
+(authority selection is in the Python facade). They exist for wire parity only.
+</TabItem>
+</Tabs>
 
 `supporting_sources = 0` and `unsupported_claims_removed > 0` are different
 bugs in different halves of the pipeline. The first is retrieval, the second is
@@ -137,10 +259,28 @@ three different failures with three different fixes.
 `retrieve()` is the engine under `ask()`, exposed so you can measure ranking
 without a generator in the loop:
 
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
 for c in rag.retrieve("termination notice period", k=10):
     print(f"{c.score:.4f}  {c.document_id}  {c.citable_text[:60]}")
 ```
+</TabItem>
+<TabItem label="Go">
+**There is no `retrieve()` in this port** — ranking is internal to `Ask` and not
+exposed. The closest thing is `topK`: `answer.Ask(corpus, q, 1)` versus
+`answer.Ask(corpus, q, answer.DefaultTopK)` tells you whether the right passage
+was ranked first or merely somewhere in the top five. The ranking primitives
+themselves — `bm25.Rank` and `rrf.Fuse` — are exported and can be driven directly
+if you need the scores.
+</TabItem>
+<TabItem label="JavaScript">
+**There is no `retrieve()` in this port** — ranking is internal to `ask`.
+Narrowing `topK` (`askWith(corpus, q, { topK: 1 })`) tells you whether the right
+passage ranked first. The `bm25` and `rrfFuse` primitives are exported if you want
+the scores themselves.
+</TabItem>
+</Tabs>
 
 If the right passage is not in the top-k here, no amount of prompt work will
 save the answer.

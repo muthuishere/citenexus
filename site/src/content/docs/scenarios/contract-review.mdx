@@ -3,15 +3,14 @@ title: Contract review
 description: Answer clause questions from a contract set with the exact quote and page — and get a refusal when no clause supports the question.
 ---
 
-import { Aside, Steps } from '@astrojs/starlight/components';
-import FacadeNote from '../../../components/FacadeNote.astro';
+import { Aside, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 
 **The failure this prevents:** a reviewer asks "can they subcontract without
 consent?", the model produces a fluent paragraph, and no clause in the agreement
 actually says it. The answer looks identical to a correct one.
 
-<FacadeNote />
-
+<Tabs syncKey="lang">
+<TabItem label="Python">
 <Steps>
 
 1. **Ingest the agreement set.** PDFs keep their page number, so every later
@@ -44,15 +43,86 @@ actually says it. The answer looks identical to a correct one.
 
 </Steps>
 
-## What you get back
-
 ```text
 The Supplier shall not subcontract any part of the Services without the prior
 written consent of the Customer.
 msa.pdf p. 14
 ```
+</TabItem>
+<TabItem label="Go">
+```go
+package main
 
-The quoted sentence is **verbatim from the source**, not a paraphrase. That is
+import (
+	"fmt"
+
+	"github.com/muthuishere/citenexus/golang/answer"
+)
+
+func main() {
+	clauses := []answer.Doc{
+		{DocumentID: "msa", Text: "The Supplier shall not subcontract any part of the Services without the prior written consent of the Customer."},
+		{DocumentID: "dpa", Text: "The Processor shall notify the Controller without undue delay after becoming aware of a personal data breach."},
+	}
+
+	res := answer.Ask(clauses, "May the supplier subcontract without our written consent?", answer.DefaultTopK)
+	if res.Evidence.Decision == "answered" {
+		fmt.Println(res.Answer)
+		fmt.Println(res.Sources[0].Document, "page:", res.Sources[0].Page) // page is nil
+	}
+
+	// No clause covers this, so the flow refuses and cites nothing.
+	miss := answer.Ask(clauses, "What is the liability cap for consequential damages?", answer.DefaultTopK)
+	fmt.Println(miss.Evidence.Decision, "|", miss.Answer, "| sources:", len(miss.Sources))
+}
+```
+
+```text
+The Supplier shall not subcontract any part of the Services without the prior written consent of the Customer.
+msa page: <nil>
+refused | I can't answer that from the available evidence. | sources: 0
+```
+
+**The difference: there is no PDF ingest, so there is no page number.** Go has no
+extractor and no storage — you supply the clause text, and `Sources[0].Page` is
+always `nil`. The outcome that matters is identical: the verbatim clause with its
+document, or the pinned refusal with zero sources.
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { ask } from "@muthuishere/citenexus"
+
+const clauses = [
+  { document_id: "msa", text: "The Supplier shall not subcontract any part of the Services without the prior written consent of the Customer." },
+  { document_id: "dpa", text: "The Processor shall notify the Controller without undue delay after becoming aware of a personal data breach." },
+]
+
+const res = ask(clauses, "May the supplier subcontract without our written consent?")
+if (res.evidence.decision === "answered") {
+  console.log(res.answer)
+  console.log(res.sources[0].document, "page:", res.sources[0].page) // page is null
+}
+
+// No clause covers this, so the flow refuses and cites nothing.
+const miss = ask(clauses, "What is the liability cap for consequential damages?")
+console.log(miss.evidence.decision, "|", miss.answer, "| sources:", miss.sources.length)
+```
+
+```text
+The Supplier shall not subcontract any part of the Services without the prior written consent of the Customer.
+msa page: null
+refused | I can't answer that from the available evidence. | sources: 0
+```
+
+**The difference: no PDF ingest, therefore no page number** — `sources[0].page` is
+always `null`. You supply the clause text; the cite-or-abstain outcome is the
+same one Python returns.
+</TabItem>
+</Tabs>
+
+## Why the quote is not a paraphrase
+
+The quoted sentence in every tab above is **verbatim from the source**, not a paraphrase. That is
 deliberate: a paraphrased quote is no longer evidence, and a reviewer who cannot
 diff the quote against the page cannot defend the answer.
 
@@ -66,6 +136,12 @@ Do not build a viewer that expects to highlight a rectangle.
 
 ## Reading the signals
 
+The signal names are the same in all three — `EvidenceSignals` is one of the
+conformance-pinned shapes, so a reviewer reads the same four fields whichever
+port produced the `Result`.
+
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
 sig = response.evidence
 sig.decision                     # answered | refused | partial
@@ -73,6 +149,40 @@ sig.distinct_documents           # how many DIFFERENT documents support this
 sig.unsupported_claims_removed   # sentences dropped for lacking support
 sig.all_claims_verified          # False means the answer was trimmed
 ```
+</TabItem>
+<TabItem label="Go">
+```go
+sig := res.Evidence
+fmt.Println(sig.Decision)                 // answered | refused | partial
+fmt.Println(sig.DistinctDocuments)        // how many DIFFERENT documents support this
+fmt.Println(sig.UnsupportedClaimsRemoved) // claims dropped for lacking support
+fmt.Println(sig.AllClaimsVerified)        // false means the answer was trimmed
+```
+
+```text
+answered
+1
+0
+true
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const sig = res.evidence
+console.log(sig.decision)                    // answered | refused | partial
+console.log(sig.distinct_documents)          // how many DIFFERENT documents support this
+console.log(sig.unsupported_claims_removed)  // claims dropped for lacking support
+console.log(sig.all_claims_verified)         // false means the answer was trimmed
+```
+
+```text
+answered
+1
+0
+true
+```
+</TabItem>
+</Tabs>
 
 `unsupported_claims_removed` is the one reviewers care about most. An answer is
 verified **per atomic claim**: if the model produces two sentences and only one
@@ -94,6 +204,8 @@ Isolation between matters comes from the **partition**, and from nothing else. A
 index, manifests and evidence all live under that leaf, so a question asked on
 one matter's client cannot reach another matter's paper.
 
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
 from citenexus import CiteNexus
 from citenexus.domain.partition import PartitionPath
@@ -105,6 +217,19 @@ matter = CiteNexus(
 )
 matter.ingest("msa.pdf")
 ```
+</TabItem>
+<TabItem label="Go">
+Go has **no partition, no storage layer and no `acl` field** — there is nothing
+to isolate, because the port never holds your corpus. The `[]answer.Doc` slice
+you pass to `Ask` *is* the scope: build it from the one matter the caller is
+entitled to, and the isolation is your slice.
+</TabItem>
+<TabItem label="JavaScript">
+JavaScript has **no partition, no storage layer and no `acl` field** — same
+reason as Go: the corpus is the array you pass in. Scoping a question to one
+matter means passing only that matter's documents.
+</TabItem>
+</Tabs>
 
 One client per matter. Route the request to the instance whose partition the
 caller is entitled to, and the entitlement check stays in your application —

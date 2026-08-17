@@ -3,8 +3,7 @@ title: Right to erasure
 description: Revoke a document and prove every byte it ever wrote is gone — including the copies left behind by earlier versions of the same document.
 ---
 
-import { Aside, Steps } from '@astrojs/starlight/components';
-import FacadeNote from '../../../components/FacadeNote.astro';
+import { Aside, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 
 **The failure this prevents:** `delete()` returns `status="deleted"`, and the
 document's text is still in your bucket. Not the current copy — an *earlier*
@@ -18,8 +17,8 @@ here because the shape of the bug generalises to any content-addressed store.
 
 ## Revoking a document
 
-<FacadeNote />
-
+<Tabs syncKey="lang">
+<TabItem label="Python">
 <Steps>
 
 1. **Delete by document ID.** This removes the evidence units, the vector rows,
@@ -29,6 +28,10 @@ here because the shape of the bug generalises to any content-addressed store.
    ```python
    result = rag.delete("employee-nda")
    print(result.status)          # "deleted"
+   ```
+
+   ```text
+   deleted
    ```
 
 2. **The commit point is the manifest entry**, written last. While it is present
@@ -43,6 +46,39 @@ here because the shape of the bug generalises to any content-addressed store.
    ```
 
 </Steps>
+</TabItem>
+<TabItem label="Go">
+**`delete()` does not exist in this port, and there is nothing for it to
+delete.** Go has no storage layer, no manifest and no content-addressed blob
+store — the corpus is the `[]answer.Doc` slice you own and pass to `Ask` on every
+call. Erasure is dropping the element:
+
+```go
+corpus = slices.DeleteFunc(corpus, func(d answer.Doc) bool {
+	return d.DocumentID == "employee-nda"
+})
+```
+
+That is honest about what it does and does not prove: it removes the document
+from *this* process's next question. The bug this page is about — an earlier
+blob surviving a re-ingest — is a property of the Python store, and so is its
+fix. If you need provable erasure over persisted bytes, the store must be
+Python's.
+</TabItem>
+<TabItem label="JavaScript">
+**`delete()` does not exist in this port, and there is nothing for it to
+delete.** JavaScript has no storage layer, no manifest and no blob store — the
+corpus is the array you pass to `ask` each call, so erasure is a filter:
+
+```js
+corpus = corpus.filter((d) => d.document_id !== "employee-nda")
+```
+
+This removes the document from the next question and proves nothing about bytes
+on disk, because this port never wrote any. Provable erasure over a persisted
+index requires the Python store.
+</TabItem>
+</Tabs>
 
 ## Why re-ingested documents were the hard case
 
@@ -81,6 +117,8 @@ that checksum, and no other document currently claims it.
 Two documents with identical content share one blob. Revoking one must not
 delete the other's evidence:
 
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
 rag.ingest(text="Identical text.", document_id="doc-a")
 rag.ingest(text="Identical text.", document_id="doc-b")
@@ -88,6 +126,16 @@ rag.ingest(text="Identical text.", document_id="doc-b")
 rag.delete("doc-a")        # blob survives — doc-b still owns it
 rag.delete("doc-b")        # now the blob goes
 ```
+</TabItem>
+<TabItem label="Go">
+No blobs, no refcounts — Go stores nothing, so two identical documents are simply
+two entries in your slice. Nothing is shared and nothing needs counting.
+</TabItem>
+<TabItem label="JavaScript">
+No blobs, no refcounts — JavaScript stores nothing, so two identical documents
+are two array entries. Nothing is shared and nothing needs counting.
+</TabItem>
+</Tabs>
 
 Retired references deliberately do **not** count as ownership: those bytes are
 dead for their document too, so only a live owner keeps a blob alive.

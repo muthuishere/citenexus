@@ -3,36 +3,138 @@ title: S3-native storage
 description: Point CiteNexus at an S3 (or MinIO) bucket. Credentials come from the standard AWS environment variables — never as an argument.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
-import FacadeNote from '../../components/FacadeNote.astro';
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-Point CiteNexus at a bucket with the `S3` location. `endpoint_url` targets MinIO
-or any S3-compatible store; omit it for AWS.
+Python is S3-native: pass the `S3` location and the bucket **is** the store —
+vectors, manifests, and provenance are written into it. Go and JavaScript ship no
+S3 store, so there the bucket stays a pile of documents you read into a corpus
+with your normal AWS SDK. Either way the credentials come from the environment.
 
-<FacadeNote />
-
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
 from citenexus import CiteNexus, S3
 
 rag = CiteNexus(
-    S3(bucket="my-docs", endpoint_url="http://localhost:19000"),
+    S3(bucket="citenexus-local", endpoint_url="http://localhost:19000"),  # omit for AWS
     embedder=..., generator=...,
 )
 
-rag.ingest("contracts/nda.pdf")              # sources are ingested individually
+rag.ingest("corpus/nda.txt")                 # sources are ingested individually
 rag.ingest("https://example.com/policy")     # a URL is fetched and ingested
-response = rag.ask("What notice does termination require?")
+
+r = rag.ask("What notice does termination require?")
+print(r.evidence.decision, "|", r.sources[0].document)
+#  answered | nda
 ```
+</TabItem>
+<TabItem label="Go">
+```go
+// No S3 store in the Go port — read the bucket into a corpus with the AWS SDK.
+import (
+	"context"
+	"fmt"
+	"io"
+	"path"
+	"strings"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/muthuishere/citenexus/golang/answer"
+	"github.com/muthuishere/citenexus/golang/chunker"
+)
+
+func corpusFromBucket(ctx context.Context, client *s3.Client, bucket, prefix string) []answer.Doc {
+	var corpus []answer.Doc
+	pages := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{Bucket: &bucket, Prefix: &prefix})
+	for pages.HasMorePages() {
+		page, err := pages.NextPage(ctx)
+		if err != nil {
+			panic(err)
+		}
+		for _, obj := range page.Contents {
+			out, err := client.GetObject(ctx, &s3.GetObjectInput{Bucket: &bucket, Key: obj.Key})
+			if err != nil {
+				continue
+			}
+			raw, _ := io.ReadAll(out.Body)
+			out.Body.Close()
+			id := strings.TrimSuffix(path.Base(*obj.Key), path.Ext(*obj.Key))
+			for i, chunk := range chunker.ChunkText(string(raw), chunker.DefaultMaxTokens, chunker.DefaultOverlap) {
+				corpus = append(corpus, answer.Doc{DocumentID: fmt.Sprintf("%s::%d", id, i), Text: chunk})
+			}
+		}
+	}
+	return corpus
+}
+
+ctx := context.Background()
+cfg, err := config.LoadDefaultConfig(ctx)   // reads AWS_* from the environment
+if err != nil {
+	panic(err)
+}
+client := s3.NewFromConfig(cfg, func(o *s3.Options) {
+	o.BaseEndpoint = aws.String("http://localhost:19000") // omit for AWS
+	o.UsePathStyle = true
+})
+
+corpus := corpusFromBucket(ctx, client, "citenexus-local", "docs/")
+res := answer.Ask(corpus, "What notice does termination require?", answer.DefaultTopK)
+fmt.Println(len(corpus), "docs |", res.Evidence.Decision, "|", res.Sources[0].Document)
+//  2 docs | answered | nda::0
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+// No S3 store in the JavaScript port — read the bucket into a corpus with the AWS SDK.
+import { GetObjectCommand, ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
+import { basename, extname } from "node:path";
+import { ask, chunkText } from "@muthuishere/citenexus";
+
+async function corpusFromBucket(client, Bucket, Prefix) {
+  const corpus = [];
+  const listed = await client.send(new ListObjectsV2Command({ Bucket, Prefix }));
+  for (const obj of listed.Contents ?? []) {
+    const got = await client.send(new GetObjectCommand({ Bucket, Key: obj.Key }));
+    const raw = await got.Body.transformToString();
+    const id = basename(obj.Key, extname(obj.Key));
+    chunkText(raw).forEach((text, i) => corpus.push({ document_id: `${id}::${i}`, text }));
+  }
+  return corpus;
+}
+
+const client = new S3Client({         // reads AWS_* from the environment
+  endpoint: "http://localhost:19000", // omit for AWS
+  forcePathStyle: true,
+});
+
+const corpus = await corpusFromBucket(client, "citenexus-local", "docs/");
+const res = ask(corpus, "What notice does termination require?");
+console.log(corpus.length, "docs |", res.evidence.decision, "|", res.sources[0].document);
+//  2 docs | answered | nda::0
+```
+</TabItem>
+</Tabs>
 
 <Aside type="caution" title="Credentials stay in the environment">
 `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` (and region) are read from the
 environment — CiteNexus never takes a credential as an argument, and no secret
-value crosses an API boundary.
+value crosses an API boundary. In the Go and JavaScript tabs the AWS SDK is the
+only thing that touches them; the corpus handed to `Ask` / `ask` is plain text.
 </Aside>
 
-The S3 bucket is CiteNexus's **store** — where it writes vectors, manifests, and
-provenance — not a pile of documents it auto-scans. You ingest each source
-(a file, a URL, or raw text) individually; content-hash idempotency means
-re-ingesting an unchanged `document_id` is a no-op. The local
-[MinIO compose file](https://github.com/muthuishere/citenexus) in the repo brings
-up an S3 endpoint on `:19000` for development.
+<Aside type="note" title="A store, not a scanned folder — and only in Python">
+In Python the S3 bucket is CiteNexus's **store** — where it writes vectors,
+manifests, and provenance — not a pile of documents it auto-scans. You ingest
+each source (a file, a URL, or raw text) individually; content-hash idempotency
+means re-ingesting an unchanged `document_id` is a no-op.
+
+The Go and JavaScript ports have **no S3 storage backend at all** (their
+persistent options are the FFI-gated Lance store and the pgvector store), which
+is why their tabs treat the bucket as an input rather than an index.
+</Aside>
+
+The local [MinIO compose file](https://github.com/muthuishere/citenexus) in the
+repo brings up an S3 endpoint on `:19000` for development — every tab above runs
+against it.

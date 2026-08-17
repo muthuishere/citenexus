@@ -3,16 +3,15 @@ title: Multilingual desk
 description: Ask in one language over a corpus written in another — the answer follows the question, the citation stays verbatim in the source language, and unsupported scripts say so.
 ---
 
-import { Aside, Steps } from '@astrojs/starlight/components';
-import FacadeNote from '../../../components/FacadeNote.astro';
+import { Aside, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 
 **The failure this prevents:** a French-speaking analyst asks a question, the
 system answers in French, and the "quote" it shows is a French **translation** of
 an English clause. That translation is not the evidence. Nobody can diff it
 against the source, and the moment it is wrong there is nothing to catch it.
 
-<FacadeNote />
-
+<Tabs syncKey="lang">
+<TabItem label="Python">
 <Steps>
 
 1. **Ingest a corpus in whatever languages it is written in.** Language is
@@ -43,6 +42,99 @@ against the source, and the moment it is wrong there is nothing to catch it.
    ```
 
 </Steps>
+</TabItem>
+<TabItem label="Go">
+Go runs the same 14-script tokenizer and the same v2 faithfulness gate, so a
+non-Latin corpus is answered **verbatim in its own script** — which is the part
+of this page that actually protects you:
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/muthuishere/citenexus/golang/answer"
+	"github.com/muthuishere/citenexus/golang/tokenize"
+)
+
+func main() {
+	corpus := []answer.Doc{
+		{DocumentID: "ja-policy", Text: "個人データの保持期間は五年間です。"},
+		{DocumentID: "en-policy", Text: "Invoices are retained for seven years."},
+	}
+
+	res := answer.Ask(corpus, "個人データの保持期間は？", answer.DefaultTopK)
+	fmt.Println(res.Evidence.Decision)   // answered
+	fmt.Println(res.Answer)              // the Japanese sentence, verbatim
+	fmt.Println(res.Sources[0].Document) // ja-policy
+
+	// A script the tokenizer does not claim is nameable BEFORE you ask:
+	fmt.Println(tokenize.UnsupportedScripts("ការជូនដំណឹង")) // [khmer]
+
+	khmer := answer.Ask(corpus, "ការជូនដំណឹង?", answer.DefaultTopK)
+	fmt.Println(khmer.Evidence.Decision)           // refused
+	fmt.Println(khmer.Evidence.UnsupportedScripts) // [] — NOT populated by this port
+}
+```
+
+```text
+answered
+個人データの保持期間は五年間です。
+ja-policy
+[khmer]
+refused
+[]
+```
+
+**Two honest differences.** There is no language *detection*: `Sources[0].PassageLanguage`
+and `Result.AnswerLanguage` are both hardcoded `"en"` in this port, so read the
+passage, not the field. And a Khmer question refuses through the ordinary
+evidence-absent path — `Evidence.UnsupportedScripts` stays empty, so call
+`tokenize.UnsupportedScripts` yourself to tell a capability gap from an evidence
+gap.
+</TabItem>
+<TabItem label="JavaScript">
+JavaScript runs the same 14-script tokenizer and v2 gate as Go and Python, so the
+non-Latin passage is answered verbatim:
+
+```js
+import { ask, unsupportedScripts } from "@muthuishere/citenexus"
+
+const corpus = [
+  { document_id: "ja-policy", text: "個人データの保持期間は五年間です。" },
+  { document_id: "en-policy", text: "Invoices are retained for seven years." },
+]
+
+const res = ask(corpus, "個人データの保持期間は？")
+console.log(res.evidence.decision)   // answered
+console.log(res.answer)              // the Japanese sentence, verbatim
+console.log(res.sources[0].document) // ja-policy
+
+// A script the tokenizer does not claim is nameable BEFORE you ask:
+console.log(unsupportedScripts("ការជូនដំណឹង"))   // [ 'khmer' ]
+
+const khmer = ask(corpus, "ការជូនដំណឹង?")
+console.log(khmer.evidence.decision)             // refused
+console.log(khmer.evidence.unsupported_scripts)  // [] — NOT populated by this port
+```
+
+```text
+answered
+個人データの保持期間は五年間です。
+ja-policy
+[ 'khmer' ]
+refused
+[]
+```
+
+**Two honest differences.** No language detection — `sources[0].passage_language`
+and `answer_language` are both hardcoded `"en"` here. And a Khmer question takes
+the ordinary evidence-absent refusal: `evidence.unsupported_scripts` stays `[]`,
+so call `unsupportedScripts()` yourself to separate "I cannot read this script"
+from "the evidence isn't there".
+</TabItem>
+</Tabs>
 
 ## The rule that makes this defensible
 
@@ -56,10 +148,25 @@ an explicit `answer_language="de"` wins outright, the sentinel
 conversation, then the client's `default_answer_language`. The retrieved evidence
 does not vote.
 
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
 rag.ask("What is the retention period?", answer_language="de")     # forced German
 rag.ask("Quelle est la durée de conservation ?", answer_language="auto")  # detected
 ```
+</TabItem>
+<TabItem label="Go">
+**No answer-language resolution in this port.** `answerLanguage` is the constant
+`"en"` in `golang/answer`, there is no config layer to hold a
+`default_answer_language`, and `Ask` takes no such argument. What you get is the
+half that cannot lie: the verbatim passage in its own script.
+</TabItem>
+<TabItem label="JavaScript">
+**No answer-language resolution in this port.** `ask` emits
+`answer_language: "en"` unconditionally and takes no language argument — there is
+no config layer behind it. The verbatim passage is still the source's own script.
+</TabItem>
+</Tabs>
 
 <Aside type="caution" title="When verbatim and the answer language collide">
 The strict flow is extractive, so if the *only* support for a question is a
@@ -82,9 +189,31 @@ Each claimed script is backed by a golden conformance fixture. A script is
 claimed **only** when its evidence exists — the fixture generator fails if the
 claim set and the fixture set disagree in either direction.
 
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
 response.evidence.unsupported_scripts   # ('khmer',) — a CAPABILITY gap
 ```
+</TabItem>
+<TabItem label="Go">
+The tokenizer names the gap; the `Result` does not carry it. Ask the tokenizer
+directly — the run in the first tab shows both halves:
+
+```go
+tokenize.UnsupportedScripts("ការជូនដំណឹង") // [khmer]
+res.Evidence.UnsupportedScripts            // [] — always, in this port
+```
+</TabItem>
+<TabItem label="JavaScript">
+The tokenizer names the gap; the `Result` does not carry it. Ask the tokenizer
+directly:
+
+```js
+unsupportedScripts("ការជូនដំណឹង")   // [ 'khmer' ]
+res.evidence.unsupported_scripts    // [] — always, in this port
+```
+</TabItem>
+</Tabs>
 
 That signal is deliberately distinct from "no supporting evidence". An abstention
 carrying `unsupported_scripts` means *"I cannot read this script"*, which is a
@@ -97,14 +226,6 @@ The bigram path mechanically works for them. That is precisely why they are not
 claimed: answering through a segmentation no fixture has ever checked produces an
 answer indistinguishable, at the point of use, from a verified one. Refusing is
 the honest output until a golden fixture exists.
-</Aside>
-
-<Aside type="note" title="The same 14 scripts in Go and JavaScript">
-The ports are not Latin-only: Go and JavaScript ship the same Unicode tokenizer
-over the same canonical 14-script table, and it drives BM25 and the v2
-faithfulness predicate in both. The Python-only part of this page is the facade
-around it — `ask()`, `answer_language` resolution at the client, the detector
-seam. See [Languages & multilingual](/citenexus/languages/) for the full matrix.
 </Aside>
 
 ## Known sharp edge

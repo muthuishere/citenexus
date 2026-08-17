@@ -3,8 +3,7 @@ title: Wrong subject, right source
 description: A grounded, top-authority citation can still be about the wrong kind of thing. Applicability severance is why — the clause that decides whether a rule applies gets chunked into a different Evidence Unit than the rule itself.
 ---
 
-import { Aside, Steps } from '@astrojs/starlight/components';
-import FacadeNote from '../../../components/FacadeNote.astro';
+import { Aside, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 
 **The failure this does NOT yet prevent.** This page documents a known open gap,
 not a feature. Read it before you put CiteNexus in front of anyone who will act on
@@ -74,6 +73,101 @@ Retrieval selected `::3::0`. The gate saw `::3::0`. The generator saw `::3::0`.
 **Nothing in the pipeline ever saw the sentence saying this rule does not apply to
 a lease with a specified term.**
 
+That is not a Python defect — it is what chunk-local verification does in every
+implementation. **The same corpus produces the same wrong-scope answer in all
+three**, which is the clearest way to show the gap is structural and that no port
+closes it:
+
+<Tabs syncKey="lang">
+<TabItem label="Python">
+The failure above is from the live law benchmark; the shape reduces to two
+Evidence Units, one holding the precondition and one holding the rule. `ask()`
+selects the rule, the gate passes it verbatim, and the precondition is never in
+front of anything.
+
+```python
+rag.ingest(text="(a) A hiring of residential real property for a term not "
+                "specified by the parties is deemed renewed as stated in "
+                "Section 1945.",
+           document_id="ca-civ-1946_1::2")
+rag.ingest(text="The owner shall give notice at least 60 days prior to the "
+                "proposed date of termination.",
+           document_id="ca-civ-1946_1::3")
+
+response = rag.ask("How much notice must a landlord give to terminate a "
+                   "fixed five-year commercial lease?")
+print(response.evidence.decision)     # answered — every guard passed
+print(response.sources[0].document)   # ca-civ-1946_1::3
+```
+</TabItem>
+<TabItem label="Go">
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/muthuishere/citenexus/golang/answer"
+)
+
+func main() {
+	// One statutory subdivision per Evidence Unit — the precondition and the
+	// operative rule are in different units.
+	corpus := []answer.Doc{
+		{DocumentID: "ca-civ-1946_1::2", Text: "(a) A hiring of residential real property for a term not specified by the parties is deemed renewed as stated in Section 1945."},
+		{DocumentID: "ca-civ-1946_1::3", Text: "The owner shall give notice at least 60 days prior to the proposed date of termination."},
+	}
+
+	res := answer.Ask(corpus, "How much notice must a landlord give to terminate a fixed five-year commercial lease?", answer.DefaultTopK)
+
+	fmt.Println(res.Evidence.Decision)   // answered — every guard passed
+	fmt.Println(res.Answer)              // ...and the answer is out of scope
+	fmt.Println(res.Sources[0].Document) // ca-civ-1946_1::3
+}
+```
+
+```text
+answered
+The owner shall give notice at least 60 days prior to the proposed date of termination.
+ca-civ-1946_1::3
+```
+
+Go has **no authority tiers** either (`Evidence.AuthorityTier` is always empty
+here — selection lives in the Python facade), so mitigation 2 below is not
+available in this port. Mitigation 1 — keeping the precondition and the rule in
+the same `Doc` — is, and it is the one that actually works.
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { ask } from "@muthuishere/citenexus"
+
+// One statutory subdivision per Evidence Unit — the precondition and the
+// operative rule are in different units.
+const corpus = [
+  { document_id: "ca-civ-1946_1::2", text: "(a) A hiring of residential real property for a term not specified by the parties is deemed renewed as stated in Section 1945." },
+  { document_id: "ca-civ-1946_1::3", text: "The owner shall give notice at least 60 days prior to the proposed date of termination." },
+]
+
+const res = ask(corpus, "How much notice must a landlord give to terminate a fixed five-year commercial lease?")
+
+console.log(res.evidence.decision)   // answered — every guard passed
+console.log(res.answer)              // ...and the answer is out of scope
+console.log(res.sources[0].document) // ca-civ-1946_1::3
+```
+
+```text
+answered
+The owner shall give notice at least 60 days prior to the proposed date of termination.
+ca-civ-1946_1::3
+```
+
+JavaScript has **no authority tiers** (`evidence.authority_tier` is always `""` —
+selection is in the Python facade), so mitigation 2 below does not apply here.
+Mitigation 1 — keeping the precondition and the rule in the same document — does,
+and it is the one that actually works.
+</TabItem>
+</Tabs>
+
 Measured over that corpus: **8 of 11** operative notice-period Evidence Units are
 citable in isolation from the precondition that governs them — a **73%
 applicability-severance rate**. Five of the six documents state their term-scope
@@ -92,8 +186,6 @@ this number as a library property.
 
 Nothing here closes the class. Each raises the cost of a wrong-scope answer.
 
-<FacadeNote />
-
 <Steps>
 
 1. **Keep the whole applicability clause in one chunk.** This is the highest-value
@@ -110,10 +202,27 @@ Nothing here closes the class. Each raises the cost of a wrong-scope answer.
    `residential-*` and `commercial-*` tiers, and flooring per question class, is a
    deterministic, refusal-only filter you can ship now:
 
+   <Tabs syncKey="lang">
+   <TabItem label="Python">
    ```python
    rag.ingest(path, document_id=path.stem,
               authority={"authority_tier": "ca-residential-periodic"})
    ```
+   </TabItem>
+   <TabItem label="Go">
+   **No authority layer in this port.** `Evidence.AuthorityTier` and
+   `Evidence.AuthorityFloorApplied` are carried for wire parity and always empty
+   / false — authority selection runs in Python's `ask()` facade. To floor by
+   scope here, split the corpus yourself and pass only the tier the question
+   belongs to.
+   </TabItem>
+   <TabItem label="JavaScript">
+   **No authority layer in this port.** `evidence.authority_tier` and
+   `evidence.authority_floor_applied` are always `""` / `false` — selection runs
+   in Python's facade. Floor by scope by passing `ask` only the subset of
+   documents the question's class is entitled to.
+   </TabItem>
+   </Tabs>
 
    This is exactly the ADR-0004 seam — a curator's assertion turned into a
    deterministic input. It does **not** generalise to scope facts that vary

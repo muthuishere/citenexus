@@ -3,25 +3,27 @@ title: Access & partitions
 description: CiteNexus gives you the building blocks for tenant/RBAC isolation — scope resolution, a hard partition pre-filter, and an opaque ACL predicate — that you compose. It does not enforce access automatically.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
-import FacadeNote from '../../components/FacadeNote.astro';
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-Multi-tenant and RBAC isolation is built on **partitions**. CiteNexus ships the
+Multi-tenant and RBAC isolation is built on **partitions**. Python ships the
 composable pre-filter pieces — resolve a scope to a partition, hard-filter
 candidate partitions, apply an opaque ACL predicate — and you wire them into your
-own authorization flow.
+own authorization flow. Go and JavaScript ship no access module, so the same
+three steps are ~20 lines you own; the shape is identical because the rule is
+just "contiguous prefix from the root, matched before retrieval".
 
 <Aside type="caution" title="Carried, not enforced">
 These helpers are a **toolkit you call** — CiteNexus does **not** enforce them
 automatically. There is no `allowed_partitions` argument on the constructor and no
 `scope` argument on `ask()`. The `acl` you pass to `ingest()` is **carried**
 alongside the evidence, never parsed or enforced by the library. Enforcement is
-the host's job — compose the helpers below before retrieval.
+the host's job — compose the helpers below before retrieval. That is doubly true
+in the ports, where there is no library code involved at all.
 </Aside>
 
 ## The helpers
 
-Import: `from citenexus.access import resolve_scope, filter_partitions, allowed_partition, apply_acl_predicate`
+Python — `from citenexus.access import resolve_scope, filter_partitions, allowed_partition, apply_acl_predicate`:
 
 - **`resolve_scope(scope, hierarchy)`** → `PartitionPath` — turn a scope dict
   (e.g. `{"org": "acme", "team": "legal"}`) into a contiguous-prefix partition.
@@ -34,22 +36,184 @@ Import: `from citenexus.access import resolve_scope, filter_partitions, allowed_
   stage: your `predicate` decides; the library never interprets the ACL. `None` =
   keep all.
 
+Go and JavaScript have **no `access` package** — the tabs below implement the
+same four functions over a partition string.
+
 ## The pattern
 
-<FacadeNote />
-
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
-from citenexus.access import resolve_scope, filter_partitions
+from citenexus.access import resolve_scope, filter_partitions, apply_acl_predicate
 
 # 1. Resolve the caller's scope to the partition they're allowed to see.
-allowed = {resolve_scope({"org": "acme", "team": "legal"}, hierarchy=["org", "team"])}
+allowed_path = resolve_scope({"org": "acme", "team": "legal"}, hierarchy=["org", "team"])
+print(allowed_path.as_pairs())          # (('org', 'acme'), ('team', 'legal'))
 
 # 2. Hard pre-filter your candidate partitions to that set BEFORE retrieval.
-visible = filter_partitions(candidate_partitions, allowed)
+other = resolve_scope({"org": "globex", "team": "legal"}, hierarchy=["org", "team"])
+visible = filter_partitions([allowed_path, other], {allowed_path})
+print(len(visible))                     # 1
 
-# 3. Ingest tenant data under its partition, carrying an opaque acl.
+# 3. Then the opaque ACL stage — your predicate decides, the library never looks inside.
+objects = [{"id": "a", "acl": {"role": "legal"}}, {"id": "b", "acl": {"role": "hr"}}]
+print(apply_acl_predicate(objects, lambda o: o["acl"], lambda acl: acl["role"] == "legal"))
+#  [{'id': 'a', 'acl': {'role': 'legal'}}]
+
+# 4. Ingest tenant data under its partition, carrying an opaque acl.
 rag.ingest("contracts/nda.pdf", acl={"role": "legal"})   # acl is carried, not enforced
 ```
 
+A gap in the scope is refused rather than silently widened:
+
+```python
+resolve_scope({"team": "legal"}, hierarchy=["org", "team"])
+#  ValueError: scope has a gap before level 'team': a partition prefix must be
+#  contiguous from the root (hierarchy=['org', 'team'])
+```
+</TabItem>
+<TabItem label="Go">
+```go
+// No access package in the Go port — a partition is a path prefix you own.
+import (
+	"fmt"
+	"strings"
+
+	"github.com/muthuishere/citenexus/golang/answer"
+	"github.com/muthuishere/citenexus/golang/storage"
+)
+
+func resolveScope(scope map[string]string, hierarchy []string) (string, error) {
+	parts := make([]string, 0, len(hierarchy))
+	for _, level := range hierarchy {
+		value, ok := scope[level]
+		if !ok {
+			break // a contiguous prefix from the root — stop at the first gap
+		}
+		parts = append(parts, level+"="+value)
+	}
+	if len(parts) == 0 {
+		return "", fmt.Errorf("scope resolves to no partition (hierarchy=%v)", hierarchy)
+	}
+	return strings.Join(parts, "/"), nil
+}
+
+func allowedPartition(candidate string, allowed []string) bool {
+	for _, a := range allowed {
+		if candidate == a || strings.HasPrefix(candidate, a+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+func filterPartitions(candidates, allowed []string) []string {
+	kept := make([]string, 0, len(candidates))
+	for _, c := range candidates {
+		if allowedPartition(c, allowed) {
+			kept = append(kept, c)
+		}
+	}
+	return kept
+}
+
+// A tenant document carries its partition and an opaque acl nothing interprets.
+type tenantDoc struct {
+	answer.Doc
+	Partition string
+	ACL       map[string]string
+}
+
+// 1. Resolve the caller's scope to the partition they may see.
+allowed, err := resolveScope(map[string]string{"org": "acme", "team": "legal"}, []string{"org", "team"})
+if err != nil {
+	panic(err)
+}
+fmt.Println("allowed:", allowed)
+//  allowed: org=acme/team=legal
+
+// 2. Hard pre-filter the candidate partitions BEFORE retrieval.
+candidates := []string{"org=acme/team=legal", "org=globex/team=legal"}
+fmt.Println("visible:", filterPartitions(candidates, []string{allowed}))
+//  visible: [org=acme/team=legal]
+
+// 3. Filter the corpus to those partitions, then apply your own ACL predicate.
+all := []tenantDoc{
+	{Doc: answer.Doc{DocumentID: "acme-nda", Text: "The employee shall not disclose confidential information."},
+		Partition: "org=acme/team=legal", ACL: map[string]string{"role": "legal"}},
+	{Doc: answer.Doc{DocumentID: "globex-nda", Text: "The contractor shall not disclose confidential information."},
+		Partition: "org=globex/team=legal", ACL: map[string]string{"role": "legal"}},
+}
+var corpus []answer.Doc
+for _, d := range all {
+	if allowedPartition(d.Partition, []string{allowed}) && d.ACL["role"] == "legal" {
+		corpus = append(corpus, d.Doc)
+	}
+}
+
+res := answer.Ask(corpus, "Can the employee disclose confidential information?", answer.DefaultTopK)
+fmt.Println(len(corpus), "visible docs |", res.Evidence.Decision, "|", res.Sources[0].Document)
+//  1 visible docs | answered | acme-nda
+
+// The same partition string names the store's leaf table.
+fmt.Println("table:", storage.TableNameFor("citenexus", "org=acme/team=legal"))
+//  table: citenexus_org_acme_team_legal
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+// No access module in the JavaScript port — a partition is a path prefix you own.
+import { ask, tableNameFor } from "@muthuishere/citenexus";
+
+function resolveScope(scope, hierarchy) {
+  const parts = [];
+  for (const level of hierarchy) {
+    if (!(level in scope)) break;   // a contiguous prefix from the root
+    parts.push(`${level}=${scope[level]}`);
+  }
+  if (parts.length === 0) throw new Error(`scope resolves to no partition (hierarchy=${hierarchy})`);
+  return parts.join("/");
+}
+
+const allowedPartition = (candidate, allowed) =>
+  allowed.some((a) => candidate === a || candidate.startsWith(`${a}/`));
+
+const filterPartitions = (candidates, allowed) =>
+  candidates.filter((c) => allowedPartition(c, allowed));
+
+// 1. Resolve the caller's scope to the partition they may see.
+const allowed = resolveScope({ org: "acme", team: "legal" }, ["org", "team"]);
+console.log("allowed:", allowed);
+//  allowed: org=acme/team=legal
+
+// 2. Hard pre-filter the candidate partitions BEFORE retrieval.
+console.log("visible:", filterPartitions(["org=acme/team=legal", "org=globex/team=legal"], [allowed]));
+//  visible: [ 'org=acme/team=legal' ]
+
+// 3. Filter the corpus to those partitions, then apply your own ACL predicate.
+const all = [
+  { document_id: "acme-nda", text: "The employee shall not disclose confidential information.",
+    partition: "org=acme/team=legal", acl: { role: "legal" } },
+  { document_id: "globex-nda", text: "The contractor shall not disclose confidential information.",
+    partition: "org=globex/team=legal", acl: { role: "legal" } },
+];
+const corpus = all
+  .filter((d) => allowedPartition(d.partition, [allowed]) && d.acl.role === "legal")
+  .map(({ document_id, text }) => ({ document_id, text }));
+
+const res = ask(corpus, "Can the employee disclose confidential information?");
+console.log(corpus.length, "visible docs |", res.evidence.decision, "|", res.sources[0].document);
+//  1 visible docs | answered | acme-nda
+
+// The same partition string names the store's leaf table.
+console.log("table:", tableNameFor("citenexus", "org=acme/team=legal"));
+//  table: citenexus_org_acme_team_legal
+```
+</TabItem>
+</Tabs>
+
 The design keeps CiteNexus out of your identity system: it gives you a hard
-partition boundary and an ACL hook, and lets your host own who-can-see-what.
+partition boundary and an ACL hook, and lets your host own who-can-see-what. Note
+what the tabs have in common — the filter runs **before** the ask, never after.
+Filtering an answer is not access control; the ungrantable passage must never
+reach the generator in the first place.

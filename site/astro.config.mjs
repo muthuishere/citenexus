@@ -2,12 +2,39 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import starlightLlmsTxt from 'starlight-llms-txt';
+// Resolved from python/pyproject.toml + js/package.json (cross-checked) at build time.
+// Importing it here means a drifted/unreadable manifest fails the build at config load,
+// before a single page renders. Never hardcode the version.
+import { CITENEXUS_VERSION, CITENEXUS_RELEASE_URL } from './src/components/version.mjs';
+
+/**
+ * Exposes the build-time-resolved library version to components as
+ * `virtual:citenexus/version`. The values are baked in here, in Node, so nothing
+ * has to touch the filesystem from inside a bundled chunk.
+ * @returns {import('vite').Plugin}
+ */
+function citenexusVersionPlugin() {
+	const id = 'virtual:citenexus/version';
+	const resolved = '\0' + id;
+	return {
+		name: 'citenexus:version',
+		resolveId: (source) => (source === id ? resolved : null),
+		load: (loadedId) =>
+			loadedId === resolved
+				? `export const CITENEXUS_VERSION = ${JSON.stringify(CITENEXUS_VERSION)};\n` +
+					`export const CITENEXUS_RELEASE_URL = ${JSON.stringify(CITENEXUS_RELEASE_URL)};\n`
+				: null,
+	};
+}
+
+console.log(`[citenexus] building docs for library version ${CITENEXUS_VERSION}`);
 
 // Project GitHub Pages: https://muthuishere.github.io/citenexus
 // https://astro.build/config
 export default defineConfig({
 	site: 'https://muthuishere.github.io',
 	base: '/citenexus',
+	vite: { plugins: [citenexusVersionPlugin()] },
 	integrations: [
 		starlight({
 			plugins: [
@@ -21,6 +48,10 @@ export default defineConfig({
 			],
 			title: 'CiteNexus',
 			tagline: 'Answers you can defend.',
+			// Wordmark + a small version pill linking to the matching release tag.
+			components: {
+				SiteTitle: './src/components/SiteTitle.astro',
+			},
 			// In-page nav for the long pages (several run past 200 lines with 8-10 H2s).
 			// H2s only, so the right-hand rail stays a map, not a second sidebar.
 			tableOfContents: { minHeadingLevel: 2, maxHeadingLevel: 2 },

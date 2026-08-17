@@ -3,8 +3,7 @@ title: Which scenario?
 description: Eight worked builds — contract review, conflicting sources, regulated audit, right-to-erasure, multilingual desks, cross-lingual retrieval, corpus evaluation, and a support assistant that refuses rather than invents — plus one honest account of a failure not yet closed.
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
-import FacadeNote from '../../../components/FacadeNote.astro';
+import { Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
 
 Each scenario is a complete build, not a snippet: the problem, the code, what
 comes back, and — most importantly — **the specific failure it protects you
@@ -63,8 +62,13 @@ can plan against.
 
 ## The shape every scenario shares
 
-<FacadeNote />
+Every scenario below starts from one of these three entry points. They are
+**different shapes, not translations of each other**: Python owns the corpus for
+you (storage, ingest, models, config); Go and JavaScript take the corpus as an
+argument and hand back the identical cite-or-abstain `Result`.
 
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
 from citenexus import CiteNexus
 from citenexus import OpenAICompatibleEmbedding, OpenAICompatibleGenerator
@@ -76,9 +80,93 @@ rag = CiteNexus(
     generator=OpenAICompatibleGenerator(
         base_url="http://localhost:11434/v1", model="qwen2.5"),
 )
+
+rag.ingest("employee-nda.pdf")
+response = rag.ask("Can the employee disclose confidential information?")
 ```
+</TabItem>
+<TabItem label="Go">
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/muthuishere/citenexus/golang/answer"
+)
+
+func main() {
+	corpus := []answer.Doc{
+		{DocumentID: "employee-nda", Text: "The employee shall not disclose confidential information."},
+	}
+
+	res := answer.Ask(corpus, "Can the employee disclose confidential information?", answer.DefaultTopK)
+
+	fmt.Println(res.Evidence.Decision)   // answered
+	fmt.Println(res.Answer)              // verbatim from the corpus — or the refusal
+	fmt.Println(res.Sources[0].Document) // employee-nda
+}
+```
+
+```text
+answered
+The employee shall not disclose confidential information.
+employee-nda
+```
+
+**The difference:** there is no `CiteNexus` object, no `ingest()`, no storage and
+no config — you pass the corpus in memory on every call. `Ask` runs on
+deterministic in-process fakes (no endpoint needed); `answer.AskWith(corpus, q,
+topK, answer.Providers{…})` puts your own models behind the same flow.
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { ask } from "@muthuishere/citenexus"
+
+const corpus = [
+  { document_id: "employee-nda", text: "The employee shall not disclose confidential information." },
+]
+
+const res = ask(corpus, "Can the employee disclose confidential information?")
+
+console.log(res.evidence.decision)   // answered
+console.log(res.answer)              // verbatim from the corpus — or the refusal
+console.log(res.sources[0].document) // employee-nda
+```
+
+```text
+answered
+The employee shall not disclose confidential information.
+employee-nda
+```
+
+**The difference:** same as Go — no facade, no storage, corpus in memory. Note
+`topK` lives **inside the options object** here (`askWith(corpus, q, { embedding,
+generator, topK })`), where Go takes it positionally.
+</TabItem>
+</Tabs>
 
 Nothing is bundled. Every model is an injected OpenAI-compatible endpoint, so
 the same code runs against Ollama on your laptop, a self-hosted vLLM inside your
 VPC, or a hosted API — which is what makes an EU-sovereign or air-gapped
 deployment a configuration choice rather than a fork.
+
+<Tabs syncKey="lang">
+<TabItem label="Python">
+Every scenario page below is written against this facade: `ingest` / `ask` /
+`retrieve` / `evaluate` / `delete` / `reconcile`, with storage on disk or S3.
+</TabItem>
+<TabItem label="Go">
+Go ships the [deterministic core](/citenexus/deterministic-core/) — the
+faithfulness gate, the 14-script tokenizer, the chunker, BM25, RRF and `Result`,
+at conformance parity with Python. It has **no** S3 storage layer, no ACL, no
+vision, no `evaluate()` and no `reconcile()`; each page below says so in this
+tab where the Python step depends on one.
+</TabItem>
+<TabItem label="JavaScript">
+JavaScript ships the same [deterministic core](/citenexus/deterministic-core/) as
+Go, at the same conformance parity, with the same gaps — no storage, ACL, vision,
+`evaluate()` or `reconcile()`. Each page below names the gap in this tab rather
+than sending you elsewhere.
+</TabItem>
+</Tabs>

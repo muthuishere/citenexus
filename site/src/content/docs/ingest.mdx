@@ -3,14 +3,15 @@ title: Ingest anything
 description: Ingest a file, raw text, or a URL — each idempotent by content hash. Every source becomes cited Evidence Units. A crawl() helper walks a site same-domain.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
-import FacadeNote from '../../components/FacadeNote.astro';
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-Ingest a file, raw text, or a URL. Each call returns an `IngestResult` and is
-idempotent by content hash — re-ingesting an unchanged `document_id` does no work.
+Ingest a file, raw text, or a URL. Python's `ingest()` writes into a persistent
+store and is idempotent by content hash. Go and JavaScript have no store on the
+plain `go get` / `npm install` surface, so they do the same job in memory: turn a
+source into chunked corpus documents and pass that corpus to `Ask` / `ask`.
 
-<FacadeNote />
-
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
 from citenexus.extract.types import SourceType
 
@@ -19,19 +20,112 @@ rag.ingest(text="Clause 4: 90 days notice.", document_id="c4")   # raw text (pla
 rag.ingest("https://example.com/policy")          # a URL → fetched, HTML-extracted
 rag.ingest(image_bytes, source_type=SourceType.image, document_id="fig-1")  # an image
 ```
+</TabItem>
+<TabItem label="Go">
+```go
+// No store on the plain `go get` surface: a source becomes corpus documents.
+import (
+	"fmt"
+	"os"
 
-Each `ingest()` returns an `IngestResult`:
+	"github.com/muthuishere/citenexus/golang/answer"
+	"github.com/muthuishere/citenexus/golang/chunker"
+)
 
+func ingestFile(path, documentID string) []answer.Doc {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		panic(err)
+	}
+	var docs []answer.Doc
+	for i, chunk := range chunker.ChunkText(string(raw), chunker.DefaultMaxTokens, chunker.DefaultOverlap) {
+		docs = append(docs, answer.Doc{DocumentID: fmt.Sprintf("%s::%d", documentID, i), Text: chunk})
+	}
+	return docs
+}
+
+corpus := ingestFile("corpus/nda.txt", "nda")
+corpus = append(corpus, answer.Doc{DocumentID: "clause-4", Text: "Clause 4: 90 days notice."})
+
+res := answer.Ask(corpus, "Can the employee disclose confidential information?", answer.DefaultTopK)
+fmt.Println(len(corpus), "documents |", res.Evidence.Decision, "|", res.Sources[0].Document)
+//  2 documents | answered | nda::0
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+// No store on the plain `npm install` surface: a source becomes corpus documents.
+import { readFileSync } from "node:fs";
+import { ask, chunkText } from "@muthuishere/citenexus";
+
+function ingestFile(path, documentId) {
+  const raw = readFileSync(path, "utf8");
+  return chunkText(raw).map((text, i) => ({ document_id: `${documentId}::${i}`, text }));
+}
+
+const corpus = [
+  ...ingestFile("corpus/nda.txt", "nda"),
+  { document_id: "clause-4", text: "Clause 4: 90 days notice." },
+];
+
+const res = ask(corpus, "Can the employee disclose confidential information?");
+console.log(corpus.length, "documents |", res.evidence.decision, "|", res.sources[0].document);
+//  2 documents | answered | nda::0
+```
+</TabItem>
+</Tabs>
+
+## What comes back
+
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
-r = rag.ingest("report.pdf")
-print(r.status, r.n_units)     # "ingested" 42   (or "unchanged" 0 on a re-ingest)
-print(r.document_id, r.eu_ids) # the id and the Evidence-Unit ids created
+r = rag.ingest("corpus/nda.txt")
+print(r.status, r.n_units)     # "ingested" 1   (or "unchanged" 0 on a re-ingest)
+print(r.document_id, r.eu_ids) # "nda" ('nda::0::0',)
 ```
 
+Re-ingesting the same `document_id` with identical bytes is a no-op:
+
+```python
+rag.ingest(text="Clause 4: 90 days notice.", document_id="c4").status   # "ingested"
+rag.ingest(text="Clause 4: 90 days notice.", document_id="c4").status   # "unchanged"
+```
+</TabItem>
+<TabItem label="Go">
+```go
+// The corpus slice *is* the result: one Doc per chunk, with the ids you assigned.
+docs := ingestFile("corpus/nda.txt", "nda")
+for _, d := range docs {
+	fmt.Println(d.DocumentID, len(d.Text))
+}
+//  nda::0 148
+```
+
+There is no `status`/`unchanged` to read because nothing is persisted — see
+[bulk & batch ingest](/citenexus/bulk-ingest/) for the content-hash dedup you add
+yourself with `euid.Checksum`.
+</TabItem>
+<TabItem label="JavaScript">
+```js
+// The corpus array *is* the result: one document per chunk, with the ids you assigned.
+const docs = ingestFile("corpus/nda.txt", "nda");
+for (const d of docs) console.log(d.document_id, d.text.length);
+//  nda::0 148
+```
+
+There is no `status`/`unchanged` to read because nothing is persisted — see
+[bulk & batch ingest](/citenexus/bulk-ingest/) for the content-hash dedup you add
+yourself with `sha256Hex`.
+</TabItem>
+</Tabs>
+
 <Aside type="note" title="One source at a time">
-`ingest()` takes a single source. It does **not** walk a directory and there is
-**no** no-argument "ingest the whole bucket/folder" call — pass each file, URL, or
-text yourself. For whole-site intake, use `crawl()` below.
+Python's `ingest()` takes a single source. It does **not** walk a directory and
+there is **no** no-argument "ingest the whole bucket/folder" call — pass each
+file, URL, or text yourself. For whole-site intake, use `crawl()` below. The Go
+and JavaScript helpers above are per-file for the same reason; loop them
+yourself ([bulk & batch ingest](/citenexus/bulk-ingest/)).
 </Aside>
 
 Ingest has an inverse: [`rag.delete(document_id)`](/citenexus/revoke/) (alias
@@ -40,12 +134,28 @@ idempotently, and guarding raw blobs shared by identical bytes.
 
 ## Crawl a site
 
+<Tabs syncKey="lang">
+<TabItem label="Python">
 `crawl()` does a same-domain breadth-first walk, ingesting each page as HTML:
 
 ```python
 results = rag.crawl("https://docs.example.com", max_pages=50, max_depth=3)
 print(len(results), "pages ingested")
 ```
+</TabItem>
+<TabItem label="Go">
+No crawler in the Go port — fetch the pages with `net/http`, then feed each body
+through the same `chunker.ChunkText` → `[]answer.Doc` path as a file. The port
+ships no HTML extractor on the plain `go get` surface either (that lives in the
+Rust core, behind the `citenexus_ffi` build tag), so you strip markup yourself.
+</TabItem>
+<TabItem label="JavaScript">
+No crawler in the JavaScript port — `fetch()` the pages, then feed each body
+through the same `chunkText` → corpus path as a file. The port ships no HTML
+extractor on the plain `npm install` surface either (that lives in the Rust core,
+behind the `@muthuishere/citenexus/ingest` subpath), so you strip markup yourself.
+</TabItem>
+</Tabs>
 
 ## Supported formats
 
@@ -74,10 +184,12 @@ Which indexes get built from the extracted units is governed by the
 [signals](/citenexus/signals/) you declared.
 
 <Aside type="note" title="Where extraction actually runs">
-**Go and JavaScript** extract through the shared Rust core (`citenexus_extract`).
-The **Python** reference does not — it uses `pdfplumber` for PDF and `openpyxl`
-for XLSX, and holds itself to the Rust twin with parity tests instead. Today
-**XLSX byte-identity is test-pinned**; **PDF has neither a parity test nor a
-conformance case**, so do not assume a PDF extracts identically across the three
-languages.
+**Go and JavaScript** extract through the shared Rust core (`citenexus_extract`)
+— reachable behind the `citenexus_ffi` build tag (Go) and the
+`@muthuishere/citenexus/ingest` subpath (JavaScript), both of which need the Rust
+cdylib built. The **Python** reference does not use it — it uses `pdfplumber` for
+PDF and `openpyxl` for XLSX, and holds itself to the Rust twin with parity tests
+instead. Today **XLSX byte-identity is test-pinned**; **PDF has neither a parity
+test nor a conformance case**, so do not assume a PDF extracts identically across
+the three languages.
 </Aside>

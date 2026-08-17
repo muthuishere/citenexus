@@ -3,21 +3,124 @@ title: Evaluate
 description: Score a corpus against a golden CSV — answered/refused counts plus groundedness, citation, and expected-support rates. Returns an in-memory EvaluationReport.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
-import FacadeNote from '../../components/FacadeNote.astro';
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-Prove the guarantee holds on *your* corpus. `evaluate()` runs each row of a golden
-CSV through `ask()` and returns an `EvaluationReport`.
+Prove the guarantee holds on *your* corpus. Python's `evaluate()` runs each row of
+a golden CSV through `ask()` and returns an `EvaluationReport`. Go and JavaScript
+have no `evaluate()` — you drive `Ask` / `ask` over the rows and count, which
+produces the same numbers because it is the same flow.
 
-<FacadeNote />
+All three tabs below run the same two-row `golden.csv` against the same two-doc
+corpus and print identical counts and rates.
 
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
 from citenexus.evaluate import EvaluationReport
 
 report: EvaluationReport = rag.evaluate("golden.csv")
 print(report.total, report.answered, report.refused)
 print(report.groundedness_rate, report.citation_rate, report.expected_support_rate)
+#  2 1 1
+#  1.0 1.0 0.5
 ```
+</TabItem>
+<TabItem label="Go">
+```go
+// No evaluate() in the Go port — drive Ask over the golden rows and count.
+import (
+	"encoding/csv"
+	"fmt"
+	"os"
+	"strings"
+
+	"github.com/muthuishere/citenexus/golang/answer"
+	"github.com/muthuishere/citenexus/golang/gate"
+	"github.com/muthuishere/citenexus/golang/result"
+)
+
+corpus := []answer.Doc{
+	{DocumentID: "nda", Text: "The employee shall not disclose confidential information."},
+	{DocumentID: "leave", Text: "Employees accrue twenty days of annual leave."},
+}
+
+f, err := os.Open("golden.csv")
+if err != nil {
+	panic(err)
+}
+defer f.Close()
+rows, err := csv.NewReader(f).ReadAll()
+if err != nil {
+	panic(err)
+}
+
+total, answered, refused, grounded, cited, supported := 0, 0, 0, 0, 0, 0
+for _, row := range rows[1:] { // skip the header
+	question, expected := row[0], row[1]
+	total++
+	res := answer.Ask(corpus, question, answer.DefaultTopK)
+	if res.Evidence.Decision != result.DecisionAnswered {
+		refused++
+		continue
+	}
+	answered++
+	if res.Evidence.AllClaimsVerified {
+		grounded++
+	}
+	if len(res.Sources) > 0 {
+		cited++
+	}
+	// expected-support: an empty `expected` counts any answer (see the warning below).
+	if strings.TrimSpace(expected) == "" || gate.IsSupportedV2(expected, res.Answer) {
+		supported++
+	}
+}
+fmt.Println(total, answered, refused)
+fmt.Printf("%.1f %.1f %.1f\n",
+	float64(grounded)/float64(answered),
+	float64(cited)/float64(answered),
+	float64(supported)/float64(total))
+//  2 1 1
+//  1.0 1.0 0.5
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+// No evaluate() in the JavaScript port — drive ask over the golden rows and count.
+import { readFileSync } from "node:fs";
+import { ask, isSupportedV2 } from "@muthuishere/citenexus";
+
+const corpus = [
+  { document_id: "nda", text: "The employee shall not disclose confidential information." },
+  { document_id: "leave", text: "Employees accrue twenty days of annual leave." },
+];
+
+// A golden row is `question,expected` with either field optionally quoted.
+const parseRow = (line) =>
+  (line.match(/("[^"]*"|[^,]*)(?:,|$)/g) ?? [])
+    .slice(0, 2)
+    .map((f) => f.replace(/,$/, "").replace(/^"|"$/g, ""));
+
+const rows = readFileSync("golden.csv", "utf8").trim().split("\n").slice(1).map(parseRow);
+
+let total = 0, answered = 0, refused = 0, grounded = 0, cited = 0, supported = 0;
+for (const [question, expected] of rows) {
+  total++;
+  const res = ask(corpus, question);
+  if (res.evidence.decision !== "answered") { refused++; continue; }
+  answered++;
+  if (res.evidence.all_claims_verified) grounded++;
+  if (res.sources.length > 0) cited++;
+  // expected-support: an empty `expected` counts any answer (see the warning below).
+  if (!expected.trim() || isSupportedV2(expected, res.answer)) supported++;
+}
+console.log(total, answered, refused);
+console.log((grounded / answered).toFixed(1), (cited / answered).toFixed(1), (supported / total).toFixed(1));
+//  2 1 1
+//  1.0 1.0 0.5
+```
+</TabItem>
+</Tabs>
 
 ## The golden CSV
 
@@ -38,29 +141,64 @@ question,expected
 <Aside type="danger" title="`evaluate()` cannot score abstention — and scores it backwards">
 That second rule is the opposite of what you probably want. A blank `expected`
 does **not** mean "this row should be refused". It means "any answer counts",
-so a **correct refusal earns nothing and lowers `expected_support_rate`.**
+so a **correct refusal earns nothing and lowers `expected_support_rate`.** That
+is exactly why the runs above report `0.5` — the France row is *correctly*
+refused and is scored as a miss.
 
-This is why the [law example](/citenexus/benchmark-law/) reads 45% expected
+This is also why the [law example](/citenexus/benchmark-law/) reads 45% expected
 support while its groundedness and citation rates are both 100% — five of its
 eleven rows are refusals, four of them correct.
 
 **Do not build a refusal regression gate on `expected_support_rate`.** To assert
-abstention, drive `ask()` yourself and check the decision:
+abstention, drive the ask yourself and check the decision:
 
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
 from citenexus.answer.result import Decision
 
 must_refuse = ["What is the maximum security deposit under this statute?"]
 for q in must_refuse:
     assert rag.ask(q).evidence.decision is Decision.refused, q
+print("refusal assertion held")
 ```
+</TabItem>
+<TabItem label="Go">
+```go
+mustRefuse := []string{"What is the maximum security deposit under this statute?"}
+for _, q := range mustRefuse {
+	res := answer.Ask(corpus, q, answer.DefaultTopK)
+	if res.Evidence.Decision != result.DecisionRefused {
+		panic("expected a refusal for: " + q)
+	}
+}
+fmt.Println("refusal assertion held")
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import assert from "node:assert/strict";
+
+const mustRefuse = ["What is the maximum security deposit under this statute?"];
+for (const q of mustRefuse) {
+  assert.equal(ask(corpus, q).evidence.decision, "refused", q);
+}
+console.log("refusal assertion held");
+```
+</TabItem>
+</Tabs>
 </Aside>
 
 <Aside type="caution" title="`evaluate()` passes no options through to `ask()`">
-`evaluate()` calls `ask(question)` bare — no `mode`, `k`, `answer_language` or
-`search_languages` (`client.py:883-885`, `evaluate.py:72`). On a multilingual
-corpus its counts will differ from a harness that fans out over
-`search_languages`, and that difference is the missing fan-out, not a regression.
+Python's `evaluate()` calls `ask(question)` bare — no `mode`, `k`,
+`answer_language` or `search_languages` (`client.py:883-885`,
+`evaluate.py:72`). On a multilingual corpus its counts will differ from a harness
+that fans out over `search_languages`, and that difference is the missing
+fan-out, not a regression.
+
+The hand-rolled Go and JavaScript loops above don't have this limitation — you
+are calling `Ask` / `ask` yourself, so pass whatever you want (`AskWith` /
+`askWith` for injected models, your own `topK`).
 </Aside>
 
 <Aside type="note" title="What the report contains">
@@ -69,6 +207,9 @@ corpus its counts will differ from a harness that fans out over
 `expected_supported` — and derived rates: `groundedness_rate`, `citation_rate`,
 `expected_support_rate`. It is returned **in memory**; `evaluate()` writes nothing
 to disk or S3. Compute a refusal rate yourself as `report.refused / report.total`.
+
+In Go and JavaScript there is no report type at all — the counters in the loop
+are the report, and every field above maps to one line of it.
 </Aside>
 
 <Aside type="tip" title="Run the real thing">

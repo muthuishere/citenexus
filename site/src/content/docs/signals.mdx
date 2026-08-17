@@ -3,34 +3,144 @@ title: Signals & capabilities
 description: The signals you declare decide which indexes are built at ingest and which retrievers run at query time. Omit them and all six are active. An absent signal skips its build and its retriever — ingest() and ask() never raise over it.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
-import FacadeNote from '../../components/FacadeNote.astro';
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
 `signals` is CiteNexus's capability gate. It decides **which indexes are built**
 when you ingest and **which retrievers run** when you ask. Declaring fewer signals
 is how you keep ingest cheap and retrieval fast — you only build what you'll use.
 
-<FacadeNote />
+In Python that gate is declarative: one list on the constructor. Go and
+JavaScript have no config layer, so the gate is the call graph — you build the
+index you want by calling its builder, and skip the rest.
 
+<Tabs syncKey="lang">
+<TabItem label="Python">
 ```python
 from citenexus import CiteNexus
 
 # Dense + lexical only. No graph, community, structure, or wiki index is built or queried.
 rag = CiteNexus("./citenexus-data", embedder=..., generator=..., signals=["embedding", "text"])
+
+rag.ingest(text="The employee shall not disclose confidential information.", document_id="nda")
+print(rag.ask("Can the employee disclose confidential information?").evidence.decision)
+#  answered
 ```
+</TabItem>
+<TabItem label="Go">
+```go
+// No signals list: each signal is a builder you call — or don't.
+import (
+	"fmt"
+
+	"github.com/muthuishere/citenexus/golang/answer"
+	"github.com/muthuishere/citenexus/golang/bm25"
+	"github.com/muthuishere/citenexus/golang/graph"
+	"github.com/muthuishere/citenexus/golang/structure"
+)
+
+docs := []answer.Doc{
+	{DocumentID: "nda", Text: "The employee shall not disclose confidential information."},
+	{DocumentID: "leave", Text: "Employees accrue twenty days of annual leave."},
+}
+
+// "embedding" — the dense path: Ask embeds and ranks by cosine.
+res := answer.Ask(docs, "Can the employee disclose confidential information?", answer.DefaultTopK)
+fmt.Println("embedding:", res.Evidence.Decision, res.Sources[0].Document)
+
+// "text" — the lexical path: rank the same rows with BM25 and nothing else.
+rows := make([]bm25.Row, len(docs))
+for i, d := range docs {
+	rows[i] = bm25.Row{EuID: d.DocumentID, Text: d.Text}
+}
+ranked := bm25.Rank(rows, "confidential information")
+fmt.Println("text:", ranked[0].EuID, ranked[0].Score)
+
+// "structure" — build the structure index for one document.
+level := 1
+idx := structure.BuildStructure(structure.Doc{
+	DocumentID:    "nda",
+	StructureType: "heading_tree",
+	Blocks: []structure.Block{
+		{Order: 0, Kind: "heading", Text: "Confidentiality", Level: &level},
+		{Order: 1, Kind: "paragraph", Text: "The employee shall not disclose confidential information."},
+	},
+})
+fmt.Println("structure:", idx.StructureType, len(idx.Nodes), idx.Nodes[0].Label)
+
+// "graph" — build the co-mention graph over the same EUs.
+g := graph.BuildComentionGraph([]graph.Row{
+	{EUID: "nda::0", Text: "The employee shall not disclose confidential information."},
+})
+fmt.Println("graph:", len(g.Nodes), "nodes,", len(g.Edges), "edges")
+
+//  embedding: answered nda
+//  text: nda 1.386294
+//  structure: heading_tree 1 Confidentiality
+//  graph: 4 nodes, 6 edges
+```
+
+`community` and `wiki` have no builder in the Go port — there is nothing to call
+for those two.
+</TabItem>
+<TabItem label="JavaScript">
+```js
+// No signals list: each signal is a builder you call — or don't.
+import { ask, bm25, buildComentionGraph, buildStructure } from "@muthuishere/citenexus";
+
+const docs = [
+  { document_id: "nda", text: "The employee shall not disclose confidential information." },
+  { document_id: "leave", text: "Employees accrue twenty days of annual leave." },
+];
+
+// "embedding" — the dense path: ask embeds and ranks by cosine.
+const res = ask(docs, "Can the employee disclose confidential information?");
+console.log("embedding:", res.evidence.decision, res.sources[0].document);
+
+// "text" — the lexical path: rank the same rows with BM25 and nothing else.
+const ranked = bm25(docs.map((d) => ({ eu_id: d.document_id, text: d.text })), "confidential information");
+console.log("text:", ranked[0].eu_id, ranked[0].score);
+
+// "structure" — build the structure index for one document.
+const idx = buildStructure({
+  document_id: "nda",
+  structure_type: "heading_tree",
+  blocks: [
+    { order: 0, kind: "heading", text: "Confidentiality", level: 1 },
+    { order: 1, kind: "paragraph", text: "The employee shall not disclose confidential information." },
+  ],
+});
+console.log("structure:", idx.structure_type, idx.nodes.length, idx.nodes[0].label);
+
+// "graph" — build the co-mention graph over the same EUs.
+const g = buildComentionGraph([
+  { eu_id: "nda::0", text: "The employee shall not disclose confidential information." },
+]);
+console.log("graph:", g.nodes.length, "nodes,", g.edges.length, "edges");
+
+//  embedding: answered nda
+//  text: nda 1.386294
+//  structure: heading_tree 1 Confidentiality
+//  graph: 4 nodes, 6 edges
+```
+
+`community` and `wiki` have no builder in the JavaScript port — there is nothing
+to call for those two. (The outputs above are byte-identical to Go's — that is
+the conformance parity.)
+</TabItem>
+</Tabs>
 
 ## The six signals
 
 `Signal` is a closed set (`from citenexus.config.signals import Signal`):
 
-| Signal | Builds at ingest | Enables retriever |
-|---|---|---|
-| `embedding` | vectors in the vector store | Vector (dense) — *also needs an embedder* |
-| `text` | lexical / BM25 index | Lexical (BM25 / full-text) |
-| `structure` | the structure index | Structure |
-| `graph` | the entity graph *(slow path)* | Graph |
-| `community` | graph communities *(slow path)* | Graph |
-| `wiki` | the distilled wiki *(slow path)* | Wiki |
+| Signal | Builds at ingest | Enables retriever | Go / JS counterpart |
+|---|---|---|---|
+| `embedding` | vectors in the vector store | Vector (dense) — *also needs an embedder* | `Ask` / `ask` (and `AskWith` / `askWith`) |
+| `text` | lexical / BM25 index | Lexical (BM25 / full-text) | `bm25.Rank` / `bm25` |
+| `structure` | the structure index | Structure | `structure.BuildStructure` / `buildStructure` |
+| `graph` | the entity graph *(slow path)* | Graph | `graph.BuildComentionGraph` / `buildComentionGraph` |
+| `community` | graph communities *(slow path)* | Graph | — none |
+| `wiki` | the distilled wiki *(slow path)* | Wiki | — none |
 
 <Aside type="note" title="Gating builds and queries — with two exceptions that raise">
 An absent signal simply **skips its build and its retriever**. Ingest still runs
@@ -41,11 +151,19 @@ entirely and all six are built and queried.
 Two paths *do* raise, both loudly and at the boundary:
 
 - An **unknown signal name** raises `ValueError` at construction
-  (`resolve_signals` validates every entry against the closed `Signal` set).
+  (`resolve_signals` validates every entry against the closed `Signal` set):
+
+  ```python
+  CiteNexus("./citenexus-data", signals=["embedding", "nope"])
+  #  ValueError: 'nope' is not a valid Signal
+  ```
 - The typed intake verbs [`rag.code.ingest_from(...)`](/citenexus/scope/) and
   `rag.schema.ingest_from(...)` raise `ValueError` if neither `graph` nor
   `community` is declared — a code or schema corpus is meaningless without its
   structural graph, so they refuse rather than ingest something unusable.
+
+Both are Python-only: with no config layer, the Go and JavaScript ports have no
+name to mistype and no verb to gate.
 </Aside>
 
 ## Fast path vs. slow path
@@ -70,4 +188,8 @@ Nothing raises — which is why this shows up later as an unexplained refusal:
 BM25 alone cannot bridge a paraphrase, so `ask()` reports *"no sufficiently
 relevant evidence found"*. It is the first thing to rule out in
 [Why did it abstain?](/citenexus/abstention/).
+
+The port equivalent is calling `Ask` / `ask` (which uses the built-in hermetic
+embedding) where you meant to inject a real one with `AskWith` / `askWith` — same
+symptom, same fix.
 </Aside>
