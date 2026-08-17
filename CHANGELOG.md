@@ -10,19 +10,181 @@ Dist name on PyPI is **`citenexus`** (the import package is `citenexus`; see
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-08-17
+
+**The parity release.** Six capabilities that existed only in Python now ship
+natively and byte-identically in Go and JavaScript, and four ways a
+correctly-cited answer could still be wrong are closed. Every claim below was
+verified by executing the shipped path, not by reading it.
+
+A minor bump rather than a patch: some of this **changes behaviour you may be
+depending on**. Embedding providers that quietly returned the wrong number of
+vectors now raise. Port answers that previously refused whole can now come back
+trimmed. `passage_language` in the ports was the constant `"en"` and is now
+derived. See *Changed* below.
+
 ### Added
 
-- **Conflict detection (ADR-0007) is native in all three ports, byte-identical**
-  (`d519550`). `golang/answer/conflict.go` and `js/src/answer/conflict.ts` now
-  implement the full pairwise algorithm and near-duplicate collapse against the
-  same tier-2 tables as `python/src/citenexus/answer/conflict.py`, and both are
-  wired onto the shipped ask path (`golang/answer/askwith.go:157,164`,
-  `js/src/answer/answer.ts:97-98`). Pinned by 102 cases in
-  `conformance/cases/conflict.json` as of `070dcf4` (27 true conflicts, 27 hard
-  negatives, 22 unrelated, 5 + 10 held-out, 9 near-duplicates, 2
-  identifier-tokenization).
-  **This supersedes the "Python-only" conflict note under 0.10.1 below** — that
-  note was accurate for its release and is left unedited as history.
+- **Conflict detection (ADR-0007) is native in all three ports, byte-identical.**
+  `golang/answer/conflict.go` and `js/src/answer/conflict.ts` implement the full
+  pairwise algorithm and near-duplicate collapse against the same tier-2 tables
+  as `python/src/citenexus/answer/conflict.py`, wired onto the shipped ask path.
+  Before this, both ports hardcoded `Conflicts: []string{}` / `conflicts: []` —
+  the *fields* shipped for wire parity while nothing computed them, which is the
+  most dangerous shape of gap: present in every type signature, every serialized
+  `Result` and every docs table, and absent in fact. Given a filing and its
+  restatement, Go and JS returned `12 cents` with `decision: answered`,
+  `conflicts_detected: 0` and **`supporting_sources: 2`** — counting the passage
+  that says the opposite as corroboration.
+  Pinned by **132** cases in `conformance/cases/conflict.json`.
+
+- **Conflict detection works on non-Latin scripts.** All three ports moved from
+  the frozen v1 tokenizer (`tokenize.py:77`, "ASCII only, by contract") to
+  `tokenize_v2`. A new **30-case `non_latin` bucket** covers Tamil, Telugu,
+  Arabic, Japanese and Chinese with per-script hard negatives, so the suite
+  proves the detector still *discriminates* rather than merely firing.
+  The 102 pre-existing English vectors are **byte-identical before and after** —
+  same digest over the whole suite; v2 changed nothing about the English
+  contract.
+
+- **Vision orchestration (SPEC-v6 §9) is native in all three ports.** New
+  `golang/vision/` and `js/src/vision/` implement the pre-filter decision table,
+  request emission, reply parsing and figure-EU assembly; the model itself stays
+  **injected** and is called by the host through the two-phase protocol, never by
+  the library. The pinned prompt is generated from one canonical source
+  (`conformance/prompts.json`) into each port, never hand-copied.
+  `conformance/cases/vision_orchestration.json` was an **orphan asserting nothing
+  in any port, including Python**, and now binds in all three.
+
+- **Embedding-vector validation**, identical in all three ports, with rejection
+  order pinned (`non_vector → empty → dimension → non_finite → zero`, arity
+  first). New `conformance/cases/vector_validation.json`.
+
+- **Atomic-claim verification in Go and JS.** Both ports shipped
+  `SplitClaims`/`splitClaims`, vector-pinned, with **zero non-test callers**, so
+  an answer passed or refused *whole* and one fabricated sentence discarded a
+  true one alongside it. Both flows now split, verify each claim against its own
+  passage, and drop the unsupported ones — ADR-0009 drop-not-fail.
+
+- **`unsupported_scripts` is populated in the ports.** A Khmer question now
+  returns `unsupported_scripts: ["khmer"]` and `missing_evidence: "unsupported
+  script: khmer"`, so "I cannot read this script" is distinguishable from "I have
+  no evidence". Both ports already shipped `UnsupportedScripts` with no caller.
+
+### Changed
+
+- **A malformed embedding batch now raises instead of silently mis-pairing.**
+  Python validated nothing. Proven end to end through the real
+  `OpenAICompatibleEmbedding(batch_size=2)` → `IngestPipeline` → `retrieve()`
+  with a provider whose first response was short by one and second long by one
+  (**net count correct**, which is why the existing `strict=True` zip never
+  fired): `ingest()` returned with no error and **3 of 4 queries then retrieved
+  the wrong passage**, with row counts, scores and citations all looking healthy.
+  `embed/client.py` also discarded OpenAI's `index` field, so an out-of-order
+  response mis-paired too; it is now honoured.
+  **If your provider was subtly wrong, you will now see an error where you
+  previously saw plausible answers.** That is the point.
+
+- **`passage_language` / `languages_in_evidence` in the ports are derived, not
+  the constant `"en"`.** A Telugu passage reported `"en"`; it now reports `"te"`.
+  An undeclared document reports `"und"` — deliberately *not* the answer
+  language, because "I don't know this passage's language" and "I answered in
+  English" are different facts and the old code collapsed them.
+  `answer_language` legitimately stays `"en"` by default: that is the correct
+  rung-4 output of the §11a chain when there is no caller request and no
+  detector, which is the ports' situation.
+
+- **Python's smoke pipeline grounds on the Unicode relevance gate.** It used the
+  frozen ASCII `content_tokens`, so it tokenized every non-Latin question to the
+  empty set and refused it while Go and JS answered the same corpus — a **false
+  abstention**, not a safe one, since the passage answered the question verbatim.
+  No pinned vector moved: v1 and v2 agree on all 48 question/document pairs in
+  `e2e_hermetic`, verified before the change.
+
+### Fixed
+
+- **Deep-ask cited the context model's blurb as the source's words — and so did
+  the strict path.** `retrieve/types.py:39` says of `Candidate.text`: "it is NOT
+  the customer's words. Never quote it; see `citable_text`." `flow.py` respected
+  that in 8 places; `tools.py` handed the agentic loop the enriched string and
+  `agentic.py` cited it, so `strategy="deep"` returned **the blurb alone** as the
+  answer, attributed to the source, citing a sentence that appears nowhere in the
+  corpus. The sharper half was the gate: deep-ask verified against that same
+  generated prose, so the context model's sentence was admissible evidence for
+  itself.
+  **The strict path was leaking too.** `0697c41` fixed `vector.py`, `lexical.py`
+  and `structure.py` and missed `graph/retrieve.py`, which never carried
+  `passage` at all — and because `fusion.py:43` keeps the highest-*raw-score*
+  candidate per `eu_id`, and the graph retriever scores by term-hit count
+  (`1.0`, beating any cosine score), the passage-less payload **displaced** the
+  one that carried the verbatim text. On any corpus with the graph signal
+  enabled, `0697c41`'s guarantee was silently re-opened on the default path.
+  Legacy indexes with no `passage` column still answer via fallback; re-ingest
+  is what earns the guarantee.
+
+- **Go inflated corroboration on the answered path.** It computed near-duplicate
+  collapse and then ignored it, reporting pre-collapse counts. Three clones of
+  one sentence gave `supporting_sources: 3, distinct_documents: 3` while listing
+  **one** source — self-inconsistent, and it rewarded a poisoned corpus: inject
+  N copies, earn N-fold confidence. All three now report `1`.
+
+- `js/src/answer/conflict.ts` held four **literal NUL bytes** as a bigram-key
+  delimiter, so git treated the file as binary and `grep` silently returned
+  nothing on it. A file nobody can grep is a file nobody reviews. Now escape
+  sequences, identical at runtime.
+
+### Tests
+
+- **Six conformance files had their expectations computed by calling the
+  implementation**, so they pinned whatever the code did rather than a spec.
+  `conflict` was found first; `bm25`, `rrf`, `eu_ids`, `structure` and
+  `e2e_hermetic` had the same defect. All now declare literal expectations,
+  independently derived — BM25 and RRF from a standalone calculator implementing
+  the published formulas with **no `citenexus` import**, which reproduced every
+  pre-existing vector byte-for-byte before generating new ones; `e2e_hermetic`
+  reasoned from SPEC-v6, with its generator mirror deleted.
+
+- **Python bound 4 of 19 case files; Go and JS bound 18 each.** The reference
+  implementation was the unbound one — `faithful_v2`'s 39 vectors, which pin
+  ADR-0009's containment predicate, were asserted by the two ports and not by the
+  port that defines it. All 19 now bind in all three.
+
+- **Every suite guarded vector count with a floor** (`> 0`) or nothing, so a file
+  shrunk from 39 vectors to 1 stayed green everywhere. Every floor is now an
+  exact pin, verified by mutation: dropping one vector from `bm25.json` fails all
+  three ports.
+
+- Suites expanded: `segmentation` 12 → **95**, `bm25` 4 → **13**, `rrf` 5 → **13**,
+  `e2e_hermetic` 4 → **8** cases over 6 documents, `eu_ids` 2 → **8**,
+  `structure` 3 → **11**.
+
+### Known
+
+Recorded as pinned `known_miss` vectors rather than silently carried:
+
+- **`"no"` is in `ABBREVIATIONS`** (for "No. 5"), so *"The answer is no. It is
+  denied."* never splits. A refusal fuses with whatever follows it — and under
+  per-claim verification that means a true sentence and a fabricated one share
+  one verdict. That is the failure ADR-0009 exists to prevent, living inside the
+  segmenter that implements it.
+- **`e.g.` / `i.e.` are unreachable**: the table holds `eg`/`ie` but the scanner
+  sees `e.g`, so it breaks mid-sentence on the form English actually writes.
+- **Ordered list markers become claims**: `"1. Give notice\n2. Pay rent"` yields
+  `["1.", "Give notice", "2.", "Pay rent"]`. The gate spends verdicts on `"1."`.
+- Greek is a claimed script whose question mark is not a terminator; **Thai** has
+  no terminator at all, so a paragraph is one claim.
+- **Duplicate `block.order` produces colliding `eu_id`s** and no builder objects,
+  so an upsert keyed by `eu_id` can display a passage the answer was never
+  verified against.
+- **Negation and antonym conflict rules cannot fire outside Latin** — those
+  tables are English wordlists. Only the *value* rule is script-independent.
+  Closing this needs per-language polarity tables.
+- **Full-width digits (`３０`) are unmatched.** Deferred deliberately: NFKC would
+  fix it and also *invent* numbers (`²`→`2`, `½`→`1⁄2`, `㎎`→`mg`), so `"50 m²"`
+  would acquire a number that is not in the text — and a false value conflict is
+  a false refusal.
+- The **§9 vision decision table has no conformance vector** in any port; the
+  fixture covers emit/fulfil/assemble only.
 
 ### Docs
 
@@ -32,42 +194,30 @@ Dist name on PyPI is **`citenexus`** (the import package is `citenexus`; see
   - *"Isolation comes from `PartitionPath` + the `allowed_partitions`
     pre-filter."* **False.** `filter_partitions` (`access/prefilter.py:39`) has
     zero callers outside `access/` and its own tests; `allowed_partitions`
-    (`config/schema.py:282`) is read by nothing; `grep allowed_partition golang/
-    js/src/` is empty; retrieval does no partition or ACL filtering. The
-    isolation that is real is **physical** — one client is bound to one
-    `PartitionPath` and every storage key is prefixed with it
-    (`storage/paths.py:27-39`). One client per tenant isolates; one client
-    serving several tenants has no isolation at all.
+    (`config/schema.py:282`) is read by nothing. The isolation that is real is
+    **physical** — one client is bound to one `PartitionPath` and every storage
+    key is prefixed with it (`storage/paths.py:27-39`). **One client per tenant
+    isolates; one client serving several tenants has no isolation at all.**
   - *"every graph edge carries an explicit confidence."* **False.**
-    `EdgeConfidence` (`graph/store.py:44`) is never constructed in `python/src/`,
-    `golang/` or `js/src/`; `GraphEdge.confidence` (`:66`) is always `None` and
-    the Go/JS fields always nil/null (`golang/graph/graph.go:41`).
-  - *"answer-language invariant, regenerate-on-mismatch."* **False.**
-    `answer/flow.py:308` passes `language` to the generator as an instruction;
-    the returned text's language is never verified. `grep -rni regenerat
-    python/src/` has one hit and it is a comment (`config/schema.py:264`).
-    `docs/SPEC-v6.md` still *specifies* the enforcement; the code does not
-    implement it, and the spec now says so inline.
-- **New documented gap: conflict detection is inert on non-Latin scripts, in all
-  three ports.** Through `070dcf4` all three import the frozen **v1** tokenizer,
-  documented at `tokenize.py:77` as "ASCII only, by contract". Measured on that
-  tree: `detect_conflict("The notice period is 30 days.", "…60 days.")` →
-  `rule='value', detail='30 vs 60'`; the same contradiction in Tamil or Telugu →
-  `None`, because v1 drops every non-Latin word and `MIN_CONTENT = 3` is never
-  met. Byte-identical parity was the deliverable, so the ports reproduce the
-  defect exactly. **A fix is in flight and uncommitted at the time of writing** —
-  all three ports moved to `tokenize_v2` and `conformance/cases/conflict.json`
-  gained a 22-case `non_latin` bucket (124 total) — so this entry records the
-  gap, not its closure. Whoever lands that work owns the "Fixed" entry.
-- Facade verb line citations in `CLAUDE.md` were off by one on **every** entry
-  and are corrected against `client.py` at `070dcf4`; likewise the tokenizer,
-  gate and `bbox` citations.
+    `EdgeConfidence` (`graph/store.py:44`) is never constructed in any port;
+    `GraphEdge.confidence` is always `None`. This was the stated gate-2
+    justification for admitting structural code intake into the core.
+  - *"answer-language invariant, regenerate-on-mismatch."* **False.** The
+    language is passed to the generator as an instruction and the returned text
+    is never checked.
+- **ADR-0005 amended.** It placed all deterministic ingest work in the Rust core
+  over FFI; ADR-0010 governs placement and classifies vision orchestration as
+  tier 1 (base64, prefix matching, string joins) — native per port. Artifact
+  *parsing* stays tier 3 in Rust. Recorded rather than left as two ADRs
+  contradicting each other.
+- Facade verb line citations in `CLAUDE.md` were off by one on **every** entry.
+- A **fourth** broken published snippet fixed on the docs site
+  (`res.sources[0].text` — `SourceRef` has no `.text` and forbids extras), plus
+  8 pages corrected where they still said conflict detection was Python-only.
+  Understating what ships is as false as overstating it.
 - Two read-only audits added under `docs/`:
-  [`docs/PARITY-AUDIT-2026-08-17.md`](docs/PARITY-AUDIT-2026-08-17.md) (tri-port
-  capability matrix, execution-verified) and
-  [`docs/DETERMINISTIC-UTILITIES-2026-08-17.md`](docs/DETERMINISTIC-UTILITIES-2026-08-17.md)
-  (algorithm inventory, divergence audit, proposed shape). The parity audit
-  predates `d519550` and carries a staleness banner.
+  [`PARITY-AUDIT-2026-08-17.md`](docs/PARITY-AUDIT-2026-08-17.md) and
+  [`DETERMINISTIC-UTILITIES-2026-08-17.md`](docs/DETERMINISTIC-UTILITIES-2026-08-17.md).
 
 ## [0.11.0] - 2026-08-17
 
