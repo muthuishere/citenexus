@@ -7,7 +7,9 @@ import { Aside, Steps } from '@astrojs/starlight/components';
 
 A chart or diagram carries evidence too. Inject a vision model and CiteNexus
 turns figures inside your documents into **figure Evidence Units** — searchable
-text cited back to the image's page and bbox, exactly like a text passage. The
+text whose `Citation` records the image's page and bbox, exactly like a text
+passage. (The bbox is carried on the Evidence Unit; it is not yet propagated onto
+`Result.sources`, where `bbox` is always `None`.) The
 citation stays honest: *"this came from the figure at page 12, described by a
 model,"* never a verbatim source quote.
 
@@ -36,9 +38,12 @@ is keyword-only:
 OpenAICompatibleVision(
     *, base_url, model,
     temperature=0.0, max_tokens=8192,
-    mime_type="image/png", transport=None,
+    mime_type="image/png", transport=None, headers=None,
 )
 ```
+
+`headers` takes `${ENV}` templates like every other shipped client — see
+[custom endpoints & auth](/citenexus/custom-endpoints/).
 
 ## When a figure actually spends a vision call
 
@@ -65,13 +70,20 @@ The thresholds live in `VisionPrefilterConfig` (`min_area_ratio=0.05`,
   the vision model unconditionally when a describer is injected.
 </Aside>
 
-## The two-phase seam (advanced / ports)
+## The two-phase seam (advanced)
 
-Under the hood — and for any host or non-Python port that wants to own the model
-call — vision is a three-step, credential-free seam: **emit → fulfill →
-assemble.** The core shapes plain data; the *host* makes the HTTP call. The wire
-types are frozen and carry **no credential field**, so your API key never enters
-the core.
+Under the hood — and for any host that wants to own the model call itself —
+vision is a three-step, credential-free seam: **emit → fulfill → assemble.** The
+core shapes plain data; the *host* makes the HTTP call. The wire types are frozen
+and carry **no credential field**, so your API key never enters the core.
+
+<Aside type="caution" title="Vision is Python-only today">
+The Go and JavaScript ports deliberately publish **no** vision provider and have
+no conditional-vision path — their `contracts` files say so explicitly. The seam
+below is shaped so a non-Python host *could* fulfill it, and
+`conformance/cases/vision_orchestration.json` pins the orchestration, but no port
+implements it yet. Everything on this page is the Python facade.
+</Aside>
 
 <Steps>
 
@@ -129,5 +141,7 @@ the core.
 
 `VisionRecord` (what a fulfiller returns) carries `image_id`, `short_caption`,
 `detailed_description`, `objects`, `relationships`, `ocr_text`, `data_values`, and
-`image_type`. For a fully offline run, swap the fulfiller for `FakeVision`
-(`from citenexus.vision import FakeVision`) — deterministic, no network.
+`image_type`. For a fully offline run, hand `fulfill_vision_requests` a
+`FakeVision` in place of the HTTP client (`from citenexus.vision import
+FakeVision`) — it is a `VisionPlugin` that derives every field from the image id,
+so it is deterministic and opens no socket. It performs no real inference.

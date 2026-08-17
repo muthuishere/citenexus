@@ -5,11 +5,6 @@ description: A perfectly grounded quote can still come from the wrong law. Autho
 
 import { Aside, Steps } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Requires 0.10.0 — not yet on PyPI or npm">
-This capability is on `main` and documented here, but the published packages are
-still **0.9.0**. Install from source until 0.10.0 ships.
-</Aside>
-
 A Florida statute can be quoted perfectly verbatim and still be the wrong law for
 a Texas question — and the faithfulness gate passes it, because the words really
 are in the passage. **Grounding proves the words came from the source. It says
@@ -17,6 +12,14 @@ nothing about whether that source governs.**
 
 That is not a bug in the gate; it is the limit of what a gate can prove. Closing
 it needs a second, separate signal: the **standing** of the source.
+
+<Aside type="note" title="Python only">
+Authority selection lives in the `ask()` facade, which the Go and JavaScript
+ports do not have. Those ports carry `authority_tier` and
+`authority_floor_applied` on `EvidenceSignals` for **wire parity only** — no
+profile, no policy, no floor, no selection logic — so they always emit the empty
+string and `false`. See [Install](/citenexus/install/) for what each port ships.
+</Aside>
 
 ## Authority is metadata, never content
 
@@ -195,7 +198,11 @@ From the live run in
 [`examples/law-authority/`](https://github.com/muthuishere/citenexus/tree/main/examples/law-authority)
 (real Jina embeddings + reranker, real Gemini generation, nothing mocked):
 
-| metric | before the floor | with the floor |
+The baseline column is **v0.10.0 pre-floor** — the same code as the right-hand
+column with the floor switched off, *not* the older v0.9.0 run that
+[the law benchmark](/citenexus/benchmark-law/) also reports:
+
+| metric | v0.10.0 pre-floor | v0.10.0 post-floor |
 |---|---|---|
 | out-of-jurisdiction citations | **4** | **0** |
 | `abstain_when_no_evidence` | 33% | **100%** |
@@ -204,6 +211,17 @@ From the live run in
 The Texas question — previously answered "not less than 30 days' notice" from a
 **Florida** statute with `all_claims_verified: True` — is now a refusal. That is
 the trade the floor buys: strictly stronger abstention, never a weaker one.
+
+<Aside type="caution" title="How to read these numbers">
+**Single live run per configuration.** Gemini is not deterministic at temperature
+0 — an *identical* re-run of the post-floor configuration produced 5/6 answered
+and `answer_when_grounded` 62% instead of 6/5 and 75%
+([`RESULTS.md`](https://github.com/muthuishere/citenexus/blob/main/examples/law-authority/RESULTS.md)).
+What reproduced exactly across both runs is precisely the table above: **0
+out-of-jurisdiction citations, 100% groundedness, 100% citation rate, 100%
+abstain-when-no-evidence**. Treat the safety metrics as the result and any rate
+metric as an illustration with about a question of wobble in it.
+</Aside>
 
 ## What the floor does not fix
 

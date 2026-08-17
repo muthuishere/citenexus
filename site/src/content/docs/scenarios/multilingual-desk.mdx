@@ -69,7 +69,8 @@ limitation — see
 
 ## Script support is explicit, and narrower than "multilingual"
 
-Fourteen scripts are supported in the Python reference — Latin, Cyrillic, Greek,
+Fourteen scripts are supported, the same fourteen in Python, Go and JavaScript —
+Latin, Cyrillic, Greek,
 Han, Hiragana, Katakana, Hangul, Arabic, Hebrew, Devanagari, Bengali, Tamil,
 Telugu and Thai. Space-less scripts (Han, Kana, Thai) are indexed by character
 bigrams.
@@ -95,10 +96,12 @@ answer indistinguishable, at the point of use, from a verified one. Refusing is
 the honest output until a golden fixture exists.
 </Aside>
 
-<Aside type="note" title="The Go and JavaScript ports are Latin-script only">
-The ports run the frozen ASCII tokenizer, so non-Latin text yields no tokens
-there and abstains. Every other pinned algorithm is at parity. See
-[Languages & multilingual](/citenexus/languages/) for the full matrix.
+<Aside type="note" title="The same 14 scripts in Go and JavaScript">
+The ports are not Latin-only: Go and JavaScript ship the same Unicode tokenizer
+over the same canonical 14-script table, and it drives BM25 and the v2
+faithfulness predicate in both. The Python-only part of this page is the facade
+around it — `ask()`, `answer_language` resolution at the client, the detector
+seam. See [Languages & multilingual](/citenexus/languages/) for the full matrix.
 </Aside>
 
 ## Known sharp edge

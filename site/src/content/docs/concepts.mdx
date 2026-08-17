@@ -1,6 +1,6 @@
 ---
 title: How it holds the line
-description: The cite-or-abstain guarantee — ground, verify, then cite or refuse. What "no ungrounded claim" means, and how the same deterministic core stays byte-for-byte identical across Go, JavaScript and Python.
+description: The cite-or-abstain guarantee — ground, verify, then cite or refuse. What "no ungrounded claim" means, what the faithfulness gate actually checks, and which algorithms are pinned byte-for-byte across Go, JavaScript and Python.
 ---
 
 import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
@@ -13,12 +13,54 @@ can defend.
 ## Ground → verify → cite or abstain
 
 1. **Ground.** The answer is generated at temperature 0 from retrieved passages
-   only, quoted verbatim, in the question's own language.
-2. **Verify.** A per-claim grounding gate checks every word of the answer against
-   its cited passage. Anything unsupported is dropped before it reaches you.
-3. **Cite or abstain.** A surviving claim resolves to a document, page, and bbox.
-   If nothing supports the question, CiteNexus emits the single **pinned refusal
-   string** — identical in every port — rather than guessing.
+   only. The answer is written in the language you asked for; the **quote stays
+   verbatim in the source's own language**, so an English answer can carry a
+   Telugu citation.
+2. **Verify.** A grounding gate runs **per atomic claim**. Anything unsupported
+   is dropped before it reaches you — see the mechanism below.
+3. **Cite or abstain.** A surviving claim resolves to a document, a page, and the
+   verbatim passage. If nothing supports the question, CiteNexus emits the single
+   **pinned refusal string** — identical in every port — rather than guessing.
+
+## What "verified" actually checks
+
+The gate is **not** a bag-of-words check, and the difference is the whole
+guarantee. Set containment — "every word of the claim appears somewhere in the
+passage" — is closed under two meaning-changing edits:
+
+- **Reordering.** *"The Customer shall indemnify the Supplier"* and *"The
+  Supplier shall indemnify the Customer"* are the same token set and opposite
+  obligations.
+- **Deletion.** `not` is just a token, so dropping a negation yields a strict
+  subset — and passes.
+
+Measured in `spikes/library-stress/`: that predicate accepted **9 of 9**
+deliberately false answers. What ships instead (ADR-0009) requires:
+
+1. the claim's tokens to appear in the passage **in order**, preserving
+   multiplicity, within a **bounded interior gap**; and
+2. every **polarity marker** inside the matched span to survive into the claim —
+   drop one of two negations and it is rejected.
+
+It is strictly narrower than the old predicate: anything it accepts, the old one
+accepted too, so it can only reduce what passes. Its cost is over-refusal, not
+under-refusal.
+
+<Aside type="caution" title="The gap budget is pinned, and it was fitted on English">
+The interior-gap budget is `MAX_SINGLE_GAP = 4`, `MAX_TOTAL_GAP = 8`
+(`answer/verify.py:135-136`). It is **not configurable** — a caller who widens it
+silently weakens the guarantee, and a conformance vector cannot pin a value the
+caller controls. The swept knee was `(3, 6)`; `(4, 8)` leaves headroom for
+compressed answers.
+
+**That sweep ran on synthetic English fixtures.** The same is true of conflict
+detection's thresholds (`MAX_RESIDUAL = 1` and its companions in
+`answer/conflict.py`). The attacks the budget defends against fail on *order*,
+not on gap size, so the constants are not load-bearing for those — but if you are
+tuning for a non-English corpus, know that nobody has fitted these for one, and
+we cannot tell you what the right value is there. Measure over-refusal on your
+own corpus before you trust the recall number.
+</Aside>
 
 <Aside type="note" title="The pinned refusal">
 Every port emits the exact same sentence when it abstains:
@@ -27,13 +69,27 @@ a generated apology — so a refusal is always recognizable and never a stealth
 hallucination.
 </Aside>
 
-## The core is byte-for-byte identical
+## The pinned algorithms are byte-for-byte identical
 
-The cite-or-abstain flow isn't re-implemented per language and hoped to match —
-it's pinned by a shared [`conformance/`](https://github.com/muthuishere/citenexus/tree/main/conformance)
-suite. The same corpus and questions produce the same decision, answer, and
-cited passage in Go, JavaScript, and Python. Here is that flow, over the
-conformance corpus:
+The deterministic pieces aren't re-implemented per language and hoped to match —
+they're pinned by a shared [`conformance/`](https://github.com/muthuishere/citenexus/tree/main/conformance)
+suite of golden vectors. Tokenization (v1 and v2), BM25, RRF, the chunker, the
+language-fallback chain, EU-id derivation and the frozen gate predicate produce
+identical bytes in Go, JavaScript and Python, and the hermetic `ask()` demo below
+produces the same decision, answer and cited passage in all three.
+
+<Aside type="caution" title="The ports gate the whole answer; Python gates each claim">
+The ordered/polarity predicate ships in all three languages and all three answer
+paths now call it. The remaining difference is granularity: Python splits a
+generated answer into atomic claims and verifies each one, keeping the supported
+ones and counting the rest in `unsupported_claims_removed`. Go and JavaScript
+apply the predicate to the **whole answer as a single claim**, so a multi-claim
+answer there is all-or-nothing — it cannot come back trimmed. The old v1
+set-containment predicate stays exported in both ports, frozen for the
+conformance vectors, and is no longer what `ask()` calls.
+</Aside>
+
+Here is the hermetic flow, over the conformance corpus:
 
 <Tabs syncKey="lang">
 <TabItem label="Go">
@@ -72,7 +128,7 @@ response = rag.ask("Can the employee disclose confidential information?")
 
 if response.evidence.decision.value == "answered":
     src = response.sources[0]
-    print(response.answer, "—", src.document, "p.", src.page, src.bbox)
+    print(response.answer, "—", src.document, "p.", src.page)
 else:
     print("abstained:", response.answer)     # the pinned refusal, not a fabrication
 ```
@@ -82,6 +138,10 @@ else:
 ## Navigate, don't cite
 
 Higher-level structure — graph and wiki — is **navigation over evidence**, never
-a citation itself. Every hit resolves *down* to a bbox- or `file:line`-cited
-Evidence Unit before an answer is generated. You can browse the map, but the
-answer is always anchored to a real passage.
+a citation itself. Every hit resolves *down* to a cited Evidence Unit before an
+answer is generated. You can browse the map, but the answer is always anchored to
+a real passage.
+
+What this protects is the **content** of a citation, not the topology of the
+graph: an edge or a wiki link is a route to evidence, and is never itself quoted
+as a fact.

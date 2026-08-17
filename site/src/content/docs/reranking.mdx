@@ -31,7 +31,7 @@ Which retrievers run is gated by the `signals` you declare on the client. Omit
 | Vector (dense) | `embedding` *(and an embedder is set)* | nearest-neighbour over the vector store |
 | Lexical (BM25) | `text` | BM25 / full-text search (Postgres `tsvector` or the in-core BM25) |
 | Structure | `structure` | matches query terms to structure-node labels |
-| Graph | `graph` / `community` | graph traversal (slow path) |
+| Graph | `graph` / `community` | matches query terms to entity-node labels and returns that node's Evidence Units (no edge walking — see [graph](/citenexus/graph/)) |
 | Wiki | `wiki` | distilled-wiki navigation (slow path) |
 
 ```python
@@ -84,6 +84,15 @@ docs   = rag.retrieve("termination notice", k=20)               # retrieval only
 
 `retrieve()` returns the ranked candidates without generating an answer — the
 engine under `ask()`, and the escape hatch for wiring your own small model.
+
+<Aside type="caution" title="The reranker seam and `retrieve()` are Python-only">
+RRF fusion itself exists in all three languages (`rrf.Fuse` in Go, `rrfFuse` in
+JavaScript, plus the core-backed `rrf`). The **reranker seam** and **`retrieve()`**
+do not: the Go port's `Providers` struct carries no `Reranker` field at all
+(there is nothing in that port that would call one), and JavaScript ships no
+rerank symbol either. Everything on this page below "The pipeline" describes the
+Python facade.
+</Aside>
 
 ## RRF, directly
 

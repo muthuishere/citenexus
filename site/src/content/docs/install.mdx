@@ -12,13 +12,13 @@ All three ports are published from the same release and carry the same version.
 ```sh
 go get github.com/muthuishere/citenexus/golang
 ```
-Go 1.23 · [pkg.go.dev](https://pkg.go.dev/github.com/muthuishere/citenexus/golang) · the deterministic core + `ask` over a corpus, via cgo over the shared Rust engine.
+Go 1.26 · [pkg.go.dev](https://pkg.go.dev/github.com/muthuishere/citenexus/golang) · the pure-Go deterministic core + `Ask` / `AskWith` over a corpus — no cgo, no native library. Extraction, lid.176 detection and the Lance store are opt-in: build the Rust cdylib (`cd rust && cargo build --release`) and compile with `-tags citenexus_ffi`.
 </TabItem>
 <TabItem label="JavaScript">
 ```sh
 npm install @muthuishere/citenexus
 ```
-Node ≥ 20 · [npm · @muthuishere/citenexus](https://www.npmjs.com/package/@muthuishere/citenexus) · pure-JS core; native extraction/detection/store load lazily via `koffi`.
+Node ≥ 20 · [npm · @muthuishere/citenexus](https://www.npmjs.com/package/@muthuishere/citenexus) · pure-JS core, dependency-free. Native extraction/detection/store live behind the `/ffi` subpath and load lazily via `koffi` — the npm package publishes `dist` only and ships **no** prebuilt binary, so build the Rust cdylib yourself or point `CITENEXUS_CORE_LIB` at one.
 </TabItem>
 <TabItem label="Python">
 ```sh
@@ -33,10 +33,23 @@ Python ≥ 3.11 · [PyPI · citenexus](https://pypi.org/project/citenexus/) · t
 - **Python** — the reference facade. Inject any OpenAI-compatible embedding + LLM
   (+ optional reranker and vision), point it at a local folder or an S3 bucket,
   and call `ingest` / `ask` / `evaluate`.
-- **Go & JavaScript** — the deterministic cite-or-abstain **core** at byte-for-byte
-  parity: extraction (PDF/DOCX/PPTX/XLSX/HTML/MD/CSV/txt), language detection,
-  chunking, BM25 + RRF fusion, the grounding gate, and `ask` over a corpus.
+- **Go & JavaScript** — the deterministic cite-or-abstain **core**, in pure Go and
+  pure JS: the 14-script tokenizer, chunking, BM25 + RRF fusion, EU-IDs, the
+  answer-language chain, the grounding gate, and `ask` over a corpus handed in
+  inline. Extraction (PDF/DOCX/PPTX/XLSX/HTML/MD/CSV/txt) and lid.176 language
+  detection are **not** part of that pure port — they are opt-in native bindings
+  over the shared Rust engine (Go: `-tags citenexus_ffi`; JS: the `/ffi`
+  subpath), and both need the Rust cdylib built locally first.
 
-Every deterministic decision is pinned by the shared
+Every **pinned** algorithm is byte-for-byte identical across the three —
+tokenize v1 and v2, BM25, RRF, the chunker, the answer-language chain, EU-IDs and
+the frozen gate — held there by the shared
 [`conformance/`](https://github.com/muthuishere/citenexus/tree/main/conformance)
-suite. Head to the [Quickstart](/citenexus/quickstart/) next.
+suite of golden vectors.
+
+The one documented exception is ADR-0009's **per-claim** faithfulness gate, which
+is Python-only on the answer path today: only Python splits an answer into atomic
+claims and verifies each one against the cited passage, while the ports verify
+the whole answer as a single claim.
+
+Head to the [Quickstart](/citenexus/quickstart/) next.

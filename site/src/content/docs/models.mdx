@@ -32,8 +32,11 @@ rag = CiteNexus(
 ```
 
 Any endpoint that speaks the OpenAI API works — Ollama, OpenAI, a local vLLM or
-llama.cpp server, or Gemini's OpenAI-compatibility endpoint. The reference
-example runs entirely on local Ollama (`bge-m3` + `qwen2.5` + `bge-reranker-v2-m3`).
+llama.cpp server, or Gemini's OpenAI-compatibility endpoint. The two shipped
+examples (`examples/multilingual` and `examples/law-authority`) run on **hosted
+Jina + Gemini**, which is the cheap default stack. For an all-local run,
+`task local:ollama:up` pulls the Ollama variant — `bge-m3`, `qwen2.5`, and the
+reranker `xitao/bge-reranker-v2-m3` (note the `xitao/` prefix).
 
 <Aside type="tip" title="An endpoint is one option, not the requirement">
 The model seam is a **published contract**, not a URL. `base_url`, `headers` and

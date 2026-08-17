@@ -5,11 +5,6 @@ description: The authoritative clause is written in a script the query shares no
 
 import { Aside, Steps } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Requires 0.10.0 — not yet on PyPI or npm">
-This capability is on `main` and documented here, but the published packages are
-still **0.9.0**. Install from source until 0.10.0 ships.
-</Aside>
-
 **The failure this prevents:** an employee at the Hyderabad office asks how much
 unused leave they may carry forward. The answer comes back *"a maximum of 10
 days"*, quoted verbatim from the English handbook, with a real document ID and a
@@ -191,12 +186,16 @@ fanned-out evaluation.
 
 One reformulation call per requested language per question, cached per
 `(question, language)` and shared across `ask()` and `retrieve()`. Three
-languages is two extra small-model calls before retrieval runs. A reformulation
+languages is **three** calls — one per requested language, including the one the
+question is already in — yielding up to three extra queries. A reformulation
 that fails, comes back empty, or duplicates the original contributes nothing —
 retrieval proceeds with fewer queries rather than erroring.
 
-<Aside type="note" title="The Go and JavaScript ports are Latin-script only">
-The ports run the frozen ASCII tokenizer, so non-Latin text yields no tokens
-there and abstains. This benchmark is Python. Every other pinned algorithm is at
-parity — see [Languages & multilingual](/citenexus/languages/).
+<Aside type="note" title="What the ports do and don't have here">
+The ports are **not** Latin-only: Go and JavaScript ship the same 14-script
+Unicode tokenizer as Python, from the same canonical script table, and it drives
+BM25 and the v2 faithfulness predicate in both. What they do not have is this
+page's subject — `search_languages`, the reformulation seam and the `ask()`
+facade they hang off are Python-only, so this benchmark is Python. See
+[Languages & multilingual](/citenexus/languages/).
 </Aside>

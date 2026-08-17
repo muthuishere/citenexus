@@ -11,8 +11,11 @@ hit resolves back **down** to a cited Evidence Unit before an answer is generate
 
 ## Enable it
 
-Declare the `graph` signal. The graph is built during ingest and queried by a
-graph retriever at ask time.
+Declare the `graph` signal. `ingest()` only marks the graph **dirty** — co-mention
+edges are corpus-wide, so a per-ingest full rebuild would not scale. The rebuild
+is **lazy on the read path**: the first graph retrieval after an ingest brings the
+index up to date before it loads, so `ask()` always sees a graph consistent with
+every committed ingest.
 
 ```python
 rag = CiteNexus("./citenexus-data", embedder=..., generator=...,
@@ -42,8 +45,12 @@ GraphRAG features are **not implemented yet**:
 - **Community detection (Leiden/Louvain).** `config.graph.community_algorithm`
   exists but has no implementation; the `community` signal currently reuses the
   same graph retriever.
-- **Multi-hop traversal.** Edges are built and stored but not walked at query time
-  (`max_hops` is unused) — retrieval is a single node-label → Evidence-Unit lookup.
+- **Multi-hop traversal.** Edges are built and stored but **never walked by
+  `GraphRetriever`** — it matches query tokens against `node.label`, returns that
+  node's `eu_refs`, and never touches `index.edges`. Retrieval is a single
+  node-label → Evidence-Unit lookup. `config.graph.max_hops` is *not* dead, but
+  it does not govern this path: `from_config` reads it as the hop cap of the
+  **deep-ask agentic loop** (`strategy="deep"`).
 
 Declare `graph` for grounded entity retrieval today; treat community summarization
 and hop-expansion as roadmap.

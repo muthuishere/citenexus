@@ -1,6 +1,6 @@
 ---
 title: The Result object
-description: Every ask() returns a structured Result — the answer, the decision, per-claim verification, cited sources with page and bbox, and a provenance chain. No scalar confidence; structured signals instead.
+description: Every ask() returns a structured Result — the answer, the decision, per-claim verification, cited sources with page and verbatim passage, and a provenance chain. No scalar confidence; structured signals instead.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -31,14 +31,26 @@ Import: `from citenexus.answer.result import Result, EvidenceSignals, SourceRef,
 | field | type | meaning |
 |---|---|---|
 | `answer` | `str` | the grounded text, or the pinned refusal |
-| `answer_language` | `str` | the query's language — guaranteed, independent of evidence language |
+| `answer_language` | `str` | the **caller-stated** answer language (see the chain below) — never the evidence's language |
 | `mode` | `TrustMode` | the trust mode the answer was produced under |
 | `evidence` | `EvidenceSignals` | the structured retrieval + verification signals (below) |
 | `claims` | `tuple[Claim, …]` | per-claim verification |
-| `sources` | `tuple[SourceRef, …]` | the cited passages |
+| `sources` | `tuple[SourceRef, …]` | the cited passages — **strict returns exactly one** |
 | `missing_evidence` | `tuple[str, …]` | why it abstained, when it did |
-| `conflicts` | `tuple[str, …]` | reserved — see the note below |
+| `conflicts` | `tuple[str, …]` | surfaced multi-source disagreement — **`normal` mode only**, see below |
 | `provenance` | `tuple[ProvenanceEntry, …]` | the full reproducibility chain |
+
+<Aside type="note" title="How `answer_language` is decided">
+It is resolved from the **question**, not from the evidence, by a four-rung chain
+(`lang/fallback.py:44-70`): an explicit `answer_language=` code wins; then
+`answer_language="auto"` detects the *question's* language; then the established
+conversation language; then the configured `default_answer_language`, which is
+`"en"`. So leaving it unset does **not** give you the query's language — it gives
+you English. Pass `answer_language="auto"` if you want the question's language.
+
+Whatever the answer language, `SourceRef.passage` stays **verbatim in the
+source's own language** — an English answer can carry a non-English quote.
+</Aside>
 
 ## `Decision`
 
@@ -60,8 +72,12 @@ on it expecting today's behavior.
 | `retrieval_score_spread` | `float` | spread across the retrieved scores |
 | `all_claims_verified` | `bool` | every claim passed the grounding gate |
 | `unsupported_claims_removed` | `int` | claims dropped for lacking support |
-| `conflicts_detected` | `int` | reserved (see below) |
+| `conflicts_detected` | `int` | conflicting pairs found in the top-`CONFLICT_TOP_K` window (all modes) |
 | `languages_in_evidence` | `tuple[str, …]` | languages the evidence was written in |
+| `unsupported_scripts` | `tuple[str, …]` | scripts the tokenizer does not claim — a **capability** signal, not an evidence judgement |
+| `authority_tier` | `str` | the cited source's tier name; `""` on an unranked corpus |
+| `authority_floor_applied` | `bool` | whether the strict-mode authority floor was enforced on this call |
+| `loop` | `LoopSignals \| None` | agentic loop signals; `None` on the strict flow |
 
 ## `SourceRef`
 
@@ -71,9 +87,9 @@ on it expecting today's behavior.
 | `passage` | `str` | the **verbatim** cited text, in its own language |
 | `passage_language` | `str` | the passage's language |
 | `page` | `int \| None` | page number, when the format has pages |
-| `bbox` | `BBox \| None` | `[x0, y0, x1, y1]` region on the page |
+| `bbox` | `BBox \| None` | `[x0, y0, x1, y1]` region — **always `None` today**, see below |
 | `source_uri` | `str \| None` | where the raw source lives |
-| `translation` | `str \| None` | optional, additive translation — never replaces `passage` |
+| `translation` | `str \| None` | declared for additive translation — **always `None` today**, nothing sets it |
 
 Evidence-Unit ids are **not** on `SourceRef` — they appear on `Claim.sources` and
 `ProvenanceEntry.evidence_unit`.
@@ -83,13 +99,48 @@ Evidence-Unit ids are **not** on `SourceRef` — they appear on `Claim.sources` 
 `Claim`: `claim: str`, `supported: bool`, `sources: tuple[str, …]` (EU ids).
 
 `ProvenanceEntry`: `claim`, `evidence_unit`, `document_id`, `s3_object`,
-`checksum`, `page`, `bbox`, `produced_by` — the chain that lets you reproduce
+`checksum`, `page`, `bbox` (always `None`, as on `SourceRef`), `produced_by` — the chain that lets you reproduce
 exactly how a claim was grounded.
 
-<Aside type="caution" title="Conflict surfacing is reserved, not yet emitted">
-`Result.conflicts` and `EvidenceSignals.conflicts_detected` are the structured
-surface for multi-source disagreement, but the current extractive flow does
-**not** populate them — today every result carries `conflicts = ()` and
-`conflicts_detected = 0`. Treat them as forward-compatible fields, not an active
-signal.
+<Aside type="caution" title="`bbox` and `translation` are declared but never populated">
+`SourceRef.bbox` is real on the model, and PDF extraction really does capture
+bounding boxes — but no `bbox` is passed at any `SourceRef` construction on the
+answer path, so `src.bbox` is `None` on every result. Cite to `document` +
+`page` + the verbatim `passage`; do not build a highlight viewer on `bbox` yet.
+
+`SourceRef.translation` is the same: the field exists and is additive by design,
+but nothing in the library assigns it, so it is always `None`.
+</Aside>
+
+## Conflict surfacing (shipped in 0.10.0)
+
+Conflict detection runs over the grounded candidates **before** anything is
+generated (ADR-0007), and it **reports rather than resolves** — deciding which of
+two contradictory sources wins by rank or score is the defect this closes, not a
+feature. What each mode does with a detected conflict differs:
+
+| mode | behaviour on a conflict touching the cited passage |
+|---|---|
+| `strict` | **abstains**, and cites both sides — the refusal names the disagreement |
+| `normal` | answers, and populates `Result.conflicts` with a description of each pair |
+| `exploratory` | answers; records `conflicts_detected` only, `conflicts` stays empty |
+
+`conflicts_detected` is populated in **all** modes, so it is safe to monitor: a
+non-zero count means the corpus contradicts itself in the window that was about
+to be cited.
+
+<Aside type="note" title="Strict can refuse because sources disagree">
+The strict-mode conflict abstention is a distinct refusal path from "no relevant
+evidence found". If a strict answer disappears on a corpus that clearly contains
+the passage, read `conflicts_detected` before assuming a retrieval bug.
+</Aside>
+
+<Aside type="caution" title="Conflict detection is Python-only, and its thresholds were fitted on English">
+Go and JavaScript declare `conflicts` / `conflicts_detected` for wire parity but
+implement no detection — those fields are always empty in the ports. And the
+detector's thresholds (`MAX_RESIDUAL = 1`, `SUBJECT_OVERLAP = 0.60`,
+`MAX_SYMDIFF = 3`, `MIN_CONTENT = 3`, `DUPLICATE_JACCARD = 0.80`,
+`CONFLICT_TOP_K = 6`, `answer/conflict.py`) are pinned, non-configurable, and were
+swept on **synthetic English** sentences. We do not know what they should be for a
+non-English corpus — measure before relying on the count there.
 </Aside>

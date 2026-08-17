@@ -129,19 +129,32 @@ embed := models.NewOpenAIEmbedding("https://api.jina.ai/v1", "jina-embeddings-v3
 
 ```ts
 // JavaScript — headers on the client config; HttpClient.resolveHeaders expands ${ENV}.
-import { OpenAIEmbedder, HttpClient } from "@muthuishere/citenexus";
+import { HttpClient } from "@muthuishere/citenexus";
 
 const http = new HttpClient();
-const embed = new OpenAIEmbedder(
-  { base_url: "https://api.jina.ai/v1", model: "jina-embeddings-v3",
-    headers: { Authorization: "Bearer ${JINA_API_KEY}" } },
-  (url, body, headers) => http.send(url, body, headers),
+const headers = { Authorization: "Bearer ${JINA_API_KEY}" };
+
+// http.send resolves ${ENV} at the request boundary — the value never lands
+// on the config object you pass around.
+const vector = await http.send(
+  "https://api.jina.ai/v1/embeddings",
+  JSON.stringify({ model: "jina-embeddings-v3", input: ["hello"] }),
+  headers,
 );
 ```
 
+<Aside type="caution" title="`OpenAIEmbedder` is not on the JavaScript public API">
+The class exists in the package source (`js/src/models/embed.ts`) but
+`js/src/index.ts` exports no `models/`, and `package.json` publishes only `.`,
+`./ffi`, `./ingest` and `./storage` — so it cannot be imported from
+`@muthuishere/citenexus`. `HttpClient` **is** exported, and it is what carries the
+`${ENV}` behaviour; drive it directly until the embedder is exported.
+</Aside>
+
 `Transport` is `(url, body, headers) => string | Promise<string>`, so an async
-transport needs no cast — the clients `await` either. A synchronous transport (the
-hermetic test fakes) stays valid.
+transport needs no cast — a consumer `await`s either. `HttpClient.send` is async
+(Node `fetch`); `resolveHeaders` is the synchronous primitive underneath it, so a
+synchronous transport (the hermetic test fakes) stays valid.
 
 <Aside type="note" title="Legacy: api_key on HttpEndpoint">
 `HttpEndpoint(api_key=SecretStr(...), auth_header=..., auth_scheme=...)` still works

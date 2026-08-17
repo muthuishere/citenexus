@@ -1,6 +1,6 @@
 ---
 title: File-based storage
-description: Use a local directory as the CiteNexus store. Ingest individual files, raw text, or a URL — each idempotent by document id.
+description: Use a local directory as the CiteNexus store. Ingest individual files, raw text, or a URL — each idempotent by content hash.
 ---
 
 Pass a local path as the store. CiteNexus keeps its index (vectors, manifests,
@@ -16,9 +16,10 @@ rag.ingest(text="Clause 4: 90 days notice.", document_id="clause-4")
 ```
 
 The local path is the **store** — where the index is written — not a folder that
-gets auto-scanned. Each source is ingested individually. Ingest is idempotent by
-`document_id`: re-ingesting the same id with identical bytes returns
-`status="unchanged"` and does no work, so re-running your ingest script only
+gets auto-scanned. Each source is ingested individually — there is no
+"ingest this folder" call. Ingest is idempotent by **content hash**: the manifest
+records a SHA-256 per `document_id`, and re-ingesting that id with identical bytes
+returns `status="unchanged"` and does no work. Re-running your ingest script only
 processes what actually changed.
 
 See [Ingest anything](/citenexus/ingest/) for the full intake surface (including

@@ -1,0 +1,134 @@
+---
+title: How it works
+description: The whole pipeline in one page — ingest to Evidence Units, then retrieve, fuse, rerank, ground, apply the authority floor, check for conflicts, generate, and gate every claim. Each stage named to the module that implements it.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Two pipelines. **Ingest** turns artifacts into cited Evidence Units and indexes.
+**Ask** turns a question into a defensible answer — or a refusal. Every guard
+that can refuse sits on the ask path, and each one is a *separate* stage with its
+own signal, so a refusal can always be attributed.
+
+Module paths below are the Python reference (`python/src/citenexus/`), which
+doubles this page as a code map.
+
+## Ingest
+
+```
+ingest(source)
+  └─ resolve bytes + document id
+     └─ etag manifest check ──────────── unchanged? stop here
+        └─ extract  (dispatch by file type)
+           └─ detect language
+              └─ chunk → build Evidence Units
+                 └─ vision: emit requests → host fulfills → figure EUs
+                    └─ persist raw blob (content-addressed)
+                       └─ build structure index          [signal: structure]
+                          └─ embed (batched)             [signal: embedding]
+                             └─ upsert vector-store rows
+                                └─ enqueue slow path     [signals: graph, community, wiki]
+                                   └─ commit manifests   ← the commit point
+                                      └─ mark graph dirty / integrate wiki
+```
+
+| Stage | Module |
+| --- | --- |
+| Orchestration | `ingest/pipeline.py` — `IngestPipeline.ingest()` |
+| Idempotency (etag skip) | `storage/manifest.py` — `EtagManifest.is_changed` |
+| Extraction dispatch | `extract/dispatch.py` — `extractor_for()` over extension / source-type tables |
+| Extractors | `extract/pdf.py`, `docx.py`, `pptx.py`, `xlsx.py`, `csv.py`, `html.py`, `md.py`, `image.py`, `code.py`, `schema_sql.py`, `schema_openapi.py`, `plain.py` |
+| Language detection | `lang/detect.py` (`FastTextDetector`, heuristic default) → `lang/fallback.py` |
+| Chunking | `evidence/chunker.py` — `chunk_text` |
+| Evidence Units | `evidence/chunked_builder.py` → `evidence/unit.py` |
+| Vision | `vision/prefilter.py` → `vision/fulfill.py` → `vision/units.py` |
+| Structure index | `evidence/structure.py` — `build_structure()` |
+| Embedding | `contracts.embed_texts` → `embed/batcher.py` |
+| Vector store | `storage/lance_store.py` — `LanceVectorStore.upsert` |
+| Manifests | `storage/manifest.py` — `record` + `save_manifest` |
+| Graph / wiki refresh | `client.py` — `_refresh_incremental` (marks dirty; the build is lazy on read) |
+
+<Aside type="note" title="The manifest commit is the ingest's commit point">
+Blobs are written content-addressed *before* the manifest records them, so an
+interrupted ingest leaves unreferenced bytes rather than a manifest pointing at
+something that is not there. Superseded blobs are purged after the commit.
+</Aside>
+
+Which of the indexes get built is decided by
+[`signals`](/citenexus/signals/) — `embedding`, `text` and `structure` are inline;
+`graph`, `community` and `wiki` are the slow path.
+
+## Ask
+
+```
+ask(question)
+  └─ fold conversation turns into the retrieval query
+     └─ cross-lingual reformulation           (search_languages)
+        └─ RETRIEVE   vector · lexical · structure · graph · wiki
+           └─ FUSE    reciprocal rank fusion (k=60)
+              └─ RERANK  the top-50 head, against the original query
+                 └─ SCRIPT CHECK ─────────── unreadable? ── refuse (capability)
+                    └─ GROUND / relevance ── nothing relevant? ── refuse
+                       └─ AUTHORITY FLOOR ── nothing with standing? ── refuse
+                          └─ CONFLICT SCAN
+                             └─ GENERATE (temp 0, from the passage only)
+                                └─ PER-CLAIM GATE ── nothing survives? ── refuse
+                                   └─ strict + conflict on the cited passage? ── refuse
+                                      └─ Result
+```
+
+| Stage | Module |
+| --- | --- |
+| Query build (conversation) | `client.py` — `_retrieval_query` |
+| Cross-lingual reformulation | `retrieve/reformulate.py` — `QueryReformulator` |
+| Retrieval engine | `retrieve/engine.py` — `RetrievalEngine.retrieve` |
+| Retrievers | `retrieve/vector.py`, `retrieve/lexical.py`, `retrieve/structure.py`, `graph/retrieve.py`, `wiki/retrieve.py` |
+| Fusion | `retrieve/fusion.py` — `rrf_fuse` |
+| Rerank | `retrieve/rerank.py` (default is an identity reranker) |
+| Answer flow | `answer/flow.py` — `AnswerFlow.ask` |
+| Script capability | `tokenize.py` → `unsupported_scripts` |
+| Relevance gate | `answer/verify.py` — `has_relevance_overlap_v2` |
+| Authority floor | `answer/authority.py` — `select_by_authority` |
+| Conflict detection | `answer/conflict.py` — `find_conflicts` |
+| Generation | `answer/generator.py` — the injected `GeneratorProvider` |
+| Claim splitting | `answer/segment.py` — `split_claims` |
+| Faithfulness gate | `answer/verify.py` — `is_supported_v2` |
+| Result models | `answer/result.py` — `Result`, `EvidenceSignals`, `SourceRef`, `Claim`, `ProvenanceEntry` |
+
+### Three things about the ask path that are easy to get wrong
+
+**The reranker can only reorder or drop.** It never introduces a candidate
+retrieval did not produce, so no reranker can smuggle an ungrounded passage past
+the gate.
+
+**The authority floor runs *after* grounding, not inside fusion.** That is
+deliberate (ADR-0004): standing is caller-supplied metadata about a source, not a
+relevance score, and mixing it into ranking would make "the wrong law, quoted
+correctly" indistinguishable from "a slightly worse match". See
+[Authority](/citenexus/authority/).
+
+**Generation is retried, and acceptance is per claim.** The flow walks the
+grounded candidates (up to five generation attempts), and accepts a candidate as
+soon as at least one atomic claim clears the gate. Claims that fail are
+*dropped*, not fatal — the surviving claims form the answer, and
+`unsupported_claims_removed` records how many went. If nothing survives on any
+candidate, it refuses. See [The faithfulness gate](/citenexus/faithfulness/).
+
+### `strategy="deep"`
+
+`ask(..., strategy="deep")` diverges into an agentic loop (`answer/agentic.py`)
+that re-queries under a hop/tool budget before running the same guards. The
+strict flow above is the default and the one the guarantee is stated against.
+
+## Navigate, don't cite
+
+Graph and wiki are **navigation over evidence**, never citations. Every hit
+resolves down to a real Evidence Unit before generation, so the answer is always
+anchored to a passage that exists.
+
+## Next
+
+- [Why did it abstain?](/citenexus/abstention/) — every refusal this pipeline can
+  emit, and which field names it.
+- [The faithfulness gate](/citenexus/faithfulness/) — the last guard, in detail.
+- [The Result object](/citenexus/result/) — what comes out the end.

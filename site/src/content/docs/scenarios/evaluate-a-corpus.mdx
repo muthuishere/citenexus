@@ -1,6 +1,6 @@
 ---
 title: Evaluate a corpus
-description: Score groundedness, citation and abstention against a golden set — so a change that answers more and cites less shows up as a regression instead of an improvement.
+description: Score groundedness and citation against a golden set, and assert must-refuse rows separately — because evaluate() scores a correct refusal as a miss, not a pass.
 ---
 
 import { Aside, Steps } from '@astrojs/starlight/components';
@@ -10,53 +10,96 @@ up, everyone celebrates, and what actually happened is that the system started
 answering questions it should have refused. Answer rate on its own is a metric
 that rewards hallucination.
 
+<Aside type="danger" title="Read this before you write a golden set">
+`evaluate()` **cannot score abstention, and scores it backwards.** A row with a
+blank `expected` counts as "expected-supported" **iff the row was answered**
+(`evaluate.py:76-77`) — so a *correct refusal earns nothing*, and because
+`expected_support_rate` divides by `total` rather than by `answered`, every
+refusal drags it down.
+
+Must-refuse rows therefore do not belong in the CSV. Split the job: `evaluate()`
+scores the answerable rows, and you assert the refusals yourself. Everything
+below is built that way.
+</Aside>
+
 <Steps>
 
-1. **Write a golden CSV.** The important rows are the ones where the correct
-   behaviour is **to refuse**.
+1. **Write a golden CSV of rows the corpus *can* answer.** The column the library
+   reads is **`expected`** — not `expected_support`, which is silently ignored.
+   The question column may be `question` or `query`.
 
    ```csv
-   question,expected_support
+   question,expected
    "Can the employee disclose confidential information?","shall not disclose"
    "What notice does termination require?","thirty days"
-   "What is the capital of France?",
    ```
 
-   The blank `expected_support` on the third row is the point: nothing in the
-   corpus supports it, so an answer there is a failure even if the answer is
-   factually true.
+   A row passes when the content tokens of `expected` are a subset of the
+   answer's — a lightweight check that the right evidence made it into the text.
 
 2. **Run it.**
 
    ```python
    report = rag.evaluate("golden.csv")
 
-   print(report.groundedness_rate)      # answers whose claims are supported
-   print(report.citation_rate)          # answers carrying a resolvable citation
-   print(report.expected_support_rate)  # answers matching the expected evidence
+   print(report.groundedness_rate)      # grounded / answered
+   print(report.citation_rate)          # cited / answered
+   print(report.expected_support_rate)  # expected_supported / TOTAL
    ```
 
-3. **Gate your CI on the direction of travel**, not on an absolute:
+3. **Keep the must-refuse questions in a separate list** and assert the decision
+   directly. This is the abstention regression gate.
+
+   ```python
+   from citenexus.answer.result import Decision
+
+   MUST_REFUSE = [
+       "What is the capital of France?",           # not in the corpus at all
+       "What is the maximum security deposit?",    # adjacent topic, no clause
+   ]
+
+   for question in MUST_REFUSE:
+       result = rag.ask(question)
+       assert result.evidence.decision is Decision.refused, question
+   ```
+
+4. **Gate CI on the direction of travel**, not on an absolute:
 
    ```python
    assert report.groundedness_rate >= baseline.groundedness_rate
    assert report.citation_rate >= baseline.citation_rate
+   assert refused_count == len(MUST_REFUSE)
    ```
 
 </Steps>
 
-## Why abstention rows are the ones that matter
+## Why the must-refuse list is the one that matters
 
 A model that answers everything scores well on any metric that only looks at
-answers. Rows with no expected support invert that: they are only passed by
-refusing. A change that makes the system more willing to answer will move them
-first, which is exactly the early warning you want.
+answers — which is exactly what `groundedness_rate` and `citation_rate` do: both
+divide by `answered`, so a system that refuses everything it is unsure of and
+answers three questions perfectly reads 100% / 100%. Those two rates prove that
+what it *did* say was grounded and cited. They say nothing about what it should
+not have said.
+
+The must-refuse assertions are the other half. A change that makes the system
+more willing to answer will flip one of those rows before it moves any rate, and
+a flipped assertion names the question. That is the early warning; the rates are
+the confirmation.
 
 <Aside type="note" title="Per-claim scoring changes what a partial answer means">
 Verification is per atomic claim, so an answer can come back trimmed — its
 supported claims only, with `unsupported_claims_removed` counting the rest.
 Trimmed answers are scored on the claims they actually returned, not on what the
 model originally produced.
+</Aside>
+
+<Aside type="caution" title="`evaluate()` passes nothing through to `ask()`">
+It calls `ask(question)` bare — no `mode`, `k`, `answer_language` or
+`search_languages` (`client.py:883-885`, `evaluate.py:72`). On a multilingual
+corpus its counts will not match a harness that fans out over `search_languages`,
+and that gap is the missing fan-out rather than a regression. If you need those
+options, drive `ask()` in a loop and aggregate yourself.
 </Aside>
 
 ## Reading a regression
@@ -73,12 +116,18 @@ sig.retrieval_score_spread      # near 0 -> everything ranked alike; ranking is 
 sig.unsupported_claims_removed  # >0 -> the generator over-reached and got trimmed
 sig.conflicts_detected          # >0 -> the corpus disagrees with itself
 sig.unsupported_scripts         # non-empty -> a capability gap, not an evidence gap
+sig.authority_floor_applied     # True -> a refusal may mean "no standing", not "no evidence"
 ```
 
 `supporting_sources = 0` and `unsupported_claims_removed > 0` are different
 bugs in different halves of the pipeline. The first is retrieval, the second is
 generation — and treating them the same is how teams spend a week tuning a
 prompt to fix an indexing problem.
+
+A **refusal is not always an evidence gap.** In strict mode it can also mean the
+authority floor withheld everything it found (`authority_floor_applied`), or that
+two grounded sources contradict each other (`conflicts_detected`). Those are
+three different failures with three different fixes.
 
 ## Retrieval on its own
 
@@ -96,5 +145,6 @@ save the answer.
 ## A worked example on a real corpus
 
 The [law worked example](/citenexus/benchmark-law/) runs this end to end against
-California landlord–tenant statutes with live models — including an honest look
-at where relevance-only ranking still falls short.
+California landlord–tenant statutes with live models — including the reason its
+own `expected_support_rate` reads 45% while groundedness and citation are both
+100%.

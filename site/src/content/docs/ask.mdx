@@ -17,32 +17,57 @@ response = rag.ask("Can the employee disclose this?")   # mode=strict by default
 
 if response.evidence.decision is Decision.answered:
     src = response.sources[0]
-    print(response.answer, "—", src.document, "p.", src.page, src.bbox)
+    print(response.answer, "—", src.document, "p.", src.page)
 else:
     print("abstained:", response.answer)          # the pinned refusal, not a fabrication
 ```
 
 ## Options
 
-`ask(question, *, mode=TrustMode.strict, k=None, answer_language=None, conversation_id=None)`
+```python
+ask(question, *, mode=TrustMode.strict, k=None, answer_language=None,
+    conversation_id=None, strategy="strict", search_languages=("en",))
+```
 
 - **`mode`** — the trust mode (below). Default `TrustMode.strict`.
 - **`k`** — per-call `top_k` override; falls back to the client's `top_k`.
 - **`answer_language`** — force the answer's language (see [Languages](/citenexus/languages/)).
 - **`conversation_id`** — thread turns together (see below).
+- **`strategy`** — `"strict"` (default) is the single-passage flow. `"deep"` runs
+  the bounded agentic loop, and **raises `UnsupportedSearchLanguageError`** if
+  `search_languages` is anything other than the default, because the loop writes
+  its own follow-up queries. Any other value raises `ValueError`.
+- **`search_languages`** — the languages the question is *searched* in; default
+  `("en",)`. See [Cross-lingual corpus](/citenexus/scenarios/multilingual-corpus/).
 
 Today the flow emits `answered` or `refused` (`partial` is a reserved `Decision`
 value). See [The Result object](/citenexus/result/) for the full return shape.
+
+<Aside type="note" title="No bbox on the answer path">
+`SourceRef` declares a `bbox` field, but it is **always `None` on a `Result`
+today**: bounding boxes are captured at extraction and are not yet carried
+through onto `Result.sources`. Cite to `document` + `page`.
+</Aside>
 
 ## Trust modes
 
 Import: `from citenexus.domain.trust import TrustMode`
 
-| Mode | Behavior |
-|---|---|
-| `strict` *(default)* | minimum-sources enforced, citations mandatory, refuse on low evidence |
-| `normal` | citations preferred |
-| `exploratory` | weak evidence may be summarized, with any speculation labeled |
+All three modes run the **same** extractive, per-claim-gated flow: the answer is
+quoted from one retrieved passage, every claim is verified against it, and an
+unsupported claim is dropped in every mode. Citations are never optional, and no
+mode summarises ungrounded evidence. What the mode actually changes is two
+things — the [authority](/citenexus/authority/) floor, and what happens when the
+retrieved passages contradict each other.
+
+| Mode | Authority | Conflicts |
+|---|---|---|
+| `strict` *(default)* | **Enforces the floor.** Candidates below `minimum_tier` are dropped outright; if nothing survives, the call refuses for lack of standing. | **Abstains** on a conflict touching the cited passage, and cites both sides. |
+| `normal` | **Tie-break only** — a stable sort by descending tier, nothing dropped. | Answers, and lists the conflicts on `result.conflicts`. |
+| `exploratory` | **Ignored** — candidates pass through untouched. | Answers, and records `conflicts_detected` only. |
+
+Conflicts are never resolved by rank
+([ADR-0007](https://github.com/muthuishere/citenexus/blob/main/docs/adr/0007-conflict-surfacing.md)).
 
 ```python
 from citenexus.domain.trust import TrustMode
@@ -54,6 +79,16 @@ response = rag.ask("Summarize the risk factors.", mode=TrustMode.exploratory)
 "No ungrounded claim" is the strict-mode contract. `normal` and `exploratory`
 trade strictness for coverage — use them deliberately, not as the default for a
 legal or medical surface.
+</Aside>
+
+<Aside type="caution" title="Verbatim beats the answer language">
+`answer_language` is what the resolution chain decided and what the generator was
+asked for — **not** a promise about the script of the returned text. The strict
+flow is extractive and citations stay verbatim in their source language, so an
+English question with `answer_language="en"` can come back as a Telugu quote when
+the only support is a Telugu clause. Read `sources[*].passage_language` when you
+need to know what is actually in front of you. Known open limitation, written up
+in [Cross-lingual corpus](/citenexus/scenarios/multilingual-corpus/).
 </Aside>
 
 ## Conversation memory
@@ -85,7 +120,7 @@ if res.Evidence.Decision == result.DecisionAnswered {
 </TabItem>
 <TabItem label="JavaScript">
 ```ts
-const r = ask(corpus, "Can the employee disclose confidential information?")
+const response = ask(corpus, "Can the employee disclose confidential information?")
 if (response.evidence.decision === "answered") {
   console.log(response.answer, "—", response.sources[0].passage)
 } else {

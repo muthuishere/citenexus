@@ -1,12 +1,12 @@
 ---
 title: CiteNexus
-description: Evidence-first, multilingual, S3-native RAG for Go, JavaScript and Python. It answers only from cited evidence — the exact quote, page and bbox — and abstains when the evidence isn't there. The guarantee is "no ungrounded claim."
+description: An evidence-integrity layer for retrieval, in Go, JavaScript and Python. It proves an answer follows from a source that actually governs — the exact quote, page and bbox, in 14 scripts — and refuses when it can't. The guarantee is "no ungrounded claim."
 template: splash
 head:
   - tag: title
     content: CiteNexus — answers you can defend
 hero:
-  tagline: A RAG library that answers only from your documents — with the exact quote and page — and tells you straight when the evidence isn't there.
+  tagline: Retrieval finds passages. CiteNexus proves the answer follows from one that governs — in 14 scripts — and refuses when it can't.
   actions:
     - text: Quickstart
       link: /citenexus/quickstart/
@@ -22,6 +22,161 @@ hero:
 ---
 
 import { Tabs, TabItem, Card, CardGrid, Aside } from '@astrojs/starlight/components';
+
+## 100% grounded. Correctly cited. Wrong.
+
+An employee in the **Hyderabad** office asks, in **English**, how much unused
+leave they may carry into the next year. The English handbook answers. The
+document that actually governs that office is a **Telugu** annexure — and a
+retrieval stack that cannot read Telugu will never tell you it exists.
+
+<div class="cn-cards">
+	<div class="cn-card">
+		<div class="cn-card__top"><span class="cn-step">Before</span><span>searched in en</span><span class="cn-state cn-state--bad">Wrong</span></div>
+		<div class="cn-card__body">
+			<p class="cn-q">How many days of unused leave may I carry forward?</p>
+			<div class="cn-quote cn-quote--bad">“An employee may carry forward a maximum of 10 days.”</div>
+			<p class="cn-note">Verbatim. Correctly cited. Every claim passed the faithfulness gate — <b>100% groundedness</b>. And wrong for the person asking: the binding Telugu annexure caps Hyderabad at <b>5</b> and states that it overrides.</p>
+			<div class="cn-cite"><span>cited to</span><b>01-en-leave-policy</b><span>·</span><span class="cn-cite--bad">superseded for this office</span></div>
+		</div>
+	</div>
+	<div class="cn-card">
+		<div class="cn-card__top"><span class="cn-step">After</span><span>searched in en, ta, te</span><span class="cn-state cn-state--ok">Right</span></div>
+		<div class="cn-card__body">
+			<p class="cn-q">How many days of unused leave may I carry forward?</p>
+			<div class="cn-quote cn-quote--script">“5 రోజులు”</div>
+			<p class="cn-note">Clause 2.12 of the Telugu annexure — the document that governs this office. Reached because the English question was also <em>searched</em> in Tamil and Telugu, and citable because the tokenizer claims those scripts.</p>
+			<div class="cn-cite"><span>cited to</span><b>09-te-hyderabad-leave-annexure</b><span>·</span><b>passage_language: te</b></div>
+		</div>
+	</div>
+</div>
+
+One argument changed. Nothing else — same corpus, same models, same 22 English
+questions:
+
+```python
+rag.ask(question, search_languages=("en", "ta", "te"))   # default: ("en",)
+```
+
+Measured over a **12-document English/Tamil/Telugu corpus**, one live run per
+configuration (Jina embeddings + reranker, Gemini at temperature 0):
+
+| | searched in `en` | searched in `en, ta, te` |
+|---|---|---|
+| answered / abstained | 8 / 14 | **16 / 6** |
+| cited the right document | 75% | **100%** |
+| answered when the corpus could ground it | 44% | **89%** |
+| groundedness | 100% | 100% |
+| **abstained when nothing could ground it** | **100%** | **100%** |
+
+That last row is the whole point. It answers **twice as often** without
+answering one thing it shouldn't have.
+
+<Aside type="caution" title="Read the honest version before you quote these">
+These are **single-run** numbers against a live, non-deterministic model, over an
+**authored fictional** corpus — not a benchmark. The Telugu column is the sum of
+*two* changes shipped in the same sitting (the fan-out, and Telugu being added to
+the tokenizer at all), and this run cannot separate them; **Tamil, 1/6 → 4/6, is
+the clean read**, and at n=6 that is a direction, not a rate you can plan
+against. There is also a live inconsistency: the answer text stays verbatim in
+Telugu while `answer_language` reports `en`, because *verbatim wins* — read
+`sources[*].passage_language` for the script actually in front of you. All of it,
+including what did not work:
+**[Cross-lingual corpus →](/citenexus/scenarios/multilingual-corpus/)**
+</Aside>
+
+**14 scripts** are claimed in the Python reference — Latin, Cyrillic, Greek, Han,
+Hiragana, Katakana, Hangul, Arabic, Hebrew, Devanagari, Bengali, Tamil, Telugu,
+Thai — each pinned by a golden conformance vector. A script that is *not* claimed
+produces **zero tokens and a refusal**, by name, before a model call is spent.
+Kannada, Malayalam, Gujarati and Sinhala are named in the table and deliberately
+not claimed: "I cannot read this script" is a better answer than a plausible
+ranking. **[Languages →](/citenexus/languages/)**
+
+<p class="cn-statement">If it can't <em>cite</em> it, it won't <em>say</em> it.</p>
+
+## Five ways a grounded answer is still wrong
+
+Every one of these produces output where **every visible signal says trust me**:
+verbatim text, a real document, a page, a bbox, 100% groundedness. That is worse
+than an obviously ungrounded answer, because there is nothing to notice. Each is
+closed by a deterministic check, and each was closed because it was **measured
+failing first**.
+
+### 1. The words came from the passage — the claim didn't follow
+
+The faithfulness gate was set containment: *every answer token appears in the
+passage*. Set containment is closed under **reordering** and **deletion**. Invert
+the parties to a transaction and you have the same token set; drop the `not` from
+a prohibition and you have a strict subset. Both pass.
+
+> **Measured:** nine adversarial answers, each false with respect to its own
+> cited passage, across five domains. Accepted as grounded **9 of 9 in Python,
+> 9 of 9 in Go, 9 of 9 in JavaScript** — one contract, faithfully reproduced
+> three times.
+
+Now `is_supported_v2` verifies **per atomic claim**, with ordered gapped
+containment and a polarity guard, so an answer that reuses the passage's
+vocabulary to assert the opposite is rejected. Unsupported claims are **dropped**
+— `unsupported_claims_removed` counts them — and the answer keeps what survives
+rather than collapsing whole. False rejection on a legitimate-support control
+set: **0 of 30**.
+
+### 2. Two sources disagree, and rank order quietly picks one
+
+When the corpus contradicts itself, a ranked list still returns something. The
+top hit wins, and you never learn there was a second answer.
+
+CiteNexus **detects conflict deterministically and surfaces it — it never
+resolves it.** Resolution is a policy question that belongs to you. In strict
+mode it abstains and cites **both sides**, verbatim, in `Result.sources`.
+
+> **Measured:** **0 false conflicts on 27 hard negatives** written to look like
+> conflicts and not be, 0 on 22 unrelated pairs, and 0 on a held-out set of 10
+> written after the thresholds were frozen. Recall is **0.889** — this detector
+> is deliberately precise, not exhaustive.
+
+**[Conflicting sources →](/citenexus/scenarios/conflicting-sources/)**
+
+### 3. The cited source has no authority over the question
+
+A **Florida** statute answered a **Texas** question with a real quotation, a
+correct citation, and `all_claims_verified: true`.
+
+> **Measured** on a live California landlord–tenant corpus: out-of-jurisdiction
+> citations **4 → 0**; questions that should abstain and did, **33% → 100%**.
+> Groundedness and citation stayed at 100% throughout — which is exactly the
+> point. *100% groundedness with four wrong-jurisdiction citations is the whole
+> reason authority had to exist.*
+
+Authority tiers are **curator assertions supplied at ingest** (`authority={...}`)
+— the library never infers standing from prose — and strict mode enforces a floor
+that withholds grounded-but-unauthoritative evidence.
+**[Authority →](/citenexus/authority/)**
+
+### 4. The governing document is in a script the system can't read
+
+The failure at the top of this page. Not fabrication — the gate stops that — but
+**a true quotation of a document that does not govern**, which is
+indistinguishable from a correct answer at the point of use. A Unicode tokenizer
+makes the authoritative document *citable*; the `search_languages` fan-out makes
+it *reachable*. Both are required; neither is sufficient.
+**[Cross-lingual corpus →](/citenexus/scenarios/multilingual-corpus/)**
+
+### 5. A model failed, and the corpus was silently poisoned
+
+A Go embedder that timed out on the Nth chunk had no way to say so, so it
+returned a zero vector — and ingest **indexed it**. Nothing downstream can detect
+that: retrieval just quietly stops finding a document that is provably present.
+
+Failure is now expressible in the seam itself: the embedding contract returns an
+error, and the write path independently refuses empty, wrong-dimension,
+non-finite and all-zero vectors before anything is stored. *This guard lives in
+the Go and JavaScript cores; in Python it remains an obligation stated on the
+provider contract — "a zero vector is not an error value" — not an enforced
+write-path check.*
+
+## The primitive underneath: cite, or abstain
 
 <div class="cn-cards">
 	<div class="cn-card">
@@ -44,14 +199,10 @@ import { Tabs, TabItem, Card, CardGrid, Aside } from '@astrojs/starlight/compone
 	</div>
 </div>
 
-## Answer only from evidence. Otherwise abstain.
-
-In law, medicine, and compliance, a confidently wrong answer isn't the model's
-mistake — it's yours, and you're the one who has to defend it. CiteNexus answers
-**only** from retrieved evidence, quotes it verbatim with a page and bbox, and
-**abstains** when the evidence is weak, missing, or conflicting. The same
-guarantee, in every [supported script](/citenexus/languages/) — 13 of them in
-Python, Latin-script in the Go and JS ports:
+Answers are generated at temperature 0 from retrieved passages only, quoted
+verbatim, then checked claim by claim against the passage they cite. Nothing
+survives that check without a document, a page and a bbox behind it. Nothing
+survives it at all → the single pinned refusal string.
 
 <Tabs syncKey="lang">
 <TabItem label="Go">
@@ -83,7 +234,7 @@ const corpus = [
   { document_id: "employee-nda", text: "The employee shall not disclose confidential information." },
 ]
 
-const r = ask(corpus, "Can the employee disclose confidential information?")
+const response = ask(corpus, "Can the employee disclose confidential information?")
 console.log(response.answer)            // the verbatim quote — or the pinned refusal
 console.log(response.evidence.decision) // "answered" | "refused"
 ```
@@ -97,8 +248,10 @@ rag = CiteNexus("./citenexus-data", embedder=..., generator=...)  # your OpenAI-
 rag.ingest(text="The employee shall not disclose confidential information.", document_id="employee-nda")
 
 response = rag.ask("Can the employee disclose confidential information?")
-print(response.answer)             # the verbatim quote — or the pinned refusal
-print(response.evidence.decision)  # "answered" | "refused"
+print(response.answer)                              # the verbatim quote — or the pinned refusal
+print(response.evidence.decision)                   # "answered" | "refused"
+print(response.evidence.all_claims_verified)        # every claim survived the gate
+print(response.evidence.unsupported_claims_removed) # how many did not
 ```
 </TabItem>
 </Tabs>
@@ -115,62 +268,80 @@ shared
 [`conformance/`](https://github.com/muthuishere/citenexus/tree/main/conformance)
 suite — see the full Python setup in the [Quickstart](/citenexus/quickstart/).
 
-**Parity status:** Python's faithfulness gate is currently *ahead* of the ports.
-It verifies per atomic claim with an order-aware predicate, so an answer that
-reuses the passage's words to assert the opposite is rejected; Go and JS still
-run the frozen token-containment predicate and accept it. Every other pinned
-algorithm remains byte-for-byte identical. The ports land once the new
-conformance vectors are in.
+**Parity status.** Python's answer flow is *ahead* of the ports on two counts.
+It runs the per-claim, order- and polarity-aware gate, so an answer that reuses
+the passage's words to assert the opposite is rejected; Go and JavaScript ship
+that predicate (`IsSupportedV2` / `isSupportedV2`) but their `ask` path still
+calls the frozen v1 containment gate over the ASCII v1 tokenizer — so a verbatim
+non-Latin quote still refuses there. The Unicode tokenizer itself **is** at
+parity: all three carry the same 14-script table and use it for BM25 and content
+overlap. Every other pinned algorithm remains byte-for-byte identical; the ports
+land once the new conformance vectors are in.
 </Aside>
 
-<p class="cn-statement">If it can't <em>cite</em> it, it won't <em>say</em> it.</p>
+## What this does not solve
 
-## What you get
+A docs set that only lists wins is not one you can plan against.
+
+**Subject scope is an open gap.** An answer can pass every guard above — grounded,
+verbatim, top-authority, right jurisdiction — and still be about the wrong *kind*
+of thing. A residential-tenancy statute answering a commercial-lease question
+clears all three checks, correctly, because nothing in the cited sentence says
+which tenancies it governs. CiteNexus guarantees **no ungrounded claim**. It does
+**not** guarantee that a grounded, high-authority citation is **on-scope**. The
+failure, the four signals that were measured and rejected, and the mitigations
+you can apply today: **[Wrong subject, right source →](/citenexus/scenarios/subject-scope/)**
+
+**Numbers on this page are single live runs**, not benchmarks. The models are
+non-deterministic even at temperature 0; the safety metrics (groundedness,
+citation, abstention, out-of-jurisdiction count) reproduced exactly across
+repeated runs, while rate metrics moved by about one question. Quote the safety
+metrics; treat the rates as illustrations.
+
+## Also true
 
 <CardGrid>
-	<Card title="Ground" icon="approve-check">
-		Temperature-0 answers from retrieved passages only, quoted verbatim in the
-		question's own language.
+	<Card title="Bring your own model" icon="setting">
+		Five published provider contracts — embedding, generation, completion,
+		vision, reranking. They are `Protocol`s, not base classes: a provider
+		**does not import or subclass CiteNexus**.
+		[Provider contracts →](/citenexus/providers/)
 	</Card>
-	<Card title="Verify" icon="error">
-		A per-claim grounding gate drops any word not in the cited passage.
-		Unsupported claims never reach you.
-	</Card>
-	<Card title="Cite or abstain" icon="document">
-		Every claim resolves to a document, page, and bbox. No support for the
-		question → the pinned refusal string.
+	<Card title="One core, three languages" icon="seti:go">
+		Every deterministic decision is byte-for-byte identical across Go,
+		JavaScript and Python, pinned by a shared suite of **golden conformance
+		vectors** generated from the Python reference and replayed by every port,
+		which must reproduce them exactly. [Install →](/citenexus/install/)
 	</Card>
 	<Card title="Any document" icon="open-book">
 		PDF, DOCX, PPTX, XLSX, HTML, Markdown, CSV, plain text, or a URL — plus
-		figures via an injected vision model. Idempotent by content hash, S3-native.
+		figures via an injected vision model. Idempotent by content hash,
+		S3-native. [Ingest →](/citenexus/ingest/)
 	</Card>
-	<Card title="Your models" icon="setting">
-		Embedding, LLM, reranker, and vision are injected OpenAI-compatible
-		endpoints. Nothing bundled; the key never leaves your config.
+	<Card title="Prove the corpus" icon="approve-check">
+		Reconcile index against manifest to show the answers derive from exactly
+		the corpus that was agreed — and revoke a document with proof every byte
+		is gone. [Regulated audit →](/citenexus/scenarios/regulated-audit/)
 	</Card>
-	<Card title="Prove it" icon="bars">
-		`evaluate()` scores groundedness, citation, and expected-support against a
-		golden CSV — so a model that answers when it should refuse scores worse.
+	<Card title="Score it, don't trust it" icon="bars">
+		`evaluate()` scores groundedness, citation and expected-support against a
+		golden CSV — so a model that answers when it should refuse scores
+		**worse**, not better. [Evaluate →](/citenexus/evaluate/)
+	</Card>
+	<Card title="Navigate, don't cite" icon="puzzle">
+		An entity [graph](/citenexus/graph/) and a distilled
+		[wiki](/citenexus/wiki/) sit over the evidence. You browse the map — but
+		every hit resolves down to a real cited passage before an answer exists.
 	</Card>
 </CardGrid>
 
-## More than retrieval
+<Aside type="caution" title="Version">
+Everything on this page is `0.10.0`, which is **not yet published**. The packages
+on PyPI, npm and crates.io are still `0.9.0`. Build from
+[source](https://github.com/muthuishere/citenexus) to run the multilingual
+fan-out, the authority floor, or the per-claim gate today.
+</Aside>
 
-Dense + lexical + structure retrieval is the base. On top, CiteNexus builds an
-entity [graph](/citenexus/graph/) and a distilled, cross-linked
-[wiki](/citenexus/wiki/) — both **navigate-not-cite**: you browse the map, but
-every hit resolves down to a real cited passage before an answer is generated.
-
-## Proven on a real corpus
-
-The [law worked example](/citenexus/benchmark-law/) runs this live on California
-landlord–tenant statutes (Jina + Gemini, nothing mocked): **100% groundedness and
-citation, zero fabricated answers** — with an honest look at where relevance-only
-ranking still falls short.
-
-## Polyglot, at parity
-
-Not a wrapper: every deterministic decision is byte-for-byte identical across
-Go, JavaScript, and Python, pinned by a shared conformance suite. Install for
-yours on the [install page](/citenexus/install/), then walk the
-[quickstart](/citenexus/quickstart/).
+Start with the failure you recognise — **[all nine scenarios
+→](/citenexus/scenarios/)** — or go straight to the
+**[Quickstart](/citenexus/quickstart/)**.

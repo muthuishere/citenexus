@@ -1,6 +1,6 @@
 ---
 title: Contract review
-description: Answer clause questions from a contract set with the exact quote, page and bbox — and get a refusal when no clause supports the question.
+description: Answer clause questions from a contract set with the exact quote and page — and get a refusal when no clause supports the question.
 ---
 
 import { Aside, Steps } from '@astrojs/starlight/components';
@@ -11,8 +11,8 @@ actually says it. The answer looks identical to a correct one.
 
 <Steps>
 
-1. **Ingest the agreement set.** PDFs keep their page and bounding box, so every
-   later citation lands on a rectangle a human can open and check.
+1. **Ingest the agreement set.** PDFs keep their page number, so every later
+   citation lands on a page a human can open and check.
 
    ```python
    for path in ["msa.pdf", "sow-2026.pdf", "dpa.pdf"]:
@@ -34,7 +34,7 @@ actually says it. The answer looks identical to a correct one.
    if response.evidence.decision is Decision.answered:
        src = response.sources[0]
        print(response.answer)                       # verbatim from the contract
-       print(src.document, "p.", src.page, src.bbox)
+       print(src.document, "p.", src.page)
    else:
        print("no clause supports this:", response.answer)
    ```
@@ -46,12 +46,20 @@ actually says it. The answer looks identical to a correct one.
 ```text
 The Supplier shall not subcontract any part of the Services without the prior
 written consent of the Customer.
-msa.pdf p. 14 (72.0, 431.5, 523.0, 466.2)
+msa.pdf p. 14
 ```
 
 The quoted sentence is **verbatim from the source**, not a paraphrase. That is
 deliberate: a paraphrased quote is no longer evidence, and a reviewer who cannot
 diff the quote against the page cannot defend the answer.
+
+<Aside type="note" title="How precise the citation is today">
+A citation resolves to **document + page + the verbatim passage** — enough to
+open the page and find the sentence by search. `SourceRef.bbox` exists on the
+model and PDF extraction does capture bounding boxes, but the box is **not
+carried onto `Result.sources`**: on the answer path `src.bbox` is always `None`.
+Do not build a viewer that expects to highlight a rectangle.
+</Aside>
 
 ## Reading the signals
 
@@ -78,15 +86,38 @@ into the claim — so a dropped "not" is rejected rather than quoted back at you
 
 ## Scoping to one matter
 
-Partitions keep matters apart, so a question about one client can never cite
-another's paper:
+Isolation between matters comes from the **partition**, and from nothing else. A
+`CiteNexus` instance is bound to one `PartitionPath` at construction; its vector
+index, manifests and evidence all live under that leaf, so a question asked on
+one matter's client cannot reach another matter's paper.
 
 ```python
-rag.ingest("msa.pdf", acl=["matter-4471"])
+from citenexus import CiteNexus
+from citenexus.domain.partition import PartitionPath
+
+matter = CiteNexus(
+    "s3://firm-corpus",
+    partition=PartitionPath.of(("matter", "4471")),
+    signals=["embedding", "text"],
+)
+matter.ingest("msa.pdf")
 ```
 
-See [Access & partitions](/citenexus/access/) for how scope becomes a hard
-pre-filter rather than a post-filter on results.
+One client per matter. Route the request to the instance whose partition the
+caller is entitled to, and the entitlement check stays in your application —
+where it can see your identity system.
+
+<Aside type="danger" title="`acl=` does not isolate anything">
+`rag.ingest(..., acl=[...])` is **carried metadata, not enforcement.** The value
+is written onto `EvidenceUnit.acl` and read by no retrieval, answer or access
+code path — passing `acl=["matter-4471"]` does **not** stop a query from citing
+that document. It exists so you can carry your own labels through to a filter you
+apply yourself. If you need confidentiality between matters, it must come from
+the partition above.
+</Aside>
+
+See [Access & partitions](/citenexus/access/) for the full contract, including
+what the library deliberately does not enforce for you.
 
 ## When the wrong paper is cited
 

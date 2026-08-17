@@ -51,7 +51,7 @@ falls back to plain text:
 
 | Extension | Extractor |
 |---|---|
-| `.pdf` | PDF (text + figures, with page/bbox) |
+| `.pdf` | PDF (text + figures, with page and — at extraction only — bbox) |
 | `.docx` `.pptx` `.xlsx` | Office (OOXML); tables become GFM Markdown |
 | `.html` `.htm` | HTML |
 | `.md` `.markdown` | Markdown |
@@ -67,6 +67,14 @@ model during ingest. CiteNexus ships **no OCR engine** — text inside a scanned
 image is only recovered if your vision model returns it.
 </Aside>
 
-Extraction runs in the shared Rust core, so a PDF or XLSX extracts byte-identically
-whether you call from Go, JavaScript, or Python. Which indexes get built from the
-extracted units is governed by the [signals](/citenexus/signals/) you declared.
+Which indexes get built from the extracted units is governed by the
+[signals](/citenexus/signals/) you declared.
+
+<Aside type="note" title="Where extraction actually runs">
+**Go and JavaScript** extract through the shared Rust core (`citenexus_extract`).
+The **Python** reference does not — it uses `pdfplumber` for PDF and `openpyxl`
+for XLSX, and holds itself to the Rust twin with parity tests instead. Today
+**XLSX byte-identity is test-pinned**; **PDF has neither a parity test nor a
+conformance case**, so do not assume a PDF extracts identically across the three
+languages.
+</Aside>

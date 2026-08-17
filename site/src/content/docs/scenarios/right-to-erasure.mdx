@@ -36,7 +36,7 @@ here because the shape of the bug generalises to any content-addressed store.
 
    ```python
    report = rag.reconcile(manifest)
-   assert "employee-nda" not in {o.document_id for o in report.orphans}
+   assert "employee-nda" not in report.orphans   # orphans is a tuple[str, ...]
    ```
 
 </Steps>

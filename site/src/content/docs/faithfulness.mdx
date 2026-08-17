@@ -1,0 +1,161 @@
+---
+title: The faithfulness gate
+description: The last guard between a model and a lie. Why token-set containment accepted 9 of 9 adversarial false answers in all three ports, and what replaced it — ordered gap-bounded containment plus a polarity guard, per atomic claim, drop-not-fail.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Everything upstream of this gate — retrieval, fusion, reranking, the authority
+floor — decides *which passage* the answer may be built from. The gate decides
+whether the answer the model actually produced **follows from that passage**. It
+is the last thing standing between a caller and a confidently cited falsehood.
+
+## The failure it was built to close
+
+The original predicate was token-set containment: tokenize the answer, tokenize
+the passage, accept if the answer's token set is a subset of the passage's.
+
+That predicate is unsound in two independent ways, and both are structural rather
+than edge cases.
+
+**It is closed under reordering.** `{tenant, pays, landlord}` and
+`{landlord, pays, tenant}` are the same set. "The landlord shall indemnify the
+tenant" has exactly the token set of its inverse — so a role-inverted answer is
+indistinguishable from the truth.
+
+**It is closed under deletion.** A subset stays a subset when you remove tokens,
+and `not` is a token. Drop the negation from "The tenant shall **not** sublet"
+and the result is a *strict subset* of the passage — more obviously "grounded",
+by that predicate, than the correct answer.
+
+<Aside type="danger" title="Measured: 9 of 9 accepted, in all three ports">
+Nine adversarial answers — each false with respect to its passage, across five
+unrelated domains (legal, finance, medical, operations, physics) — were run
+through the gate. **All nine were accepted as grounded: 9/9 in Python, 9/9 in Go,
+9/9 in JavaScript.** The attacks broke down as role inversion (3), negation
+deletion (3), value swap (2), comparator inversion (1).
+
+That was not three bugs. It was one specification defect that three
+implementations reproduced faithfully — and the conformance suite, passing 27/27,
+was pinning it in place. Source: [`spikes/library-stress/`](https://github.com/muthuishere/citenexus/tree/main/spikes/library-stress)
+and [ADR-0009](https://github.com/muthuishere/citenexus/blob/main/docs/adr/0009-atomic-claim-faithfulness-and-judge.md).
+</Aside>
+
+Why this class of output is worse than an ordinary hallucination: these answers
+are verbatim-sourced and correctly cited to a real document and page. **Every
+visible signal says trustworthy.** An ungrounded answer at least looks like one.
+
+## What replaced it
+
+Three changes, each narrowing the predicate. Nothing new is admitted — the new
+gate is strictly narrower than the old one, so it can only reject more.
+
+### 1. Ordered, gap-bounded containment
+
+The claim's tokens must appear in the passage **in order**, with multiplicity, as
+a subsequence — and the gaps between them are budgeted. It is an integer dynamic
+programme over token indices (`align()` in `answer/verify.py`): no regex, no
+recursion, so it ports to Go's RE2 and to JavaScript unchanged.
+
+Reordering now fails outright: the role-inverted sentence is not a subsequence of
+the original.
+
+### 2. The polarity guard
+
+Ordering alone still accepts every negation-deletion attack — deleting a token
+cannot break subsequence order. So a second rule applies to the *matched span
+only*: for each polarity marker present in the span, the claim must contain it at
+least as many times as the passage did.
+
+Multiplicity is the point. Dropping one of two negations flips the meaning as
+completely as dropping the only one.
+
+The marker set is 20 English tokens — *absent, cannot, denied, except, excluding,
+failed, fails, forbidden, neither, never, no, nobody, none, nor, not, nothing,
+other, prohibited, unless, without* (`answer/tables.py`). It is frozen as
+measured: this exact set produced the 9/9 rejection at 0.0% false rejection, and
+changing it invalidates that measurement. **`POLARITY_LANGUAGES = ("en",)`** —
+the guard is English-only today, deliberately, because it has only been gated on
+English fixtures.
+
+### 3. Per atomic claim, drop-not-fail
+
+The answer is split into atomic claims on deterministic boundaries — a guarded
+sentence scanner (`answer/segment.py`), not a regex, that will not break inside
+`500.00` or after `J. Smith`, breaks unconditionally on a newline, and handles
+CJK / Arabic / Indic terminators without requiring trailing whitespace. A naive
+`[.!?\n]+` split fails 54.2% across six languages; the guarded splitter drops
+that to 7.4%.
+
+Each claim is then gated independently:
+
+- a claim that fails is **dropped from the answer**, not fatal to it;
+- `unsupported_claims_removed` counts what went, and `all_claims_verified` is
+  `True` only when nothing did;
+- `Result.claims` carries a per-claim verdict;
+- if **no** claim survives, on any candidate passage, the call refuses. See
+  [Why did it abstain?](/citenexus/abstention/).
+
+Validation: all 9 adversarial fixtures rejected at **0.0% false rejection
+(0/30)** across four control shapes — verbatim answers, sub-spans, punctuation
+and case noise, and interior-word compression. Shadow-run over the real suite
+(676 tests, 144 gate calls), **exactly one verdict changed**.
+
+Two ablations, worth knowing because they justify the shape:
+
+| Variant | Result |
+| --- | --- |
+| Ordered containment, no polarity guard | 0% false rejection, but still accepts all three negation-deletion attacks |
+| Contiguity only (no gaps allowed) | Rejects all 9, but costs **13.3%** false rejection, concentrated on compressed answers |
+
+## The gap budget is pinned, and where it came from
+
+`MAX_SINGLE_GAP = 4`, `MAX_TOTAL_GAP = 8`.
+
+**They are not configurable.** A caller who widens the budget silently weakens
+the guarantee, and a conformance vector cannot pin a value the caller controls.
+Both ports hard-code the same two numbers.
+
+Be aware of their provenance before trusting them on your corpus: the spike swept
+the budget and found the knee at `(3, 6)`; `(4, 8)` leaves headroom for
+compressed answers. The sweep was run on **synthetic English fixtures**, offline,
+with a hashing fake embedder and an extractive fake generator. The attacks
+themselves are insensitive to the budget — they fail on order and polarity, not
+on gap size — but the *false-rejection* rate that justified `(4, 8)` was measured
+on English only, and has not been re-measured on a non-English corpus.
+
+<Aside type="caution" title="What this gate does not prove">
+It proves the claim follows from the passage. It says nothing about whether that
+passage is the *right* passage: the wrong jurisdiction's statute can clear the
+gate perfectly ([Authority](/citenexus/authority/)), and so can a rule quoted away
+from the precondition that scopes it
+([Wrong subject, right source](/citenexus/scenarios/subject-scope/)).
+
+Two known holes are recorded rather than hidden. The relevance pre-filter and the
+`cite-check` coverage ratio treat `"no"` and `"not"` as stopwords, so they are
+still blind to negation — only the gate itself is not. And claim decomposition on
+scripts without sentence terminators needs per-language fixtures before those
+languages can be claimed.
+</Aside>
+
+## Port status
+
+<Aside type="note" title="Port status — as of 0.10.0 + main">
+The **predicate** (`is_supported_v2` / `IsSupportedV2` / `isSupportedV2`) exists
+in all three ports and pins the same `(4, 8)` budget and the same polarity set.
+On `main`, the Go and JavaScript answer paths call it. **Atomic-claim
+decomposition and drop-not-fail remain Python-only** — Go and JS gate the whole
+answer, so their outcome is pass-or-refuse with no partial trimming.
+
+The v1 predicate stays exported and byte-frozen in every port so the existing
+conformance vectors keep passing. It is no longer what stands between a caller
+and a lie.
+</Aside>
+
+## Next
+
+- [Why did it abstain?](/citenexus/abstention/) — when the gate refuses, and the
+  four other reasons that look the same from outside.
+- [How it works](/citenexus/architecture/) — where the gate sits in the pipeline.
+- [The Result object](/citenexus/result/) — `all_claims_verified`,
+  `unsupported_claims_removed`, `Result.claims`.

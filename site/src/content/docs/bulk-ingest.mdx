@@ -39,16 +39,18 @@ results = rag.crawl("https://docs.example.com", max_pages=200, max_depth=4)
 
 ## Where batch ingest is heading
 
-<Aside type="note" title="The durable queue exists as a primitive — not yet wired to the client">
+<Aside type="note" title="The durable queue is wired into the pipeline — but unreachable from the client">
 CiteNexus ships a tested durable-worker subsystem (`citenexus.worker`:
 `DurableQueue`, `Executor`, `RetryPolicy`, dead-letter queue, `resume`) — SQLite,
 content-hash-idempotent, with exponential backoff and dead-lettering. It's how the
 "submit a job → workers process → poll status → DLQ on repeated failure" pattern
 is meant to work.
 
-Today it is a **standalone** subsystem: the public `CiteNexus` client runs
-ingest (and slow-path graph/wiki work) **inline**, and does not yet enqueue onto or
-drain the queue. A first-class, job-based `ingest_batch(...) → job id → poll` API
-that wires the client to this queue is on the roadmap — until then, the idempotent
-loop above is the supported bulk path.
+It is **not** a standalone bolt-on: `IngestPipeline` already takes a queue and
+enqueues each slow-path document's content hash onto it. What is missing is the
+last hop — **`CiteNexus.__init__` exposes no `queue=` parameter**, so the public
+client can never hand the pipeline one, and that branch never runs. Ingest (and
+slow-path graph/wiki work) therefore happens **inline**. A first-class,
+job-based `ingest_batch(...) → job id → poll` API is on the roadmap — until then,
+the idempotent loop above is the supported bulk path.
 </Aside>

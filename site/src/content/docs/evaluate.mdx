@@ -29,9 +29,36 @@ question,expected
 
 - A row with an `expected` value counts as *expected-supported* when that text's
   content tokens are a subset of the answer's — a lightweight grounding check.
-- A row with an **empty** `expected` is treated as one that *should* be refused;
-  answering it does not earn expected-support. That's how abstention is rewarded,
-  not penalized.
+- A row with an **empty** `expected` counts as expected-supported **iff the row
+  was answered** (`evaluate.py:76-77`).
+
+<Aside type="danger" title="`evaluate()` cannot score abstention — and scores it backwards">
+That second rule is the opposite of what you probably want. A blank `expected`
+does **not** mean "this row should be refused". It means "any answer counts",
+so a **correct refusal earns nothing and lowers `expected_support_rate`.**
+
+This is why the [law example](/citenexus/benchmark-law/) reads 45% expected
+support while its groundedness and citation rates are both 100% — five of its
+eleven rows are refusals, four of them correct.
+
+**Do not build a refusal regression gate on `expected_support_rate`.** To assert
+abstention, drive `ask()` yourself and check the decision:
+
+```python
+from citenexus.answer.result import Decision
+
+must_refuse = ["What is the maximum security deposit under this statute?"]
+for q in must_refuse:
+    assert rag.ask(q).evidence.decision is Decision.refused, q
+```
+</Aside>
+
+<Aside type="caution" title="`evaluate()` passes no options through to `ask()`">
+`evaluate()` calls `ask(question)` bare — no `mode`, `k`, `answer_language` or
+`search_languages` (`client.py:883-885`, `evaluate.py:72`). On a multilingual
+corpus its counts will differ from a harness that fans out over
+`search_languages`, and that difference is the missing fan-out, not a regression.
+</Aside>
 
 <Aside type="note" title="What the report contains">
 `EvaluationReport` carries counts — `total`, `answered`, `refused`, `grounded`
@@ -42,8 +69,10 @@ to disk or S3. Compute a refusal rate yourself as `report.refused / report.total
 </Aside>
 
 <Aside type="tip" title="Run the real thing">
-The runnable multilingual example in the
-[repository](https://github.com/muthuishere/citenexus) ingests a real corpus over
-MinIO + Ollama end to end — ingest → ask → evaluate — and prints the grounded
-answer, its bbox sources, and the score.
+The runnable
+[`examples/multilingual`](https://github.com/muthuishere/citenexus/tree/main/examples/multilingual)
+ingests a real corpus end to end — ingest → ask → evaluate — and prints the
+grounded answer, its cited sources, and the score. It runs against hosted
+endpoints (Jina embeddings + reranker, Gemini generation) with local-filesystem
+storage; `task local:ollama:up` pulls an all-local variant.
 </Aside>

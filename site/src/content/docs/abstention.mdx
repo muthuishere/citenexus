@@ -1,0 +1,190 @@
+---
+title: Why did it abstain?
+description: Your first ask() came back refused. Six different things cause that, they mean six different things, and each one names itself in a field. Read the signal, then fix the right problem.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+A refusal is a successful outcome — it is the product working. But "I can't
+answer that from the available evidence." is the same sentence for several
+different situations, and reaching for the wrong fix wastes a day.
+
+**Every refusal says why.** Read two things:
+
+```python
+response = rag.ask("Can the employee disclose this?")
+
+print(response.evidence.decision)        # Decision.refused
+print(response.missing_evidence)         # ← the reason, in words
+print(response.evidence)                 # ← the structured signals
+```
+
+`missing_evidence` is a tuple of strings on `Result`. `evidence` is the
+`EvidenceSignals` object. Between them, every refusal below is distinguishable
+without guessing.
+
+## The index
+
+| What happened | `missing_evidence[0]` starts with | Field to check |
+| --- | --- | --- |
+| Nothing relevant enough was retrieved | `no sufficiently relevant evidence found` | — |
+| The generated answer didn't follow from the passage | `generated answer failed the faithfulness gate` | `all_claims_verified` |
+| Nothing cleared the authority floor | `no evidence at or above the required authority tier` | `authority_floor_applied` is `True` |
+| The **question**'s script isn't claimed | `unsupported script:` | `unsupported_scripts` is non-empty |
+| Every candidate document's script isn't claimed | `no readable evidence found; unsupported script:` | `unsupported_scripts` is non-empty |
+| Strict mode, and the sources contradict each other | `cited sources disagree and the conflict is unresolved` | `conflicts_detected` > 0 |
+
+The last one is the only refusal that does **not** use the pinned refusal string:
+it answers with *"The available evidence disagrees, so I can't answer that."* and
+returns both sides in `sources`.
+
+---
+
+## 1. No sufficiently relevant evidence
+
+> `missing_evidence = ("no sufficiently relevant evidence found",)`
+
+Retrieval returned candidates, but none of them shared enough with the question
+to be worth generating from. This is the most common first-run refusal and it is
+almost always a **retrieval** problem, not an answering one.
+
+Work down this list:
+
+- **Is anything actually indexed?** `rag.retrieve(question)` returns documents
+  without generating. Empty means ingest, not answering, is the problem.
+- **Did you declare an `embedding` signal but inject no embedder?** Then dense
+  retrieval is silently absent and you are running on BM25 alone — which cannot
+  bridge a paraphrase. See [Signals & capabilities](/citenexus/signals/).
+- **Is the question in a different script from the corpus?** BM25 overlap between
+  two scripts is zero. See [Languages](/citenexus/languages/) and
+  [`search_languages`](/citenexus/scenarios/multilingual-corpus/).
+- **Is `k` too small?** Raise the per-call cutoff: `rag.ask(question, k=20)`.
+  See [Reranking & retrieval](/citenexus/reranking/).
+
+## 2. The answer failed the faithfulness gate
+
+> `missing_evidence = ("generated answer failed the faithfulness gate", ...)`
+
+Retrieval *did* find a relevant passage. The model generated from it, and what it
+generated did not follow from it — wrong order, a dropped negation, or an
+assertion the passage does not make. The gate rejected it rather than emit a
+verbatim-sourced falsehood.
+
+The flow tries up to five candidate passages before giving up, so this refusal
+means every attempt failed.
+
+**"Every atomic claim was dropped" is this same refusal.** Claims are gated
+individually and a failing claim is *dropped*, not fatal — an answer keeps its
+surviving claims and records the casualties in `unsupported_claims_removed`. Only
+when nothing at all survives does the call refuse, and it refuses with this
+string. There is no separate "all claims dropped" signal, and partial drops never
+refuse. Check `all_claims_verified` and `unsupported_claims_removed` on your
+*answered* results to see how often claims are being trimmed.
+
+What to do:
+
+- **This is usually the right answer.** Read the retrieved passage yourself:
+  more often than not, it genuinely does not support the question.
+- Your generator may be paraphrasing too freely. An **extractive** generator —
+  one that returns the source's own sentences — clears the gate reliably; a
+  chatty one will not.
+- If the passage does support the question and the gate still rejects, the claim
+  is likely compressed beyond the pinned `(4, 8)` gap budget, or its polarity
+  markers do not survive. See [The faithfulness gate](/citenexus/faithfulness/).
+
+## 3. Nothing met the authority floor
+
+> `missing_evidence = ("no evidence at or above the required authority tier",)`
+>
+> `evidence.authority_floor_applied is True`
+
+Grounded evidence existed, and it was **excluded on standing** — a Florida
+statute retrieved for a Texas question, an unpublished note where a controlling
+source was required. This is not "there is no evidence"; it is "what I found has
+no standing here", and conflating the two is exactly how an out-of-jurisdiction
+citation hides behind 100% groundedness.
+
+- `authority_floor_applied` is `True` **only** when the floor actually excluded
+  something. On an unranked corpus it stays `False` and this refusal cannot occur.
+- Fix by curating: attach `authority=` metadata at ingest for the sources that do
+  have standing, or lower the floor if it was set too high.
+- Full reference: [Authority — source standing](/citenexus/authority/).
+
+<Aside type="note" title="Standing is metadata, not content">
+A California statute's body text never says "California". Authority is asserted
+by whoever curated the corpus and is applied strictly *after* grounding — never
+folded into ranking.
+</Aside>
+
+## 4 & 5. The script is not claimed — a capability gap, not a judgement
+
+> `evidence.unsupported_scripts` is non-empty
+
+**This is the distinction that matters most on this page.** Every other refusal
+here is a statement about your *evidence*. This one is a statement about
+**CiteNexus**: the tokenizer does not claim to segment this script, so the
+library cannot read the text — and it says so rather than reporting an absence of
+evidence it never actually looked for.
+
+Returning "no evidence found" for a capability gap is precisely what let an
+ASCII-only tokenizer hide for a whole release. Never treat a non-empty
+`unsupported_scripts` as "my corpus doesn't cover this".
+
+Two forms:
+
+- **The question is unreadable** — `missing_evidence[0]` is
+  `"unsupported script: …"`. Nothing was even retrieved.
+- **The whole candidate pool is unreadable** —
+  `"no readable evidence found; unsupported script: …"`.
+
+And one **non**-refusal worth knowing: if *some* candidates are readable, the call
+**answers**, and the unreadable ones are reported additively —
+`unsupported_scripts` is still populated and `missing_evidence` carries a note
+like `"2 candidate document(s) could not be read and were excluded: …"`. A
+successful answer with a non-empty `unsupported_scripts` means part of your
+corpus was invisible to that query. Monitor it.
+
+Fix: nothing you configure. Check the claimed-script table on
+[Languages](/citenexus/languages/); an unclaimed script needs tokenizer support,
+which is a library change, not a knob.
+
+## 6. Strict mode, and the sources disagree
+
+> `answer = "The available evidence disagrees, so I can't answer that."`
+>
+> `missing_evidence = ("cited sources disagree and the conflict is unresolved",)`
+>
+> `evidence.conflicts_detected > 0`
+
+Two retrieved passages contradict each other and the contradiction touches the
+passage that would have been cited. Strict mode refuses and returns **both
+sides** in `sources` rather than letting rank silently pick a winner.
+
+- `normal` mode answers and lists the conflicts instead of abstaining;
+  `exploratory` records the count only.
+- Conflicts are never resolved by ranking. If one source really is authoritative,
+  say so with [authority metadata](/citenexus/authority/) — that is the signal
+  that can break the tie legitimately.
+- Full story: [Conflicting sources](/citenexus/scenarios/conflicting-sources/).
+
+---
+
+## A refusal is not always a bug
+
+<Aside type="caution" title="Don't measure abstention with evaluate()">
+`evaluate()` cannot score abstention: a golden row with an empty `expected`
+earns credit **iff the row was answered**, so a correct refusal *lowers*
+`expected_support_rate`. To gate on must-refuse rows, drive `ask()` yourself and
+assert `result.evidence.decision is Decision.refused`.
+</Aside>
+
+The three guards you are most likely to want to *keep* refusing are the
+faithfulness gate, the authority floor and the conflict abstention. If you are
+tuning to make refusals go away, tune retrieval (cause 1) first — the other five
+are usually telling you something true.
+
+## Next
+
+- [The faithfulness gate](/citenexus/faithfulness/)
+- [The Result object](/citenexus/result/) — every field named here
+- [How it works](/citenexus/architecture/) — where each guard sits in the pipeline

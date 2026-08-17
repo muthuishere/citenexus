@@ -1,6 +1,6 @@
 ---
 title: Signals & capabilities
-description: The signals you declare decide which indexes are built at ingest and which retrievers run at query time. Omit them and all six are active. Gating builds and queries — it never rejects a call.
+description: The signals you declare decide which indexes are built at ingest and which retrievers run at query time. Omit them and all six are active. An absent signal skips its build and its retriever — ingest() and ask() never raise over it.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -29,20 +29,34 @@ rag = CiteNexus("./citenexus-data", embedder=..., generator=..., signals=["embed
 | `community` | graph communities *(slow path)* | Graph |
 | `wiki` | the distilled wiki *(slow path)* | Wiki |
 
-<Aside type="note" title="Gating builds and queries — it never rejects">
+<Aside type="note" title="Gating builds and queries — with two exceptions that raise">
 An absent signal simply **skips its build and its retriever**. Ingest still runs
 and stores the raw blob + Evidence Units; `ask()` still answers from whatever
-retrievers are active. Declaring `signals` does not raise or block a call — it
-narrows what work happens. Omit `signals` entirely and all six are built and
-queried.
+retrievers are active — neither raises over a missing signal. Omit `signals`
+entirely and all six are built and queried.
+
+Two paths *do* raise, both loudly and at the boundary:
+
+- An **unknown signal name** raises `ValueError` at construction
+  (`resolve_signals` validates every entry against the closed `Signal` set).
+- The typed intake verbs [`rag.code.ingest_from(...)`](/citenexus/scope/) and
+  `rag.schema.ingest_from(...)` raise `ValueError` if neither `graph` nor
+  `community` is declared — a code or schema corpus is meaningless without its
+  structural graph, so they refuse rather than ingest something unusable.
 </Aside>
 
 ## Fast path vs. slow path
 
 `embedding`, `text`, and `structure` are computed inline during `ingest()`. The
-**slow-path** signals — `graph`, `community`, `wiki` — require distillation and
-are enqueued on a durable queue if one is configured, then rebuilt incrementally.
-Declare them only when you want graph/wiki navigation over your evidence.
+**slow-path** signals — `graph`, `community`, `wiki` — require distillation, so
+`ingest()` only marks the graph dirty and upserts one wiki page; the graph is
+rebuilt lazily on the read path.
+
+The durable queue that would take this work off the ingest call is already wired
+into `IngestPipeline`, but **`CiteNexus.__init__` has no `queue=` parameter**, so
+that branch is not reachable from the client today — see
+[bulk & batch ingest](/citenexus/bulk-ingest/). Declare these signals only when
+you want graph/wiki navigation over your evidence.
 
 <Aside type="caution" title="Vector retrieval needs an embedder">
 The `embedding` signal only produces a working vector retriever when an

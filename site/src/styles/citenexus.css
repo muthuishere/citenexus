@@ -22,6 +22,12 @@
 	--cn-clay-ink: #f0a883;
 	--cn-clay-wash: #2d2019;
 	--cn-accent-wash: #14284d;
+
+	/* the WRONG hue — deliberately not the abstain clay. Refusing is a correct
+	   outcome; a confident wrong answer is not, and the two must not look alike. */
+	--cn-red: #d4544e;
+	--cn-red-ink: #f08b86;
+	--cn-red-wash: #2e1817;
 }
 
 /* ── Dark theme (default): charcoal, blue accent ── */
@@ -77,6 +83,10 @@
 	--cn-clay-ink: #92400e;
 	--cn-clay-wash: #fbeade;
 	--cn-accent-wash: #d3e0ff;
+
+	--cn-red: #c0332c;
+	--cn-red-ink: #9b1c16;
+	--cn-red-wash: #fbe3e1;
 }
 
 /* Slightly tighter, more confident headings */
@@ -163,6 +173,10 @@ starlight-tabs [role='tab'][aria-selected='true'] {
 	color: var(--cn-clay-ink);
 	background: var(--cn-clay-wash);
 }
+.cn-state--bad {
+	color: var(--cn-red-ink);
+	background: var(--cn-red-wash);
+}
 
 .cn-card__body {
 	padding: 1.1rem 1.25rem 1.25rem;
@@ -188,6 +202,19 @@ starlight-tabs [role='tab'][aria-selected='true'] {
 	border-left-color: var(--cn-clay);
 	background: var(--cn-clay-wash);
 }
+.cn-quote--bad {
+	border-left-color: var(--cn-red);
+	background: var(--cn-red-wash);
+}
+
+/* A card's leading label ("Before" / "After") — reuses .cn-card__top's row. */
+.cn-card__top .cn-step {
+	font-weight: 700;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	font-size: 0.62rem;
+	color: var(--sl-color-gray-2);
+}
 .cn-note {
 	font-size: 0.9rem;
 	color: var(--sl-color-gray-2);
@@ -211,6 +238,18 @@ starlight-tabs [role='tab'][aria-selected='true'] {
 }
 .cn-cite .cn-cite--no {
 	color: var(--cn-clay-ink);
+}
+.cn-cite .cn-cite--bad {
+	color: var(--cn-red-ink);
+}
+
+/* Non-Latin evidence needs a font stack that actually has the glyphs, and a
+   little more room — Telugu/Tamil marks clip at the Latin line-height. */
+.cn-quote--script {
+	font-family: 'Noto Sans Telugu', 'Noto Sans Tamil', 'Nirmala UI', 'Kohinoor Telugu',
+		'Tamil Sangam MN', var(--sl-font);
+	font-size: 1.15rem;
+	line-height: 1.7;
 }
 
 /* ── The guarantee line — a quiet, high-contrast statement beat ── */

@@ -6,7 +6,7 @@ description: Prove the live index is derived from exactly the agreed corpus — 
 import { Aside, Steps } from '@astrojs/starlight/components';
 
 **The failure this prevents:** an answer cites a document nobody agreed was in
-scope. It has a real document ID, a real page, a real bbox and a verbatim quote.
+scope. It has a real document ID, a real page and a verbatim quote.
 At the point of use it is **indistinguishable** from a correct citation — and the
 cite-or-abstain guarantee still holds, because that guarantee is scoped to the
 index, while the auditor's question is scoped to the corpus.
@@ -97,7 +97,8 @@ corpus at time T"* becomes an evidence artifact rather than a verbal assurance:
 ```python
 from citenexus.reconcile import read_audit
 
-for entry in read_audit(rag):
+# read_audit reads the stream directly from the backend for one partition.
+for entry in read_audit(rag._backend, rag.partition):
     print(entry)          # timestamp, manifest_version, counts per set
 ```
 

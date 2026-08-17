@@ -37,15 +37,27 @@ abstain, and prove it on a golden set that rewards abstention.
    vision for figures). Keep it local (Ollama) for data-residency, or use a hosted
    endpoint — see [custom endpoints & auth](/citenexus/custom-endpoints/).
 
-4. **Prove it with a golden set — including must-refuse rows.** Write questions the
-   corpus *can't* answer (out-of-jurisdiction, not-in-guideline) with an empty
-   `expected`, so a model that answers when it should refuse scores worse. Then
-   [`evaluate()`](/citenexus/evaluate/).
+4. **Prove it with a golden set — and assert the refusals separately.**
+   [`evaluate()`](/citenexus/evaluate/) scores the answerable rows: put the text
+   you expect quoted in the `expected` column and read `groundedness_rate`,
+   `citation_rate` and `expected_support_rate`.
 
    ```csv
    question,expected
    "What notice must a CA landlord give a >1yr month-to-month tenant?","60"
-   "What is the maximum security deposit under this statute?",
+   ```
+
+   **Must-refuse rows do not belong in that CSV.** A blank `expected` is scored
+   as supported only when the row was *answered*, so a correct refusal lowers
+   `expected_support_rate` rather than raising it. Assert abstention directly
+   instead:
+
+   ```python
+   from citenexus.answer.result import Decision
+
+   must_refuse = ["What is the maximum security deposit under this statute?"]
+   for q in must_refuse:
+       assert rag.ask(q).evidence.decision is Decision.refused, q
    ```
 
 </Steps>
@@ -58,21 +70,40 @@ and citation, zero fabricated answers** across an 11-question golden set — ver
 the 17–33% hallucination rate reported for generic legal RAG (Stanford RegLab,
 2024, cited as context). It also shows the honest failure mode to watch for.
 
-<Aside type="caution" title="Know the authority gap before you ship">
-CiteNexus ranks by relevance, not **authority** — it has no jurisdiction /
-precedence / source-credibility weighting. In a corpus mixing a controlling
+That is a **single live run** against a generator that is not reproducible at
+temperature 0 — an identical re-run moved the rate metrics by a question. The
+safety metrics (100% groundedness, 100% citation, 0 out-of-jurisdiction
+citations) held across both. Treat the rates as illustration and the safety
+numbers as the result.
+
+<Aside type="caution" title="Turn the authority floor on — retrieval alone ranks by relevance">
+Retrieval and fusion rank by relevance only, so in a corpus mixing a controlling
 statute with a blog or another jurisdiction, a low-authority source that repeats
-the query vocabulary can win the citation. For legal/medical corpora, either keep
-sources single-authority per topic, or add your own authority filter before
-retrieval. This is architectural, not a tuning knob — see the
-[benchmark](/citenexus/benchmark-law/).
+the query vocabulary can win the citation. **Authority weighting ships** (ADR-0004)
+but is *unranked by default*: attach tiers at ingest with
+`rag.ingest(..., authority={"authority_tier": "controlling-statute"})` and set a
+floor, and strict mode withholds everything below it — after grounding, before
+generation. On the law corpus that took out-of-jurisdiction citations from 4 to 0.
+Tiers are curator assertions; the library never derives them from prose, and a
+mis-declared tier is a real failure mode. See
+[Authority — grounding is not standing](/citenexus/authority/).
+</Aside>
+
+<Aside type="danger" title="Right authority, wrong subject — still open">
+The floor orders *sources*; it cannot catch a passage from the highest-authority
+source that governs a different subject. A statute's applicability clause and its
+operative rule are often separate Evidence Units, and every downstream guard is
+chunk-local — measured at **73% severance** on the law corpus. See
+[Subject scope](/citenexus/scenarios/subject-scope/).
 </Aside>
 
 ## Medical, specifically
 
 The same shape applies: ingest the guideline / formulary / label, keep strict mode
 so a dose or contraindication is only ever quoted from the source (never
-synthesized), cite the exact page, and put "not in the guideline" questions in the
-golden set so abstention is measured. In any [supported script](/citenexus/languages/), answers come
-back in the clinician's language while the citation stays verbatim; other scripts
-abstain today — see [languages](/citenexus/languages/).
+synthesized), cite the exact page, and keep a separate list of "not in the
+guideline" questions asserted against `Decision.refused` — abstention has to be
+measured outside `evaluate()`. In any [supported script](/citenexus/languages/),
+answers come back in the clinician's language while the citation stays **verbatim
+in its own language**, so an English answer can carry a non-English quote — see
+[languages](/citenexus/languages/).

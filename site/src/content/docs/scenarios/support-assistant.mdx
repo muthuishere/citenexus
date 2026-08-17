@@ -60,8 +60,15 @@ rag.ask("Do you ship to Ireland?", conversation_id="ticket-8891")
 rag.ask("How long does it take?",  conversation_id="ticket-8891")
 ```
 
-Conversation memory is partition- and ACL-scoped, so one customer's thread can
-never surface in another's.
+Conversation memory is **partition-scoped** and keyed by `conversation_id`, so
+one ticket's turns can never surface in another's.
+
+<Aside type="caution" title="`acl` is carried, not enforced">
+There is no ACL scoping anywhere in the library. `acl` is metadata recorded on an
+Evidence Unit and read by nothing — it isolates nothing on its own. Isolation
+comes from the partition you construct the client with, plus the
+`allowed_partitions` pre-filter. See [Access & scoping](/citenexus/access/).
+</Aside>
 
 ## Tuning how strict to be
 

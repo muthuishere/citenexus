@@ -53,9 +53,27 @@ reads every answer anyway and wants the flag, not the block.
 ## Detection is deterministic, and it never resolves
 
 No model is involved. Detection runs over already-grounded candidates using
-content-derived signals only — negation asymmetry, mismatched numeric and date
-literals across an otherwise-shared token set — so it is reproducible and pinned
-by the cross-language conformance suite.
+content-derived signals only, across an otherwise-shared token set. There are
+exactly three rules, tried in order:
+
+1. **Antonym pair** — one content word on each side forms a known antonym pair
+   (`permitted`/`prohibited`, `required`/`optional`, …).
+2. **Negation parity** — the two passages differ in the *parity* of their
+   negations. A negation that is reported speech ("the vendor claimed it was
+   not…") is excluded: it belongs to a third party, not to the source.
+3. **Numeric-value divergence** — the measured values differ, the units match,
+   and neither set is a superset of the other (an elaboration is not a conflict).
+   **Dates participate only when they read as digit-leading numbers** (`2019`);
+   there is no date rule as such, and no date parsing.
+
+<Aside type="caution" title="Detection is Python-only today">
+Conflict detection ships in the **Python** implementation. Go and JavaScript
+declare the `conflicts` / `conflicts_detected` fields for wire parity but
+implement no detection. The golden vectors are published
+(`conformance/cases/conflict.json`) precisely so the ports can be held to them
+when they do — but a Go or JS `ask()` will report `conflicts_detected = 0` on a
+corpus Python flags.
+</Aside>
 
 It deliberately **does not resolve**. Deciding *which* of two contradictory
 sources wins is a policy question about authority, recency and jurisdiction. That
@@ -67,7 +85,36 @@ is a **false refusal** — the library becomes useless long before it becomes
 wrong. Detection is therefore tuned against hard negatives: passages that look
 contradictory but are not (a dose for adults vs one for children, p50 vs p99
 latency, staging vs production). Measured: **0 false positives** across 27 hard
-negatives and 10 held-out cases, in five unrelated domains independently.
+negatives and 10 held-out cases, in five unrelated domains independently — on
+**synthetic English** fixtures. That is the honest scope of the number.
+</Aside>
+
+## Where the thresholds came from — and why you can't turn them
+
+Every constant below is **pinned in the source and exposed as no caller
+parameter**. That is deliberate: a conformance vector cannot pin a value the
+caller controls, and each one trades directly against false abstention.
+
+| Constant | Value | What it governs |
+|---|---|---|
+| `MAX_RESIDUAL` | `1` | content divergence still allowed *after* removing the polarity signal itself |
+| `SUBJECT_OVERLAP` | `0.60` | overlap needed before two passages count as being about the same subject |
+| `MAX_SYMDIFF` | `3` | total divergence past which the pair is simply unrelated |
+| `MIN_CONTENT` | `3` | passages with fewer content tokens are not comparable |
+| `DUPLICATE_JACCARD` | `0.80` | where two same-polarity passages become surface clones |
+| `CONFLICT_TOP_K` | `6` | how many post-fusion candidates are compared pairwise |
+
+`MAX_RESIDUAL` does nearly all the work, and the ADR-0007 sweep shows why it is
+frozen at 1: relaxing it to 2 buys 4 points of recall (0.89 → 0.93) and costs
+**15 points of false-conflict rate** (0.00 → 0.15) — in strict mode, 15 points of
+false *refusal*.
+
+<Aside type="caution" title="These were swept on synthetic English sentences">
+The sweep that produced every value above ran on **synthetic English** fixtures.
+They have never been fitted against a non-English corpus, and nothing in the
+library adapts them to one. If you run a non-English or heavily domain-specific
+corpus in `strict` mode, treat the false-refusal rate as **unmeasured for your
+data** and measure it yourself before trusting the abstention behaviour.
 </Aside>
 
 ## Duplicates stop inflating your confidence

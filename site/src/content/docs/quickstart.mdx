@@ -57,8 +57,17 @@ JavaScript ship the same deterministic core (see the [concepts](/citenexus/conce
 
    response = rag.ask("Can the employee disclose confidential information?")
 
-   print(response.answer)                         # the verbatim quote — or a refusal
-   print(response.sources[0].document, response.sources[0].page)
+   print(response.answer)                       # the verbatim quote — or a refusal
+
+   # A refusal carries NO sources, so always branch on the decision first —
+   # response.sources[0] would raise IndexError.
+   from citenexus.answer.result import Decision
+
+   if response.evidence.decision is Decision.answered:
+       src = response.sources[0]
+       print(src.document, src.page)
+   else:
+       print("refused:", response.missing_evidence)
    ```
 
 </Steps>
@@ -73,5 +82,7 @@ If the evidence doesn't support the question, `response.evidence.decision` is
 
 - Store your corpus on [S3 / MinIO](/citenexus/s3/) instead of a local folder.
 - [Bring your own models](/citenexus/models/) — embedding, LLM, reranker, vision.
-- [Ingest anything](/citenexus/ingest/) — files, raw text, a URL, or a whole bucket.
+- [Ingest anything](/citenexus/ingest/) — a file, raw text, an image, or a URL,
+  one source per call (there is no "ingest the whole bucket" call); `crawl()`
+  walks a whole site.
 - [Prove it](/citenexus/evaluate/) with `evaluate()` against a golden set.

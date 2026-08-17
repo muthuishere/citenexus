@@ -1,0 +1,162 @@
+---
+title: Bring your own model — how to
+description: Three steps to plug any embedder, generator, reranker or vision model into CiteNexus — pick a contract, implement one method, pass it to the constructor. No HTTP required, no citenexus import required.
+---
+
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+CiteNexus bundles no models. Every model seam is a **published contract**, and
+anything matching the shape works — an HTTP client, an in-process model, a cached
+fixture, a mock in a test.
+
+This is the short path. For the reasoning behind the seam, the deprecated
+shapes, batching, and the failure semantics in full, see
+[Provider contracts](/citenexus/providers/). For wiring a *hosted* endpoint with
+auth headers, see [Custom endpoints & auth](/citenexus/custom-endpoints/).
+
+<Steps>
+
+1. **Pick your contract.**
+
+   All five live in `citenexus.contracts` and are re-exported from the top-level
+   `citenexus` package.
+
+   | Contract | The one method you implement |
+   | --- | --- |
+   | `EmbeddingProvider` | `embed_many(texts: Sequence[str]) -> list[Vector]` |
+   | `GeneratorProvider` | `answer(question: str, passage: str, answer_language: str = "en") -> str` |
+   | `CompletionProvider` | `complete(prompt: str) -> str` |
+   | `VisionProvider` | `describe(image_region: Any) -> Mapping[str, Any]` |
+   | `RerankerProvider` | `rerank(query: str, candidates: Sequence[Candidate]) -> list[Candidate]` |
+
+   `Vector` is `list[float]`. Every contract **returns a value or raises** — none
+   defines a sentinel, because a zero vector is a valid embedding and an empty
+   string is a valid answer. If your provider cannot fulfil a call, raise.
+
+2. **Implement the method.**
+
+   They are `@runtime_checkable` `Protocol`s, not ABCs: **matching the shape is
+   enough.** You do not have to subclass anything, and you do not have to import
+   CiteNexus into your provider's source at all. Nothing in a contract mentions a
+   transport, so a provider that never opens a socket satisfies it.
+
+   ```python
+   from collections.abc import Sequence
+
+   class MyEmbedder:                       # no base class, no citenexus import
+       def embed_many(self, texts: Sequence[str]) -> list[float]:
+           return [self._vector(t) for t in texts]   # one per input, in input order
+
+       def _vector(self, text: str) -> list[float]:
+           ...
+
+
+   class MyGenerator:
+       def answer(self, question: str, passage: str, answer_language: str = "en") -> str:
+           # Extractive is the best kind: whatever you return still has to clear
+           # the per-claim faithfulness gate before it can be emitted.
+           ...
+   ```
+
+   Batching is the primitive on purpose: `embed_many` takes the whole list, so
+   one request per Evidence Unit is not what a real corpus costs you.
+
+3. **Pass it to `CiteNexus(...)`.**
+
+   ```python
+   from citenexus import CiteNexus
+
+   rag = CiteNexus("./citenexus-data", embedder=MyEmbedder(), generator=MyGenerator())
+   ```
+
+   The keyword-only injection points are `embedder=`, `generator=`, `reranker=`,
+   `vision=`, `detector=` and `agentic_decider=`.
+
+</Steps>
+
+## A partial set is a valid set
+
+You do not have to supply all of them.
+
+- **Generator, no embedder** — retrieval falls back to lexical (BM25) and `ask()`
+  still answers. This case is pinned by the test suite.
+- **Embedder, no generator** — the Python facade becomes search-only:
+  `retrieve()` works, `ask()` raises `ValueError`. (The Go and JS ports differ
+  here — they fall back to a deterministic fake generator.)
+
+## Two rough edges, stated plainly
+
+<Aside type="caution" title="Only two seams are annotated against the contracts">
+`embedder=` and `generator=` are typed against the published contracts.
+`reranker=` is still annotated with the nominal `RerankerPlugin` ABC and
+`vision=` with an internal alias — a structural provider works at runtime and the
+reference test injects one, but a `mypy --strict` caller needs
+`# type: ignore[arg-type]` on those arguments until the annotations are widened.
+</Aside>
+
+There is **no `completion=` parameter.** `CompletionProvider` is the deep-ask
+decision seam and enters through `agentic_decider=`; if you leave that unset,
+CiteNexus wraps your generator, which is why a generator used with
+`strategy="deep"` should implement `complete()` as well as `answer()`.
+
+## Go and JavaScript
+
+The ports publish **two** contracts — embedding and generation — and the
+injection point is `AskWith` / `askWith`. There is no vision, completion or
+reranker seam in either port. The batch method is the same primitive, spelled
+differently per language.
+
+<Tabs syncKey="lang">
+<TabItem label="Go">
+```go
+// golang/contracts
+type EmbeddingProvider interface {
+	Embed(texts []string) ([][]float64, error)
+}
+type GeneratorProvider interface {
+	Answer(question, passage, answerLanguage string) (string, error)
+}
+
+res, err := answer.AskWith(corpus, question, answer.DefaultTopK, answer.Providers{
+	Embedding: myEmbedder,
+	Generator: myGenerator,
+})
+```
+</TabItem>
+<TabItem label="JavaScript">
+```ts
+// @muthuishere/citenexus — contracts
+interface EmbeddingProvider {
+  embed(texts: readonly string[]): Awaitable<Vector[]>
+}
+interface GeneratorProvider {
+  answer(question: string, passage: string, answerLanguage?: string): Awaitable<string>
+}
+
+const res = await askWith(corpus, question, {
+  embedding: myEmbedder,
+  generator: myGenerator,
+})
+```
+</TabItem>
+<TabItem label="Python">
+```python
+from citenexus import CiteNexus
+
+rag = CiteNexus("./citenexus-data", embedder=MyEmbedder(), generator=MyGenerator())
+response = rag.ask("Can the employee disclose this?")
+```
+</TabItem>
+</Tabs>
+
+Both ports accept a partial set: a nil/omitted field falls back to the port's
+deterministic hermetic fake. JS providers may be async — `askWith` returns a
+`Promise`, while the batteries-free `ask` stays synchronous.
+
+## Next
+
+- [Provider contracts](/citenexus/providers/) — the full reference: structural
+  typing, the deprecated single-text shapes, failure semantics, per-port scope.
+- [Custom endpoints & auth](/citenexus/custom-endpoints/) — `${ENV}` header
+  templates for hosted models, expanded only at the HTTP boundary.
+- [Models & endpoints](/citenexus/models/) — the clients CiteNexus already ships.
