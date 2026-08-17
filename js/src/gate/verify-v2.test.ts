@@ -21,12 +21,18 @@ interface V2Fixture {
 // accepts 9/9; the controls are legitimately-supported answers in four shapes
 // (verbatim, subspan, punctuation/case noise, interior-word compression) that
 // must stay accepted — measured false rejection is 0.0%.
+/** Bucket sizes, pinned. A vector silently dropped from a bucket is a weakened
+ *  contract that no per-case assertion can see. */
+const EXPECTED_COUNTS: Record<string, number> = { attacks: 9, controls: 30 };
+
 describe("isSupportedV2 conformance", () => {
   const fixture = loadCase<V2Fixture>("faithful_v2.json");
 
-  it("has cases", () => {
-    expect(fixture.attacks.length).toBeGreaterThan(0);
-    expect(fixture.controls.length).toBeGreaterThan(0);
+  it("bucket names and sizes are pinned", () => {
+    const sizes = Object.fromEntries(
+      Object.entries(fixture).map(([k, v]) => [k, (v as unknown[]).length]),
+    );
+    expect(sizes).toEqual(EXPECTED_COUNTS);
   });
 
   for (const c of [...fixture.attacks, ...fixture.controls]) {

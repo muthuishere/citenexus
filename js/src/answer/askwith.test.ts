@@ -68,11 +68,20 @@ interface E2EFixture {
   cases: { question: string }[];
 }
 
+/** Vector counts, pinned. A vector silently dropped from the fixture is a
+ *  weakened contract that no per-case assertion can see. `top_k` is a scalar
+ *  parameter, not a count, so it is pinned separately. */
+const EXPECTED_COUNTS: Record<string, number> = { corpus: 3, cases: 4 };
+const EXPECTED_TOP_K = 5;
+
 describe("askWith with an empty provider set is ask", () => {
   const fixture = loadCase<E2EFixture>("e2e_hermetic.json");
 
-  it("has cases", () => {
-    expect(fixture.cases.length).toBeGreaterThan(0);
+  it("vector counts are pinned", () => {
+    expect({ corpus: fixture.corpus.length, cases: fixture.cases.length }).toEqual(
+      EXPECTED_COUNTS,
+    );
+    expect(fixture.top_k).toBe(EXPECTED_TOP_K);
   });
 
   for (const c of fixture.cases) {

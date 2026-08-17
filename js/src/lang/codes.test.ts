@@ -29,6 +29,27 @@ interface LanguagesFixture {
 
 const FIXTURE = loadCase<LanguagesFixture>("languages.json");
 
+/** Bucket sizes, pinned. A vector silently dropped from a bucket is a weakened
+ *  contract that no per-case assertion can see. (`auto_sentinel` is a scalar,
+ *  not a bucket, and is asserted by name below.) */
+const EXPECTED_COUNTS: Record<string, number> = {
+  scripts: 27,
+  supported_scripts: 14,
+  continuous_scripts: 7,
+  languages: 41,
+};
+
+describe("languages.json bucket shape", () => {
+  it("bucket names and sizes are pinned", () => {
+    const sizes = Object.fromEntries(
+      Object.entries(FIXTURE)
+        .filter(([, v]) => Array.isArray(v))
+        .map(([k, v]) => [k, (v as unknown[]).length]),
+    );
+    expect(sizes).toEqual(EXPECTED_COUNTS);
+  });
+});
+
 describe("language / script code sets (conformance)", () => {
   it("the search table matches the fixture, in order", () => {
     expect(

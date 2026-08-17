@@ -20,6 +20,37 @@ type v2Fixture struct {
 	Controls []v2Case `json:"controls"`
 }
 
+// expectedFaithfulV2Counts pins the bucket sizes of
+// conformance/cases/faithful_v2.json: nine adversarial attacks and thirty
+// controls. A dropped attack is a silently weakened ADR-0009 contract.
+var expectedFaithfulV2Counts = map[string]int{
+	"attacks":  9,
+	"controls": 30,
+}
+
+func loadFaithfulV2(t *testing.T) v2Fixture {
+	t.Helper()
+	var fixture v2Fixture
+	conform.Case(t, "faithful_v2.json", &fixture)
+	return fixture
+}
+
+func assertFaithfulV2Counts(t *testing.T, fixture v2Fixture) {
+	t.Helper()
+	for name, got := range map[string]int{
+		"attacks":  len(fixture.Attacks),
+		"controls": len(fixture.Controls),
+	} {
+		if want := expectedFaithfulV2Counts[name]; got != want {
+			t.Fatalf("faithful_v2.json bucket %q: got %d vectors, want %d", name, got, want)
+		}
+	}
+}
+
+func TestFaithfulV2VectorBucketSizes(t *testing.T) {
+	assertFaithfulV2Counts(t, loadFaithfulV2(t))
+}
+
 // TestIsSupportedV2Conformance is the ADR-0009 contract: every verdict in
 // conformance/cases/faithful_v2.json must be reproduced exactly. The attacks are
 // nine false answers that the frozen v1 predicate accepts 9/9; the controls are
@@ -27,12 +58,8 @@ type v2Fixture struct {
 // punctuation/case noise, interior-word compression) that must stay accepted —
 // the measured false-rejection rate is 0.0%.
 func TestIsSupportedV2Conformance(t *testing.T) {
-	var fixture v2Fixture
-	conform.Case(t, "faithful_v2.json", &fixture)
-
-	if len(fixture.Attacks) == 0 || len(fixture.Controls) == 0 {
-		t.Fatal("faithful_v2.json loaded no cases")
-	}
+	fixture := loadFaithfulV2(t)
+	assertFaithfulV2Counts(t, fixture)
 
 	for _, group := range []struct {
 		label string
@@ -53,8 +80,8 @@ func TestIsSupportedV2Conformance(t *testing.T) {
 // accepted. If this ever fails, v2 has become a different predicate rather than
 // a tightening of the same one.
 func TestV2IsNarrowerThanV1(t *testing.T) {
-	var fixture v2Fixture
-	conform.Case(t, "faithful_v2.json", &fixture)
+	fixture := loadFaithfulV2(t)
+	assertFaithfulV2Counts(t, fixture)
 
 	all := append(append([]v2Case{}, fixture.Attacks...), fixture.Controls...)
 	for _, c := range all {
@@ -68,8 +95,8 @@ func TestV2IsNarrowerThanV1(t *testing.T) {
 // all nine adversarial answers. It also guards the requirement that IsSupported
 // stays byte-identical.
 func TestAttacksStillPassV1(t *testing.T) {
-	var fixture v2Fixture
-	conform.Case(t, "faithful_v2.json", &fixture)
+	fixture := loadFaithfulV2(t)
+	assertFaithfulV2Counts(t, fixture)
 
 	accepted := 0
 	for _, c := range fixture.Attacks {

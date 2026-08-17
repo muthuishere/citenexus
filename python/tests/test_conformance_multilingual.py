@@ -26,6 +26,30 @@ _CORPUS = json.loads(
 )
 
 
+#: Bucket sizes, pinned. Every assertion below iterates its bucket, so a vector
+#: silently dropped from the fixture weakens the contract without failing
+#: anything. Go and JS pin the same numbers.
+EXPECTED_COUNTS: dict[str, int] = {
+    "tokenize": 10,
+    "bm25": 3,
+    "chunker": 2,
+    "gate.supported": 3,
+    "gate.relevance": 3,
+}
+
+
+def test_bucket_names_and_sizes() -> None:
+    assert set(_CORPUS) == {"tokenize", "bm25", "chunker", "gate"}
+    got = {
+        "tokenize": len(_CORPUS["tokenize"]),
+        "bm25": len(_CORPUS["bm25"]),
+        "chunker": len(_CORPUS["chunker"]),
+        "gate.supported": len(_CORPUS["gate"]["supported"]),
+        "gate.relevance": len(_CORPUS["gate"]["relevance"]),
+    }
+    assert got == EXPECTED_COUNTS
+
+
 class _StubStore:
     def __init__(self, rows: list[dict[str, Any]]) -> None:
         self._rows = rows

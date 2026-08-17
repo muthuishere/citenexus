@@ -7,6 +7,24 @@ import (
 	"github.com/muthuishere/citenexus/golang/internal/conform"
 )
 
+// expectedMultilingualBm25Cases pins the "bm25" bucket of
+// conformance/cases/multilingual.json as this package consumes it. Four packages
+// read that file; each pins its own bucket independently.
+const expectedMultilingualBm25Cases = 3
+
+func TestMultilingualBm25VectorCount(t *testing.T) {
+	var fixture struct {
+		Bm25 []struct {
+			Name string `json:"name"`
+		} `json:"bm25"`
+	}
+	conform.Case(t, "multilingual.json", &fixture)
+	if len(fixture.Bm25) != expectedMultilingualBm25Cases {
+		t.Fatalf("multilingual.json bucket %q: got %d vectors, want %d",
+			"bm25", len(fixture.Bm25), expectedMultilingualBm25Cases)
+	}
+}
+
 // The multilingual anti-drift corpus (ADR-0006) run through BM25: a query like
 // "İstanbul" tokenizes to {i, stanbul} in the reference, so a port that lowers
 // İ to a bare "i" ranks the rows differently and fails these vectors.
@@ -27,8 +45,9 @@ func TestBm25MultilingualConformance(t *testing.T) {
 	}
 	conform.Case(t, "multilingual.json", &fixture)
 
-	if len(fixture.Bm25) == 0 {
-		t.Fatal("no multilingual bm25 cases loaded")
+	if len(fixture.Bm25) != expectedMultilingualBm25Cases {
+		t.Fatalf("multilingual.json bucket %q: got %d vectors, want %d",
+			"bm25", len(fixture.Bm25), expectedMultilingualBm25Cases)
 	}
 	for _, c := range fixture.Bm25 {
 		rows := make([]Row, len(c.Rows))

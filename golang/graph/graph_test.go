@@ -7,6 +7,21 @@ import (
 	"github.com/muthuishere/citenexus/golang/internal/conform"
 )
 
+// expectedComentionCases pins the size of conformance/cases/graph_comention.json.
+const expectedComentionCases = 3
+
+func TestComentionGraphVectorCount(t *testing.T) {
+	var fixture struct {
+		Cases []struct {
+			Name string `json:"name"`
+		} `json:"cases"`
+	}
+	conform.Case(t, "graph_comention.json", &fixture)
+	if len(fixture.Cases) != expectedComentionCases {
+		t.Fatalf("graph_comention.json: got %d cases, want %d", len(fixture.Cases), expectedComentionCases)
+	}
+}
+
 // BuildComentionGraph is proven against the shared fixture — every case must
 // match the Python arbiter (citenexus.graph.store.build_comention_graph)
 // exactly. Follows the gate/tokenize exemplar: load the fixture, assert over ALL
@@ -22,8 +37,8 @@ func TestComentionGraphConformance(t *testing.T) {
 	}
 	conform.Case(t, "graph_comention.json", &fixture)
 
-	if len(fixture.Cases) == 0 {
-		t.Fatal("no graph_comention cases loaded")
+	if len(fixture.Cases) != expectedComentionCases {
+		t.Fatalf("graph_comention.json: got %d cases, want %d", len(fixture.Cases), expectedComentionCases)
 	}
 
 	for _, c := range fixture.Cases {

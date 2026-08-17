@@ -9,6 +9,32 @@ import (
 	"github.com/muthuishere/citenexus/golang/internal/conform"
 )
 
+// expectedMultilingualTokenizeCases pins the "tokenize" bucket of
+// conformance/cases/multilingual.json. Four packages read this file; each pins
+// the bucket it consumes independently, so a shrunken file cannot pass anywhere.
+const expectedMultilingualTokenizeCases = 10
+
+type multilingualTokenizeFixture struct {
+	Tokenize []struct {
+		Input  string   `json:"input"`
+		Tokens []string `json:"tokens"`
+	} `json:"tokenize"`
+}
+
+func loadMultilingualTokenize(t *testing.T) multilingualTokenizeFixture {
+	t.Helper()
+	var fixture multilingualTokenizeFixture
+	conform.Case(t, "multilingual.json", &fixture)
+	return fixture
+}
+
+func TestMultilingualTokenizeVectorCount(t *testing.T) {
+	if got := len(loadMultilingualTokenize(t).Tokenize); got != expectedMultilingualTokenizeCases {
+		t.Fatalf("multilingual.json bucket \"tokenize\": got %d vectors, want %d",
+			got, expectedMultilingualTokenizeCases)
+	}
+}
+
 // naiveTokenize is a DELIBERATELY-divergent tokenizer: a bare simple-case
 // lowercase with no İ expansion — exactly the trap ADR-0006 warns about. It is
 // here to prove the multilingual corpus BITES: at least one committed vector
@@ -24,13 +50,11 @@ func naiveTokenize(text string) []string {
 // TestMultilingualCorpusBites is the red→green guarantee (task 2.4): the real
 // tokenizer passes every vector, and the divergent one is caught by at least one.
 func TestMultilingualCorpusBites(t *testing.T) {
-	var fixture struct {
-		Tokenize []struct {
-			Input  string   `json:"input"`
-			Tokens []string `json:"tokens"`
-		} `json:"tokenize"`
+	fixture := loadMultilingualTokenize(t)
+	if len(fixture.Tokenize) != expectedMultilingualTokenizeCases {
+		t.Fatalf("multilingual.json bucket \"tokenize\": got %d vectors, want %d",
+			len(fixture.Tokenize), expectedMultilingualTokenizeCases)
 	}
-	conform.Case(t, "multilingual.json", &fixture)
 
 	bites := false
 	for _, c := range fixture.Tokenize {
@@ -48,16 +72,10 @@ func TestMultilingualCorpusBites(t *testing.T) {
 // İ, German ß, NFC vs NFD, CJK, and combining marks must tokenize byte-identical
 // to the Python reference — a simple 1:1 lowercase that drops İ's dot fails here.
 func TestTokenizeMultilingualConformance(t *testing.T) {
-	var fixture struct {
-		Tokenize []struct {
-			Input  string   `json:"input"`
-			Tokens []string `json:"tokens"`
-		} `json:"tokenize"`
-	}
-	conform.Case(t, "multilingual.json", &fixture)
-
-	if len(fixture.Tokenize) == 0 {
-		t.Fatal("no multilingual tokenize cases loaded")
+	fixture := loadMultilingualTokenize(t)
+	if len(fixture.Tokenize) != expectedMultilingualTokenizeCases {
+		t.Fatalf("multilingual.json bucket \"tokenize\": got %d vectors, want %d",
+			len(fixture.Tokenize), expectedMultilingualTokenizeCases)
 	}
 	for _, c := range fixture.Tokenize {
 		got := Tokenize(c.Input)

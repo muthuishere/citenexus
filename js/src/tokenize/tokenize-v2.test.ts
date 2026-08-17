@@ -38,6 +38,32 @@ interface TokenizeV2Fixture {
 
 const FIXTURE = loadCase<TokenizeV2Fixture>("tokenize_v2.json");
 
+/** Bucket sizes, pinned. A vector silently dropped from a bucket is a weakened
+ *  contract that no per-case assertion can see. (`tokenizer_version` and
+ *  `unrelated_passage` are scalars, not buckets, and are asserted by name.) */
+const EXPECTED_COUNTS: Record<string, number> = {
+  supported_scripts: 14,
+  continuous_scripts: 7,
+  supported: 14,
+  unclaimed: 11,
+  unicode: 27,
+};
+
+/** tokenize.json is loaded here too (the ASCII-agreement check) — this file must
+ *  independently refuse a shrunken copy. */
+const EXPECTED_TOKENIZE_V1_COUNT = 11;
+
+describe("tokenize_v2.json bucket shape", () => {
+  it("bucket names and sizes are pinned", () => {
+    const sizes = Object.fromEntries(
+      Object.entries(FIXTURE)
+        .filter(([, v]) => Array.isArray(v))
+        .map(([k, v]) => [k, (v as unknown[]).length]),
+    );
+    expect(sizes).toEqual(EXPECTED_COUNTS);
+  });
+});
+
 describe("tokenizeV2 conformance (ADR-0011)", () => {
   it("the fixture pins the tokenizer version", () => {
     expect(FIXTURE.tokenizer_version).toBe(TOKENIZER_VERSION);
@@ -84,8 +110,8 @@ describe("tokenizeV2 conformance (ADR-0011)", () => {
     expect(isSupportedV2(c.text, FIXTURE.unrelated_passage)).toBe(false);
   });
 
-  it("the unclaimed half of the matrix is not empty", () => {
-    expect(FIXTURE.unclaimed.length).toBeGreaterThan(0);
+  it("the unclaimed half of the matrix is pinned", () => {
+    expect(FIXTURE.unclaimed.length).toBe(EXPECTED_COUNTS.unclaimed);
   });
 
   it.each(FIXTURE.unclaimed)("$script is reported as a capability gap", (c) => {
@@ -102,7 +128,7 @@ describe("tokenizeV2 conformance (ADR-0011)", () => {
   // moving BM25 and the gate onto v2 left every shipped vector unchanged.
   it("agrees with v1 on every ASCII v1 vector", () => {
     const cases = loadCase<{ input: string; tokens: string[] }[]>("tokenize.json");
-    expect(cases.length).toBeGreaterThan(0);
+    expect(cases.length).toBe(EXPECTED_TOKENIZE_V1_COUNT);
     for (const c of cases) {
       if (Array.from(c.input).some((ch) => ch.codePointAt(0)! > 127)) continue;
       expect(tokenizeV2(c.input)).toEqual(tokenize(c.input));

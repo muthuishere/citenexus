@@ -66,11 +66,15 @@ interface RoundtripCase {
   result: unknown;
 }
 
+/** Vector counts, pinned. A vector silently dropped from the fixture is a
+ *  weakened contract that no per-case assertion can see. */
+const EXPECTED_COUNTS: Record<string, number> = { cases: 2 };
+
 describe("result roundtrip conformance", () => {
   const cases = loadCase<RoundtripCase[]>("result_roundtrip.json");
 
-  it("has cases", () => {
-    expect(cases.length).toBeGreaterThan(0);
+  it("vector counts are pinned", () => {
+    expect({ cases: cases.length }).toEqual(EXPECTED_COUNTS);
   });
 
   for (const c of cases) {

@@ -7,6 +7,19 @@ import (
 	"github.com/muthuishere/citenexus/golang/internal/conform"
 )
 
+// expectedChunkerCases pins the size of conformance/cases/chunker.json.
+const expectedChunkerCases = 7
+
+func TestChunkerVectorCount(t *testing.T) {
+	var cases []struct {
+		MaxTokens int `json:"max_tokens"`
+	}
+	conform.Case(t, "chunker.json", &cases)
+	if len(cases) != expectedChunkerCases {
+		t.Fatalf("chunker.json: got %d cases, want %d", len(cases), expectedChunkerCases)
+	}
+}
+
 // The chunker is proven against the shared fixture — every case must match the
 // Python reference exactly (SPEC-PORTS-v1 §4/§10). Byte-identical output over ALL
 // cases, no leniency, no skips.
@@ -19,8 +32,8 @@ func TestChunkerConformance(t *testing.T) {
 	}
 	conform.Case(t, "chunker.json", &cases)
 
-	if len(cases) == 0 {
-		t.Fatal("no chunker cases loaded")
+	if len(cases) != expectedChunkerCases {
+		t.Fatalf("chunker.json: got %d cases, want %d", len(cases), expectedChunkerCases)
 	}
 	for i, c := range cases {
 		got := ChunkText(c.Text, c.MaxTokens, c.Overlap)

@@ -18,11 +18,15 @@ interface StructureCase {
   expected: StructureIndex;
 }
 
+/** Vector counts, pinned. A vector silently dropped from the fixture is a
+ *  weakened contract that no per-case assertion can see. */
+const EXPECTED_COUNTS: Record<string, number> = { cases: 3 };
+
 describe("structure index conformance", () => {
   const { cases } = loadCase<{ cases: StructureCase[] }>("structure.json");
 
-  it("has cases", () => {
-    expect(cases.length).toBeGreaterThan(0);
+  it("vector counts are pinned", () => {
+    expect({ cases: cases.length }).toEqual(EXPECTED_COUNTS);
   });
 
   for (const c of cases) {

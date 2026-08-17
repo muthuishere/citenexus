@@ -64,12 +64,35 @@ func canned(response []byte) Transport {
 	}
 }
 
+// expectedModelWireCounts pins the bucket sizes of
+// conformance/cases/model_wire.json.
+var expectedModelWireCounts = map[string]int{
+	"requests":  4,
+	"responses": 3,
+}
+
+func assertModelWireCounts(t *testing.T, fx wireFixture) {
+	t.Helper()
+	for name, got := range map[string]int{
+		"requests":  len(fx.Requests),
+		"responses": len(fx.Responses),
+	} {
+		if want := expectedModelWireCounts[name]; got != want {
+			t.Fatalf("model_wire.json bucket %q: got %d vectors, want %d", name, got, want)
+		}
+	}
+}
+
+func TestModelWireVectorBucketSizes(t *testing.T) {
+	var fx wireFixture
+	conform.Case(t, "model_wire.json", &fx)
+	assertModelWireCounts(t, fx)
+}
+
 func TestModelWireRequests(t *testing.T) {
 	var fx wireFixture
 	conform.Case(t, "model_wire.json", &fx)
-	if len(fx.Requests) == 0 {
-		t.Fatal("no request cases loaded")
-	}
+	assertModelWireCounts(t, fx)
 
 	for _, c := range fx.Requests {
 		t.Run(c.Name, func(t *testing.T) {
@@ -134,9 +157,7 @@ func TestModelWireRequests(t *testing.T) {
 func TestModelWireResponses(t *testing.T) {
 	var fx wireFixture
 	conform.Case(t, "model_wire.json", &fx)
-	if len(fx.Responses) == 0 {
-		t.Fatal("no response cases loaded")
-	}
+	assertModelWireCounts(t, fx)
 
 	for _, c := range fx.Responses {
 		t.Run(c.Name, func(t *testing.T) {

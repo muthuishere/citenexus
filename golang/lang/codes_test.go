@@ -32,6 +32,31 @@ func loadLanguages(t *testing.T) languagesFixture {
 	return f
 }
 
+// expectedLanguagesCounts pins every list in conformance/cases/languages.json.
+// The row-by-row loop below compares the table against the fixture, so a fixture
+// that lost rows would agree with a table that lost the same rows unless the
+// absolute sizes are pinned too.
+var expectedLanguagesCounts = map[string]int{
+	"scripts":            27,
+	"supported_scripts":  14,
+	"continuous_scripts": 7,
+	"languages":          41,
+}
+
+func TestLanguagesVectorBucketSizes(t *testing.T) {
+	f := loadLanguages(t)
+	for name, got := range map[string]int{
+		"scripts":            len(f.Scripts),
+		"supported_scripts":  len(f.SupportedScripts),
+		"continuous_scripts": len(f.ContinuousScripts),
+		"languages":          len(f.Languages),
+	} {
+		if want := expectedLanguagesCounts[name]; got != want {
+			t.Errorf("languages.json bucket %q: got %d entries, want %d", name, got, want)
+		}
+	}
+}
+
 func TestSearchLanguageTableMatchesConformance(t *testing.T) {
 	f := loadLanguages(t)
 	got := SearchLanguages()

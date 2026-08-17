@@ -8,6 +8,21 @@ import (
 	"github.com/muthuishere/citenexus/golang/internal/conform"
 )
 
+// expectedSegmentationCases pins the size of conformance/cases/segmentation.json.
+// The per-case loop below is a contract only while the case list cannot shrink.
+const expectedSegmentationCases = 12
+
+func TestSegmentationVectorCount(t *testing.T) {
+	var cases []struct {
+		Text   string   `json:"text"`
+		Claims []string `json:"claims"`
+	}
+	conform.Case(t, "segmentation.json", &cases)
+	if len(cases) != expectedSegmentationCases {
+		t.Fatalf("segmentation.json: got %d cases, want %d", len(cases), expectedSegmentationCases)
+	}
+}
+
 // TestSplitClaimsConformance is the ADR-0009 segmentation contract: every case
 // in conformance/cases/segmentation.json must split exactly as the Python
 // reference does — abbreviations, initials, decimals, terminator runs, CJK
@@ -19,8 +34,8 @@ func TestSplitClaimsConformance(t *testing.T) {
 	}
 	conform.Case(t, "segmentation.json", &cases)
 
-	if len(cases) == 0 {
-		t.Fatal("segmentation.json loaded no cases")
+	if len(cases) != expectedSegmentationCases {
+		t.Fatalf("segmentation.json: got %d cases, want %d", len(cases), expectedSegmentationCases)
 	}
 	for _, c := range cases {
 		got := SplitClaims(c.Text)

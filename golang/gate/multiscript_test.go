@@ -21,14 +21,24 @@ type scriptFixture struct {
 	} `json:"supported"`
 }
 
+// expectedScriptSupportedCases pins the "supported" bucket of
+// conformance/cases/tokenize_v2.json as this package consumes it — one claimed
+// script per vector. golang/tokenize pins the same file independently.
+const expectedScriptSupportedCases = 14
+
 func loadScriptFixture(t *testing.T) scriptFixture {
 	t.Helper()
 	var f scriptFixture
 	conform.Case(t, "tokenize_v2.json", &f)
-	if len(f.Supported) == 0 {
-		t.Fatal("no claimed-script cases loaded")
+	if len(f.Supported) != expectedScriptSupportedCases {
+		t.Fatalf("tokenize_v2.json bucket \"supported\": got %d vectors, want %d",
+			len(f.Supported), expectedScriptSupportedCases)
 	}
 	return f
+}
+
+func TestScriptFixtureVectorCount(t *testing.T) {
+	loadScriptFixture(t) // the count assertion lives in the loader
 }
 
 func TestEveryClaimedScriptSupportsAVerbatimQuoteOfItsOwnSource(t *testing.T) {

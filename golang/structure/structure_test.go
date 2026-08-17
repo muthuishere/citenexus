@@ -7,6 +7,21 @@ import (
 	"github.com/muthuishere/citenexus/golang/internal/conform"
 )
 
+// expectedStructureCases pins the size of conformance/cases/structure.json.
+const expectedStructureCases = 3
+
+func TestStructureVectorCount(t *testing.T) {
+	var fixture struct {
+		Cases []struct {
+			Name string `json:"name"`
+		} `json:"cases"`
+	}
+	conform.Case(t, "structure.json", &fixture)
+	if len(fixture.Cases) != expectedStructureCases {
+		t.Fatalf("structure.json: got %d cases, want %d", len(fixture.Cases), expectedStructureCases)
+	}
+}
+
 // BuildStructure is proven against the shared fixture — every case must match
 // the Python arbiter (citenexus.evidence.structure.build_structure) exactly.
 // Load the fixture, assert over ALL cases, no leniency. Produced and expected
@@ -23,8 +38,8 @@ func TestStructureConformance(t *testing.T) {
 	}
 	conform.Case(t, "structure.json", &fixture)
 
-	if len(fixture.Cases) == 0 {
-		t.Fatal("no structure cases loaded")
+	if len(fixture.Cases) != expectedStructureCases {
+		t.Fatalf("structure.json: got %d cases, want %d", len(fixture.Cases), expectedStructureCases)
 	}
 
 	for _, c := range fixture.Cases {

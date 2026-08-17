@@ -12,11 +12,15 @@ interface Bm25Case {
   expected: Bm25Result[];
 }
 
+/** Vector counts, pinned. A vector silently dropped from the fixture is a
+ *  weakened contract that no per-case assertion can see. */
+const EXPECTED_COUNTS: Record<string, number> = { cases: 4 };
+
 describe("bm25 conformance", () => {
   const cases = loadCase<Bm25Case[]>("bm25.json");
 
-  it("has cases", () => {
-    expect(cases.length).toBeGreaterThan(0);
+  it("vector counts are pinned", () => {
+    expect({ cases: cases.length }).toEqual(EXPECTED_COUNTS);
   });
 
   for (const c of cases) {

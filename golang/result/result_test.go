@@ -10,6 +10,20 @@ import (
 
 func strPtr(s string) *string { return &s }
 
+// expectedResultRoundtripCases pins the size of
+// conformance/cases/result_roundtrip.json.
+const expectedResultRoundtripCases = 2
+
+func TestResultRoundtripVectorCount(t *testing.T) {
+	var cases []struct {
+		Name string `json:"name"`
+	}
+	conform.Case(t, "result_roundtrip.json", &cases)
+	if len(cases) != expectedResultRoundtripCases {
+		t.Fatalf("result_roundtrip.json: got %d cases, want %d", len(cases), expectedResultRoundtripCases)
+	}
+}
+
 // roundtrip marshals v, parses the JSON back into a generic value, and returns it
 // for structural comparison — so numeric 0 vs 0.0 and key order never matter.
 func roundtrip(t *testing.T, v any) any {
@@ -36,8 +50,8 @@ func TestResultRoundtripConformance(t *testing.T) {
 	}
 	conform.Case(t, "result_roundtrip.json", &cases)
 
-	if len(cases) != 2 {
-		t.Fatalf("expected 2 result_roundtrip cases, got %d", len(cases))
+	if len(cases) != expectedResultRoundtripCases {
+		t.Fatalf("result_roundtrip.json: got %d cases, want %d", len(cases), expectedResultRoundtripCases)
 	}
 
 	answered := Result{

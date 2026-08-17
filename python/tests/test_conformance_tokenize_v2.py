@@ -30,6 +30,22 @@ _FIXTURE = json.loads(
 )
 
 
+#: Bucket sizes, pinned. Every assertion below iterates its bucket, so a script
+#: silently dropped from the fixture would weaken the ADR-0011 claim without
+#: failing anything. Go and JS pin the same numbers.
+EXPECTED_COUNTS: dict[str, int] = {
+    "supported_scripts": 14,
+    "continuous_scripts": 7,
+    "supported": 14,
+    "unclaimed": 11,
+    "unicode": 27,
+}
+
+
+def test_bucket_sizes() -> None:
+    assert {k: len(_FIXTURE[k]) for k in EXPECTED_COUNTS} == EXPECTED_COUNTS
+
+
 def test_fixture_pins_the_tokenizer_version() -> None:
     assert _FIXTURE["tokenizer_version"] == TOKENIZER_VERSION
 

@@ -7,6 +7,21 @@ import (
 	"github.com/muthuishere/citenexus/golang/internal/conform"
 )
 
+// expectedEUIDCases pins the size of conformance/cases/eu_ids.json.
+const expectedEUIDCases = 2
+
+func TestEUIDVectorCount(t *testing.T) {
+	var fixture struct {
+		Cases []struct {
+			Name string `json:"name"`
+		} `json:"cases"`
+	}
+	conform.Case(t, "eu_ids.json", &fixture)
+	if len(fixture.Cases) != expectedEUIDCases {
+		t.Fatalf("eu_ids.json: got %d cases, want %d", len(fixture.Cases), expectedEUIDCases)
+	}
+}
+
 // The Evidence-Unit id + block builder is proven against the shared fixture:
 // every case's block-builder and chunked-builder eu_id lists must match the
 // Python reference exactly, and the checksum example must reproduce byte-for-byte.
@@ -28,8 +43,8 @@ func TestEUIDConformance(t *testing.T) {
 	}
 	conform.Case(t, "eu_ids.json", &fixture)
 
-	if len(fixture.Cases) == 0 {
-		t.Fatal("no eu_ids cases loaded")
+	if len(fixture.Cases) != expectedEUIDCases {
+		t.Fatalf("eu_ids.json: got %d cases, want %d", len(fixture.Cases), expectedEUIDCases)
 	}
 
 	for _, c := range fixture.Cases {

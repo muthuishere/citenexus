@@ -12,6 +12,10 @@ import (
 	"github.com/muthuishere/citenexus/golang/rrf"
 )
 
+// expectedCoreRRFCases pins the size of conformance/cases/rrf.json as this
+// package consumes it (golang/rrf pins the same file independently).
+const expectedCoreRRFCases = 5
+
 func TestVersion(t *testing.T) {
 	v := Version()
 	if v == "" {
@@ -36,8 +40,8 @@ func TestFuse(t *testing.T) {
 	if err := json.Unmarshal(raw, &cases); err != nil {
 		t.Fatalf("parse rrf fixture: %v", err)
 	}
-	if len(cases) == 0 {
-		t.Fatal("no rrf cases")
+	if len(cases) != expectedCoreRRFCases {
+		t.Fatalf("rrf.json: got %d cases, want %d", len(cases), expectedCoreRRFCases)
 	}
 	for i, c := range cases {
 		got, err := Fuse(c.Lists, c.K)

@@ -7,6 +7,19 @@ import (
 	"github.com/muthuishere/citenexus/golang/internal/conform"
 )
 
+// expectedRRFCases pins the size of conformance/cases/rrf.json.
+const expectedRRFCases = 5
+
+func TestRRFVectorCount(t *testing.T) {
+	var cases []struct {
+		K int `json:"k"`
+	}
+	conform.Case(t, "rrf.json", &cases)
+	if len(cases) != expectedRRFCases {
+		t.Fatalf("rrf.json: got %d cases, want %d", len(cases), expectedRRFCases)
+	}
+}
+
 // Reciprocal Rank Fusion is proven against the shared fixture — every case must
 // match the Python reference exactly (citenexus.retrieve.fusion.rrf_fuse). This
 // test follows the §4 exemplar: load conformance/cases/rrf.json, assert exact
@@ -19,8 +32,8 @@ func TestRRFConformance(t *testing.T) {
 	}
 	conform.Case(t, "rrf.json", &cases)
 
-	if len(cases) == 0 {
-		t.Fatal("no rrf cases loaded")
+	if len(cases) != expectedRRFCases {
+		t.Fatalf("rrf.json: got %d cases, want %d", len(cases), expectedRRFCases)
 	}
 	for i, c := range cases {
 		got := Fuse(c.Lists, c.K)

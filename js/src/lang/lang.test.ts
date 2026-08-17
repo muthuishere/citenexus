@@ -16,11 +16,15 @@ interface LangCase {
   expected: string;
 }
 
+/** Vector counts, pinned. A vector silently dropped from the fixture is a
+ *  weakened contract that no per-case assertion can see. */
+const EXPECTED_COUNTS: Record<string, number> = { cases: 6 };
+
 describe("resolve_answer_language conformance", () => {
   const cases = loadCase<LangCase[]>("language.json");
 
-  it("has cases", () => {
-    expect(cases.length).toBeGreaterThan(0);
+  it("vector counts are pinned", () => {
+    expect({ cases: cases.length }).toEqual(EXPECTED_COUNTS);
   });
 
   for (const c of cases) {

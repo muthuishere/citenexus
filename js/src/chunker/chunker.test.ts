@@ -12,11 +12,15 @@ interface ChunkerCase {
   chunks: string[];
 }
 
+/** Vector counts, pinned. A vector silently dropped from the fixture is a
+ *  weakened contract that no per-case assertion can see. */
+const EXPECTED_COUNTS: Record<string, number> = { cases: 7 };
+
 describe("chunker conformance", () => {
   const cases = loadCase<ChunkerCase[]>("chunker.json");
 
-  it("has cases", () => {
-    expect(cases.length).toBeGreaterThan(0);
+  it("vector counts are pinned", () => {
+    expect({ cases: cases.length }).toEqual(EXPECTED_COUNTS);
   });
 
   for (const [i, c] of cases.entries()) {

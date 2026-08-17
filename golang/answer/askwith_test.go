@@ -89,8 +89,14 @@ func TestAskWithNoProvidersIsIdenticalToAsk(t *testing.T) {
 		} `json:"cases"`
 	}
 	conform.Case(t, "e2e_hermetic.json", &fixture)
-	if len(fixture.Cases) == 0 {
-		t.Fatal("no e2e_hermetic cases loaded")
+	if len(fixture.Cases) != expectedE2ECounts["cases"] {
+		t.Fatalf("e2e_hermetic.json: got %d cases, want %d", len(fixture.Cases), expectedE2ECounts["cases"])
+	}
+	if len(fixture.Corpus) != expectedE2ECounts["corpus"] {
+		t.Fatalf("e2e_hermetic.json: got %d corpus docs, want %d", len(fixture.Corpus), expectedE2ECounts["corpus"])
+	}
+	if fixture.TopK != expectedE2ECounts["top_k"] {
+		t.Fatalf("e2e_hermetic.json: top_k = %d, want %d", fixture.TopK, expectedE2ECounts["top_k"])
 	}
 
 	for _, c := range fixture.Cases {

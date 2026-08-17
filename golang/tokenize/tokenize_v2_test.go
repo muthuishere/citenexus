@@ -42,6 +42,32 @@ func loadTokenizeV2(t *testing.T) tokenizeV2Fixture {
 	return f
 }
 
+// expectedTokenizeV2Counts pins every bucket in
+// conformance/cases/tokenize_v2.json. Iterating a bucket asserts nothing about a
+// vector that was silently dropped from it.
+var expectedTokenizeV2Counts = map[string]int{
+	"supported":          14,
+	"unclaimed":          11,
+	"unicode":            27,
+	"supported_scripts":  14,
+	"continuous_scripts": 7,
+}
+
+func TestTokenizeV2VectorBucketSizes(t *testing.T) {
+	f := loadTokenizeV2(t)
+	for name, got := range map[string]int{
+		"supported":          len(f.Supported),
+		"unclaimed":          len(f.Unclaimed),
+		"unicode":            len(f.Unicode),
+		"supported_scripts":  len(f.SupportedScripts),
+		"continuous_scripts": len(f.ContinuousScripts),
+	} {
+		if want := expectedTokenizeV2Counts[name]; got != want {
+			t.Errorf("tokenize_v2.json bucket %q: got %d vectors, want %d", name, got, want)
+		}
+	}
+}
+
 func TestTokenizeV2FixturePinsTheVersion(t *testing.T) {
 	if got := loadTokenizeV2(t).TokenizerVersion; got != TokenizerVersion {
 		t.Fatalf("tokenizer_version = %d, want %d", got, TokenizerVersion)
@@ -155,8 +181,8 @@ func TestV2AgreesWithV1OnAsciiVectors(t *testing.T) {
 		Tokens []string `json:"tokens"`
 	}
 	conform.Case(t, "tokenize.json", &cases)
-	if len(cases) == 0 {
-		t.Fatal("no v1 tokenize cases loaded")
+	if len(cases) != expectedTokenizeCases {
+		t.Fatalf("tokenize.json: got %d cases, want %d", len(cases), expectedTokenizeCases)
 	}
 	for _, c := range cases {
 		if !isASCIIWords(c.Input) {

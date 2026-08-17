@@ -53,6 +53,19 @@ interface WireFixture {
 
 const fixture = loadCase<WireFixture>("model_wire.json");
 
+/** Bucket sizes, pinned. A vector silently dropped from a bucket is a weakened
+ *  contract that no per-case assertion can see. */
+const EXPECTED_COUNTS: Record<string, number> = { requests: 4, responses: 3 };
+
+describe("model_wire.json bucket shape", () => {
+  it("bucket names and sizes are pinned", () => {
+    const sizes = Object.fromEntries(
+      Object.entries(fixture).map(([k, v]) => [k, (v as unknown[]).length]),
+    );
+    expect(sizes).toEqual(EXPECTED_COUNTS);
+  });
+});
+
 /** A transport that records the one call made through it. */
 function capturingTransport(): {
   transport: Transport;
@@ -92,10 +105,6 @@ function invoke(kind: ClientKind, config: WireConfig, inputs: ChatInputs | Embed
 }
 
 describe("model wire conformance — requests", () => {
-  it("has cases", () => {
-    expect(fixture.requests.length).toBeGreaterThan(0);
-  });
-
   for (const c of fixture.requests) {
     it(c.name, async () => {
       const { transport, calls } = capturingTransport();
@@ -119,10 +128,6 @@ describe("model wire conformance — requests", () => {
 });
 
 describe("model wire conformance — responses", () => {
-  it("has cases", () => {
-    expect(fixture.responses.length).toBeGreaterThan(0);
-  });
-
   for (const c of fixture.responses) {
     it(c.name, async () => {
       const transport = cannedTransport(c.response_body);

@@ -20,15 +20,30 @@ interface Multilingual {
   };
 }
 
+/** Bucket sizes, pinned. A vector silently dropped from a bucket is a weakened
+ *  contract that no per-case assertion can see. */
+const EXPECTED_COUNTS: Record<string, number> = {
+  tokenize: 10,
+  bm25: 3,
+  chunker: 2,
+  "gate.supported": 3,
+  "gate.relevance": 3,
+};
+
 describe("multilingual conformance", () => {
   const m = loadCase<Multilingual>("multilingual.json");
 
-  it("has cases in every section", () => {
-    expect(m.tokenize.length).toBeGreaterThan(0);
-    expect(m.bm25.length).toBeGreaterThan(0);
-    expect(m.chunker.length).toBeGreaterThan(0);
-    expect(m.gate.supported.length).toBeGreaterThan(0);
-    expect(m.gate.relevance.length).toBeGreaterThan(0);
+  it("bucket names and sizes are pinned", () => {
+    expect({
+      tokenize: m.tokenize.length,
+      bm25: m.bm25.length,
+      chunker: m.chunker.length,
+      "gate.supported": m.gate.supported.length,
+      "gate.relevance": m.gate.relevance.length,
+    }).toEqual(EXPECTED_COUNTS);
+    // no unexpected sibling bucket has appeared or vanished
+    expect(Object.keys(m).sort()).toEqual(["bm25", "chunker", "gate", "tokenize"]);
+    expect(Object.keys(m.gate).sort()).toEqual(["relevance", "supported"]);
   });
 
   for (const c of m.tokenize) {

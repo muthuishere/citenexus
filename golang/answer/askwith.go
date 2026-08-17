@@ -212,8 +212,14 @@ func AskWith(corpus []Doc, question string, topK int, providers Providers) (resu
 		return conflictAbstention(window, touching, len(conflictPairs), independent), nil
 	}
 
-	distinct := make(map[string]struct{}, len(grounded))
-	for _, r := range grounded {
+	// Count the INDEPENDENT evidence, not the retrieved rows. Clones of one
+	// sentence ingested under several document ids are one fact, and reporting
+	// them as N corroborating sources rewards a poisoned corpus: inject N copies,
+	// earn N-fold confidence. The abstention path above already counts
+	// `independent`; counting `grounded` here left the two paths disagreeing and
+	// the answered path claiming more support than it listed sources for.
+	distinct := make(map[string]struct{}, len(independent))
+	for _, r := range independent {
 		distinct[r.documentID] = struct{}{}
 	}
 
@@ -223,7 +229,7 @@ func AskWith(corpus []Doc, question string, topK int, providers Providers) (resu
 		Mode:           result.TrustModeStrict,
 		Evidence: result.EvidenceSignals{
 			Decision:            result.DecisionAnswered,
-			SupportingSources:   len(grounded),
+			SupportingSources:   len(independent),
 			DistinctDocuments:   len(distinct),
 			AllClaimsVerified:   true,
 			LanguagesInEvidence: []string{answerLanguage},

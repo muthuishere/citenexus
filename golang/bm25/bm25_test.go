@@ -7,6 +7,19 @@ import (
 	"github.com/muthuishere/citenexus/golang/internal/conform"
 )
 
+// expectedBm25Cases pins the size of conformance/cases/bm25.json.
+const expectedBm25Cases = 4
+
+func TestBm25VectorCount(t *testing.T) {
+	var cases []struct {
+		Name string `json:"name"`
+	}
+	conform.Case(t, "bm25.json", &cases)
+	if len(cases) != expectedBm25Cases {
+		t.Fatalf("bm25.json: got %d cases, want %d", len(cases), expectedBm25Cases)
+	}
+}
+
 // BM25 ranking is proven against the shared fixture — every case must match the
 // Python reference exactly. Mirrors the tokenize EXEMPLAR: load the fixture,
 // assert over ALL cases, no leniency, fail loudly on the first mismatch.
@@ -25,8 +38,8 @@ func TestBm25Conformance(t *testing.T) {
 	}
 	conform.Case(t, "bm25.json", &cases)
 
-	if len(cases) == 0 {
-		t.Fatal("no bm25 cases loaded")
+	if len(cases) != expectedBm25Cases {
+		t.Fatalf("bm25.json: got %d cases, want %d", len(cases), expectedBm25Cases)
 	}
 
 	for _, c := range cases {

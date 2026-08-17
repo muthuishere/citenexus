@@ -6,11 +6,15 @@ import { tokenize } from "./tokenize.js";
 // Python reference exactly. This is the EXEMPLAR every §4 algorithm test in this
 // port follows: load conformance/cases/<algo>.json, assert deep equality over
 // ALL cases, no leniency.
+/** Vector counts, pinned. A vector silently dropped from the fixture is a
+ *  weakened contract that no per-case assertion can see. */
+const EXPECTED_COUNTS: Record<string, number> = { cases: 11 };
+
 describe("tokenize conformance", () => {
   const cases = loadCase<{ input: string; tokens: string[] }[]>("tokenize.json");
 
-  it("has cases", () => {
-    expect(cases.length).toBeGreaterThan(0);
+  it("vector counts are pinned", () => {
+    expect({ cases: cases.length }).toEqual(EXPECTED_COUNTS);
   });
 
   for (const c of cases) {

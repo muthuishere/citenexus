@@ -18,6 +18,13 @@ import {
   TOKENIZER_VERSION_TABLE,
 } from "./tables.js";
 
+/** Bucket sizes, pinned. A vector silently dropped from a bucket is a weakened
+ *  contract that no per-case assertion can see. */
+const EXPECTED_COUNTS: Record<string, number> = {
+  supported_scripts: 14,
+  continuous_scripts: 7,
+};
+
 describe("generated tables match conformance/", () => {
   it("stopwords", () => {
     expect(STOPWORDS_TABLE).toEqual(loadData<string[]>("stopwords.json"));
@@ -37,6 +44,12 @@ describe("generated tables match conformance/", () => {
       supported_scripts: string[];
       continuous_scripts: string[];
     }>("tokenize_v2.json");
+    // Pinned: a shrunken fixture would make the equality above pass against a
+    // table that had shrunk with it.
+    expect({
+      supported_scripts: fixture.supported_scripts.length,
+      continuous_scripts: fixture.continuous_scripts.length,
+    }).toEqual(EXPECTED_COUNTS);
     expect(SUPPORTED_SCRIPTS_TABLE).toEqual(fixture.supported_scripts);
     expect(CONTINUOUS_SCRIPTS_TABLE).toEqual(fixture.continuous_scripts);
     expect(TOKENIZER_VERSION_TABLE).toEqual(fixture.tokenizer_version);

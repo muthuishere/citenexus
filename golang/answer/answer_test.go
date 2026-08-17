@@ -6,6 +6,35 @@ import (
 	"github.com/muthuishere/citenexus/golang/internal/conform"
 )
 
+// expectedE2ECounts pins the shape of conformance/cases/e2e_hermetic.json. Both
+// answer_test.go and askwith_test.go drive this fixture; neither may run against
+// a silently shrunken corpus or case list.
+var expectedE2ECounts = map[string]int{
+	"corpus": 3,
+	"cases":  4,
+	"top_k":  5,
+}
+
+func TestE2EHermeticVectorCounts(t *testing.T) {
+	var fixture struct {
+		Corpus []Doc `json:"corpus"`
+		TopK   int   `json:"top_k"`
+		Cases  []struct {
+			Question string `json:"question"`
+		} `json:"cases"`
+	}
+	conform.Case(t, "e2e_hermetic.json", &fixture)
+	for name, got := range map[string]int{
+		"corpus": len(fixture.Corpus),
+		"cases":  len(fixture.Cases),
+		"top_k":  fixture.TopK,
+	} {
+		if want := expectedE2ECounts[name]; got != want {
+			t.Errorf("e2e_hermetic.json %q: got %d, want %d", name, got, want)
+		}
+	}
+}
+
 // eqOptStr compares an actual value (present flag + value) against an expected
 // nullable string from the fixture.
 func eqOptStr(present bool, got string, want *string) bool {
@@ -36,8 +65,14 @@ func TestAskConformance(t *testing.T) {
 	}
 	conform.Case(t, "e2e_hermetic.json", &fixture)
 
-	if len(fixture.Cases) == 0 {
-		t.Fatal("no e2e_hermetic cases loaded")
+	if len(fixture.Cases) != expectedE2ECounts["cases"] {
+		t.Fatalf("e2e_hermetic.json: got %d cases, want %d", len(fixture.Cases), expectedE2ECounts["cases"])
+	}
+	if len(fixture.Corpus) != expectedE2ECounts["corpus"] {
+		t.Fatalf("e2e_hermetic.json: got %d corpus docs, want %d", len(fixture.Corpus), expectedE2ECounts["corpus"])
+	}
+	if fixture.TopK != expectedE2ECounts["top_k"] {
+		t.Fatalf("e2e_hermetic.json: top_k = %d, want %d", fixture.TopK, expectedE2ECounts["top_k"])
 	}
 
 	for _, c := range fixture.Cases {
