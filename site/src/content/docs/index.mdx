@@ -118,9 +118,11 @@ script actually in front of you. All of it, including what did not work:
 **14 scripts** are claimed in the Python reference — Latin, Cyrillic, Greek, Han,
 Hiragana, Katakana, Hangul, Arabic, Hebrew, Devanagari, Bengali, Tamil, Telugu,
 Thai — each pinned by a golden conformance vector. A script that is *not* claimed
-produces **zero tokens and a refusal**, by name, before a model call is spent.
-Kannada, Malayalam, Gujarati and Sinhala are named in the table and deliberately
-not claimed: "I cannot read this script" is a better answer than a plausible
+is **reported by name and refused**, before a model call is spent — the question
+is tokenized, but the script is flagged as unclaimed rather than silently ranked.
+Eleven scripts — Kannada, Malayalam, Gujarati, Gurmukhi, Oriya, Sinhala, Khmer,
+Lao, Myanmar, Georgian and Armenian — are named in the table and deliberately
+**not** claimed: "I cannot read this script" is a better answer than a plausible
 ranking. **[Languages →](/citenexus/languages/)**
 
 ### Which language you *search* in and which you *answer* in are two knobs
@@ -341,11 +343,13 @@ suite — see the full Python setup in the [Quickstart](/citenexus/quickstart/).
 **Parity status.** The order- and polarity-aware predicate
 (`is_supported_v2` / `IsSupportedV2` / `isSupportedV2`) ships in all three
 languages and **all three `ask` paths now call it**, over the same 14-script
-Unicode tokenizer. What is still Python-only is *granularity*: Python splits an
-answer into atomic claims and gates each one, keeping the survivors and counting
-the rest in `unsupported_claims_removed`, while Go and JavaScript gate the whole
-answer as a single claim — so an answer there is all-or-nothing and cannot come
-back trimmed. Every other pinned algorithm is byte-for-byte identical. What each
+Unicode tokenizer. Since 0.12.0 *granularity* is at parity too: all three split
+an answer into atomic claims, gate each one against its own passage, keep the
+survivors and count the rest in `unsupported_claims_removed`, so a trimmed answer
+looks identical in every port (`answered`, `all_claims_verified: false`).
+Conflict detection, near-duplicate collapse, vector validation and vision
+orchestration are native in all three as well. Every pinned algorithm is
+byte-for-byte identical. What each
 guard is and where it sits: [how it works](/citenexus/architecture/) and
 [the faithfulness gate](/citenexus/faithfulness/).
 </Aside>
@@ -397,8 +401,11 @@ metrics; treat the rates as illustrations.
 	</Card>
 	<Card title="Score it, don't trust it" icon="bars">
 		`evaluate()` scores groundedness, citation and expected-support against a
-		golden CSV — so a model that answers when it should refuse scores
-		**worse**, not better. [Evaluate →](/citenexus/evaluate/)
+		golden CSV. **It cannot score abstention** — a blank `expected` earns
+		expected-support only if the row was *answered* (`evaluate.py:76`), so a
+		must-refuse row scores better when the model answers it. Gate on refusals
+		by driving `ask()` and asserting `Decision.refused`.
+		[Evaluate →](/citenexus/evaluate/)
 	</Card>
 	<Card title="Navigate, don't cite" icon="puzzle">
 		An entity [graph](/citenexus/graph/) and a distilled
@@ -408,9 +415,9 @@ metrics; treat the rates as illustrations.
 </CardGrid>
 
 <Aside type="caution" title="Version">
-Everything on this page is `0.10.1`, published on **PyPI**, **npm** and the Go
+Everything on this page is `0.12.0`, published on **PyPI**, **npm** and the Go
 module proxy. The Go module lives in a subdirectory, so it carries its own tag
-prefix — `go get github.com/muthuishere/citenexus/golang@v0.10.1`.
+prefix — `go get github.com/muthuishere/citenexus/golang@v0.12.0`.
 </Aside>
 
 Start with the failure you recognise — **[all nine scenarios
