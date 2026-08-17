@@ -51,3 +51,15 @@ export * from "./http.js";
 export * from "./models/embed.js";
 export * from "./models/openai.js";
 export * from "./models/anthropic.js";
+export * from "./models/vision.js";
+// §9 conditional-vision ORCHESTRATION (ADR-0005 two-phase emit/fulfil/assemble).
+// Vision is an INJECTED model like the generator and the embedder; everything
+// around the call is deterministic, so it ports natively — pure ESM, no native
+// dependency. The pinned prompt is generated into gen/prompts.ts from
+// conformance/prompts.json (ADR-0010 tier 2).
+export * from "./vision/prefilter.js";
+export * from "./vision/requests.js";
+export * from "./vision/describe.js";
+export * from "./vision/fulfill.js";
+export * from "./vision/units.js";
+export * from "./gen/prompts.js";

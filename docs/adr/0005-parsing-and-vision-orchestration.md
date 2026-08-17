@@ -30,6 +30,21 @@ not enter the Apache-2.0 core; use pypdfium2** (per the ingest-fidelity spike).
 
 ## Decision
 
+> **Amended 2026-08-17 — placement is now governed by [ADR-0010](0010-algorithm-placement-rust-core-vs-ports.md).**
+> The two-phase host-fulfilled protocol below is unchanged and shipped. What
+> changed is *where the deterministic half lives*. ADR-0010 classifies work by
+> what the algorithm carries: tier 1 (structural/arithmetic) is native in each
+> port, tier 3 (real Unicode competence — parsing, normalisation, script
+> detection) is Rust over FFI. The **vision orchestration** — the §9 decision
+> table, the data-URI/magic-byte payload build, the record parse and the EU
+> assembly — is base64, prefix matching and string joins, so it is tier 1 and
+> now ships **natively** in `python/src/citenexus/vision/`, `golang/vision/` and
+> `js/src/vision/`, pinned by `conformance/cases/vision_orchestration.json` in
+> all three. **Artifact parsing stays tier 3 and remains in the Rust core**, as
+> this ADR says. The practical reason for the split: a plain `go get` and plain
+> ESM must keep working with no native library, and ADR-0010 forbids moving
+> anything onto that path without an explicit distribution decision.
+
 **All deterministic ingest work lives in the Rust core and is shared via FFI;
 bindings (ctypes / cgo-or-purego / koffi) stay thin. The vision model call is
 fulfilled by the host through a two-phase "emit requests" protocol, never by the
