@@ -36,3 +36,11 @@ export * from "./fakes/fakes.js";
 export * from "./storage/index.js";
 // The shared HTTP layer: ${ENV}-header auth expanded at the request boundary.
 export * from "./http.js";
+// The shipped OpenAI-compatible model clients. They are the other half of the
+// HTTP layer above — `HttpClient` was reachable from the package root while the
+// clients it exists to authenticate were not, so the documented one-liner
+// (`import { OpenAIEmbedder, HttpClient } from "@muthuishere/citenexus"`) threw.
+// Parity with Python, which exports its model clients top-level.
+export * from "./models/embed.js";
+export * from "./models/openai.js";
+export * from "./models/anthropic.js";

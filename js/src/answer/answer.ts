@@ -15,7 +15,14 @@ import {
   type Vector,
 } from "../contracts.js";
 import { FakeEmbedding, FakeLLM, cosine } from "../fakes/fakes.js";
-import { hasRelevanceOverlap, isSupported } from "../gate/gate.js";
+// ADR-0009 / ADR-0011: the answer path runs the V2 gates, the same pair the
+// Python reference uses (`has_relevance_overlap_v2` / `is_supported_v2`).
+// The v1 `hasRelevanceOverlap` / `isSupported` stay exported and frozen for the
+// conformance vectors, but they are no longer what stands between a caller and
+// a lie: v1 faithfulness is set containment, and a set is closed under
+// reordering and deletion, so it accepted all nine adversarial false answers.
+import { hasRelevanceOverlapV2 } from "../gate/gate.js";
+import { isSupportedV2 } from "../gate/verify-v2.js";
 import {
   claim,
   Decision,
@@ -78,13 +85,13 @@ export function ask(corpus: readonly CorpusDoc[], question: string, topK = 5): R
     .slice(0, topK)
     .map((x) => x.row);
 
-  const grounded = ranked.filter((row) => hasRelevanceOverlap(question, row.text));
+  const grounded = ranked.filter((row) => hasRelevanceOverlapV2(question, row.text));
   if (grounded.length === 0) return refuse();
 
   const top = grounded[0]!;
   const passage = top.text;
   const answer = llm.answer(question, passage);
-  if (!isSupported(answer, passage)) return refuse(); // cite-or-drop: never ungrounded
+  if (!isSupportedV2(answer, passage)) return refuse(); // cite-or-drop: never ungrounded
 
   const distinctDocuments = new Set(grounded.map((row) => row.documentId)).size;
   return result({
@@ -227,7 +234,7 @@ export async function askWith(
     .slice(0, topK)
     .map((x) => x.row);
 
-  const grounded = ranked.filter((row) => hasRelevanceOverlap(question, row.text));
+  const grounded = ranked.filter((row) => hasRelevanceOverlapV2(question, row.text));
   if (grounded.length === 0) return refuse();
 
   const top = grounded[0]!;
@@ -237,7 +244,7 @@ export async function askWith(
   // The faithfulness gate runs on injected output exactly as it runs on the
   // fake's — this gate is the product, and it does not soften because the caller
   // supplied the model.
-  if (!isSupported(answer, passage)) return refuse();
+  if (!isSupportedV2(answer, passage)) return refuse();
 
   const distinctDocuments = new Set(grounded.map((row) => row.documentId)).size;
   return result({

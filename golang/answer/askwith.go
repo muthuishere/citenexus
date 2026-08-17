@@ -130,9 +130,13 @@ func AskWith(corpus []Doc, question string, topK int, providers Providers) (resu
 	}
 
 	// Relevance gate: keep only rows sharing a content token with the question.
+	// V2 (ADR-0011) tokenizes 14 scripts, not ASCII alone; under v1 a CJK or
+	// Devanagari question and its own passage both tokenized to the empty set,
+	// so this gate abstained before the faithfulness gate ever ran. Matches the
+	// Python reference, which calls has_relevance_overlap_v2 here.
 	grounded := make([]row, 0, len(ranked))
 	for _, r := range ranked {
-		if gate.HasRelevanceOverlap(question, r.text) {
+		if gate.HasRelevanceOverlapV2(question, r.text) {
 			grounded = append(grounded, r)
 		}
 	}
@@ -150,7 +154,17 @@ func AskWith(corpus []Doc, question string, topK int, providers Providers) (resu
 	// Faithfulness gate: never emit an ungrounded claim. It runs on injected
 	// output exactly as it runs on the fake's — this gate is the product, and it
 	// does not soften because the caller supplied the model.
-	if !gate.IsSupported(ans, passage) {
+	//
+	// V2 (ADR-0009), the predicate the Python reference uses at
+	// answer/flow.py. The frozen v1 gate.IsSupported is SET CONTAINMENT, and a
+	// set is closed under reordering and deletion: it accepted all nine
+	// adversarial false answers (role inversion, negation deletion, value swap,
+	// comparator inversion) because a lie built by permuting the passage's own
+	// words has no token the passage lacks. V2 requires the claim's tokens to
+	// appear IN ORDER within a bounded window and forbids a dropped polarity
+	// marker. gate.IsSupported stays exported and frozen for the conformance
+	// vectors; it is no longer what stands between a caller and a lie.
+	if !gate.IsSupportedV2(ans, passage) {
 		return result.Refused(result.TrustModeStrict), nil
 	}
 
