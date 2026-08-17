@@ -27,30 +27,30 @@ hero:
 
 import { Tabs, TabItem, Card, CardGrid, Aside } from '@astrojs/starlight/components';
 
-## 100% grounded. Correctly cited. Wrong.
+## The answer was in the corpus. Nobody searched the language it was written in.
 
-An employee in the **Hyderabad** office asks, in **English**, how much unused
-leave they may carry into the next year. The English handbook answers. The
-document that actually governs that office is a **Telugu** annexure — and a
-retrieval stack that cannot read Telugu will never tell you it exists.
+An employee at the **Chennai** office asks, in **English**, what it costs to buy
+out a month of unserved notice. The number exists, it is exact, and it is in a
+**Tamil** annexure. Searched only in English, the retriever never reaches it —
+and CiteNexus does the only honest thing with what it has. It refuses.
 
 <div class="cn-cards">
 	<div class="cn-card">
-		<div class="cn-card__top"><span class="cn-step">Before</span><span>searched in en</span><span class="cn-state cn-state--bad">Wrong</span></div>
+		<div class="cn-card__top"><span class="cn-step">Before</span><span>searched in en</span><span class="cn-state cn-state--no">Refused</span></div>
 		<div class="cn-card__body">
-			<p class="cn-q">How many days of unused leave may I carry forward?</p>
-			<div class="cn-quote cn-quote--bad">“An employee may carry forward a maximum of 10 days.”</div>
-			<p class="cn-note">Verbatim. Correctly cited. Every claim passed the faithfulness gate — <b>100% groundedness</b>. And wrong for the person asking: the binding Telugu annexure caps Hyderabad at <b>5</b> and states that it overrides.</p>
-			<div class="cn-cite"><span>cited to</span><b>01-en-leave-policy</b><span>·</span><span class="cn-cite--bad">superseded for this office</span></div>
+			<p class="cn-q">How much must a confirmed employee at the Chennai office pay to buy out one unserved month of the notice period?</p>
+			<div class="cn-quote cn-quote--no">“I can't answer that from the available evidence.”</div>
+			<p class="cn-note">The correct behaviour on the evidence it had — and useless to the person asking. The answer was sitting in the corpus the whole time, one script away.</p>
+			<div class="cn-cite"><span class="cn-cite--no">cited: none · the Tamil annexure was never retrieved</span></div>
 		</div>
 	</div>
 	<div class="cn-card">
-		<div class="cn-card__top"><span class="cn-step">After</span><span>searched in en, ta, te</span><span class="cn-state cn-state--ok">Right</span></div>
+		<div class="cn-card__top"><span class="cn-step">After</span><span>searched in en, ta, te</span><span class="cn-state cn-state--ok">Answered</span></div>
 		<div class="cn-card__body">
-			<p class="cn-q">How many days of unused leave may I carry forward?</p>
-			<div class="cn-quote cn-quote--script">“5 రోజులు”</div>
-			<p class="cn-note">Clause 2.12 of the Telugu annexure — the document that governs this office. Reached because the English question was also <em>searched</em> in Tamil and Telugu, and citable because the tokenizer claims those scripts.</p>
-			<div class="cn-cite"><span>cited to</span><b>09-te-hyderabad-leave-annexure</b><span>·</span><b>passage_language: te</b></div>
+			<p class="cn-q">How much must a confirmed employee at the Chennai office pay to buy out one unserved month of the notice period?</p>
+			<div class="cn-quote">“INR 45,000”</div>
+			<p class="cn-note">An exact token that survives translation — the hardest cross-lingual case, because nothing about the English question looks like the Tamil passage that answers it. Reached because the English question was also <em>searched</em> in Tamil and Telugu.</p>
+			<div class="cn-cite"><span>cited to</span><b>06-ta-notice-buyout-annexure</b><span>·</span><b>answer_language: en</b></div>
 		</div>
 	</div>
 </div>
@@ -61,6 +61,26 @@ questions:
 ```python
 rag.ask(question, search_languages=("en", "ta", "te"))   # default: ("en",)
 ```
+
+**Tamil leads this page for a measurement reason, not a decorative one.** Tamil
+was *already* a claimed script in the baseline, so these rows isolate exactly one
+variable: the search fan-out. Telugu's numbers are larger and mean less — Telugu
+was absent from the tokenizer's script table before this run, so part of its lift
+is being able to tokenize the script at all. Same sitting, two changes, and a
+single run cannot separate them. Tamil can.
+
+Three more English questions, each answered from a Tamil annexure only after the
+fan-out:
+
+| Asked in English | Before | After | Cited |
+|---|---|---|---|
+| Days of notice for the extra festival leave? | refused | <span class="cn-quote--script">குறைந்தபட்சம் 15 நாட்கள் முன்னதாக</span> | `05-ta-chennai-leave-annexure` |
+| Weeks of paid maternity leave at Chennai? | refused | <span class="cn-quote--script">26 வாரங்கள் ஊதியத்துடன் கூடிய மகப்பேறு விடுப்பு வழங்கப்படும்</span> | `07-ta-maternity-creche-annexure` |
+| Additional festival-leave days per leave year? | <span class="cn-quote--script">4 நாட்கள்</span> | <span class="cn-quote--script">4 நாட்கள்</span> | `05-ta-chennai-leave-annexure` |
+
+That last row already worked before the change, and it is on this page for that
+reason. Six of the 22 questions turn on a Tamil annexure: **one was answered
+before, four after.** At n=6 that is a direction, not a rate.
 
 Python, and only Python: `ask()` and the search-language fan-out are the facade.
 Go and JavaScript ship the [deterministic core](/citenexus/deterministic-core/) —
@@ -83,14 +103,15 @@ answering one thing it shouldn't have.
 
 <Aside type="caution" title="Read the honest version before you quote these">
 These are **single-run** numbers against a live, non-deterministic model, over an
-**authored fictional** corpus — not a benchmark. The Telugu column is the sum of
-*two* changes shipped in the same sitting (the fan-out, and Telugu being added to
-the tokenizer at all), and this run cannot separate them; **Tamil, 1/6 → 4/6, is
-the clean read**, and at n=6 that is a direction, not a rate you can plan
-against. There is also a live inconsistency: the answer text stays verbatim in
-Telugu while `answer_language` reports `en`, because *verbatim wins* — read
-`sources[*].passage_language` for the script actually in front of you. All of it,
-including what did not work:
+**authored fictional** corpus — not a benchmark. **Tamil leads this page because
+Tamil is the clean read**: it was already a claimed script, so its rows move for
+one reason only. Telugu's rows move for two — the fan-out *and* Telugu entering
+the tokenizer in the same sitting — and this run cannot separate them, so Telugu
+is illustration here, never the measurement. Even the clean read is 1/6 → 4/6: a
+direction, not a rate you can plan against. There is also a live inconsistency:
+the answer text stays verbatim in the source script while `answer_language`
+reports `en`, because *verbatim wins* — read `sources[*].passage_language` for the
+script actually in front of you. All of it, including what did not work:
 **[Cross-lingual corpus →](/citenexus/scenarios/multilingual-corpus/)**
 </Aside>
 
@@ -101,6 +122,30 @@ produces **zero tokens and a refusal**, by name, before a model call is spent.
 Kannada, Malayalam, Gujarati and Sinhala are named in the table and deliberately
 not claimed: "I cannot read this script" is a better answer than a plausible
 ranking. **[Languages →](/citenexus/languages/)**
+
+### Which language you *search* in and which you *answer* in are two knobs
+
+`search_languages` decides what gets retrieved. `answer_language` decides what
+comes back. They are independent on purpose, and the evidence never votes on
+either. Take Dutch — same Latin script, nothing exotic — asked against any corpus
+you already have:
+
+```python
+res = rag.ask("Hoeveel dagen opzegtermijn geldt er?", answer_language="auto")
+res.answer                         # prose in Dutch — "auto" detects nl from the QUESTION
+res.sources[0].text                # the citation, verbatim, in ITS language — never translated
+res.sources[0].passage_language    # what that passage actually is
+```
+
+Pass `answer_language="nl"` to force it unconditionally; leave it unset and you
+get the configured `default_answer_language`, a fixed value rather than a quiet
+inference. The one thing that never moves is the citation: **a translated quote is
+not the evidence**, so it stays in its source language and
+`sources[*].passage_language` tells you which one that is.
+
+*This is the documented behaviour of the answer-language rule, shown in Dutch —
+not a measured result. There is no Dutch corpus in this repository, so there are
+no Dutch numbers on this page.*
 
 <p class="cn-statement">If it can't <em>cite</em> it, it won't <em>say</em> it.</p>
 
@@ -166,11 +211,21 @@ that withholds grounded-but-unauthoritative evidence.
 
 ### 4. The governing document is in a script the system can't read
 
-The failure at the top of this page. Not fabrication — the gate stops that — but
-**a true quotation of a document that does not govern**, which is
-indistinguishable from a correct answer at the point of use. A Unicode tokenizer
-makes the authoritative document *citable*; the `search_languages` fan-out makes
-it *reachable*. Both are required; neither is sufficient.
+The Tamil case at the top of this page refuses, which is survivable. The sharper
+failure is the one that *answers*. An employee in the **Hyderabad** office asks,
+in English, how many days of unused leave they may carry forward. The English
+handbook says **“An employee may carry forward a maximum of 10 days.”** — verbatim,
+correctly cited, every claim through the faithfulness gate, **100% groundedness**.
+It is also wrong for the person asking: the binding Telugu annexure
+(`09-te-hyderabad-leave-annexure`, clause 2.12) caps Hyderabad at
+<span class="cn-quote--script">5 రోజులు</span> and states that it overrides.
+
+Not fabrication — the gate stops that — but **a true quotation of a document that
+does not govern**, which is indistinguishable from a correct answer at the point
+of use. A Unicode tokenizer makes the authoritative document *citable*; the
+`search_languages` fan-out makes it *reachable*. Both are required; neither is
+sufficient. (Telugu is the vivid illustration and not the measurement, for the
+reason given above.)
 **[Cross-lingual corpus →](/citenexus/scenarios/multilingual-corpus/)**
 
 ### 5. A model failed, and the corpus was silently poisoned
