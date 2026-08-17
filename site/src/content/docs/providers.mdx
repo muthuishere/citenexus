@@ -311,11 +311,16 @@ with no way for a timed-out model to say so, and a reproduction indexed a
 polarity-flipped "may not disclose" clause as a zero vector while reporting
 success. An empty string is likewise an answer, not a failure.
 
-Belt as well as braces: in the Go and JS ports the ingest **write path** now
-refuses a vector outright — empty, wrong-dimension for the run, non-finite (JS),
-or all-zeros — because a seam that *can* report failure still does not stop a
-provider that returns a degenerate vector while reporting success. A failed embed
-is fail-closed and all-or-nothing: the ingest aborts and writes nothing.
+Belt as well as braces: in **all three** implementations the ingest **write path**
+now refuses a vector outright — empty, wrong-dimension for the run, non-finite
+(`NaN`/`±Inf`), or all-zeros — and refuses a batch that does not return one vector
+per input text, because a seam that *can* report failure still does not stop a
+provider that returns a degenerate vector while reporting success. The rejection
+**order** is itself pinned, by the 48 cases in
+`conformance/cases/vector_validation.json`
+(Python `check_vector`, Go `contracts.CheckVector`, JavaScript `checkVector`). A
+failed embed is fail-closed and all-or-nothing: the ingest aborts and writes
+nothing.
 Skip-and-report was rejected, because a document missing one chunk is, at
 retrieval time, indistinguishable from a document that never contained that
 sentence.

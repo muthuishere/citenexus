@@ -88,10 +88,12 @@ response = rag.ask("Summarize the risk factors.", mode=TrustMode.exploratory)
 trade strictness for coverage — use them deliberately, not as the default for a
 legal or medical surface.
 
-The trust modes above are Python-only in a stronger sense than the rest of this
-page: Go and JavaScript define **`TrustMode.strict` alone**
-(`golang/result/result.go`, `js/src/result/result.ts`). There is no `normal` and
-no `exploratory` to select, so there is no port tab to write for this block.
+The mode **selector** is Python-only: Go and JavaScript define
+**`TrustMode.strict` alone** (`golang/result/result.go`, `js/src/result/result.ts`)
+and their `ask` takes no mode argument, so there is no port tab to write for this
+block. That is a missing knob, not a missing behaviour — the ports always take
+the `strict` row of the table above, authority column aside, and their conflict
+abstention is the same predicate Python runs.
 </Aside>
 
 <Aside type="caution" title="Verbatim beats the answer language">

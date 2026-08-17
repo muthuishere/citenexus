@@ -71,6 +71,230 @@
         "long-doc::1::1",
         "long-doc::1::2"
       ]
+    },
+    {
+      "name": "every block is blank -> zero units, not a failure",
+      "document_id": "blank-doc",
+      "blocks": [
+        {
+          "order": 0,
+          "kind": "paragraph",
+          "text": "",
+          "page": 1
+        },
+        {
+          "order": 1,
+          "kind": "paragraph",
+          "text": "   ",
+          "page": 1
+        },
+        {
+          "order": 2,
+          "kind": "paragraph",
+          "text": "\n\t ",
+          "page": 1
+        }
+      ],
+      "chunk_max_tokens": 450,
+      "chunk_overlap": 60,
+      "block_builder_eu_ids": [],
+      "chunked_builder_eu_ids": []
+    },
+    {
+      "name": "eu_id follows block.order, not list position",
+      "document_id": "sparse",
+      "blocks": [
+        {
+          "order": 5,
+          "kind": "paragraph",
+          "text": "fifth",
+          "page": 1
+        },
+        {
+          "order": 2,
+          "kind": "paragraph",
+          "text": "second",
+          "page": 1
+        },
+        {
+          "order": 9,
+          "kind": "paragraph",
+          "text": "ninth",
+          "page": 1
+        }
+      ],
+      "chunk_max_tokens": 450,
+      "chunk_overlap": 60,
+      "block_builder_eu_ids": [
+        "sparse::5",
+        "sparse::2",
+        "sparse::9"
+      ],
+      "chunked_builder_eu_ids": [
+        "sparse::5::0",
+        "sparse::2::0",
+        "sparse::9::0"
+      ]
+    },
+    {
+      "name": "single block",
+      "document_id": "solo",
+      "blocks": [
+        {
+          "order": 0,
+          "kind": "paragraph",
+          "text": "the only block",
+          "page": 1
+        }
+      ],
+      "chunk_max_tokens": 450,
+      "chunk_overlap": 60,
+      "block_builder_eu_ids": [
+        "solo::0"
+      ],
+      "chunked_builder_eu_ids": [
+        "solo::0::0"
+      ]
+    },
+    {
+      "name": "every block kind uses the same id scheme",
+      "document_id": "kinds",
+      "blocks": [
+        {
+          "order": 0,
+          "kind": "heading",
+          "text": "Title",
+          "page": 1
+        },
+        {
+          "order": 1,
+          "kind": "paragraph",
+          "text": "Prose.",
+          "page": 1
+        },
+        {
+          "order": 2,
+          "kind": "table",
+          "text": "a | b",
+          "page": 1
+        },
+        {
+          "order": 3,
+          "kind": "code",
+          "text": "print(1)",
+          "page": 1
+        },
+        {
+          "order": 4,
+          "kind": "image",
+          "text": "A chart of revenue.",
+          "page": 2
+        },
+        {
+          "order": 5,
+          "kind": "slide",
+          "text": "Agenda",
+          "page": 2
+        },
+        {
+          "order": 6,
+          "kind": "thread_turn",
+          "text": "Reply from Ann.",
+          "page": 2
+        },
+        {
+          "order": 7,
+          "kind": "ocr_block",
+          "text": "SCANNED TEXT",
+          "page": 3
+        }
+      ],
+      "chunk_max_tokens": 450,
+      "chunk_overlap": 60,
+      "block_builder_eu_ids": [
+        "kinds::0",
+        "kinds::1",
+        "kinds::2",
+        "kinds::3",
+        "kinds::4",
+        "kinds::5",
+        "kinds::6",
+        "kinds::7"
+      ],
+      "chunked_builder_eu_ids": [
+        "kinds::0::0",
+        "kinds::1::0",
+        "kinds::2::0",
+        "kinds::3::0",
+        "kinds::4::0",
+        "kinds::5::0",
+        "kinds::6::0",
+        "kinds::7::0"
+      ]
+    },
+    {
+      "name": "non-latin block text does not change the id shape",
+      "document_id": "multi",
+      "blocks": [
+        {
+          "order": 0,
+          "kind": "paragraph",
+          "text": "従業員は機密情報を開示してはならない。",
+          "page": 1
+        },
+        {
+          "order": 1,
+          "kind": "paragraph",
+          "text": "ஊழியர் ரகசியத் தகவலை வெளியிடக் கூடாது.",
+          "page": 1
+        },
+        {
+          "order": 2,
+          "kind": "paragraph",
+          "text": "الموظف لا يفشي المعلومات السرية.",
+          "page": 1
+        }
+      ],
+      "chunk_max_tokens": 450,
+      "chunk_overlap": 60,
+      "block_builder_eu_ids": [
+        "multi::0",
+        "multi::1",
+        "multi::2"
+      ],
+      "chunked_builder_eu_ids": [
+        "multi::0::0",
+        "multi::1::0",
+        "multi::2::0"
+      ]
+    },
+    {
+      "name": "KNOWN MISS: duplicate block.order yields duplicate (colliding) eu_ids",
+      "document_id": "dup",
+      "blocks": [
+        {
+          "order": 0,
+          "kind": "paragraph",
+          "text": "first passage",
+          "page": 1
+        },
+        {
+          "order": 0,
+          "kind": "paragraph",
+          "text": "second passage",
+          "page": 1
+        }
+      ],
+      "chunk_max_tokens": 450,
+      "chunk_overlap": 60,
+      "block_builder_eu_ids": [
+        "dup::0",
+        "dup::0"
+      ],
+      "chunked_builder_eu_ids": [
+        "dup::0::0",
+        "dup::0::0"
+      ]
     }
   ],
   "checksum_example": {

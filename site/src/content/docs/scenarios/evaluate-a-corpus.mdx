@@ -218,11 +218,15 @@ sig.RetrievalScoreSpread     // near 0 -> ranking is not discriminating
 sig.UnsupportedClaimsRemoved // >0 -> the generator over-reached and got trimmed
 ```
 
-**Three of them are always zero in this port** and diagnose nothing:
-`ConflictsDetected` (no detection), `UnsupportedScripts` (never populated on a
-`Result` — call `tokenize.UnsupportedScripts` instead) and
-`AuthorityFloorApplied` (authority selection runs in the Python `ask()` facade).
-They are carried for wire parity, not as signals you can read.
+`ConflictsDetected` is a real signal here too — ADR-0007 detection is native in
+this port, so a non-zero count means the corpus contradicted itself in the window
+that was about to be cited.
+
+**Two fields are always zero/empty in this port** and diagnose nothing:
+`UnsupportedScripts` (never populated on a `Result` — call
+`tokenize.UnsupportedScripts` instead) and `AuthorityFloorApplied` (authority
+selection runs in the Python `ask()` facade). They are carried for wire parity,
+not as signals you can read.
 </TabItem>
 <TabItem label="JavaScript">
 `EvidenceSignals` is conformance-pinned, so the fields are the same:
@@ -237,10 +241,13 @@ sig.retrieval_score_spread      // near 0 -> ranking is not discriminating
 sig.unsupported_claims_removed  // >0 -> the generator over-reached and got trimmed
 ```
 
-**Three are always zero/empty here** and diagnose nothing:
-`conflicts_detected` (no detection), `unsupported_scripts` (never populated on a
-`Result` — call `unsupportedScripts()` instead) and `authority_floor_applied`
-(authority selection is in the Python facade). They exist for wire parity only.
+`conflicts_detected` is a real signal here too — ADR-0007 detection is native in
+this port.
+
+**Two are always zero/empty here** and diagnose nothing: `unsupported_scripts`
+(never populated on a `Result` — call `unsupportedScripts()` instead) and
+`authority_floor_applied` (authority selection is in the Python facade). They
+exist for wire parity only.
 </TabItem>
 </Tabs>
 

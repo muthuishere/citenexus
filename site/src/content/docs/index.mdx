@@ -133,7 +133,7 @@ you already have:
 ```python
 res = rag.ask("Hoeveel dagen opzegtermijn geldt er?", answer_language="auto")
 res.answer                         # prose in Dutch — "auto" detects nl from the QUESTION
-res.sources[0].text                # the citation, verbatim, in ITS language — never translated
+res.sources[0].passage             # the citation, verbatim, in ITS language — never translated
 res.sources[0].passage_language    # what that passage actually is
 ```
 
@@ -191,6 +191,11 @@ mode it abstains and cites **both sides**, verbatim, in `Result.sources`.
 > written after the thresholds were frozen. Recall is **0.889** — this detector
 > is deliberately precise, not exhaustive.
 
+It is deterministic set arithmetic, so it is **native in Python, Go and
+JavaScript alike**, pinned by 132 shared vectors. On a non-Latin corpus only the
+numeric-value rule can fire — negation and antonym run off English wordlists —
+and the page below says exactly which cases that leaves uncaught.
+
 **[Conflicting sources →](/citenexus/scenarios/conflicting-sources/)**
 
 ### 3. The cited source has no authority over the question
@@ -235,11 +240,11 @@ returned a zero vector — and ingest **indexed it**. Nothing downstream can det
 that: retrieval just quietly stops finding a document that is provably present.
 
 Failure is now expressible in the seam itself: the embedding contract returns an
-error, and the write path independently refuses empty, wrong-dimension,
-non-finite and all-zero vectors before anything is stored. *This guard lives in
-the Go and JavaScript cores; in Python it remains an obligation stated on the
-provider contract — "a zero vector is not an error value" — not an enforced
-write-path check.*
+error, and the write path independently refuses a provider that returns the wrong
+*number* of vectors, or a vector that is empty, wrong-dimension for the run,
+non-finite (`NaN`/`±Inf`) or all zeros — before anything is stored. *That guard
+is now in **all three** implementations, in the same rejection order, pinned by
+48 committed vectors (`conformance/cases/vector_validation.json`).*
 
 ## The primitive underneath: cite, or abstain
 

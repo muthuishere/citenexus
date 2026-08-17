@@ -19,6 +19,17 @@ import "github.com/muthuishere/citenexus/golang/result"
 type Doc struct {
 	DocumentID string `json:"document_id"`
 	Text       string `json:"text"`
+	// Language is the document's declared language (a BCP-47-ish code such as
+	// "te"). OPTIONAL and additive: it mirrors the Python reference's
+	// Candidate.language, which is caller-supplied METADATA stamped at ingest —
+	// it is never derived from the text here. Empty means "not declared", and
+	// the cited SourceRef then reports the pinned "und" that Python emits for
+	// `candidate.language or "und"`, NOT the answer language.
+	//
+	// Before this field existed the ports stamped every passage "en", so a
+	// Telugu passage reported English and any caller branching on
+	// passage_language was branching on a constant.
+	Language string `json:"language,omitempty"`
 }
 
 // DefaultTopK is the retrieval cutoff used by the hermetic flow.
@@ -29,6 +40,7 @@ type row struct {
 	euID       string
 	documentID string
 	text       string
+	language   string // declared document language; "" when undeclared.
 	vector     []float64
 	order      int // corpus insertion order, for stable tie-breaking.
 }

@@ -127,6 +127,358 @@
         "structure_type": "none",
         "nodes": []
       }
+    },
+    {
+      "name": "three-level nesting with a two-level jump back up",
+      "document_id": "doc-deep",
+      "structure_type": "heading_tree",
+      "blocks": [
+        {
+          "order": 0,
+          "kind": "heading",
+          "text": "Chapter 1",
+          "level": 1
+        },
+        {
+          "order": 1,
+          "kind": "heading",
+          "text": "Section 1.1",
+          "level": 2
+        },
+        {
+          "order": 2,
+          "kind": "heading",
+          "text": "Clause 1.1.1",
+          "level": 3
+        },
+        {
+          "order": 3,
+          "kind": "heading",
+          "text": "Section 1.2",
+          "level": 2
+        },
+        {
+          "order": 4,
+          "kind": "heading",
+          "text": "Chapter 2",
+          "level": 1
+        }
+      ],
+      "expected": {
+        "document_id": "doc-deep",
+        "structure_type": "heading_tree",
+        "nodes": [
+          {
+            "node_id": "doc-deep::0",
+            "parent_id": null,
+            "label": "Chapter 1",
+            "kind": "heading",
+            "eu_ref": "doc-deep::0"
+          },
+          {
+            "node_id": "doc-deep::1",
+            "parent_id": "doc-deep::0",
+            "label": "Section 1.1",
+            "kind": "heading",
+            "eu_ref": "doc-deep::1"
+          },
+          {
+            "node_id": "doc-deep::2",
+            "parent_id": "doc-deep::1",
+            "label": "Clause 1.1.1",
+            "kind": "heading",
+            "eu_ref": "doc-deep::2"
+          },
+          {
+            "node_id": "doc-deep::3",
+            "parent_id": "doc-deep::0",
+            "label": "Section 1.2",
+            "kind": "heading",
+            "eu_ref": "doc-deep::3"
+          },
+          {
+            "node_id": "doc-deep::4",
+            "parent_id": null,
+            "label": "Chapter 2",
+            "kind": "heading",
+            "eu_ref": "doc-deep::4"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a skipped heading level still nests",
+      "document_id": "doc-skip",
+      "structure_type": "heading_tree",
+      "blocks": [
+        {
+          "order": 0,
+          "kind": "heading",
+          "text": "Part A",
+          "level": 1
+        },
+        {
+          "order": 1,
+          "kind": "heading",
+          "text": "Deep note",
+          "level": 3
+        },
+        {
+          "order": 2,
+          "kind": "heading",
+          "text": "Sub A",
+          "level": 2
+        }
+      ],
+      "expected": {
+        "document_id": "doc-skip",
+        "structure_type": "heading_tree",
+        "nodes": [
+          {
+            "node_id": "doc-skip::0",
+            "parent_id": null,
+            "label": "Part A",
+            "kind": "heading",
+            "eu_ref": "doc-skip::0"
+          },
+          {
+            "node_id": "doc-skip::1",
+            "parent_id": "doc-skip::0",
+            "label": "Deep note",
+            "kind": "heading",
+            "eu_ref": "doc-skip::1"
+          },
+          {
+            "node_id": "doc-skip::2",
+            "parent_id": "doc-skip::0",
+            "label": "Sub A",
+            "kind": "heading",
+            "eu_ref": "doc-skip::2"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a document that starts at level 3 roots at null",
+      "document_id": "doc-root3",
+      "structure_type": "heading_tree",
+      "blocks": [
+        {
+          "order": 0,
+          "kind": "heading",
+          "text": "Deep first",
+          "level": 3
+        },
+        {
+          "order": 1,
+          "kind": "heading",
+          "text": "Deeper",
+          "level": 4
+        }
+      ],
+      "expected": {
+        "document_id": "doc-root3",
+        "structure_type": "heading_tree",
+        "nodes": [
+          {
+            "node_id": "doc-root3::0",
+            "parent_id": null,
+            "label": "Deep first",
+            "kind": "heading",
+            "eu_ref": "doc-root3::0"
+          },
+          {
+            "node_id": "doc-root3::1",
+            "parent_id": "doc-root3::0",
+            "label": "Deeper",
+            "kind": "heading",
+            "eu_ref": "doc-root3::1"
+          }
+        ]
+      }
+    },
+    {
+      "name": "headings with no level default to level 1 and are siblings",
+      "document_id": "doc-nolevel",
+      "structure_type": "heading_tree",
+      "blocks": [
+        {
+          "order": 0,
+          "kind": "heading",
+          "text": "First",
+          "level": null
+        },
+        {
+          "order": 1,
+          "kind": "heading",
+          "text": "Second",
+          "level": null
+        }
+      ],
+      "expected": {
+        "document_id": "doc-nolevel",
+        "structure_type": "heading_tree",
+        "nodes": [
+          {
+            "node_id": "doc-nolevel::0",
+            "parent_id": null,
+            "label": "First",
+            "kind": "heading",
+            "eu_ref": "doc-nolevel::0"
+          },
+          {
+            "node_id": "doc-nolevel::1",
+            "parent_id": null,
+            "label": "Second",
+            "kind": "heading",
+            "eu_ref": "doc-nolevel::1"
+          }
+        ]
+      }
+    },
+    {
+      "name": "heading_tree with no heading blocks -> zero nodes",
+      "document_id": "doc-noheads",
+      "structure_type": "heading_tree",
+      "blocks": [
+        {
+          "order": 0,
+          "kind": "paragraph",
+          "text": "prose only",
+          "level": null
+        },
+        {
+          "order": 1,
+          "kind": "table",
+          "text": "a | b",
+          "level": null
+        }
+      ],
+      "expected": {
+        "document_id": "doc-noheads",
+        "structure_type": "heading_tree",
+        "nodes": []
+      }
+    },
+    {
+      "name": "a whitespace-only heading is skipped and never becomes a parent",
+      "document_id": "doc-blankhead",
+      "structure_type": "heading_tree",
+      "blocks": [
+        {
+          "order": 0,
+          "kind": "heading",
+          "text": "Chapter",
+          "level": 1
+        },
+        {
+          "order": 1,
+          "kind": "heading",
+          "text": "   ",
+          "level": 2
+        },
+        {
+          "order": 2,
+          "kind": "heading",
+          "text": "Section",
+          "level": 2
+        }
+      ],
+      "expected": {
+        "document_id": "doc-blankhead",
+        "structure_type": "heading_tree",
+        "nodes": [
+          {
+            "node_id": "doc-blankhead::0",
+            "parent_id": null,
+            "label": "Chapter",
+            "kind": "heading",
+            "eu_ref": "doc-blankhead::0"
+          },
+          {
+            "node_id": "doc-blankhead::2",
+            "parent_id": "doc-blankhead::0",
+            "label": "Section",
+            "kind": "heading",
+            "eu_ref": "doc-blankhead::2"
+          }
+        ]
+      }
+    },
+    {
+      "name": "slide_sequence ignores non-slide and blank blocks and stays flat",
+      "document_id": "doc-s2",
+      "structure_type": "slide_sequence",
+      "blocks": [
+        {
+          "order": 0,
+          "kind": "slide",
+          "text": "Title",
+          "level": null
+        },
+        {
+          "order": 1,
+          "kind": "paragraph",
+          "text": "speaker notes",
+          "level": null
+        },
+        {
+          "order": 2,
+          "kind": "slide",
+          "text": "  ",
+          "level": null
+        },
+        {
+          "order": 3,
+          "kind": "slide",
+          "text": "Summary",
+          "level": null
+        }
+      ],
+      "expected": {
+        "document_id": "doc-s2",
+        "structure_type": "slide_sequence",
+        "nodes": [
+          {
+            "node_id": "doc-s2::0",
+            "parent_id": null,
+            "label": "Title",
+            "kind": "slide",
+            "eu_ref": "doc-s2::0"
+          },
+          {
+            "node_id": "doc-s2::3",
+            "parent_id": null,
+            "label": "Summary",
+            "kind": "slide",
+            "eu_ref": "doc-s2::3"
+          }
+        ]
+      }
+    },
+    {
+      "name": "structure_type none ignores headings that are present",
+      "document_id": "doc-n2",
+      "structure_type": "none",
+      "blocks": [
+        {
+          "order": 0,
+          "kind": "heading",
+          "text": "Looks like a heading",
+          "level": 1
+        },
+        {
+          "order": 1,
+          "kind": "heading",
+          "text": "And another",
+          "level": 2
+        }
+      ],
+      "expected": {
+        "document_id": "doc-n2",
+        "structure_type": "none",
+        "nodes": []
+      }
     }
   ]
 }

@@ -12,7 +12,7 @@ from .fixtures import load_case
 
 VECTORS: list[dict[str, Any]] = load_case("bm25.json")
 
-EXPECTED_COUNT = 4
+EXPECTED_COUNT = 13
 
 
 class _StubStore:

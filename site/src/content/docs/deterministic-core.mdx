@@ -1,14 +1,14 @@
 ---
 title: The deterministic core
-description: Chunking, the faithfulness gate, and claim segmentation — the three algorithms that exist byte-for-byte in Python, Go and JavaScript, pinned by shared conformance vectors. Same input, same output, whichever language you call from.
+description: Chunking, the faithfulness gate, claim segmentation, conflict detection and embedding-vector validation — the algorithms that exist byte-for-byte in Python, Go and JavaScript, pinned by shared conformance vectors. Same input, same output, whichever language you call from.
 ---
 
 import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
 Most of CiteNexus is the Python facade — ingest, retrieve, ask, evaluate, the
-config layer. This page is the part that is **not** Python: three pure functions
-that exist in Python, Go and JavaScript alike, take the same input, and return
-the same output, because a shared set of conformance vectors fails the build
+config layer. This page is the part that is **not** Python: pure functions that
+exist in Python, Go and JavaScript alike, take the same input, and return the
+same output, because a shared set of conformance vectors fails the build
 otherwise.
 
 | Algorithm | Python | Go | JavaScript | Pinned by |
@@ -16,6 +16,8 @@ otherwise.
 | Chunking | `chunk_text` | `chunker.ChunkText` | `chunkText` | `conformance/cases/chunker.json` |
 | Faithfulness gate (v2) | `is_supported_v2`, `align` | `gate.IsSupportedV2`, `gate.Align` | `isSupportedV2`, `align` | `conformance/cases/faithful_v2.json` |
 | Claim segmentation | `split_claims` | `answer.SplitClaims` | `splitClaims` | `conformance/cases/segmentation.json` |
+| Conflict + near-duplicate | `detect_conflict`, `is_near_duplicate` | `answer.DetectConflict`, `answer.IsNearDuplicate` | `detectConflict`, `isNearDuplicate` | `conformance/cases/conflict.json` |
+| Embedding-vector validation | `check_vector` | `contracts.CheckVector` | `checkVector` | `conformance/cases/vector_validation.json` |
 
 The tokenizer underneath them ([14 scripts, one table](/citenexus/languages/))
 and [RRF fusion](/citenexus/reranking/) are pinned the same way.
@@ -178,22 +180,29 @@ splitClaims("The notice period is 30 days. It may be extended.");
 </Tabs>
 
 <Aside type="caution" title="The ports ship it, but do not yet run it">
-This is the one place the parity story has a seam, and it is worth stating
-plainly. `SplitClaims` / `splitClaims` are exported and vector-pinned, but
-neither port's answer flow calls them: `AskWith` / `askWith` verify the **whole
-answer as a single claim**. Only Python's flow splits an answer, verifies each
-claim, and drops the unsupported ones.
+`SplitClaims` / `splitClaims` are exported, vector-pinned, **and called by every
+port's answer flow**. `AskWith` / `askWith` split the generated answer, verify
+each claim against its own passage, and drop the unsupported ones — the same
+ADR-0009 drop-not-fail Python does.
 
-The practical consequence: a Python answer can come back trimmed, with
-`unsupported_claims_removed` greater than zero. A Go or JavaScript answer
-**passes or refuses whole** — it is never trimmed. Both are safe, in the sense
-that nothing ungrounded is emitted; the port is simply stricter and blunter.
+So a trimmed answer looks identical everywhere: `decision: answered`,
+`all_claims_verified: false`, `unsupported_claims_removed` above zero, and the
+surviving claims listed with their sources. There is no `partial` decision — the
+strict flow never emits one in any port.
+
+Until 2026-08-17 both ports verified the **whole answer as a single claim** while
+shipping the splitter unused, so one fabricated sentence discarded a true one
+alongside it. That was safe — nothing ungrounded was emitted — but blunt, and it
+is no longer the behaviour.
 </Aside>
 
 ## What is *not* in the core
 
 Everything that needs orchestration. Ingestion, retrieval, the config layer, the
-authority floor, conflict detection, evaluation, graph and wiki, deep-ask and the
-`CiteNexus` class itself live only in Python — the ports have no facade to hang
-them on. [Install](/citenexus/install/) has the per-port surface;
+authority floor, evaluation, graph and wiki, deep-ask and the `CiteNexus` class
+itself live only in Python — the ports have no facade to hang them on.
+(**Conflict detection is not on that list any more**: ADR-0007 detection and
+near-duplicate collapse are deterministic set arithmetic, so they are native in
+all three, pinned by `conformance/cases/conflict.json` — see
+[Conflicting sources](/citenexus/scenarios/conflicting-sources/).) [Install](/citenexus/install/) has the per-port surface;
 [Scope](/citenexus/scope/) has the boundary and why it is drawn there.

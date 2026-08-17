@@ -105,5 +105,210 @@
     ],
     "query": "quantum entanglement",
     "expected": []
+  },
+  {
+    "name": "one-document corpus",
+    "rows": [
+      {
+        "eu_id": "c::0",
+        "text": "alpha beta gamma"
+      }
+    ],
+    "query": "alpha",
+    "expected": [
+      {
+        "eu_id": "c::0",
+        "score": 0.287682
+      }
+    ]
+  },
+  {
+    "name": "term absent from one document",
+    "rows": [
+      {
+        "eu_id": "p::0",
+        "text": "rent is due monthly"
+      },
+      {
+        "eu_id": "p::1",
+        "text": "the roof was repaired"
+      }
+    ],
+    "query": "rent",
+    "expected": [
+      {
+        "eu_id": "p::0",
+        "score": 0.693147
+      }
+    ]
+  },
+  {
+    "name": "empty query -> empty result",
+    "rows": [
+      {
+        "eu_id": "e::0",
+        "text": "anything at all"
+      }
+    ],
+    "query": "",
+    "expected": []
+  },
+  {
+    "name": "empty corpus -> empty result",
+    "rows": [],
+    "query": "anything",
+    "expected": []
+  },
+  {
+    "name": "very different document lengths -> the short document wins",
+    "rows": [
+      {
+        "eu_id": "len::short",
+        "text": "notice"
+      },
+      {
+        "eu_id": "len::long",
+        "text": "notice of termination must be given in writing to the landlord at the address stated in the lease agreement"
+      }
+    ],
+    "query": "notice",
+    "expected": [
+      {
+        "eu_id": "len::short",
+        "score": 0.306423
+      },
+      {
+        "eu_id": "len::long",
+        "score": 0.129766
+      }
+    ]
+  },
+  {
+    "name": "term-frequency saturation at equal document length",
+    "rows": [
+      {
+        "eu_id": "s::1",
+        "text": "alpha filler filler filler filler filler"
+      },
+      {
+        "eu_id": "s::2",
+        "text": "alpha alpha filler filler filler filler"
+      },
+      {
+        "eu_id": "s::6",
+        "text": "alpha alpha alpha alpha alpha alpha"
+      }
+    ],
+    "query": "alpha",
+    "expected": [
+      {
+        "eu_id": "s::6",
+        "score": 0.267063
+      },
+      {
+        "eu_id": "s::2",
+        "score": 0.190759
+      },
+      {
+        "eu_id": "s::1",
+        "score": 0.133531
+      }
+    ]
+  },
+  {
+    "name": "a rare term outweighs a common one",
+    "rows": [
+      {
+        "eu_id": "r::0",
+        "text": "common rare"
+      },
+      {
+        "eu_id": "r::1",
+        "text": "common common"
+      },
+      {
+        "eu_id": "r::2",
+        "text": "common filler"
+      },
+      {
+        "eu_id": "r::3",
+        "text": "common filler"
+      }
+    ],
+    "query": "common rare",
+    "expected": [
+      {
+        "eu_id": "r::0",
+        "score": 1.309333
+      },
+      {
+        "eu_id": "r::1",
+        "score": 0.150515
+      },
+      {
+        "eu_id": "r::2",
+        "score": 0.105361
+      },
+      {
+        "eu_id": "r::3",
+        "score": 0.105361
+      }
+    ]
+  },
+  {
+    "name": "query term in every document keeps a positive idf floor",
+    "rows": [
+      {
+        "eu_id": "f::0",
+        "text": "policy"
+      },
+      {
+        "eu_id": "f::1",
+        "text": "policy notes"
+      },
+      {
+        "eu_id": "f::2",
+        "text": "the policy applies here"
+      }
+    ],
+    "query": "policy",
+    "expected": [
+      {
+        "eu_id": "f::0",
+        "score": 0.179754
+      },
+      {
+        "eu_id": "f::1",
+        "score": 0.142705
+      },
+      {
+        "eu_id": "f::2",
+        "score": 0.101051
+      }
+    ]
+  },
+  {
+    "name": "case folding: uppercase document, lowercase query",
+    "rows": [
+      {
+        "eu_id": "k::0",
+        "text": "NOTICE PERIOD"
+      },
+      {
+        "eu_id": "k::1",
+        "text": "Notice period"
+      }
+    ],
+    "query": "notice",
+    "expected": [
+      {
+        "eu_id": "k::0",
+        "score": 0.182322
+      },
+      {
+        "eu_id": "k::1",
+        "score": 0.182322
+      }
+    ]
   }
 ]

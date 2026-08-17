@@ -171,7 +171,7 @@ const STOPWORDS: ReadonlySet<string> = new Set(STOPWORDS_TABLE);
 const NEGATIONS: ReadonlySet<string> = new Set(CONFLICT_NEGATIONS_TABLE);
 const MEASUREMENT_UNITS: ReadonlySet<string> = new Set(MEASUREMENT_UNITS_TABLE);
 const REPORT_BIGRAMS: ReadonlySet<string> = new Set(
-  CONFLICT_REPORT_BIGRAMS_TABLE.map(([a, b]) => `${a} ${b}`),
+  CONFLICT_REPORT_BIGRAMS_TABLE.map(([a, b]) => `${a}\u0000${b}`),
 );
 
 /** The antonym table is stored in ONE direction; the reader symmetrises. */
@@ -205,7 +205,7 @@ export function fold(token: string): string {
 }
 
 const FOLDED_ANTONYMS: ReadonlySet<string> = new Set(
-  ANTONYMS.map(([a, b]) => `${fold(a)} ${fold(b)}`),
+  ANTONYMS.map(([a, b]) => `${fold(a)}\u0000${fold(b)}`),
 );
 const FOLDED_SCOPE: ReadonlySet<string> = new Set(CONFLICT_SCOPE_MARKERS_TABLE.map(fold));
 
@@ -347,7 +347,7 @@ function features(text: string): Features {
 
   let reported = false;
   for (let i = 0; i < tokens.length - 1; i++) {
-    if (REPORT_BIGRAMS.has(`${tokens[i] as string} ${tokens[i + 1] as string}`)) {
+    if (REPORT_BIGRAMS.has(`${tokens[i] as string}\u0000${tokens[i + 1] as string}`)) {
       reported = true;
       break;
     }
@@ -388,7 +388,7 @@ export function detectConflict(left: string, right: string): ConflictFinding | n
   const onlyB = sorted(difference(b.content, a.content));
   for (const x of onlyA) {
     for (const y of onlyB) {
-      if (!FOLDED_ANTONYMS.has(`${x} ${y}`)) continue;
+      if (!FOLDED_ANTONYMS.has(`${x}\u0000${y}`)) continue;
       let residual = 0;
       for (const token of divergence) {
         if (token !== x && token !== y) residual++;

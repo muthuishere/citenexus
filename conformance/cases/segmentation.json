@@ -1,36 +1,218 @@
 [
   {
+    "label": "abbrev/art",
     "text": "Art. 5 applies to all tenants.",
     "claims": [
       "Art. 5 applies to all tenants."
     ]
   },
   {
+    "label": "abbrev/dr",
     "text": "See Dr. Smith for details.",
     "claims": [
       "See Dr. Smith for details."
     ]
   },
   {
+    "label": "abbrev/initial",
     "text": "J. Smith signed the agreement.",
     "claims": [
       "J. Smith signed the agreement."
     ]
   },
   {
+    "label": "abbrev/two-initials",
+    "text": "A. B. Smith wrote it.",
+    "claims": [
+      "A. B. Smith wrote it."
+    ]
+  },
+  {
+    "label": "abbrev/prof-dr",
+    "text": "Prof. Lee and Dr. Chan agree.",
+    "claims": [
+      "Prof. Lee and Dr. Chan agree."
+    ]
+  },
+  {
+    "label": "abbrev/mr-mrs",
+    "text": "Mr. Smith met Mrs. Jones.",
+    "claims": [
+      "Mr. Smith met Mrs. Jones."
+    ]
+  },
+  {
+    "label": "abbrev/sec-para",
+    "text": "See sec. 12 and para. 4.",
+    "claims": [
+      "See sec. 12 and para. 4."
+    ]
+  },
+  {
+    "label": "abbrev/cf",
+    "text": "Cf. the annex.",
+    "claims": [
+      "Cf. the annex."
+    ]
+  },
+  {
+    "label": "abbrev/etc",
+    "text": "etc. remains binding.",
+    "claims": [
+      "etc. remains binding."
+    ]
+  },
+  {
+    "label": "abbrev/fig",
+    "text": "Fig. 2 shows the trend.",
+    "claims": [
+      "Fig. 2 shows the trend."
+    ]
+  },
+  {
+    "label": "abbrev/vs",
+    "text": "The vs. comparison applies.",
+    "claims": [
+      "The vs. comparison applies."
+    ]
+  },
+  {
+    "label": "abbrev/uppercase",
+    "text": "DR. Smith arrived.",
+    "claims": [
+      "DR. Smith arrived."
+    ]
+  },
+  {
+    "label": "abbrev/no-swallows-a-sentence",
+    "text": "The answer is no. It is denied.",
+    "claims": [
+      "The answer is no. It is denied."
+    ],
+    "known_miss": "\"no\" is in ABBREVIATIONS as the number abbreviation (\"No. 5\"), but it is also an extremely common English sentence-final word. R3 therefore refuses the break and fuses a refusal with whatever follows it — the worst possible pairing for a polarity-sensitive gate."
+  },
+  {
+    "label": "abbrev/fig-at-a-real-sentence-end",
+    "text": "Refer to the fig. The next page follows.",
+    "claims": [
+      "Refer to the fig. The next page follows."
+    ],
+    "known_miss": "The dual of the Dr./p.m. tailoring UAX #29 leaves unresolved: an abbreviation that also ends a sentence cannot be told apart locally, so R3 always chooses no-break and fuses two sentences."
+  },
+  {
+    "label": "abbrev/inc-not-in-table",
+    "text": "Acme Inc. filed a claim.",
+    "claims": [
+      "Acme Inc.",
+      "filed a claim."
+    ],
+    "known_miss": "\"inc\" is not in ABBREVIATIONS, so a company suffix breaks mid-sentence and produces a two-word fragment as an independent claim."
+  },
+  {
+    "label": "abbrev/eg-dotted-form",
+    "text": "The tenant may sublet, e.g. to a relative.",
+    "claims": [
+      "The tenant may sublet, e.g.",
+      "to a relative."
+    ],
+    "known_miss": "ABBREVIATIONS holds \"eg\", but R3 reads the preceding token as \"e.g\" (interior dots survive the rstrip), so the table entry never matches the form English actually writes. Same for i.e."
+  },
+  {
+    "label": "abbrev/ie-dotted-form",
+    "text": "This applies, i.e. to tenants only.",
+    "claims": [
+      "This applies, i.e.",
+      "to tenants only."
+    ],
+    "known_miss": "As above: the table has \"ie\", the scanner sees \"i.e\"."
+  },
+  {
+    "label": "abbrev/us-army",
+    "text": "The U.S. Army moved.",
+    "claims": [
+      "The U.S.",
+      "Army moved."
+    ],
+    "known_miss": "Named in the module docstring as one of the two residual failures the ADR-0009 spike could not fix; UAX #29 calls it a required tailoring."
+  },
+  {
+    "label": "digit/decimal",
     "text": "The dose is 500.00 milligrams daily.",
     "claims": [
       "The dose is 500.00 milligrams daily."
     ]
   },
   {
-    "text": "The contractor maintains insurance. The term is five years.",
+    "label": "digit/pi",
+    "text": "Pi is 3.14 exactly.",
     "claims": [
-      "The contractor maintains insurance.",
-      "The term is five years."
+      "Pi is 3.14 exactly."
     ]
   },
   {
+    "label": "digit/semver",
+    "text": "Version v1.2.3 shipped.",
+    "claims": [
+      "Version v1.2.3 shipped."
+    ]
+  },
+  {
+    "label": "digit/section-number",
+    "text": "Section 1.1 applies.",
+    "claims": [
+      "Section 1.1 applies."
+    ]
+  },
+  {
+    "label": "digit/thousands",
+    "text": "The total is 1,000.50 dollars.",
+    "claims": [
+      "The total is 1,000.50 dollars."
+    ]
+  },
+  {
+    "label": "digit/long-decimal",
+    "text": "Ratio 3.14159265 holds.",
+    "claims": [
+      "Ratio 3.14159265 holds."
+    ]
+  },
+  {
+    "label": "digit/ipv4",
+    "text": "Ping 10.0.0.1 now.",
+    "claims": [
+      "Ping 10.0.0.1 now."
+    ]
+  },
+  {
+    "label": "digit/trailing-number",
+    "text": "It costs 10. It is cheap.",
+    "claims": [
+      "It costs 10.",
+      "It is cheap."
+    ]
+  },
+  {
+    "label": "digit/percent-then-stop",
+    "text": "The rate is 4.5%. The term is fixed.",
+    "claims": [
+      "The rate is 4.5%.",
+      "The term is fixed."
+    ]
+  },
+  {
+    "label": "digit/ordered-list-marker",
+    "text": "1. Give notice\n2. Pay rent",
+    "claims": [
+      "1.",
+      "Give notice",
+      "2.",
+      "Pay rent"
+    ],
+    "known_miss": "An ordered-list marker is a digit followed by a full stop and a space, which R2 does not cover and R4 accepts, so the marker becomes its own claim. The gate then verifies the string \"1.\" against a passage."
+  },
+  {
+    "label": "run/question",
     "text": "Is it approved? It is not.",
     "claims": [
       "Is it approved?",
@@ -38,6 +220,7 @@
     ]
   },
   {
+    "label": "run/interrobang",
     "text": "Really?! Yes.",
     "claims": [
       "Really?!",
@@ -45,25 +228,164 @@
     ]
   },
   {
+    "label": "run/bang-bang-bang",
+    "text": "Stop!!! Now.",
+    "claims": [
+      "Stop!!!",
+      "Now."
+    ]
+  },
+  {
+    "label": "run/ellipsis",
+    "text": "He paused... Then he left.",
+    "claims": [
+      "He paused...",
+      "Then he left."
+    ]
+  },
+  {
+    "label": "run/mixed",
+    "text": "Wait?!? Really.",
+    "claims": [
+      "Wait?!?",
+      "Really."
+    ]
+  },
+  {
+    "label": "run/bare-punctuation",
+    "text": "...",
+    "claims": [
+      "..."
+    ],
+    "known_miss": "A terminator run with no words is still emitted as a claim. It carries no proposition, so the gate spends a verdict on punctuation."
+  },
+  {
+    "label": "run/double-exclamation",
+    "text": "Interrobang‼ Next.",
+    "claims": [
+      "Interrobang‼",
+      "Next."
+    ]
+  },
+  {
+    "label": "run/double-question",
+    "text": "Really⁇ Yes.",
+    "claims": [
+      "Really⁇",
+      "Yes."
+    ]
+  },
+  {
+    "label": "run/question-exclamation",
+    "text": "Hmm⁈ Maybe.",
+    "claims": [
+      "Hmm⁈",
+      "Maybe."
+    ]
+  },
+  {
+    "label": "run/exclamation-question",
+    "text": "Wow⁉ Indeed.",
+    "claims": [
+      "Wow⁉",
+      "Indeed."
+    ]
+  },
+  {
+    "label": "r4/plain-pair",
+    "text": "The contractor maintains insurance. The term is five years.",
+    "claims": [
+      "The contractor maintains insurance.",
+      "The term is five years."
+    ]
+  },
+  {
+    "label": "r4/domain-name",
+    "text": "Visit example.com for details.",
+    "claims": [
+      "Visit example.com for details."
+    ]
+  },
+  {
+    "label": "r4/end-of-text",
+    "text": "Done.",
+    "claims": [
+      "Done."
+    ]
+  },
+  {
+    "label": "r4/no-terminator",
     "text": "The window opens at 02:00 UTC",
     "claims": [
       "The window opens at 02:00 UTC"
     ]
   },
   {
-    "text": "従業員は開示してはならない。期間は五年である。",
+    "label": "r4/tab-after",
+    "text": "Ends with a tab.\tNext.",
     "claims": [
-      "従業員は開示してはならない。",
-      "期間は五年である。"
+      "Ends with a tab.",
+      "Next."
     ]
   },
   {
-    "text": "The parties are (a) the tenant; (b) the landlord.",
+    "label": "r4/cr-after",
+    "text": "Line one.\rLine two.",
     "claims": [
-      "The parties are (a) the tenant; (b) the landlord."
+      "Line one.",
+      "Line two."
     ]
   },
   {
+    "label": "r4/formfeed-after",
+    "text": "Yes.\fNo.",
+    "claims": [
+      "Yes.",
+      "No."
+    ]
+  },
+  {
+    "label": "r4/nbsp-after",
+    "text": "Yes. No.",
+    "claims": [
+      "Yes.",
+      "No."
+    ]
+  },
+  {
+    "label": "r4/ideographic-space-after",
+    "text": "Yes.　No.",
+    "claims": [
+      "Yes.",
+      "No."
+    ]
+  },
+  {
+    "label": "r4/quote-spans-the-boundary",
+    "text": "He said \"yes.\" Then he left.",
+    "claims": [
+      "He said \"yes.\" Then he left."
+    ],
+    "known_miss": "A closing quote is not whitespace, so R4 refuses the break and two sentences fuse. A quoted assertion and the narrator's sentence about it are then gated as one claim."
+  },
+  {
+    "label": "r4/parenthesis-spans-the-boundary",
+    "text": "(See Art. 5.) The rest follows.",
+    "claims": [
+      "(See Art. 5.) The rest follows."
+    ],
+    "known_miss": "Same defect through a closing paren: a parenthetical citation swallows the sentence after it."
+  },
+  {
+    "label": "r4/missing-space-after-stop",
+    "text": "Yes.No space here.",
+    "claims": [
+      "Yes.No space here."
+    ],
+    "known_miss": "R4's cost: a typo (or a PDF extraction that ate the space) fuses two sentences, and this is exactly what bad extraction produces."
+  },
+  {
+    "label": "nl/two-lines",
     "text": "france is in europe\nparis is the capital",
     "claims": [
       "france is in europe",
@@ -71,7 +393,327 @@
     ]
   },
   {
+    "label": "nl/leading",
+    "text": "\nleading newline",
+    "claims": [
+      "leading newline"
+    ]
+  },
+  {
+    "label": "nl/trailing",
+    "text": "trailing newline\n",
+    "claims": [
+      "trailing newline"
+    ]
+  },
+  {
+    "label": "nl/blank-line",
+    "text": "a\n\nb",
+    "claims": [
+      "a",
+      "b"
+    ]
+  },
+  {
+    "label": "nl/after-terminator",
+    "text": "a.\nb",
+    "claims": [
+      "a.",
+      "b"
+    ]
+  },
+  {
+    "label": "nl/crlf",
+    "text": "a\r\nb",
+    "claims": [
+      "a",
+      "b"
+    ]
+  },
+  {
+    "label": "nl/bullet-list",
+    "text": "- one\n- two\n- three",
+    "claims": [
+      "- one",
+      "- two",
+      "- three"
+    ]
+  },
+  {
+    "label": "nl/only-newlines",
+    "text": "\n\n\n",
+    "claims": []
+  },
+  {
+    "label": "nl/whitespace-only-lines",
+    "text": "  \n  \n",
+    "claims": []
+  },
+  {
+    "label": "nl/interior-tab-survives",
+    "text": "tab\there\nnext",
+    "claims": [
+      "tab\there",
+      "next"
+    ]
+  },
+  {
+    "label": "nl/terminator-and-newline",
+    "text": "one sentence. two on same line\nthree on next",
+    "claims": [
+      "one sentence.",
+      "two on same line",
+      "three on next"
+    ]
+  },
+  {
+    "label": "nl/no-terminator-then-newline",
+    "text": "no terminator\n",
+    "claims": [
+      "no terminator"
+    ]
+  },
+  {
+    "label": "nonterm/semicolon-list",
+    "text": "The parties are (a) the tenant; (b) the landlord.",
+    "claims": [
+      "The parties are (a) the tenant; (b) the landlord."
+    ]
+  },
+  {
+    "label": "nonterm/colon",
+    "text": "Note the following: the term is five years.",
+    "claims": [
+      "Note the following: the term is five years."
+    ]
+  },
+  {
+    "label": "nonterm/semicolon",
+    "text": "Rent is due; late fees apply.",
+    "claims": [
+      "Rent is due; late fees apply."
+    ]
+  },
+  {
+    "label": "nonterm/em-dash",
+    "text": "Terms — including rent — apply.",
+    "claims": [
+      "Terms — including rent — apply."
+    ]
+  },
+  {
+    "label": "nonterm/arabic-comma",
+    "text": "هذا صحيح، وهذا أيضا صحيح.",
+    "claims": [
+      "هذا صحيح، وهذا أيضا صحيح."
+    ]
+  },
+  {
+    "label": "script/japanese",
+    "text": "従業員は開示してはならない。期間は五年である。",
+    "claims": [
+      "従業員は開示してはならない。",
+      "期間は五年である。"
+    ]
+  },
+  {
+    "label": "script/japanese-question",
+    "text": "これは本当ですか？はい。",
+    "claims": [
+      "これは本当ですか？",
+      "はい。"
+    ]
+  },
+  {
+    "label": "script/chinese",
+    "text": "员工不得披露机密信息。合同期限为五年。",
+    "claims": [
+      "员工不得披露机密信息。",
+      "合同期限为五年。"
+    ]
+  },
+  {
+    "label": "script/chinese-exclamation",
+    "text": "太好了！我们同意。",
+    "claims": [
+      "太好了！",
+      "我们同意。"
+    ]
+  },
+  {
+    "label": "script/mixed-cjk-latin",
+    "text": "従業員は開示してはならない。The term is five years.",
+    "claims": [
+      "従業員は開示してはならない。",
+      "The term is five years."
+    ]
+  },
+  {
+    "label": "script/arabic-question",
+    "text": "هل هذا صحيح؟ نعم.",
+    "claims": [
+      "هل هذا صحيح؟",
+      "نعم."
+    ]
+  },
+  {
+    "label": "script/arabic-full-stop",
+    "text": "لا يجوز للموظف إفشاء المعلومات السرية. المدة خمس سنوات.",
+    "claims": [
+      "لا يجوز للموظف إفشاء المعلومات السرية.",
+      "المدة خمس سنوات."
+    ]
+  },
+  {
+    "label": "script/urdu-full-stop",
+    "text": "یہ درست ہے۔ وہ نہیں ہے۔",
+    "claims": [
+      "یہ درست ہے۔",
+      "وہ نہیں ہے۔"
+    ]
+  },
+  {
+    "label": "script/devanagari-danda",
+    "text": "कर्मचारी गोपनीय जानकारी प्रकट नहीं करेगा। अवधि पाँच वर्ष है।",
+    "claims": [
+      "कर्मचारी गोपनीय जानकारी प्रकट नहीं करेगा।",
+      "अवधि पाँच वर्ष है।"
+    ]
+  },
+  {
+    "label": "script/devanagari-double-danda",
+    "text": "श्लोक समाप्त॥ अगला श्लोक॥",
+    "claims": [
+      "श्लोक समाप्त॥",
+      "अगला श्लोक॥"
+    ]
+  },
+  {
+    "label": "script/bengali-danda",
+    "text": "কর্মচারী গোপনীয় তথ্য প্রকাশ করবেন না। মেয়াদ পাঁচ বছর।",
+    "claims": [
+      "কর্মচারী গোপনীয় তথ্য প্রকাশ করবেন না।",
+      "মেয়াদ পাঁচ বছর।"
+    ]
+  },
+  {
+    "label": "script/hebrew",
+    "text": "העובד לא יגלה מידע סודי. התקופה היא חמש שנים.",
+    "claims": [
+      "העובד לא יגלה מידע סודי.",
+      "התקופה היא חמש שנים."
+    ]
+  },
+  {
+    "label": "script/hangul",
+    "text": "직원은 기밀 정보를 공개해서는 안 된다. 기간은 5년이다.",
+    "claims": [
+      "직원은 기밀 정보를 공개해서는 안 된다.",
+      "기간은 5년이다."
+    ]
+  },
+  {
+    "label": "script/cyrillic",
+    "text": "Работник не должен раскрывать информацию. Срок пять лет.",
+    "claims": [
+      "Работник не должен раскрывать информацию.",
+      "Срок пять лет."
+    ]
+  },
+  {
+    "label": "script/tamil",
+    "text": "ஊழியர் ரகசியத் தகவலை வெளியிடக் கூடாது. காலம் ஐந்து ஆண்டுகள்.",
+    "claims": [
+      "ஊழியர் ரகசியத் தகவலை வெளியிடக் கூடாது.",
+      "காலம் ஐந்து ஆண்டுகள்."
+    ]
+  },
+  {
+    "label": "script/telugu",
+    "text": "ఉద్యోగి రహస్య సమాచారాన్ని వెల్లడించకూడదు. కాలం ఐదు సంవత్సరాలు.",
+    "claims": [
+      "ఉద్యోగి రహస్య సమాచారాన్ని వెల్లడించకూడదు.",
+      "కాలం ఐదు సంవత్సరాలు."
+    ]
+  },
+  {
+    "label": "script/greek-full-stop",
+    "text": "Ο εργαζόμενος δεν πρέπει να αποκαλύπτει πληροφορίες. Η διάρκεια είναι πέντε έτη.",
+    "claims": [
+      "Ο εργαζόμενος δεν πρέπει να αποκαλύπτει πληροφορίες.",
+      "Η διάρκεια είναι πέντε έτη."
+    ]
+  },
+  {
+    "label": "script/greek-question-mark",
+    "text": "Είναι εγκεκριμένο; Δεν είναι.",
+    "claims": [
+      "Είναι εγκεκριμένο; Δεν είναι."
+    ],
+    "known_miss": "Greek is a CLAIMED script, but the Greek question mark (U+037E, and its canonical ASCII ';' spelling) is not in TERMINATORS, so a Greek question and the answer to it are gated as one claim."
+  },
+  {
+    "label": "script/thai-space-separated",
+    "text": "พนักงานต้องไม่เปิดเผยข้อมูล พนักงานต้องรักษาความลับ",
+    "claims": [
+      "พนักงานต้องไม่เปิดเผยข้อมูล พนักงานต้องรักษาความลับ"
+    ],
+    "known_miss": "Thai is a CLAIMED script and marks sentence ends with a space, not a terminator, so a whole Thai paragraph is one claim. Named in the module docstring as the second residual failure; UAX #29 defers it to dictionary breaking."
+  },
+  {
+    "label": "script/armenian-full-stop",
+    "text": "Սա ճիշտ է։ Դա ճիշտ չէ։",
+    "claims": [
+      "Սա ճիշտ է։ Դա ճիշտ չէ։"
+    ],
+    "known_miss": "The Armenian full stop (U+0589) is not in TERMINATORS. Armenian is NOT one of the 14 claimed scripts, so this is scoped-out rather than broken — pinned so that claiming Armenian later cannot skip the table."
+  },
+  {
+    "label": "empty/spaces",
     "text": "   ",
     "claims": []
+  },
+  {
+    "label": "empty/string",
+    "text": "",
+    "claims": []
+  },
+  {
+    "label": "empty/tabs",
+    "text": "\t\t",
+    "claims": []
+  },
+  {
+    "label": "empty/ideographic-space",
+    "text": "　",
+    "claims": []
+  },
+  {
+    "label": "ws/trailing",
+    "text": "Yes.   ",
+    "claims": [
+      "Yes."
+    ]
+  },
+  {
+    "label": "ws/leading",
+    "text": "   Yes.",
+    "claims": [
+      "Yes."
+    ]
+  },
+  {
+    "label": "ws/single-claim-no-terminator",
+    "text": "Single claim with no terminator",
+    "claims": [
+      "Single claim with no terminator"
+    ]
+  },
+  {
+    "label": "ws/bom-is-not-whitespace",
+    "text": "﻿hello.",
+    "claims": [
+      "﻿hello."
+    ]
   }
 ]

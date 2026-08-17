@@ -189,8 +189,11 @@ Two retrieved passages contradict each other and the contradiction touches the
 passage that would have been cited. Strict mode refuses and returns **both
 sides** in `sources` rather than letting rank silently pick a winner.
 
-- `normal` mode answers and lists the conflicts instead of abstaining;
-  `exploratory` records the count only.
+- This refusal really is the same in all three: detection is native in Python, Go
+  and JavaScript, from one predicate pinned by 132 committed vectors.
+- In **Python**, `normal` mode answers and lists the conflicts instead of
+  abstaining, and `exploratory` records the count only. Go and JavaScript define
+  `strict` alone, so they always take the abstention above.
 - Conflicts are never resolved by ranking. If one source really is authoritative,
   say so with [authority metadata](/citenexus/authority/) — that is the signal
   that can break the tie legitimately.

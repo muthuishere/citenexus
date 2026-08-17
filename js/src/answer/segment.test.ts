@@ -14,7 +14,7 @@ interface SegCase {
 // hard-newline rule.
 /** Vector counts, pinned. A vector silently dropped from the fixture is a
  *  weakened contract that no per-case assertion can see. */
-const EXPECTED_COUNTS: Record<string, number> = { cases: 12 };
+const EXPECTED_COUNTS: Record<string, number> = { cases: 95 };
 
 describe("splitClaims conformance", () => {
   const cases = loadCase<SegCase[]>("segmentation.json");

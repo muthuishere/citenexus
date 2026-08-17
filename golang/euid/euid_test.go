@@ -8,7 +8,7 @@ import (
 )
 
 // expectedEUIDCases pins the size of conformance/cases/eu_ids.json.
-const expectedEUIDCases = 2
+const expectedEUIDCases = 8
 
 func TestEUIDVectorCount(t *testing.T) {
 	var fixture struct {

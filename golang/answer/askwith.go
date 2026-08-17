@@ -15,11 +15,14 @@ package answer
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/muthuishere/citenexus/golang/contracts"
 	"github.com/muthuishere/citenexus/golang/fakes"
 	"github.com/muthuishere/citenexus/golang/gate"
+	"github.com/muthuishere/citenexus/golang/lang"
 	"github.com/muthuishere/citenexus/golang/result"
+	"github.com/muthuishere/citenexus/golang/tokenize"
 )
 
 // Providers are the models the flow runs on. A nil field falls back to this
@@ -38,14 +41,33 @@ type Providers struct {
 	// its output goes through the faithfulness gate below before it can be
 	// emitted, which is why an extractive generator is the best kind.
 	Generator contracts.GeneratorProvider
+	// AnswerLanguage is the CALLER's answer-language request — rung 1 of the
+	// §11a chain (lang.ResolveAnswerLanguage), the same slot Python's
+	// `ask(answer_language=...)` fills. Empty means "unspecified", which falls
+	// through to the pinned default below, and the "auto" sentinel is not a
+	// request (this port has no detector to resolve it with, so it also falls
+	// through). It rides on Providers to keep AskWith's arity — and therefore
+	// conformance/cases/e2e_hermetic.json — untouched.
+	AnswerLanguage string
 }
 
-// answerLanguage is fixed at "en" in this port. Python resolves it from config
-// (including the "auto" sentinel, which means "answer in the query's language");
-// the Go port has no config layer and no ask() facade over one, so it does not
-// pretend to. The parameter is still passed through the contract so a provider
-// sees the same signature it sees in Python.
-const answerLanguage = "en"
+// defaultAnswerLanguage is rung 4 of the §11a chain: the dumb configured
+// default. It is NOT the answer language — the answer language is whatever
+// lang.ResolveAnswerLanguage returns, and this is only what it returns when
+// nothing above it fired.
+//
+// Until 2026-08-17 this port had a `const answerLanguage = "en"` used for the
+// answer language AND every passage_language AND languages_in_evidence. The
+// chain shipped in golang/lang with zero callers on the answer path, so all
+// three fields were a constant wearing a signal's name.
+const defaultAnswerLanguage = "en"
+
+// undeclaredLanguage is what a SourceRef reports when the cited document
+// declared no language — the pinned Python value for `candidate.language or
+// "und"`. Note it is deliberately NOT the answer language: "I do not know what
+// language this passage is in" and "I answered in English" are different facts,
+// and the old code collapsed them.
+const undeclaredLanguage = "und"
 
 // AskWith answers question grounded in corpus using the injected providers, or
 // refuses. Same flow as Ask — embed, rank by cosine, keep topK, require a shared
@@ -99,6 +121,7 @@ func AskWith(corpus []Doc, question string, topK int, providers Providers) (resu
 			euID:       doc.DocumentID + "::0",
 			documentID: doc.DocumentID,
 			text:       doc.Text,
+			language:   doc.Language,
 			vector:     vec,
 			order:      i,
 		}
@@ -129,19 +152,99 @@ func AskWith(corpus []Doc, question string, topK int, providers Providers) (resu
 		ranked = ranked[:topK]
 	}
 
+	// `ranked` is this port's analogue of the Python reference's `candidates`:
+	// the post-retrieval, post-topK pool the flow is handed. Everything below
+	// mirrors answer/flow.py over that pool, in flow.py's order.
+
+	// The evidence languages are OBSERVED and REPORTED, never an input to the
+	// chain below (flow.py:167 and the lang/fallback.py docstring: the fourth
+	// rung used to read them, which stamped 15 of 22 English questions Telugu
+	// or Tamil). Distinct, in pool order, undeclared entries skipped.
+	languages := make([]string, 0, len(ranked))
+	seenLanguage := make(map[string]struct{}, len(ranked))
+	for _, r := range ranked {
+		if r.language == "" {
+			continue
+		}
+		if _, ok := seenLanguage[r.language]; ok {
+			continue
+		}
+		seenLanguage[r.language] = struct{}{}
+		languages = append(languages, r.language)
+	}
+	// The answer language follows the CALLER, then the question — never the
+	// evidence. This port has no detector, so rung 2 is nil; `languages` is
+	// passed for signature parity and is ignored by construction.
+	answerLanguage := lang.ResolveAnswerLanguage(
+		nil, providers.AnswerLanguage, "", languages, defaultAnswerLanguage,
+	)
+
+	// Which scripts in play the tokenizer does not CLAIM (ADR-0011). Note
+	// "claim", not "process": the bigram path will mechanically produce tokens
+	// for Khmer, Lao or Myanmar, and the gate will then accept a verbatim quote
+	// in them. That is worse than refusing, because it looks exactly like a
+	// verified answer while resting on a segmentation no fixture has ever
+	// checked. An unclaimed script therefore ABSTAINS, and says why.
+	//
+	// The pool is PARTITIONED rather than unioned, because the two halves answer
+	// different questions: `readable` decides what may be cited, and `blocked`
+	// is the only thing a script-attributed refusal may be blamed on. Unioning
+	// them is the measured mis-attribution defect (flow.py:186-189).
+	questionGap := tokenize.UnsupportedScripts(question)
+	readable := make([]row, 0, len(ranked))
+	blocked := make([]blockedRow, 0, len(ranked))
+	for _, r := range ranked {
+		if gap := tokenize.UnsupportedScripts(r.text); len(gap) > 0 {
+			blocked = append(blocked, blockedRow{row: r, scripts: gap})
+		} else {
+			readable = append(readable, r)
+		}
+	}
+	blockedLists := make([][]string, 0, len(blocked))
+	for _, b := range blocked {
+		blockedLists = append(blockedLists, b.scripts)
+	}
+	blockedScripts := sortedUnique(blockedLists...)
+	// The SIGNAL still reports everything observed — narrowing it would lose the
+	// very fact the unreachable-authority signal needs. Only the reason string
+	// is attributed.
+	unsupported := sortedUnique(questionGap, blockedScripts)
+
+	// A question we cannot read is not answerable from anything.
+	if len(questionGap) > 0 {
+		return refusal(
+			answerLanguage, capabilityReason(sortedUnique(questionGap)), unsupported, nil,
+		), nil
+	}
+
 	// Relevance gate: keep only rows sharing a content token with the question.
 	// V2 (ADR-0011) tokenizes 14 scripts, not ASCII alone; under v1 a CJK or
 	// Devanagari question and its own passage both tokenized to the empty set,
 	// so this gate abstained before the faithfulness gate ever ran. Matches the
 	// Python reference, which calls has_relevance_overlap_v2 here.
-	grounded := make([]row, 0, len(ranked))
-	for _, r := range ranked {
+	grounded := make([]row, 0, len(readable))
+	for _, r := range readable {
 		if gate.HasRelevanceOverlapV2(question, r.text) {
 			grounded = append(grounded, r)
 		}
 	}
 	if len(grounded) == 0 {
-		return result.Refused(result.TrustModeStrict), nil
+		// Blame the script gap as the PRIMARY reason only when it is the only
+		// thing between us and the pool — i.e. every candidate we got back was
+		// unreadable. If we could read some of the pool and none of it was
+		// relevant, the corpus is silent on this question, and saying otherwise
+		// sends the caller after a phantom. The gap is still reported,
+		// additively, by the unreachable note.
+		onlyBlocked := len(blocked) > 0 && len(readable) == 0
+		if onlyBlocked {
+			return refusal(answerLanguage, unreadableReason(blockedScripts), unsupported, nil), nil
+		}
+		return refusal(
+			answerLanguage,
+			"no sufficiently relevant evidence found",
+			unsupported,
+			unreachableNote(blocked),
+		), nil
 	}
 
 	// Conflict detection runs over the grounded candidates, BEFORE anything is
@@ -186,13 +289,38 @@ func AskWith(corpus []Doc, question string, topK int, providers Providers) (resu
 	// appear IN ORDER within a bounded window and forbids a dropped polarity
 	// marker. gate.IsSupported stays exported and frozen for the conformance
 	// vectors; it is no longer what stands between a caller and a lie.
-	if !gate.IsSupportedV2(ans, passage) {
-		refusal := result.Refused(result.TrustModeStrict)
-		// The gate owns this refusal, but the conflict count is a signal about
-		// the evidence pool and it was already computed. Python carries it onto
-		// the same refusal (flow.py's gate-failure Result).
-		refusal.Evidence.ConflictsDetected = len(conflictPairs)
-		return refusal, nil
+	// Verification is PER ATOMIC CLAIM (ADR-0009). The answer is segmented and
+	// each claim is checked independently against the cited passage; unsupported
+	// claims are DROPPED rather than failing the answer whole, so a half-true
+	// generation returns its true half instead of nothing. The candidate is
+	// accepted as soon as at least one of its claims survives — flow.py:307-315.
+	//
+	// SplitClaims shipped in this port, pinned by conformance/cases/
+	// segmentation.json, with zero non-test callers: the port gated the entire
+	// answer string as ONE claim, so a two-sentence answer with one fabricated
+	// sentence refused BOTH sentences while Python kept the true one.
+	claimTexts := SplitClaims(ans)
+	verdicts := make([]claimVerdict, 0, len(claimTexts))
+	anySupported := false
+	for _, c := range claimTexts {
+		supported := gate.IsSupportedV2(c, passage)
+		anySupported = anySupported || supported
+		verdicts = append(verdicts, claimVerdict{text: c, supported: supported})
+	}
+	if !anySupported {
+		// The gate owns this refusal. What was elsewhere in the pool did not
+		// cause it, so it does not get blamed for it — an unreadable sibling is
+		// reported AFTER the real reason, never instead of it (flow.py:327-333).
+		gateRefusal := refusal(
+			answerLanguage,
+			"generated answer failed the faithfulness gate",
+			unsupported,
+			unreachableNote(blocked),
+		)
+		// The conflict count is a signal about the evidence pool and it was
+		// already computed. Python carries it onto the same refusal.
+		gateRefusal.Evidence.ConflictsDetected = len(conflictPairs)
+		return gateRefusal, nil
 	}
 
 	// TrustMode coupling. An unresolved conflict touching the answer's own claim
@@ -209,7 +337,9 @@ func AskWith(corpus []Doc, question string, topK int, providers Providers) (resu
 		}
 	}
 	if len(touching) > 0 {
-		return conflictAbstention(window, touching, len(conflictPairs), independent), nil
+		return conflictAbstention(
+			window, touching, len(conflictPairs), independent, answerLanguage, languages, unsupported,
+		), nil
 	}
 
 	// Count the INDEPENDENT evidence, not the retrieved rows. Clones of one
@@ -223,28 +353,151 @@ func AskWith(corpus []Doc, question string, topK int, providers Providers) (resu
 		distinct[r.documentID] = struct{}{}
 	}
 
+	// Only SUPPORTED claims reach the answer; every atomic claim keeps its own
+	// verdict, so a drop is auditable rather than silent (flow.py:357-374). The
+	// decision stays `answered` even when a claim was dropped — Python's strict
+	// flow never emits `partial` (that value is agentic.py's, for deep-ask); the
+	// drop is reported by AllClaimsVerified=false + UnsupportedClaimsRemoved.
+	supported := make([]string, 0, len(verdicts))
+	claims := make([]result.Claim, 0, len(verdicts))
+	for _, v := range verdicts {
+		sources := []string{}
+		if v.supported {
+			supported = append(supported, v.text)
+			sources = []string{top.euID}
+		}
+		claims = append(claims, result.Claim{Claim: v.text, Supported: v.supported, Sources: sources})
+	}
+	removed := len(verdicts) - len(supported)
+
 	return result.Result{
-		Answer:         ans,
+		Answer:         strings.Join(supported, " "),
 		AnswerLanguage: answerLanguage,
 		Mode:           result.TrustModeStrict,
 		Evidence: result.EvidenceSignals{
-			Decision:            result.DecisionAnswered,
-			SupportingSources:   len(independent),
-			DistinctDocuments:   len(distinct),
-			AllClaimsVerified:   true,
-			LanguagesInEvidence: []string{answerLanguage},
-			UnsupportedScripts:  []string{},
+			Decision:                 result.DecisionAnswered,
+			SupportingSources:        len(independent),
+			DistinctDocuments:        len(distinct),
+			AllClaimsVerified:        removed == 0,
+			UnsupportedClaimsRemoved: removed,
+			ConflictsDetected:        len(conflictPairs),
+			LanguagesInEvidence:      languages,
+			UnsupportedScripts:       unsupported,
 		},
-		Claims: []result.Claim{
-			{Claim: ans, Supported: true, Sources: []string{top.euID}},
-		},
+		Claims: claims,
 		Sources: []result.SourceRef{
-			{Document: top.documentID, Passage: passage, PassageLanguage: answerLanguage},
+			{Document: top.documentID, Passage: passage, PassageLanguage: passageLanguage(top)},
 		},
-		MissingEvidence: []string{},
+		// "I answered, but there is material here I cannot read." Empty on every
+		// corpus without an unclaimed script, so those Results are unchanged.
+		MissingEvidence: unreachableNote(blocked),
 		Conflicts:       []string{},
 		Provenance:      []result.ProvenanceEntry{},
 	}, nil
+}
+
+// blockedRow is one candidate the tokenizer cannot read, with the unclaimed
+// scripts that made it unreadable.
+type blockedRow struct {
+	row     row
+	scripts []string
+}
+
+// claimVerdict is one atomic claim and whether the cited passage supports it.
+type claimVerdict struct {
+	text      string
+	supported bool
+}
+
+// passageLanguage is the cited passage's DECLARED language, or the pinned "und"
+// when the document declared none — `candidate.language or "und"` in the Python
+// reference (flow.py:364). Never the answer language.
+func passageLanguage(r row) string {
+	if r.language == "" {
+		return undeclaredLanguage
+	}
+	return r.language
+}
+
+// sortedUnique is the sorted set union of the given script lists, always non-nil
+// so it marshals as [] rather than null.
+func sortedUnique(lists ...[]string) []string {
+	seen := map[string]struct{}{}
+	out := []string{}
+	for _, list := range lists {
+		for _, s := range list {
+			if _, ok := seen[s]; ok {
+				continue
+			}
+			seen[s] = struct{}{}
+			out = append(out, s)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// refusal is the localized refusal shell, mirroring answer/flow.py:50.
+//
+// `reason` is the ONE cause that actually produced the refusal; `unreachable` is
+// an additive note about material that was present but could not be read. The
+// two are separate on purpose — the second must never overwrite the first.
+func refusal(answerLanguage, reason string, unsupported, unreachable []string) result.Result {
+	res := result.Refused(result.TrustModeStrict)
+	res.AnswerLanguage = answerLanguage
+	res.Evidence.UnsupportedScripts = unsupported
+	res.MissingEvidence = append([]string{reason}, unreachable...)
+	return res
+}
+
+// capabilityReason is the refusal reason when the tokenizer cannot read the
+// QUESTION at all (ADR-0011, flow.py:78).
+//
+// It is reserved for the QUESTION on purpose. Applying it to the whole pool ran
+// the conflation backwards: one unreadable row anywhere in the top-k rewrote the
+// reason for an unrelated, purely-English refusal (measured: 11 of 14 refusals
+// reported "unsupported script: unknown" over an English-only corpus).
+func capabilityReason(scripts []string) string {
+	return "unsupported script: " + strings.Join(scripts, ", ")
+}
+
+// unreadableReason is the refusal reason when the script gap genuinely explains
+// the abstain: there WAS material, and we could not read it (flow.py:99).
+func unreadableReason(scripts []string) string {
+	return "no readable evidence found; unsupported script: " + strings.Join(scripts, ", ")
+}
+
+// unreachableNote is the additive line naming material present but unreadable
+// (flow.py:108). Measured: a Telugu annexure that capped leave at 5 days and
+// stated it overrode was silently skipped while the English handbook answered
+// "a maximum of 10 days" — correctly cited, 100% grounded, and superseded.
+//
+// We cannot read that annexure, so we assert nothing about it and we do not
+// delete a correct, grounded answer over it. What we can do is say it is there.
+func unreachableNote(blocked []blockedRow) []string {
+	if len(blocked) == 0 {
+		return []string{}
+	}
+	order := []string{}
+	byDocument := map[string][]string{}
+	for _, b := range blocked {
+		document := b.row.documentID
+		if document == "" {
+			document = b.row.euID
+		}
+		if _, ok := byDocument[document]; !ok {
+			order = append(order, document)
+		}
+		byDocument[document] = sortedUnique(byDocument[document], b.scripts)
+	}
+	named := make([]string, 0, len(order))
+	for _, document := range order {
+		named = append(named, fmt.Sprintf("%s (%s)", document, strings.Join(byDocument[document], ", ")))
+	}
+	return []string{fmt.Sprintf(
+		"%d candidate document(s) could not be read and were excluded: %s",
+		len(order), strings.Join(named, ", "),
+	)}
 }
 
 // textsOf is the citable text of each row, in order. The Python reference
@@ -265,7 +518,15 @@ func textsOf(rows []row) []string {
 // A refusal that hides the evidence is only marginally better than a confident
 // pick: the caller cannot check the library's reasoning or resolve the conflict
 // themselves. Both passages are returned as sources, verbatim.
-func conflictAbstention(window []row, touching []ConflictPair, totalConflicts int, independent []row) result.Result {
+func conflictAbstention(
+	window []row,
+	touching []ConflictPair,
+	totalConflicts int,
+	independent []row,
+	answerLanguage string,
+	languages []string,
+	unsupported []string,
+) result.Result {
 	documents := make([]string, len(window))
 	for i, r := range window {
 		documents[i] = r.documentID
@@ -282,7 +543,7 @@ func conflictAbstention(window []row, touching []ConflictPair, totalConflicts in
 			cited = append(cited, result.SourceRef{
 				Document:        r.documentID,
 				Passage:         r.text,
-				PassageLanguage: answerLanguage,
+				PassageLanguage: passageLanguage(r),
 			})
 		}
 	}
@@ -304,8 +565,8 @@ func conflictAbstention(window []row, touching []ConflictPair, totalConflicts in
 			// populate it either, and inventing a number on one path only would
 			// make the two disagree about what the field means.
 			ConflictsDetected:   totalConflicts,
-			LanguagesInEvidence: []string{answerLanguage},
-			UnsupportedScripts:  []string{},
+			LanguagesInEvidence: languages,
+			UnsupportedScripts:  unsupported,
 		},
 		Claims:          []result.Claim{},
 		Sources:         cited,

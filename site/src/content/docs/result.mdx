@@ -99,9 +99,9 @@ Import: `from citenexus.answer.result import Result, EvidenceSignals, SourceRef,
 | `mode` | `TrustMode` | the trust mode the answer was produced under |
 | `evidence` | `EvidenceSignals` | the structured retrieval + verification signals (below) |
 | `claims` | `tuple[Claim, …]` | per-claim verification |
-| `sources` | `tuple[SourceRef, …]` | the cited passages — **strict returns exactly one** |
+| `sources` | `tuple[SourceRef, …]` | the cited passages — **strict answers cite exactly one**; the conflict abstention cites both sides |
 | `missing_evidence` | `tuple[str, …]` | why it abstained, when it did |
-| `conflicts` | `tuple[str, …]` | surfaced multi-source disagreement — **`normal` mode only**, see below |
+| `conflicts` | `tuple[str, …]` | surfaced multi-source disagreement — on an **answer**, `normal` mode only; also populated by the strict conflict **abstention**, see below |
 | `provenance` | `tuple[ProvenanceEntry, …]` | the full reproducibility chain |
 
 <Aside type="note" title="How `answer_language` is decided">
@@ -165,6 +165,16 @@ on it expecting today's behavior.
 Evidence-Unit ids are **not** on `SourceRef` — they appear on `Claim.sources` and
 `ProvenanceEntry.evidence_unit`.
 
+<Aside type="caution" title="Verbatim comes from the `passage` column — re-ingest an old index to earn it">
+Under contextual retrieval a chunk is *indexed* as a small model's situating
+blurb plus the source text, which ranks better but **is not the customer's
+words**. Every retriever therefore carries the verbatim chunk separately, and
+`Candidate.citable_text` (`retrieve/types.py:55-62`) is what may be quoted.
+Rows written before that column existed have no `passage`, so `citable_text`
+falls back to the indexed text — the old behaviour, which beats refusing to
+answer, but not the guarantee. **Re-ingest to get it.**
+</Aside>
+
 ## `Claim` and `ProvenanceEntry`
 
 `Claim`: `claim: str`, `supported: bool`, `sources: tuple[str, …]` (EU ids).
@@ -192,7 +202,7 @@ feature. What each mode does with a detected conflict differs:
 
 | mode | behaviour on a conflict touching the cited passage |
 |---|---|
-| `strict` | **abstains**, and cites both sides — the refusal names the disagreement |
+| `strict` | **abstains**, cites both sides, and lists the pair on `Result.conflicts` — the refusal names the disagreement |
 | `normal` | answers, and populates `Result.conflicts` with a description of each pair |
 | `exploratory` | answers; records `conflicts_detected` only, `conflicts` stays empty |
 
@@ -206,12 +216,18 @@ evidence found". If a strict answer disappears on a corpus that clearly contains
 the passage, read `conflicts_detected` before assuming a retrieval bug.
 </Aside>
 
-<Aside type="caution" title="Conflict detection is Python-only, and its thresholds were fitted on English">
-Go and JavaScript declare `conflicts` / `conflicts_detected` for wire parity but
-implement no detection — those fields are always empty in the ports. And the
-detector's thresholds (`MAX_RESIDUAL = 1`, `SUBJECT_OVERLAP = 0.60`,
+<Aside type="caution" title="Detection is at parity in all three ports; the mode selector and the thresholds are the caveats">
+`conflicts` / `conflicts_detected` are populated natively in Python, Go and
+JavaScript from one predicate pinned by 132 committed vectors
+(`conformance/cases/conflict.json`). What is **not** at parity is the mode
+selector: Go and JavaScript define `strict` alone, so those ports always take the
+`strict` row of the table above.
+
+The detector's thresholds (`MAX_RESIDUAL = 1`, `SUBJECT_OVERLAP = 0.60`,
 `MAX_SYMDIFF = 3`, `MIN_CONTENT = 3`, `DUPLICATE_JACCARD = 0.80`,
-`CONFLICT_TOP_K = 6`, `answer/conflict.py`) are pinned, non-configurable, and were
-swept on **synthetic English** sentences. We do not know what they should be for a
-non-English corpus — measure before relying on the count there.
+`CONFLICT_TOP_K = 6`) are pinned, non-configurable, and were swept on **synthetic
+English** sentences. And on a non-Latin corpus only the numeric-value rule can
+fire at all — negation and antonym are driven by English wordlists. Read
+`conflicts_detected = 0` there as "no *numeric* conflict found":
+[the known misses, in detail](/citenexus/scenarios/conflicting-sources/#non-latin-scripts-one-rule-of-three).
 </Aside>

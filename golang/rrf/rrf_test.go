@@ -8,7 +8,7 @@ import (
 )
 
 // expectedRRFCases pins the size of conformance/cases/rrf.json.
-const expectedRRFCases = 5
+const expectedRRFCases = 13
 
 func TestRRFVectorCount(t *testing.T) {
 	var cases []struct {

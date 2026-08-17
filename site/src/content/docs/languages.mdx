@@ -160,15 +160,16 @@ The 14-script tokenizer, BM25, the v2 faithfulness predicate **and the ports' as
 path** are at parity — a Go or JavaScript answer over a non-Latin passage is
 emitted, not refused.
 
-What is not at parity is **atomic-claim decomposition**. `split_claims` /
-`SplitClaims` / `splitClaims` exists in all three
-([deterministic core](/citenexus/deterministic-core/)), but only Python's answer
-flow calls it: Python splits an answer into claims, verifies each, and drops the
-unsupported ones. A port verifies the whole answer as a single claim, so a port
-answer **passes or refuses whole — it is never trimmed**.
+**Atomic-claim decomposition is now at parity too.** `split_claims` /
+`SplitClaims` / `splitClaims` ([deterministic
+core](/citenexus/deterministic-core/)) is called by all three answer flows: each
+splits an answer into claims, verifies every claim against its own passage, and
+drops the unsupported ones. A trimmed answer comes back `answered` with
+`all_claims_verified: false` and `unsupported_claims_removed` above zero — in
+every port.
 
 `search_languages` fan-out, query reformulation, citation translation and the
-detector seam are Python-only too — the ports have no `ask()` facade to hang them
+detector seam are Python-only — the ports have no `ask()` facade to hang them
 on. Background:
 [ADR-0011](https://github.com/muthuishere/citenexus/blob/main/docs/adr/0011-tokenizer-and-non-latin-scripts.md).
 </Aside>

@@ -8,7 +8,7 @@ import (
 )
 
 // expectedBm25Cases pins the size of conformance/cases/bm25.json.
-const expectedBm25Cases = 4
+const expectedBm25Cases = 13
 
 func TestBm25VectorCount(t *testing.T) {
 	var cases []struct {

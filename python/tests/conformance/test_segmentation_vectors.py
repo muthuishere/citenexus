@@ -18,7 +18,7 @@ from .fixtures import load_case
 
 VECTORS: list[dict[str, Any]] = load_case("segmentation.json")
 
-EXPECTED_COUNT = 12
+EXPECTED_COUNT = 95
 
 
 def test_vector_count() -> None:

@@ -8,7 +8,7 @@ import (
 )
 
 // expectedStructureCases pins the size of conformance/cases/structure.json.
-const expectedStructureCases = 3
+const expectedStructureCases = 11
 
 func TestStructureVectorCount(t *testing.T) {
 	var fixture struct {

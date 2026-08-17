@@ -23,7 +23,7 @@ from .fixtures import load_case
 FIXTURE: dict[str, Any] = load_case("eu_ids.json")
 CASES: list[dict[str, Any]] = FIXTURE["cases"]
 
-EXPECTED_COUNT = 2
+EXPECTED_COUNT = 8
 
 _PARTITION = PartitionPath.of(("workspace", "default"))
 

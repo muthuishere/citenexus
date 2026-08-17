@@ -7,7 +7,7 @@ import { rrfFuse } from "./rrf.js";
 // conformance/cases/rrf.json, assert deep equality over ALL cases, no leniency.
 /** Vector counts, pinned. A vector silently dropped from the fixture is a
  *  weakened contract that no per-case assertion can see. */
-const EXPECTED_COUNTS: Record<string, number> = { cases: 5 };
+const EXPECTED_COUNTS: Record<string, number> = { cases: 13 };
 
 describe("rrf conformance", () => {
   const cases = loadCase<{ lists: string[][]; k: number; fused: string[] }[]>(

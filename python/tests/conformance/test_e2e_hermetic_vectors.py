@@ -31,8 +31,8 @@ FIXTURE: dict[str, Any] = load_case("e2e_hermetic.json")
 CORPUS: list[dict[str, str]] = FIXTURE["corpus"]
 CASES: list[dict[str, Any]] = FIXTURE["cases"]
 
-EXPECTED_COUNTS: dict[str, int] = {"corpus": 3, "cases": 4}
-EXPECTED_TOP_K = 5
+EXPECTED_COUNTS: dict[str, int] = {"corpus": 6, "cases": 8}
+EXPECTED_TOP_K = 8
 
 
 def test_fixture_shape_is_pinned() -> None:

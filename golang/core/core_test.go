@@ -14,7 +14,7 @@ import (
 
 // expectedCoreRRFCases pins the size of conformance/cases/rrf.json as this
 // package consumes it (golang/rrf pins the same file independently).
-const expectedCoreRRFCases = 5
+const expectedCoreRRFCases = 13
 
 func TestVersion(t *testing.T) {
 	v := Version()

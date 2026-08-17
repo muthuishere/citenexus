@@ -28,7 +28,7 @@ interface EuIdFixture {
 
 /** Vector counts, pinned. A vector silently dropped from the fixture is a
  *  weakened contract that no per-case assertion can see. */
-const EXPECTED_COUNTS: Record<string, number> = { cases: 2 };
+const EXPECTED_COUNTS: Record<string, number> = { cases: 8 };
 
 describe("eu_id builder conformance", () => {
   const fixture = loadCase<EuIdFixture>("eu_ids.json");

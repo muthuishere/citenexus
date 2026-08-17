@@ -10,7 +10,7 @@ import (
 
 // expectedSegmentationCases pins the size of conformance/cases/segmentation.json.
 // The per-case loop below is a contract only while the case list cannot shrink.
-const expectedSegmentationCases = 12
+const expectedSegmentationCases = 95
 
 func TestSegmentationVectorCount(t *testing.T) {
 	var cases []struct {

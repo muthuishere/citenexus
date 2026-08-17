@@ -19,7 +19,7 @@ from .fixtures import load_case
 
 CASES: list[dict[str, Any]] = load_case("structure.json")["cases"]
 
-EXPECTED_COUNT = 3
+EXPECTED_COUNT = 11
 
 
 def test_vector_count() -> None:

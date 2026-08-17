@@ -11,12 +11,25 @@
     {
       "document_id": "termination",
       "text": "The contract termination clause requires ninety days written notice."
+    },
+    {
+      "document_id": "parking",
+      "text": "Tenants may park one vehicle in the assigned garage bay."
+    },
+    {
+      "document_id": "quiet",
+      "text": "Quiet hours begin at ten. Residents must limit noise."
+    },
+    {
+      "document_id": "policy-ja",
+      "text": "従業員は機密情報を開示してはならない。"
     }
   ],
-  "top_k": 5,
+  "top_k": 8,
   "refusal_answer": "I can't answer that from the available evidence.",
   "cases": [
     {
+      "label": "answered/nda",
       "question": "Can the employee disclose confidential information?",
       "expected": {
         "decision": "answered",
@@ -27,6 +40,7 @@
       }
     },
     {
+      "label": "answered/leave",
       "question": "How many days of annual leave do employees get?",
       "expected": {
         "decision": "answered",
@@ -37,6 +51,7 @@
       }
     },
     {
+      "label": "answered/termination",
       "question": "What notice does the termination clause require?",
       "expected": {
         "decision": "answered",
@@ -47,7 +62,52 @@
       }
     },
     {
+      "label": "answered/parking",
+      "question": "Where may tenants park a vehicle?",
+      "expected": {
+        "decision": "answered",
+        "answer": "Tenants may park one vehicle in the assigned garage bay.",
+        "document": "parking",
+        "passage": "Tenants may park one vehicle in the assigned garage bay.",
+        "eu_id": "parking::0"
+      }
+    },
+    {
+      "label": "answered/two-claims-both-survive",
+      "question": "When do quiet hours begin?",
+      "expected": {
+        "decision": "answered",
+        "answer": "Quiet hours begin at ten. Residents must limit noise.",
+        "document": "quiet",
+        "passage": "Quiet hours begin at ten. Residents must limit noise.",
+        "eu_id": "quiet::0"
+      }
+    },
+    {
+      "label": "refused/no-evidence",
       "question": "What is the capital of France?",
+      "expected": {
+        "decision": "refused",
+        "answer": "I can't answer that from the available evidence.",
+        "document": null,
+        "passage": null,
+        "eu_id": null
+      }
+    },
+    {
+      "label": "refused/no-evidence-second-subject",
+      "question": "Which planet is closest to the sun?",
+      "expected": {
+        "decision": "refused",
+        "answer": "I can't answer that from the available evidence.",
+        "document": null,
+        "passage": null,
+        "eu_id": null
+      }
+    },
+    {
+      "label": "refused/no-evidence-non-latin",
+      "question": "太陽に最も近い惑星はどれですか。",
       "expected": {
         "decision": "refused",
         "answer": "I can't answer that from the available evidence.",

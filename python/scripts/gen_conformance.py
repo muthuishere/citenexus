@@ -27,10 +27,8 @@ from citenexus.answer.result import (
     Result,
     SourceRef,
 )
-from citenexus.answer.segment import split_claims
 from citenexus.answer.verify import (
     _STOPWORDS,
-    content_tokens,
     has_relevance_overlap,
     is_supported,
     is_supported_v2,
@@ -38,29 +36,17 @@ from citenexus.answer.verify import (
 from citenexus.domain.partition import PartitionPath
 from citenexus.domain.trust import TrustMode
 from citenexus.embed.client import OpenAICompatibleEmbedding
-from citenexus.evidence.builder import build_evidence_units
-from citenexus.evidence.chunked_builder import build_chunked_units
 from citenexus.evidence.chunker import chunk_text
 from citenexus.evidence.contextualize import _PROMPT as _CONTEXTUALIZE_PROMPT
-from citenexus.evidence.structure import build_structure
-from citenexus.extract.types import (
-    BlockKind,
-    ExtractedBlock,
-    ExtractedDoc,
-    SourceType,
-    StructureType,
-)
 from citenexus.graph.distill import _PROMPT as _GRAPH_DISTILL_PROMPT
 from citenexus.graph.store import build_comention_graph
 from citenexus.lang.codes import Language, Script
 from citenexus.lang.detect import LanguageResult
 from citenexus.lang.fallback import AUTO_ANSWER_LANGUAGE, resolve_answer_language
 from citenexus.lang.search import SEARCH_LANGUAGES
-from citenexus.retrieve.fusion import rrf_fuse
 from citenexus.retrieve.reformulate import _PROMPT as _REFORMULATE_PROMPT
-from citenexus.retrieve.types import Candidate, RetrievalSignal
 from citenexus.storage.bm25 import Bm25TextSearch
-from citenexus.testing.fakes import FakeEmbedding, FakeLLM, tokenize
+from citenexus.testing.fakes import tokenize
 from citenexus.tokenize import (
     CONTINUOUS_SCRIPTS,
     SUPPORTED_SCRIPTS,
@@ -127,6 +113,21 @@ def _tokenize_cases() -> list[dict[str, Any]]:
 
 # --------------------------------------------------------------------------- #
 # cases/bm25.json — rows + query -> ordered (eu_id, score rounded 1e-6)
+#
+# Every ``expected`` below is DERIVED FROM THE FORMULA, not read back from
+# ``Bm25TextSearch``. The formula (storage/bm25.py docstring, spec §10, classic
+# Robertson/Sparck-Jones BM25) is
+#
+#     idf(t)  = ln(1 + (N - n_t + 0.5) / (n_t + 0.5))
+#     norm(t) = tf * (k1 + 1) / (tf + k1 * (1 - b + b * dl / avgdl))
+#     score   = SUM over DISTINCT query terms of idf(t) * norm(t)
+#     k1 = 1.5, b = 0.75; avgdl = mean token count over ALL rows
+#
+# with zero-scoring rows dropped and ties broken by original row order. Fixture
+# text is deliberately restricted to space-separated ASCII words so tokenization
+# is not a hidden variable in the derivation. The four original vectors were
+# re-derived by hand from this formula and reproduce byte-for-byte, which is what
+# licenses the nine added below.
 # --------------------------------------------------------------------------- #
 
 
@@ -149,6 +150,10 @@ _BM25_CASES: list[dict[str, Any]] = [
             {"eu_id": "d2::0", "text": "annual leave policy for employees"},
         ],
         "query": "disclose",
+        "expected": [
+            {"eu_id": "d1::1", "score": 0.870377},
+            {"eu_id": "d1::0", "score": 0.398308},
+        ],
     },
     {
         "name": "multi-term idf weighting",
@@ -159,6 +164,11 @@ _BM25_CASES: list[dict[str, Any]] = [
             {"eu_id": "b::1", "text": "unrelated text about holidays"},
         ],
         "query": "contract termination",
+        "expected": [
+            {"eu_id": "a::0", "score": 1.284305},
+            {"eu_id": "b::0", "score": 1.172488},
+            {"eu_id": "a::1", "score": 0.711994},
+        ],
     },
     {
         "name": "zero-score rows are dropped; ties keep input order",
@@ -168,6 +178,10 @@ _BM25_CASES: list[dict[str, Any]] = [
             {"eu_id": "x::2", "text": "gamma delta"},
         ],
         "query": "alpha",
+        "expected": [
+            {"eu_id": "x::0", "score": 0.470004},
+            {"eu_id": "x::1", "score": 0.470004},
+        ],
     },
     {
         "name": "query tokens absent everywhere -> empty result",
@@ -176,60 +190,202 @@ _BM25_CASES: list[dict[str, Any]] = [
             {"eu_id": "y::1", "text": "still nothing"},
         ],
         "query": "quantum entanglement",
+        "expected": [],
+    },
+    # N=1: idf = ln(1 + 0.5/1.5) = 0.287682; dl == avgdl so norm == 1 exactly.
+    # This is the vector that pins the idf formula's +0.5 smoothing: a naive
+    # ln(N/n_t) idf is ZERO here and the whole one-document corpus vanishes.
+    {
+        "name": "one-document corpus",
+        "rows": [{"eu_id": "c::0", "text": "alpha beta gamma"}],
+        "query": "alpha",
+        "expected": [{"eu_id": "c::0", "score": 0.287682}],
+    },
+    # N=2, n_t=1 -> idf = ln(1 + 1.5/1.5) = ln 2 = 0.693147; dl == avgdl == 4.
+    {
+        "name": "term absent from one document",
+        "rows": [
+            {"eu_id": "p::0", "text": "rent is due monthly"},
+            {"eu_id": "p::1", "text": "the roof was repaired"},
+        ],
+        "query": "rent",
+        "expected": [{"eu_id": "p::0", "score": 0.693147}],
+    },
+    # No query terms -> the search is a no-op, NOT "rank everything".
+    {
+        "name": "empty query -> empty result",
+        "rows": [{"eu_id": "e::0", "text": "anything at all"}],
+        "query": "",
+        "expected": [],
+    },
+    # No rows -> avgdl would be 0/0; the guard must short-circuit before that.
+    {
+        "name": "empty corpus -> empty result",
+        "rows": [],
+        "query": "anything",
+        "expected": [],
+    },
+    # The length-normalization vector: identical tf (1) and identical idf, so the
+    # ONLY thing separating these two rows is dl/avgdl. A reimplementation that
+    # drops the b-term, or computes avgdl over matching rows instead of all rows,
+    # diverges here and nowhere else.
+    {
+        "name": "very different document lengths -> the short document wins",
+        "rows": [
+            {"eu_id": "len::short", "text": "notice"},
+            {
+                "eu_id": "len::long",
+                "text": (
+                    "notice of termination must be given in writing to the landlord "
+                    "at the address stated in the lease agreement"
+                ),
+            },
+        ],
+        "query": "notice",
+        "expected": [
+            {"eu_id": "len::short", "score": 0.306423},
+            {"eu_id": "len::long", "score": 0.129766},
+        ],
+    },
+    # Equal length, equal idf (0.133531) -> isolates k1 saturation. tf 1/2/6 give
+    # 1.0 / 1.42857 / 2.0 times the idf: six occurrences are worth less than six
+    # times one. Linear tf would put s::6 at 6x, not 2x.
+    {
+        "name": "term-frequency saturation at equal document length",
+        "rows": [
+            {"eu_id": "s::1", "text": "alpha filler filler filler filler filler"},
+            {"eu_id": "s::2", "text": "alpha alpha filler filler filler filler"},
+            {"eu_id": "s::6", "text": "alpha alpha alpha alpha alpha alpha"},
+        ],
+        "query": "alpha",
+        "expected": [
+            {"eu_id": "s::6", "score": 0.267063},
+            {"eu_id": "s::2", "score": 0.190759},
+            {"eu_id": "s::1", "score": 0.133531},
+        ],
+    },
+    # "common" is in all four rows (idf 0.105361); "rare" is in one (idf 1.203973).
+    # r::0 must outrank r::1, which has TWICE the common term — the discrimination
+    # test idf exists for.
+    {
+        "name": "a rare term outweighs a common one",
+        "rows": [
+            {"eu_id": "r::0", "text": "common rare"},
+            {"eu_id": "r::1", "text": "common common"},
+            {"eu_id": "r::2", "text": "common filler"},
+            {"eu_id": "r::3", "text": "common filler"},
+        ],
+        "query": "common rare",
+        "expected": [
+            {"eu_id": "r::0", "score": 1.309333},
+            {"eu_id": "r::1", "score": 0.150515},
+            {"eu_id": "r::2", "score": 0.105361},
+            {"eu_id": "r::3", "score": 0.105361},
+        ],
+    },
+    # n_t == N: idf = ln(1 + 0.5/3.5) = 0.133531 > 0. A port using the *unsmoothed*
+    # BM25 idf, ln((N - n_t + 0.5)/(n_t + 0.5)), gets a NEGATIVE score here and
+    # drops every row — silent, total recall loss on any ubiquitous term.
+    {
+        "name": "query term in every document keeps a positive idf floor",
+        "rows": [
+            {"eu_id": "f::0", "text": "policy"},
+            {"eu_id": "f::1", "text": "policy notes"},
+            {"eu_id": "f::2", "text": "the policy applies here"},
+        ],
+        "query": "policy",
+        "expected": [
+            {"eu_id": "f::0", "score": 0.179754},
+            {"eu_id": "f::1", "score": 0.142705},
+            {"eu_id": "f::2", "score": 0.101051},
+        ],
+    },
+    # Case folding happens in the tokenizer, so an uppercase corpus must score
+    # exactly as a lowercase one: both rows are two tokens, both match once.
+    {
+        "name": "case folding: uppercase document, lowercase query",
+        "rows": [
+            {"eu_id": "k::0", "text": "NOTICE PERIOD"},
+            {"eu_id": "k::1", "text": "Notice period"},
+        ],
+        "query": "notice",
+        "expected": [
+            {"eu_id": "k::0", "score": 0.182322},
+            {"eu_id": "k::1", "score": 0.182322},
+        ],
     },
 ]
 
 
 def _bm25_cases() -> list[dict[str, Any]]:
-    cases = []
-    for case in _BM25_CASES:
-        search = Bm25TextSearch(_StubStore(case["rows"]))  # type: ignore[arg-type]
-        results = search.search_text(case["query"], limit=10)
-        cases.append(
-            {
-                "name": case["name"],
-                "rows": case["rows"],
-                "query": case["query"],
-                "expected": [
-                    {"eu_id": row["eu_id"], "score": round(row["_text_score"], 6)}
-                    for row in results
-                ],
-            }
-        )
-    return cases
+    """Emit the DECLARED expectations verbatim (see the derivation note above).
+
+    Deliberately not computed from ``Bm25TextSearch``: a fixture computed from
+    the code under test pins whatever that code does, including its bugs. The
+    conformance suites in all three ports are what compare the two.
+    """
+    return [
+        {
+            "name": case["name"],
+            "rows": case["rows"],
+            "query": case["query"],
+            "expected": case["expected"],
+        }
+        for case in _BM25_CASES
+    ]
 
 
 # --------------------------------------------------------------------------- #
-# cases/rrf.json — ranked eu_id lists -> fused order (k=60, zero-based rank)
+# cases/rrf.json — ranked eu_id lists -> fused order (zero-based rank)
+#
+# Derived from the formula in ``retrieve/fusion.py``, not from ``rrf_fuse``:
+#
+#     score(id) = SUM over lists of 1 / (k + rank + 1)      (rank zero-based)
+#     order     = descending score, then eu_id ascending as tie-break
+#
+# The five original vectors were re-derived by hand and reproduce exactly.
 # --------------------------------------------------------------------------- #
 
-_RRF_CASES: list[list[list[str]]] = [
+_RRF_CASES: list[tuple[list[list[str]], int, list[str]]] = [
     # agreement across lists beats a single high rank
-    [["a", "b", "c"], ["b", "c", "d"], ["b", "a", "e"]],
+    ([["a", "b", "c"], ["b", "c", "d"], ["b", "a", "e"]], 60, ["b", "a", "c", "d", "e"]),
     # single list is a no-op on order
-    [["x", "y", "z"]],
+    ([["x", "y", "z"]], 60, ["x", "y", "z"]),
     # tie on fused score -> eu_id lexicographic tie-break
-    [["a", "b"], ["b", "a"]],
+    ([["a", "b"], ["b", "a"]], 60, ["a", "b"]),
     # disjoint lists interleave by rank
-    [["a1", "a2", "a3"], ["b1", "b2"]],
+    ([["a1", "a2", "a3"], ["b1", "b2"]], 60, ["a1", "b1", "a2", "b2", "a3"]),
     # empty lists contribute nothing
-    [[], ["only"], []],
+    ([[], ["only"], []], 60, ["only"]),
+    # identical lists: every id doubles its score, so the ORDER cannot move.
+    ([["a", "b", "c"], ["a", "b", "c"]], 60, ["a", "b", "c"]),
+    # three fully disjoint lists round-robin by rank: all three rank-0 ids score
+    # 1/61 and tie, broken lexicographically, then all three rank-1 ids.
+    ([["p1", "p2"], ["q1", "q2"], ["r1", "r2"]], 60, ["p1", "q1", "r1", "p2", "q2", "r2"]),
+    # nothing in, nothing out — must be [] and not an error.
+    ([[], [], []], 60, []),
+    # A total tie whose lexicographic order DIFFERS from first-seen order: "z"
+    # appears first, "y" must still come first. Pins the tie-break as eu_id, not
+    # insertion.
+    ([["z", "y"], ["y", "z"]], 60, ["y", "z"]),
+    # k = 0, the lower boundary: contributions become 1/(rank+1), the largest
+    # spread the formula can produce. a and c tie at 1/1 + 1/3 = 1.333..., b is
+    # 1/2 + 1/2 = 1.0, so the tie-break decides the top two.
+    ([["a", "b", "c"], ["c", "b", "a"]], 0, ["a", "c", "b"]),
+    # k = 1, one step in: a and c tie at 1/2 + 1/4 = 0.75; b is 2/3 = 0.666...
+    ([["a", "b", "c"], ["c", "b", "a"]], 1, ["a", "c", "b"]),
+    # A retriever that returns the same eu_id twice: RRF is a sum over
+    # occurrences, so "a" accumulates 1/61 + 1/62 and is not deduplicated away
+    # before scoring. Output is deduplicated, input is not.
+    ([["a", "a", "b"]], 60, ["a", "b"]),
+    # degenerate single element
+    ([["solo"]], 60, ["solo"]),
 ]
 
 
 def _rrf_cases() -> list[dict[str, Any]]:
-    cases = []
-    for lists in _RRF_CASES:
-        candidate_lists = [
-            [
-                Candidate(eu_id=eu_id, score=1.0 / (rank + 1), signal=RetrievalSignal.vector)
-                for rank, eu_id in enumerate(one_list)
-            ]
-            for one_list in lists
-        ]
-        fused = rrf_fuse(candidate_lists, k=60)
-        cases.append({"lists": lists, "k": 60, "fused": [c.eu_id for c in fused]})
-    return cases
+    """Emit the DECLARED fused orders verbatim (see the derivation note above)."""
+    return [{"lists": lists, "k": k, "fused": fused} for lists, k, fused in _RRF_CASES]
 
 
 # --------------------------------------------------------------------------- #
@@ -397,6 +553,22 @@ def _language_cases() -> list[dict[str, Any]]:
 
 # --------------------------------------------------------------------------- #
 # cases/eu_ids.json — block layouts -> eu_id lists (both builders) + checksum
+#
+# The eu_id is the CITATION HANDLE: it is what a Result points at, what a port
+# resolves, and what a reader clicks. A port that derives it differently produces
+# citations that cannot be resolved, which is indistinguishable from a fabricated
+# citation to anyone downstream.
+#
+# Expectations are derived from the two documented rules, not from the builders:
+#
+#   block builder   (evidence/builder.py docstring): each block whose text is
+#                   non-empty after strip() becomes ONE unit, in document order,
+#                   with eu_id = f"{document_id}::{block.order}".
+#   chunked builder (evidence/chunked_builder.py): each such block becomes one
+#                   child PER CHUNK, with eu_id = f"{document_id}::{order}::{i}".
+#                   A block that fits inside max_tokens is exactly one chunk, so
+#                   it yields a single "::0" child — which is why every case
+#                   below except the oversized one uses a generous max_tokens.
 # --------------------------------------------------------------------------- #
 
 _EU_DOCS: list[dict[str, Any]] = [
@@ -411,6 +583,8 @@ _EU_DOCS: list[dict[str, Any]] = [
         ],
         "chunk_max_tokens": 450,
         "chunk_overlap": 60,
+        "block_builder_eu_ids": ["policy-1::0", "policy-1::1", "policy-1::3"],
+        "chunked_builder_eu_ids": ["policy-1::0::0", "policy-1::1::0", "policy-1::3::0"],
     },
     {
         "name": "chunked builder splits an oversized block into doc::order::i children",
@@ -430,38 +604,130 @@ _EU_DOCS: list[dict[str, Any]] = [
         ],
         "chunk_max_tokens": 8,
         "chunk_overlap": 2,
+        "block_builder_eu_ids": ["long-doc::0", "long-doc::1"],
+        # Three eight-word paragraphs at max_tokens=8 -> one chunk each.
+        "chunked_builder_eu_ids": [
+            "long-doc::0::0",
+            "long-doc::1::0",
+            "long-doc::1::1",
+            "long-doc::1::2",
+        ],
+    },
+    # "no structure -> empty, not failure" applied to the builders: a document of
+    # nothing but blank blocks is a valid document with zero units, not an error.
+    {
+        "name": "every block is blank -> zero units, not a failure",
+        "document_id": "blank-doc",
+        "blocks": [
+            {"order": 0, "kind": "paragraph", "text": "", "page": 1},
+            {"order": 1, "kind": "paragraph", "text": "   ", "page": 1},
+            {"order": 2, "kind": "paragraph", "text": "\n\t ", "page": 1},
+        ],
+        "chunk_max_tokens": 450,
+        "chunk_overlap": 60,
+        "block_builder_eu_ids": [],
+        "chunked_builder_eu_ids": [],
+    },
+    # The id comes from block.order, NOT from the block's index in the list. An
+    # extractor that emits sparse or out-of-sequence orders (a PDF page filter, a
+    # partial rebuild) must still produce the same handles.
+    {
+        "name": "eu_id follows block.order, not list position",
+        "document_id": "sparse",
+        "blocks": [
+            {"order": 5, "kind": "paragraph", "text": "fifth", "page": 1},
+            {"order": 2, "kind": "paragraph", "text": "second", "page": 1},
+            {"order": 9, "kind": "paragraph", "text": "ninth", "page": 1},
+        ],
+        "chunk_max_tokens": 450,
+        "chunk_overlap": 60,
+        "block_builder_eu_ids": ["sparse::5", "sparse::2", "sparse::9"],
+        "chunked_builder_eu_ids": ["sparse::5::0", "sparse::2::0", "sparse::9::0"],
+    },
+    {
+        "name": "single block",
+        "document_id": "solo",
+        "blocks": [{"order": 0, "kind": "paragraph", "text": "the only block", "page": 1}],
+        "chunk_max_tokens": 450,
+        "chunk_overlap": 60,
+        "block_builder_eu_ids": ["solo::0"],
+        "chunked_builder_eu_ids": ["solo::0::0"],
+    },
+    # The id scheme is kind-independent: a table, an image caption and an OCR
+    # block are cited exactly like a paragraph. A port that special-cases any
+    # BlockKind in the id produces handles no other port can resolve.
+    {
+        "name": "every block kind uses the same id scheme",
+        "document_id": "kinds",
+        "blocks": [
+            {"order": 0, "kind": "heading", "text": "Title", "page": 1},
+            {"order": 1, "kind": "paragraph", "text": "Prose.", "page": 1},
+            {"order": 2, "kind": "table", "text": "a | b", "page": 1},
+            {"order": 3, "kind": "code", "text": "print(1)", "page": 1},
+            {"order": 4, "kind": "image", "text": "A chart of revenue.", "page": 2},
+            {"order": 5, "kind": "slide", "text": "Agenda", "page": 2},
+            {"order": 6, "kind": "thread_turn", "text": "Reply from Ann.", "page": 2},
+            {"order": 7, "kind": "ocr_block", "text": "SCANNED TEXT", "page": 3},
+        ],
+        "chunk_max_tokens": 450,
+        "chunk_overlap": 60,
+        "block_builder_eu_ids": [f"kinds::{i}" for i in range(8)],
+        "chunked_builder_eu_ids": [f"kinds::{i}::0" for i in range(8)],
+    },
+    # The id is built from document_id and an integer, so it is script-neutral —
+    # a Japanese or Tamil document is cited by the same handle shape.
+    {
+        "name": "non-latin block text does not change the id shape",
+        "document_id": "multi",
+        "blocks": [
+            {
+                "order": 0,
+                "kind": "paragraph",
+                "text": "従業員は機密情報を開示してはならない。",
+                "page": 1,
+            },
+            {
+                "order": 1,
+                "kind": "paragraph",
+                "text": "ஊழியர் ரகசியத் தகவலை வெளியிடக் கூடாது.",
+                "page": 1,
+            },
+            {
+                "order": 2,
+                "kind": "paragraph",
+                "text": "الموظف لا يفشي المعلومات السرية.",
+                "page": 1,
+            },
+        ],
+        "chunk_max_tokens": 450,
+        "chunk_overlap": 60,
+        "block_builder_eu_ids": ["multi::0", "multi::1", "multi::2"],
+        "chunked_builder_eu_ids": ["multi::0::0", "multi::1::0", "multi::2::0"],
+    },
+    # KNOWN MISS, pinned so it cannot regress silently. Two blocks carrying the
+    # SAME order produce the SAME eu_id, and neither builder objects. Downstream
+    # that is a citation handle that resolves to two different passages: a store
+    # upsert keyed by eu_id keeps whichever landed last, so a correctly-formed
+    # citation can display text the answer was never verified against. The id
+    # scheme assumes order is unique per document and nothing enforces it.
+    {
+        "name": "KNOWN MISS: duplicate block.order yields duplicate (colliding) eu_ids",
+        "document_id": "dup",
+        "blocks": [
+            {"order": 0, "kind": "paragraph", "text": "first passage", "page": 1},
+            {"order": 0, "kind": "paragraph", "text": "second passage", "page": 1},
+        ],
+        "chunk_max_tokens": 450,
+        "chunk_overlap": 60,
+        "block_builder_eu_ids": ["dup::0", "dup::0"],
+        "chunked_builder_eu_ids": ["dup::0::0", "dup::0::0"],
     },
 ]
 
 
 def _eu_id_cases() -> dict[str, Any]:
-    cases = []
-    for spec in _EU_DOCS:
-        doc = ExtractedDoc(
-            document_id=spec["document_id"],
-            source_type=SourceType.plain,
-            blocks=tuple(
-                ExtractedBlock(
-                    order=b["order"], kind=BlockKind(b["kind"]), text=b["text"], page=b["page"]
-                )
-                for b in spec["blocks"]
-            ),
-        )
-        block_units = build_evidence_units(doc, partition=_PARTITION, language="en")
-        chunked_units = build_chunked_units(
-            doc,
-            partition=_PARTITION,
-            language="en",
-            max_tokens=spec["chunk_max_tokens"],
-            overlap=spec["chunk_overlap"],
-        )
-        cases.append(
-            {
-                **spec,
-                "block_builder_eu_ids": [u.eu_id for u in block_units],
-                "chunked_builder_eu_ids": [u.eu_id for u in chunked_units],
-            }
-        )
+    """Emit the declared id lists verbatim (see the derivation note above)."""
+    cases = list(_EU_DOCS)
     raw = "hello citenexus\n"
     return {
         "cases": cases,
@@ -492,75 +758,170 @@ _E2E_CORPUS: list[dict[str, str]] = [
         "document_id": "termination",
         "text": "The contract termination clause requires ninety days written notice.",
     },
+    # Added documents share NO content token with any pre-existing question, so
+    # they cannot change an already-pinned outcome — that independence is what
+    # makes the corpus safe to grow.
+    {
+        "document_id": "parking",
+        "text": "Tenants may park one vehicle in the assigned garage bay.",
+    },
+    # The only MULTI-SENTENCE passage: it is what makes the per-claim gate
+    # observable end to end. split_claims must yield two claims, both must be
+    # verified independently, and the answer must be their join.
+    {
+        "document_id": "quiet",
+        "text": "Quiet hours begin at ten. Residents must limit noise.",
+    },
+    # A non-Latin document. It contributes no ASCII content tokens at all, which
+    # is exactly the point of the vector that queries it.
+    {"document_id": "policy-ja", "text": "従業員は機密情報を開示してはならない。"},
 ]
 
-_E2E_QUESTIONS: list[str] = [
-    "Can the employee disclose confidential information?",
-    "How many days of annual leave do employees get?",
-    "What notice does the termination clause require?",
-    "What is the capital of France?",  # no content overlap -> abstain
-]
-
-_E2E_TOP_K = 5
+# top_k EXCEEDS the corpus size on purpose. With top_k below it, which document
+# answers depends on the FakeEmbedding hash's cosine order, which cannot be
+# derived by hand — the vector would then pin whatever the hash happens to do.
+# Above it, ranking cannot decide anything and every expectation below follows
+# from the relevance gate and the faithfulness gate alone.
+_E2E_TOP_K = 8
 
 
-def _cosine(a: list[float], b: list[float]) -> float:
-    return sum(x * y for x, y in zip(a, b, strict=True))
+# Each expectation below is REASONED FROM THE SPEC, not read back from the
+# pipeline. The flow that produces it (SPEC-v6 §0/§8, mirrored by
+# citenexus.smoke.SmokePipeline.ask) is:
+#
+#   1. rank the corpus by embedding similarity and keep top_k -- INERT here,
+#      because top_k exceeds the corpus size (see above);
+#   2. RELEVANCE GATE: keep only passages sharing a content token with the
+#      question. Content tokens come from the FROZEN ASCII tokenizer, so a
+#      non-Latin question contributes NO tokens and grounds nothing;
+#   3. no grounded passage -> refuse with the pinned refusal sentence and emit
+#      NO document, passage or eu_id;
+#   4. otherwise generate from the top grounded passage. The generator here is
+#      extractive, so it returns that passage verbatim;
+#   5. FAITHFULNESS GATE, per atomic claim (ADR-0009): split the generated text
+#      with split_claims and verify each claim against the passage. A verbatim
+#      claim is trivially supported, so every claim survives;
+#   6. the answer is the surviving claims joined by a single space.
+#
+# Every question below is chosen so step 2 leaves EXACTLY ONE document (or
+# none), which is what removes ranking from the derivation entirely.
 
-
-def _hermetic_ask(question: str) -> dict[str, Any]:
-    """The reference cite-or-abstain outcome for ``question`` over the corpus.
-
-    Reuses the exact pinned primitives: FakeEmbedding (§4 hash), content-token
-    grounding (relevance gate), the extractive FakeLLM, and the per-claim
-    faithfulness gate (``split_claims`` + ``is_supported_v2``). Vectors are
-    L2-normalized, so cosine == dot product.
-    """
-    embedder = FakeEmbedding()
-    llm = FakeLLM()
-    rows = [
+_E2E_CASES: list[tuple[str, str, dict[str, Any]]] = [
+    (
+        "answered/nda",
+        "Can the employee disclose confidential information?",
         {
-            "eu_id": f"{doc['document_id']}::0",
-            "document_id": doc["document_id"],
-            "text": doc["text"],
-            "vector": embedder.embed(doc["text"]),
-        }
-        for doc in _E2E_CORPUS
-    ]
-    qvec = embedder.embed(question)
-    # Rank by descending cosine, stable tie-break by insertion order; take top_k.
-    ranked = sorted(rows, key=lambda r: -_cosine(qvec, r["vector"]))[:_E2E_TOP_K]
-    q_terms = content_tokens(question)
-    grounded = [r for r in ranked if q_terms & content_tokens(str(r["text"]))]
-    if not grounded:
-        return {
-            "decision": Decision.refused.value,
+            "decision": "answered",
+            "answer": "The employee shall not disclose confidential information.",
+            "document": "nda",
+            "passage": "The employee shall not disclose confidential information.",
+            "eu_id": "nda::0",
+        },
+    ),
+    (
+        "answered/leave",
+        "How many days of annual leave do employees get?",
+        {
+            "decision": "answered",
+            "answer": "Employees are entitled to thirty days of annual leave.",
+            "document": "leave",
+            "passage": "Employees are entitled to thirty days of annual leave.",
+            "eu_id": "leave::0",
+        },
+    ),
+    (
+        "answered/termination",
+        "What notice does the termination clause require?",
+        {
+            "decision": "answered",
+            "answer": "The contract termination clause requires ninety days written notice.",
+            "document": "termination",
+            "passage": "The contract termination clause requires ninety days written notice.",
+            "eu_id": "termination::0",
+        },
+    ),
+    # Content tokens {tenants, park, vehicle} appear only in `parking`.
+    (
+        "answered/parking",
+        "Where may tenants park a vehicle?",
+        {
+            "decision": "answered",
+            "answer": "Tenants may park one vehicle in the assigned garage bay.",
+            "document": "parking",
+            "passage": "Tenants may park one vehicle in the assigned garage bay.",
+            "eu_id": "parking::0",
+        },
+    ),
+    # The per-claim vector. {quiet, hours, begin} ground only `quiet`, whose
+    # passage is TWO sentences; split_claims yields two claims, both verbatim and
+    # therefore both supported, and step 6 rejoins them with a single space --
+    # which reproduces the passage exactly only because the passage itself uses a
+    # single space. That is the invariant being pinned: the answer is the
+    # RECOMPOSITION of surviving claims, not a copy of the passage.
+    (
+        "answered/two-claims-both-survive",
+        "When do quiet hours begin?",
+        {
+            "decision": "answered",
+            "answer": "Quiet hours begin at ten. Residents must limit noise.",
+            "document": "quiet",
+            "passage": "Quiet hours begin at ten. Residents must limit noise.",
+            "eu_id": "quiet::0",
+        },
+    ),
+    # Refusal 1: the question is well-formed English about a subject the corpus
+    # does not cover. {capital, france} ground nothing.
+    (
+        "refused/no-evidence",
+        "What is the capital of France?",
+        {
+            "decision": "refused",
             "answer": _REFUSAL,
             "document": None,
             "passage": None,
             "eu_id": None,
-        }
-    top = grounded[0]
-    passage = str(top["text"])
-    generated = llm.answer(question, passage)
-    # Per-atomic-claim gate, mirroring SmokePipeline.ask (ADR-0009).
-    supported = [c for c in split_claims(generated) if is_supported_v2(c, passage)]
-    if not supported:
-        return {
-            "decision": Decision.refused.value,
+        },
+    ),
+    # Refusal 2: a DIFFERENT out-of-corpus subject, so the abstention is a rule
+    # rather than one memorised string. {planet, closest, sun} ground nothing.
+    (
+        "refused/no-evidence-second-subject",
+        "Which planet is closest to the sun?",
+        {
+            "decision": "refused",
             "answer": _REFUSAL,
             "document": None,
             "passage": None,
             "eu_id": None,
-        }
-    answer = " ".join(supported)
-    return {
-        "decision": Decision.answered.value,
-        "answer": answer,
-        "document": str(top["document_id"]),
-        "passage": passage,
-        "eu_id": str(top["eu_id"]),
-    }
+        },
+    ),
+    # Refusal 3, in a NON-LATIN script: abstain-when-no-evidence must hold in
+    # Japanese exactly as it does in English, and a port must reach that verdict
+    # without any ASCII to lean on.
+    #
+    # The question is deliberately disjoint from every corpus document under BOTH
+    # tokenizers -- ASCII v1 (which yields the empty set for Japanese) and Unicode
+    # v2 (which yields 12 tokens, none shared with any document). That makes the
+    # expectation derivable no matter which tokenizer a port's relevance gate
+    # uses, which matters here: see the divergence recorded in the handover notes
+    # -- Python's SmokePipeline grounds on the FROZEN v1 content_tokens
+    # (smoke/pipeline.py:92) while Go's Ask grounds on the Unicode tokenizer, so
+    # a Japanese question that DOES overlap a Japanese document is answered by Go
+    # and refused by Python. That vector cannot be written until the two agree,
+    # and choosing which one is right is an implementation decision, not a
+    # fixture one.
+    (
+        "refused/no-evidence-non-latin",
+        "太陽に最も近い惑星はどれですか。",
+        {
+            "decision": "refused",
+            "answer": _REFUSAL,
+            "document": None,
+            "passage": None,
+            "eu_id": None,
+        },
+    ),
+]
 
 
 def _e2e_hermetic_cases() -> dict[str, Any]:
@@ -568,7 +929,10 @@ def _e2e_hermetic_cases() -> dict[str, Any]:
         "corpus": _E2E_CORPUS,
         "top_k": _E2E_TOP_K,
         "refusal_answer": _REFUSAL,
-        "cases": [{"question": q, "expected": _hermetic_ask(q)} for q in _E2E_QUESTIONS],
+        "cases": [
+            {"label": label, "question": question, "expected": expected}
+            for label, question, expected in _E2E_CASES
+        ],
     }
 
 
@@ -955,28 +1319,199 @@ _STRUCTURE_DOCS: list[dict[str, Any]] = [
         "structure_type": "none",
         "blocks": [{"order": 0, "kind": "paragraph", "text": "just prose", "level": None}],
     },
+    # Three levels deep, then two levels back up in one step. The stack rule is
+    # "pop while the top's level >= mine", so Section 1.2 pops BOTH the level-3
+    # and the level-2 ancestor and re-parents onto Chapter 1.
+    {
+        "name": "three-level nesting with a two-level jump back up",
+        "document_id": "doc-deep",
+        "structure_type": "heading_tree",
+        "blocks": [
+            {"order": 0, "kind": "heading", "text": "Chapter 1", "level": 1},
+            {"order": 1, "kind": "heading", "text": "Section 1.1", "level": 2},
+            {"order": 2, "kind": "heading", "text": "Clause 1.1.1", "level": 3},
+            {"order": 3, "kind": "heading", "text": "Section 1.2", "level": 2},
+            {"order": 4, "kind": "heading", "text": "Chapter 2", "level": 1},
+        ],
+    },
+    # A SKIPPED level (1 then 3) is not an error: the rule is strictly "greater
+    # than", so the level-3 heading nests under the level-1 one even though no
+    # level-2 heading exists. Real extractors emit exactly this.
+    {
+        "name": "a skipped heading level still nests",
+        "document_id": "doc-skip",
+        "structure_type": "heading_tree",
+        "blocks": [
+            {"order": 0, "kind": "heading", "text": "Part A", "level": 1},
+            {"order": 1, "kind": "heading", "text": "Deep note", "level": 3},
+            {"order": 2, "kind": "heading", "text": "Sub A", "level": 2},
+        ],
+    },
+    # A document whose shallowest heading is level 3 still has a root: the stack
+    # is empty at the first heading, so parent_id is null. There is no synthetic
+    # level-1 ancestor.
+    {
+        "name": "a document that starts at level 3 roots at null",
+        "document_id": "doc-root3",
+        "structure_type": "heading_tree",
+        "blocks": [
+            {"order": 0, "kind": "heading", "text": "Deep first", "level": 3},
+            {"order": 1, "kind": "heading", "text": "Deeper", "level": 4},
+        ],
+    },
+    # level=None defaults to 1, so two such headings are SIBLINGS, not nested.
+    {
+        "name": "headings with no level default to level 1 and are siblings",
+        "document_id": "doc-nolevel",
+        "structure_type": "heading_tree",
+        "blocks": [
+            {"order": 0, "kind": "heading", "text": "First", "level": None},
+            {"order": 1, "kind": "heading", "text": "Second", "level": None},
+        ],
+    },
+    # Explicitly documented: "a heading document with no headings" degrades to
+    # zero nodes. Best-effort means empty, never an error.
+    {
+        "name": "heading_tree with no heading blocks -> zero nodes",
+        "document_id": "doc-noheads",
+        "structure_type": "heading_tree",
+        "blocks": [
+            {"order": 0, "kind": "paragraph", "text": "prose only", "level": None},
+            {"order": 1, "kind": "table", "text": "a | b", "level": None},
+        ],
+    },
+    # A blank heading is skipped ENTIRELY — it is not pushed onto the stack, so it
+    # cannot become anyone's parent. "Section" therefore parents onto "Chapter",
+    # not onto the blank level-2 heading between them.
+    {
+        "name": "a whitespace-only heading is skipped and never becomes a parent",
+        "document_id": "doc-blankhead",
+        "structure_type": "heading_tree",
+        "blocks": [
+            {"order": 0, "kind": "heading", "text": "Chapter", "level": 1},
+            {"order": 1, "kind": "heading", "text": "   ", "level": 2},
+            {"order": 2, "kind": "heading", "text": "Section", "level": 2},
+        ],
+    },
+    # slide_sequence is FLAT (every parent_id null) and considers only slide
+    # blocks; a blank slide is skipped, and its order number is skipped with it.
+    {
+        "name": "slide_sequence ignores non-slide and blank blocks and stays flat",
+        "document_id": "doc-s2",
+        "structure_type": "slide_sequence",
+        "blocks": [
+            {"order": 0, "kind": "slide", "text": "Title", "level": None},
+            {"order": 1, "kind": "paragraph", "text": "speaker notes", "level": None},
+            {"order": 2, "kind": "slide", "text": "  ", "level": None},
+            {"order": 3, "kind": "slide", "text": "Summary", "level": None},
+        ],
+    },
+    # Dispatch is on structure_type ALONE. Headings that are present but not
+    # claimed produce nothing — a port that sniffs for heading blocks instead of
+    # reading structure_type invents a tree here.
+    {
+        "name": "structure_type none ignores headings that are present",
+        "document_id": "doc-n2",
+        "structure_type": "none",
+        "blocks": [
+            {"order": 0, "kind": "heading", "text": "Looks like a heading", "level": 1},
+            {"order": 1, "kind": "heading", "text": "And another", "level": 2},
+        ],
+    },
 ]
+
+# Expected nodes, derived by hand from the two rules in build_structure's
+# docstring — heading_tree nests by level with a "pop while top.level >= mine"
+# ancestor stack, slide_sequence is flat, everything else is empty — and from the
+# uniform node shape (node_id == eu_ref == f"{document_id}::{order}"). Keyed by
+# case name; a case with no entry keeps the shape it had before this suite grew.
+_STRUCTURE_EXPECTED: dict[str, list[dict[str, Any]]] = {
+    "heading tree": [
+        ("doc-h::0", None, "Chapter 1"),
+        ("doc-h::2", "doc-h::0", "Section 1.1"),
+        ("doc-h::3", "doc-h::0", "Section 1.2"),
+        ("doc-h::4", None, "Chapter 2"),
+    ],
+    "three-level nesting with a two-level jump back up": [
+        ("doc-deep::0", None, "Chapter 1"),
+        ("doc-deep::1", "doc-deep::0", "Section 1.1"),
+        ("doc-deep::2", "doc-deep::1", "Clause 1.1.1"),
+        ("doc-deep::3", "doc-deep::0", "Section 1.2"),
+        ("doc-deep::4", None, "Chapter 2"),
+    ],
+    "a skipped heading level still nests": [
+        ("doc-skip::0", None, "Part A"),
+        ("doc-skip::1", "doc-skip::0", "Deep note"),
+        ("doc-skip::2", "doc-skip::0", "Sub A"),
+    ],
+    "a document that starts at level 3 roots at null": [
+        ("doc-root3::0", None, "Deep first"),
+        ("doc-root3::1", "doc-root3::0", "Deeper"),
+    ],
+    "headings with no level default to level 1 and are siblings": [
+        ("doc-nolevel::0", None, "First"),
+        ("doc-nolevel::1", None, "Second"),
+    ],
+    "heading_tree with no heading blocks -> zero nodes": [],
+    "a whitespace-only heading is skipped and never becomes a parent": [
+        ("doc-blankhead::0", None, "Chapter"),
+        ("doc-blankhead::2", "doc-blankhead::0", "Section"),
+    ],
+    "structure_type none ignores headings that are present": [],
+}  # type: ignore[assignment]
+
+# slide_sequence cases, same derivation, kind "slide" and parent always null.
+_STRUCTURE_EXPECTED_SLIDES: dict[str, list[tuple[str, str]]] = {
+    "slide sequence": [("doc-s::0", "Title slide"), ("doc-s::1", "Agenda")],
+    "slide_sequence ignores non-slide and blank blocks and stays flat": [
+        ("doc-s2::0", "Title"),
+        ("doc-s2::3", "Summary"),
+    ],
+}
+
+_STRUCTURE_EXPECTED_EMPTY: set[str] = {"no structure"}
 
 
 def _structure_cases() -> dict[str, Any]:
+    """Emit the hand-derived Structure Indexes (see the derivation note above)."""
     cases = []
     for spec in _STRUCTURE_DOCS:
-        doc = ExtractedDoc(
-            document_id=spec["document_id"],
-            source_type=SourceType.plain,
-            structure_type=StructureType(spec["structure_type"]),
-            blocks=tuple(
-                ExtractedBlock(
-                    order=b["order"],
-                    kind=BlockKind(b["kind"]),
-                    text=b["text"],
-                    level=b["level"],
-                )
-                for b in spec["blocks"]
-            ),
+        name = spec["name"]
+        nodes: list[dict[str, Any]] = []
+        if name in _STRUCTURE_EXPECTED:
+            nodes = [
+                {
+                    "node_id": node_id,
+                    "parent_id": parent_id,
+                    "label": label,
+                    "kind": "heading",
+                    "eu_ref": node_id,
+                }
+                for node_id, parent_id, label in _STRUCTURE_EXPECTED[name]  # type: ignore[misc]
+            ]
+        elif name in _STRUCTURE_EXPECTED_SLIDES:
+            nodes = [
+                {
+                    "node_id": node_id,
+                    "parent_id": None,
+                    "label": label,
+                    "kind": "slide",
+                    "eu_ref": node_id,
+                }
+                for node_id, label in _STRUCTURE_EXPECTED_SLIDES[name]
+            ]
+        elif name not in _STRUCTURE_EXPECTED_EMPTY:
+            raise KeyError(f"structure case {name!r} has no declared expectation")
+        cases.append(
+            {
+                **spec,
+                "expected": {
+                    "document_id": spec["document_id"],
+                    "structure_type": spec["structure_type"],
+                    "nodes": nodes,
+                },
+            }
         )
-        index = build_structure(doc)
-        cases.append({**spec, "expected": index.model_dump(mode="json")})
     return {"cases": cases}
 
 
@@ -1332,26 +1867,443 @@ def _faithful_v2_cases() -> dict[str, Any]:
     }
 
 
-_SEGMENTATION_INPUTS = [
-    "Art. 5 applies to all tenants.",
-    "See Dr. Smith for details.",
-    "J. Smith signed the agreement.",
-    "The dose is 500.00 milligrams daily.",
-    "The contractor maintains insurance. The term is five years.",
-    "Is it approved? It is not.",
-    "Really?! Yes.",
-    "The window opens at 02:00 UTC",
-    "\u5f93\u696d\u54e1\u306f\u958b\u793a\u3057\u3066\u306f\u306a\u3089\u306a\u3044\u3002\u671f\u9593\u306f\u4e94\u5e74\u3067\u3042\u308b\u3002",
-    "The parties are (a) the tenant; (b) the landlord.",
-    "france is in europe\nparis is the capital",
-    "   ",
+# --------------------------------------------------------------------------- #
+# cases/segmentation.json — ADR-0009 guarded claim segmentation.
+#
+# WHY THIS SUITE IS LARGE. Claim splitting is what makes drop-not-fail a
+# PER-CLAIM guarantee. Fuse a true sentence and a fabricated one into a single
+# claim and the gate then passes or fails BOTH together — the guarantee silently
+# degrades to all-or-nothing with no visible symptom, no metric moving, and no
+# test failing. Every vector below therefore pins one boundary decision.
+#
+# HOW THE EXPECTATIONS WERE DERIVED. Not by running ``split_claims``. Each
+# ``claims`` value is worked out by hand from the five rules the module states
+# (``answer/segment.py``), applied in this order to each break candidate:
+#
+#   R0. a "\n" ALWAYS ends a claim, unconditionally, before any other rule;
+#   R1. a run of terminators is ONE candidate boundary, not several;
+#   R2. no break when the terminator sits between two digits ("500.00");
+#   R3. no break when the token before the run (the run's terminators stripped,
+#       lowercased) is a known abbreviation, or a single letter (initials);
+#   R4. for ".!?" ONLY, no break unless whitespace or end-of-text follows —
+#       the CJK/Arabic/Indic terminators break unconditionally, because those
+#       scripts do not put a space after the mark;
+#   then each claim is ``.strip()``ed and empties are dropped.
+#
+# ``known_miss`` marks a vector where the rules produce a LINGUISTICALLY WRONG
+# split. The vector still pins what the rules say, exactly like the ``non_latin``
+# bucket in cases/conflict.json: the point is that a future fix must be a
+# conscious fixture change, not that today's behaviour is right. Each one names
+# the defect. None of them is fixed here.
+#
+# Fields: (label, text, expected claims, known_miss or None).
+# --------------------------------------------------------------------------- #
+
+_SEGMENTATION_CASES: list[tuple[str, str, list[str], str | None]] = [
+    # ── R3: abbreviations and initials ──────────────────────────────────────
+    ("abbrev/art", "Art. 5 applies to all tenants.", ["Art. 5 applies to all tenants."], None),
+    ("abbrev/dr", "See Dr. Smith for details.", ["See Dr. Smith for details."], None),
+    ("abbrev/initial", "J. Smith signed the agreement.", ["J. Smith signed the agreement."], None),
+    ("abbrev/two-initials", "A. B. Smith wrote it.", ["A. B. Smith wrote it."], None),
+    ("abbrev/prof-dr", "Prof. Lee and Dr. Chan agree.", ["Prof. Lee and Dr. Chan agree."], None),
+    ("abbrev/mr-mrs", "Mr. Smith met Mrs. Jones.", ["Mr. Smith met Mrs. Jones."], None),
+    ("abbrev/sec-para", "See sec. 12 and para. 4.", ["See sec. 12 and para. 4."], None),
+    ("abbrev/cf", "Cf. the annex.", ["Cf. the annex."], None),
+    ("abbrev/etc", "etc. remains binding.", ["etc. remains binding."], None),
+    ("abbrev/fig", "Fig. 2 shows the trend.", ["Fig. 2 shows the trend."], None),
+    ("abbrev/vs", "The vs. comparison applies.", ["The vs. comparison applies."], None),
+    # R3 lowercases the preceding token, so the table is case-insensitive.
+    ("abbrev/uppercase", "DR. Smith arrived.", ["DR. Smith arrived."], None),
+    (
+        "abbrev/no-swallows-a-sentence",
+        "The answer is no. It is denied.",
+        ["The answer is no. It is denied."],
+        '"no" is in ABBREVIATIONS as the number abbreviation ("No. 5"), but it is '
+        "also an extremely common English sentence-final word. R3 therefore "
+        "refuses the break and fuses a refusal with whatever follows it — the "
+        "worst possible pairing for a polarity-sensitive gate.",
+    ),
+    (
+        "abbrev/fig-at-a-real-sentence-end",
+        "Refer to the fig. The next page follows.",
+        ["Refer to the fig. The next page follows."],
+        "The dual of the Dr./p.m. tailoring UAX #29 leaves unresolved: an "
+        "abbreviation that also ends a sentence cannot be told apart locally, "
+        "so R3 always chooses no-break and fuses two sentences.",
+    ),
+    (
+        "abbrev/inc-not-in-table",
+        "Acme Inc. filed a claim.",
+        ["Acme Inc.", "filed a claim."],
+        '"inc" is not in ABBREVIATIONS, so a company suffix breaks mid-sentence '
+        "and produces a two-word fragment as an independent claim.",
+    ),
+    (
+        "abbrev/eg-dotted-form",
+        "The tenant may sublet, e.g. to a relative.",
+        ["The tenant may sublet, e.g.", "to a relative."],
+        'ABBREVIATIONS holds "eg", but R3 reads the preceding token as "e.g" '
+        "(interior dots survive the rstrip), so the table entry never matches "
+        "the form English actually writes. Same for i.e.",
+    ),
+    (
+        "abbrev/ie-dotted-form",
+        "This applies, i.e. to tenants only.",
+        ["This applies, i.e.", "to tenants only."],
+        'As above: the table has "ie", the scanner sees "i.e".',
+    ),
+    (
+        "abbrev/us-army",
+        "The U.S. Army moved.",
+        ["The U.S.", "Army moved."],
+        "Named in the module docstring as one of the two residual failures the "
+        "ADR-0009 spike could not fix; UAX #29 calls it a required tailoring.",
+    ),
+    # ── R2: digits ──────────────────────────────────────────────────────────
+    (
+        "digit/decimal",
+        "The dose is 500.00 milligrams daily.",
+        ["The dose is 500.00 milligrams daily."],
+        None,
+    ),
+    ("digit/pi", "Pi is 3.14 exactly.", ["Pi is 3.14 exactly."], None),
+    ("digit/semver", "Version v1.2.3 shipped.", ["Version v1.2.3 shipped."], None),
+    ("digit/section-number", "Section 1.1 applies.", ["Section 1.1 applies."], None),
+    ("digit/thousands", "The total is 1,000.50 dollars.", ["The total is 1,000.50 dollars."], None),
+    ("digit/long-decimal", "Ratio 3.14159265 holds.", ["Ratio 3.14159265 holds."], None),
+    ("digit/ipv4", "Ping 10.0.0.1 now.", ["Ping 10.0.0.1 now."], None),
+    # R2 needs a digit on BOTH sides; "10." before a space is a real full stop.
+    ("digit/trailing-number", "It costs 10. It is cheap.", ["It costs 10.", "It is cheap."], None),
+    # R2 declines (the "%" is not a digit), then R4 declines (no space), so the
+    # break lands after the "%." instead — the right answer by a different route.
+    (
+        "digit/percent-then-stop",
+        "The rate is 4.5%. The term is fixed.",
+        ["The rate is 4.5%.", "The term is fixed."],
+        None,
+    ),
+    (
+        "digit/ordered-list-marker",
+        "1. Give notice\n2. Pay rent",
+        ["1.", "Give notice", "2.", "Pay rent"],
+        "An ordered-list marker is a digit followed by a full stop and a space, "
+        "which R2 does not cover and R4 accepts, so the marker becomes its own "
+        'claim. The gate then verifies the string "1." against a passage.',
+    ),
+    # ── R1: terminator runs ─────────────────────────────────────────────────
+    ("run/question", "Is it approved? It is not.", ["Is it approved?", "It is not."], None),
+    ("run/interrobang", "Really?! Yes.", ["Really?!", "Yes."], None),
+    ("run/bang-bang-bang", "Stop!!! Now.", ["Stop!!!", "Now."], None),
+    ("run/ellipsis", "He paused... Then he left.", ["He paused...", "Then he left."], None),
+    ("run/mixed", "Wait?!? Really.", ["Wait?!?", "Really."], None),
+    (
+        "run/bare-punctuation",
+        "...",
+        ["..."],
+        "A terminator run with no words is still emitted as a claim. It carries "
+        "no proposition, so the gate spends a verdict on punctuation.",
+    ),
+    # U+203C / U+2047 / U+2048 / U+2049 are in TERMINATORS but NOT in the
+    # needs-trailing-space set, so R4 never applies to them.
+    ("run/double-exclamation", "Interrobang‼ Next.", ["Interrobang‼", "Next."], None),
+    ("run/double-question", "Really⁇ Yes.", ["Really⁇", "Yes."], None),
+    ("run/question-exclamation", "Hmm⁈ Maybe.", ["Hmm⁈", "Maybe."], None),
+    ("run/exclamation-question", "Wow⁉ Indeed.", ["Wow⁉", "Indeed."], None),
+    # ── R4: ".!?" need whitespace or end-of-text after them ─────────────────
+    (
+        "r4/plain-pair",
+        "The contractor maintains insurance. The term is five years.",
+        ["The contractor maintains insurance.", "The term is five years."],
+        None,
+    ),
+    ("r4/domain-name", "Visit example.com for details.", ["Visit example.com for details."], None),
+    ("r4/end-of-text", "Done.", ["Done."], None),
+    ("r4/no-terminator", "The window opens at 02:00 UTC", ["The window opens at 02:00 UTC"], None),
+    ("r4/tab-after", "Ends with a tab.\tNext.", ["Ends with a tab.", "Next."], None),
+    ("r4/cr-after", "Line one.\rLine two.", ["Line one.", "Line two."], None),
+    ("r4/formfeed-after", "Yes.\fNo.", ["Yes.", "No."], None),
+    # NBSP and the ideographic space are in the module's spelled-out whitespace
+    # set precisely because RE2's \s is ASCII-only. Both must break AND be
+    # stripped from the next claim.
+    ("r4/nbsp-after", "Yes. No.", ["Yes.", "No."], None),
+    ("r4/ideographic-space-after", "Yes.　No.", ["Yes.", "No."], None),
+    (
+        "r4/quote-spans-the-boundary",
+        'He said "yes." Then he left.',
+        ['He said "yes." Then he left.'],
+        "A closing quote is not whitespace, so R4 refuses the break and two "
+        "sentences fuse. A quoted assertion and the narrator's sentence about it "
+        "are then gated as one claim.",
+    ),
+    (
+        "r4/parenthesis-spans-the-boundary",
+        "(See Art. 5.) The rest follows.",
+        ["(See Art. 5.) The rest follows."],
+        "Same defect through a closing paren: a parenthetical citation swallows "
+        "the sentence after it.",
+    ),
+    (
+        "r4/missing-space-after-stop",
+        "Yes.No space here.",
+        ["Yes.No space here."],
+        "R4's cost: a typo (or a PDF extraction that ate the space) fuses two "
+        "sentences, and this is exactly what bad extraction produces.",
+    ),
+    # ── R0: the hard-newline rule ───────────────────────────────────────────
+    # Pooled evidence and list items are newline-joined; dropping R0 silently
+    # merged them into one unverifiable claim, which is why it runs FIRST.
+    (
+        "nl/two-lines",
+        "france is in europe\nparis is the capital",
+        ["france is in europe", "paris is the capital"],
+        None,
+    ),
+    ("nl/leading", "\nleading newline", ["leading newline"], None),
+    ("nl/trailing", "trailing newline\n", ["trailing newline"], None),
+    ("nl/blank-line", "a\n\nb", ["a", "b"], None),
+    ("nl/after-terminator", "a.\nb", ["a.", "b"], None),
+    ("nl/crlf", "a\r\nb", ["a", "b"], None),
+    ("nl/bullet-list", "- one\n- two\n- three", ["- one", "- two", "- three"], None),
+    ("nl/only-newlines", "\n\n\n", [], None),
+    ("nl/whitespace-only-lines", "  \n  \n", [], None),
+    ("nl/interior-tab-survives", "tab\there\nnext", ["tab\there", "next"], None),
+    (
+        "nl/terminator-and-newline",
+        "one sentence. two on same line\nthree on next",
+        ["one sentence.", "two on same line", "three on next"],
+        None,
+    ),
+    ("nl/no-terminator-then-newline", "no terminator\n", ["no terminator"], None),
+    # ── punctuation that is deliberately NOT a terminator ───────────────────
+    (
+        "nonterm/semicolon-list",
+        "The parties are (a) the tenant; (b) the landlord.",
+        ["The parties are (a) the tenant; (b) the landlord."],
+        None,
+    ),
+    (
+        "nonterm/colon",
+        "Note the following: the term is five years.",
+        ["Note the following: the term is five years."],
+        None,
+    ),
+    ("nonterm/semicolon", "Rent is due; late fees apply.", ["Rent is due; late fees apply."], None),
+    (
+        "nonterm/em-dash",
+        "Terms — including rent — apply.",
+        ["Terms — including rent — apply."],
+        None,
+    ),
+    # U+060C is a COMMA, not a terminator; treating it as one would shatter
+    # Arabic clauses into fragments.
+    (
+        "nonterm/arabic-comma",
+        "هذا صحيح، وهذا أيضا صحيح.",
+        ["هذا صحيح، وهذا أيضا صحيح."],
+        None,
+    ),
+    # ── non-Latin terminators, per claimed script (ADR-0011) ────────────────
+    # These are the vectors that matter most for the "14 supported scripts"
+    # claim: a segmenter that only knows ASCII ".!?" fuses an entire Japanese or
+    # Hindi paragraph into ONE claim, and the per-claim gate becomes per-answer.
+    (
+        "script/japanese",
+        "従業員は開示してはならない。期間は五年である。",
+        [
+            "従業員は開示してはならない。",
+            "期間は五年である。",
+        ],
+        None,
+    ),
+    (
+        "script/japanese-question",
+        "これは本当ですか？はい。",
+        ["これは本当ですか？", "はい。"],
+        None,
+    ),
+    (
+        "script/chinese",
+        "员工不得披露机密信息。合同期限为五年。",
+        [
+            "员工不得披露机密信息。",
+            "合同期限为五年。",
+        ],
+        None,
+    ),
+    (
+        "script/chinese-exclamation",
+        "太好了！我们同意。",
+        ["太好了！", "我们同意。"],
+        None,
+    ),
+    (
+        "script/mixed-cjk-latin",
+        "従業員は開示してはならない。The term is five years.",
+        [
+            "従業員は開示してはならない。",
+            "The term is five years.",
+        ],
+        None,
+    ),
+    (
+        "script/arabic-question",
+        "هل هذا صحيح؟ نعم.",
+        ["هل هذا صحيح؟", "نعم."],
+        None,
+    ),
+    (
+        "script/arabic-full-stop",
+        "لا يجوز للموظف إفشاء المعلومات السرية. المدة خمس سنوات.",
+        [
+            "لا يجوز للموظف إفشاء المعلومات السرية.",
+            "المدة خمس سنوات.",
+        ],
+        None,
+    ),
+    (
+        "script/urdu-full-stop",
+        "یہ درست ہے۔ وہ نہیں ہے۔",
+        [
+            "یہ درست ہے۔",
+            "وہ نہیں ہے۔",
+        ],
+        None,
+    ),
+    (
+        "script/devanagari-danda",
+        "कर्मचारी गोपनीय जानकारी प्रकट नहीं करेगा। अवधि पाँच वर्ष है।",
+        [
+            "कर्मचारी गोपनीय जानकारी प्रकट नहीं करेगा।",
+            "अवधि पाँच वर्ष है।",
+        ],
+        None,
+    ),
+    (
+        "script/devanagari-double-danda",
+        "श्लोक समाप्त॥ अगला श्लोक॥",
+        [
+            "श्लोक समाप्त॥",
+            "अगला श्लोक॥",
+        ],
+        None,
+    ),
+    (
+        "script/bengali-danda",
+        "কর্মচারী গোপনীয় তথ্য প্রকাশ করবেন না। মেয়াদ পাঁচ বছর।",
+        [
+            "কর্মচারী গোপনীয় তথ্য প্রকাশ করবেন না।",
+            "মেয়াদ পাঁচ বছর।",
+        ],
+        None,
+    ),
+    (
+        "script/hebrew",
+        "העובד לא יגלה מידע סודי. התקופה היא חמש שנים.",
+        [
+            "העובד לא יגלה מידע סודי.",
+            "התקופה היא חמש שנים.",
+        ],
+        None,
+    ),
+    (
+        "script/hangul",
+        "직원은 기밀 정보를 공개해서는 안 된다. 기간은 5년이다.",
+        [
+            "직원은 기밀 정보를 공개해서는 안 된다.",
+            "기간은 5년이다.",
+        ],
+        None,
+    ),
+    (
+        "script/cyrillic",
+        "Работник не должен раскрывать информацию. Срок пять лет.",
+        [
+            "Работник не должен раскрывать информацию.",
+            "Срок пять лет.",
+        ],
+        None,
+    ),
+    (
+        "script/tamil",
+        "ஊழியர் ரகசியத் தகவலை வெளியிடக் கூடாது. காலம் ஐந்து ஆண்டுகள்.",
+        [
+            "ஊழியர் ரகசியத் தகவலை வெளியிடக் கூடாது.",
+            "காலம் ஐந்து ஆண்டுகள்.",
+        ],
+        None,
+    ),
+    (
+        "script/telugu",
+        "ఉద్యోగి రహస్య సమాచారాన్ని వెల్లడించకూడదు. కాలం ఐదు సంవత్సరాలు.",
+        [
+            "ఉద్యోగి రహస్య సమాచారాన్ని వెల్లడించకూడదు.",
+            "కాలం ఐదు సంవత్సరాలు.",
+        ],
+        None,
+    ),
+    (
+        "script/greek-full-stop",
+        "Ο εργαζόμενος δεν πρέπει να αποκαλύπτει πληροφορίες. Η διάρκεια είναι πέντε έτη.",
+        [
+            "Ο εργαζόμενος δεν πρέπει να αποκαλύπτει πληροφορίες.",
+            "Η διάρκεια είναι πέντε έτη.",
+        ],
+        None,
+    ),
+    (
+        "script/greek-question-mark",
+        "Είναι εγκεκριμένο; Δεν είναι.",
+        ["Είναι εγκεκριμένο; Δεν είναι."],
+        "Greek is a CLAIMED script, but the Greek question mark (U+037E, and its "
+        "canonical ASCII ';' spelling) is not in TERMINATORS, so a Greek question "
+        "and the answer to it are gated as one claim.",
+    ),
+    (
+        "script/thai-space-separated",
+        "พนักงานต้องไม่เปิดเผยข้อมูล พนักงานต้องรักษาความลับ",
+        ["พนักงานต้องไม่เปิดเผยข้อมูล พนักงานต้องรักษาความลับ"],
+        "Thai is a CLAIMED script and marks sentence ends with a space, not a "
+        "terminator, so a whole Thai paragraph is one claim. Named in the module "
+        "docstring as the second residual failure; UAX #29 defers it to "
+        "dictionary breaking.",
+    ),
+    (
+        "script/armenian-full-stop",
+        "Սա ճիշտ է։ Դա ճիշտ չէ։",
+        ["Սա ճիշտ է։ Դա ճիշտ չէ։"],
+        "The Armenian full stop (U+0589) is not in TERMINATORS. Armenian is NOT "
+        "one of the 14 claimed scripts, so this is scoped-out rather than broken "
+        "— pinned so that claiming Armenian later cannot skip the table.",
+    ),
+    # ── degenerate / whitespace ─────────────────────────────────────────────
+    ("empty/spaces", "   ", [], None),
+    ("empty/string", "", [], None),
+    ("empty/tabs", "\t\t", [], None),
+    ("empty/ideographic-space", "　", [], None),
+    ("ws/trailing", "Yes.   ", ["Yes."], None),
+    ("ws/leading", "   Yes.", ["Yes."], None),
+    (
+        "ws/single-claim-no-terminator",
+        "Single claim with no terminator",
+        ["Single claim with no terminator"],
+        None,
+    ),
+    # U+FEFF is stripped by JS String.trim() but NOT by Python str.strip() or Go
+    # strings.TrimSpace. A port that trims with the platform default drops it and
+    # the claim no longer matches its passage byte-for-byte.
+    ("ws/bom-is-not-whitespace", "﻿hello.", ["﻿hello."], None),
 ]
 
 
 def _segmentation_cases() -> list[dict[str, Any]]:
-    from citenexus.answer.segment import split_claims
-
-    return [{"text": t, "claims": split_claims(t)} for t in _SEGMENTATION_INPUTS]
+    """Emit the hand-derived vectors verbatim (see the derivation note above)."""
+    out: list[dict[str, Any]] = []
+    for label, text, claims, known_miss in _SEGMENTATION_CASES:
+        case: dict[str, Any] = {"label": label, "text": text, "claims": claims}
+        if known_miss is not None:
+            case["known_miss"] = known_miss
+        out.append(case)
+    return out
 
 
 def generate() -> dict[str, str]:
@@ -1700,8 +2652,7 @@ def _vector_validation_cases() -> dict[str, Any]:
             for name, vector, dim, valid, reason in _VECTOR_CHECK_CASES
         ],
         "non_vector": [
-            {"name": name, "vector": payload, "dim": dim, "valid": False,
-             "reason": "non_vector"}
+            {"name": name, "vector": payload, "dim": dim, "valid": False, "reason": "non_vector"}
             for name, payload, dim in _VECTOR_NON_VECTOR_CASES
         ],
         "batch_arity": [

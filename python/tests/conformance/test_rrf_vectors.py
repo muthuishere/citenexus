@@ -19,7 +19,7 @@ from .fixtures import load_case
 
 VECTORS: list[dict[str, Any]] = load_case("rrf.json")
 
-EXPECTED_COUNT = 5
+EXPECTED_COUNT = 13
 
 
 def test_vector_count() -> None:
@@ -39,6 +39,13 @@ def test_rrf_vector(case: dict[str, Any]) -> None:
     assert [c.eu_id for c in fused] == case["fused"], f"lists={case['lists']}"
 
 
-def test_k_is_pinned_at_60() -> None:
-    """Every vector fixes k=60; a port reading a different k is not conformant."""
-    assert {c["k"] for c in VECTORS} == {60}
+def test_the_k_values_under_test_are_pinned() -> None:
+    """k is read PER VECTOR, and the set of k values is itself a contract.
+
+    k=60 is the production default; k=0 and k=1 are the lower boundary, where the
+    1/(k+rank+1) contributions are furthest apart and an off-by-one in the rank
+    base is impossible to hide. A port that hard-codes 60 instead of reading the
+    fixture's ``k`` fails the boundary vectors.
+    """
+    assert {c["k"] for c in VECTORS} == {0, 1, 60}
+    assert sum(1 for c in VECTORS if c["k"] == 60) == 11

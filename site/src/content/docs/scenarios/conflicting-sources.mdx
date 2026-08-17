@@ -11,9 +11,12 @@ grounded. Whichever one happens to rank first becomes the answer — and nothing
 tells the caller the other one exists.
 
 That is not hypothetical. Before conflict detection existed, the corpus below
-returned a confident, correctly-cited answer with `conflicts_detected = 0`.
-Python abstains on it now; **Go and JavaScript still answer**, and their tabs
-show exactly that:
+returned a confident, correctly-cited answer with `conflicts_detected = 0`. It
+now refuses in **all three** implementations, over the same corpus and the same
+question, from one predicate pinned by
+[132 committed vectors](https://github.com/muthuishere/citenexus/blob/main/conformance/cases/conflict.json).
+
+## Example 1 — the filing and its restatement
 
 <Tabs syncKey="lang">
 <TabItem label="Python">
@@ -25,9 +28,10 @@ rag.ingest(text="The dividend for the period was 30 cents per share.",
 
 response = rag.ask("What was the dividend per share for the period?")
 
-print(response.evidence.decision)            # refused
+print(response.evidence.decision)
 print(response.answer)
 print(response.conflicts)
+print(response.evidence.conflicts_detected)
 
 for src in response.sources:                 # BOTH sides are cited
     print(src.document, "—", src.passage)
@@ -37,20 +41,12 @@ for src in response.sources:                 # BOTH sides are cited
 refused
 The available evidence disagrees, so I can't answer that.
 ('value: filing-q1-restated vs filing-q1 (30 vs 12)',)
+1
 filing-q1-restated — The dividend for the period was 30 cents per share.
 filing-q1 — The dividend for the period was 12 cents per share.
 ```
-
-In `strict` mode an unresolved conflict that touches the answer's own claim is an
-**abstention with both sides cited**. "These sources disagree, here is each of
-them" is a defensible output. Silently picking one is not.
 </TabItem>
 <TabItem label="Go">
-**Conflict detection does not exist in this port.** Go declares `conflicts` and
-`conflicts_detected` for wire parity and implements no detection, so on this
-corpus it does the thing the page opens by warning about: it answers, from
-whichever side ranked first. That is worth seeing rather than being told.
-
 ```go
 package main
 
@@ -66,33 +62,32 @@ func main() {
 		{DocumentID: "filing-q1-restated", Text: "The dividend for the period was 30 cents per share."},
 	}
 
-	res := answer.Ask(corpus, "What was the dividend for the period?", answer.DefaultTopK)
+	res := answer.Ask(corpus, "What was the dividend per share for the period?", answer.DefaultTopK)
 
-	fmt.Println(res.Evidence.Decision)          // answered  <- Python refuses here
-	fmt.Println(res.Answer)                     // one side, quoted verbatim
-	fmt.Println(res.Evidence.ConflictsDetected) // 0 — no detection in this port
-	fmt.Println(res.Sources[0].Document)
+	fmt.Println(res.Evidence.Decision)
+	fmt.Println(res.Answer)
+	fmt.Println(res.Conflicts)
+	fmt.Println(res.Evidence.ConflictsDetected)
+	for _, s := range res.Sources { // BOTH sides are cited
+		fmt.Println(s.Document, "—", s.Passage)
+	}
 }
 ```
 
 ```text
-answered
-The dividend for the period was 12 cents per share.
-0
-filing-q1
+refused
+The available evidence disagrees, so I can't answer that.
+[value: filing-q1 vs filing-q1-restated (12 vs 30)]
+1
+filing-q1 — The dividend for the period was 12 cents per share.
+filing-q1-restated — The dividend for the period was 30 cents per share.
 ```
 
-What Go **does** give you on the same corpus is the rest of the guarantee: the
-answer is verbatim from a real document, it passed the faithfulness gate, and an
-unsupported question still refuses. What it cannot tell you is that the other
-filing exists. Until detection lands here, compare `Evidence.DistinctDocuments`
-yourself, or run conflict-sensitive corpora through Python.
+The Go port has no `ask()` facade and no config layer, so `answer.Ask` is the
+whole flow: embed, rank, ground, check for conflict, generate, gate. There is no
+retrieval index in front of it — you hand it the corpus.
 </TabItem>
 <TabItem label="JavaScript">
-**Conflict detection does not exist in this port.** JavaScript declares
-`conflicts` / `conflicts_detected` for wire parity and implements no detection,
-so it answers where Python abstains:
-
 ```js
 import { ask } from "@muthuishere/citenexus"
 
@@ -101,60 +96,185 @@ const corpus = [
   { document_id: "filing-q1-restated", text: "The dividend for the period was 30 cents per share." },
 ]
 
-const res = ask(corpus, "What was the dividend for the period?")
+const res = ask(corpus, "What was the dividend per share for the period?")
 
-console.log(res.evidence.decision)           // answered  <- Python refuses here
-console.log(res.answer)                      // one side, quoted verbatim
-console.log(res.evidence.conflicts_detected) // 0 — no detection in this port
-console.log(res.sources[0].document)
+console.log(res.evidence.decision)
+console.log(res.answer)
+console.log(res.conflicts)
+console.log(res.evidence.conflicts_detected)
+for (const s of res.sources) console.log(s.document, "—", s.passage) // BOTH sides
 ```
 
 ```text
-answered
-The dividend for the period was 12 cents per share.
-0
-filing-q1
+refused
+The available evidence disagrees, so I can't answer that.
+[ 'value: filing-q1 vs filing-q1-restated (12 vs 30)' ]
+1
+filing-q1 — The dividend for the period was 12 cents per share.
+filing-q1-restated — The dividend for the period was 30 cents per share.
 ```
 
-The cite-or-abstain guarantee still holds — the quote is verbatim, the gate ran,
-an unsupported question refuses. The **conflict** is the part that is silent.
-Send conflict-sensitive corpora through Python until detection ships here.
+Like Go, JavaScript has no `ask()` facade over an index — `ask(corpus, question)`
+takes the corpus directly. Same predicate, same decision, same count.
 </TabItem>
 </Tabs>
 
-This is the one refusal that does *not* emit the pinned refusal string — it says
-*"The available evidence disagrees, so I can't answer that."* and
-`evidence.conflicts_detected` is above zero. That pair is how you tell it apart
-from the other five ways `ask()` can refuse:
-[Why did it abstain?](/citenexus/abstention/)
+**Why this conflicts.** Strip stopwords and the measured numbers from both
+passages and what is left is *identical* — `cent`, `dividend`, `per`, `period`,
+`share` on both sides, a subject overlap of `1.0`. The parsed unit sets match,
+`{12}` is not a superset of `{30}` (an elaboration would not be a conflict), and
+after the numbers are set aside the divergence between the two sentences is
+**zero words**. There is nothing left that could explain the difference except
+the disagreement itself, so the library refuses and hands you both.
 
-## Choosing how much to enforce
+In `strict` mode that is an **abstention with both sides cited**. "These sources
+disagree, here is each of them" is a defensible output. Silently picking one is
+not.
+
+<Aside type="note" title="The pair's order follows retrieval rank, not policy">
+Python names `filing-q1-restated` first and Go/JavaScript name `filing-q1` first.
+That is the order the candidates arrived in — Python's facade fuses BM25 and
+vector scores over a real index; the ports rank the corpus you pass them. The
+*predicate* is byte-identical and neither ordering asserts a winner: the line is
+`left vs right`, never `correct vs wrong`.
+</Aside>
+
+## Example 2 — two numbers that are *not* a conflict
+
+The interesting question is not whether a detector fires. It is whether it
+declines. A detector that refuses whenever it sees two different numbers in one
+corpus is worthless: almost every real corpus contains two different numbers.
+
+Same shape as Example 1 — two documents, two dividends, one question — with one
+word changed on each side.
 
 <Tabs syncKey="lang">
 <TabItem label="Python">
 ```python
-from citenexus.domain.trust import TrustMode
+rag.ingest(text="The Q1 dividend was 12 cents per share.", document_id="filing-q1")
+rag.ingest(text="The Q2 dividend was 15 cents per share.", document_id="filing-q2")
 
-rag.ask(q, mode=TrustMode.strict)        # conflict on the claim -> abstain, cite both
-rag.ask(q, mode=TrustMode.normal)        # answer, but surface the conflict
-rag.ask(q, mode=TrustMode.exploratory)   # record only
+response = rag.ask("What was the Q1 dividend per share?")
+
+print(response.evidence.decision)
+print(response.answer)
+print(response.evidence.conflicts_detected)
+
+for src in response.sources:
+    print(src.document, "—", src.passage)
+```
+
+```text
+answered
+The Q1 dividend was 12 cents per share.
+0
+filing-q1 — The Q1 dividend was 12 cents per share.
 ```
 </TabItem>
 <TabItem label="Go">
-There is **one mode in this port and it is `strict`** — `result.TrustModeStrict`
-is the only `TrustMode` constant Go defines, and `Ask` takes no mode argument.
-With no conflict detection there is nothing for `normal` to surface, so the knob
-would be decoration.
+```go
+corpus := []answer.Doc{
+	{DocumentID: "filing-q1", Text: "The Q1 dividend was 12 cents per share."},
+	{DocumentID: "filing-q2", Text: "The Q2 dividend was 15 cents per share."},
+}
+
+res := answer.Ask(corpus, "What was the Q1 dividend per share?", answer.DefaultTopK)
+
+fmt.Println(res.Evidence.Decision)
+fmt.Println(res.Answer)
+fmt.Println(res.Evidence.ConflictsDetected)
+for _, s := range res.Sources {
+	fmt.Println(s.Document, "—", s.Passage)
+}
+```
+
+```text
+answered
+The Q1 dividend was 12 cents per share.
+0
+filing-q1 — The Q1 dividend was 12 cents per share.
+```
 </TabItem>
 <TabItem label="JavaScript">
-There is **one mode in this port and it is `strict`** — `TrustMode` exports the
-single value `"strict"`, and `ask` takes no mode argument. With no conflict
-detection there is nothing for `normal` to surface.
+```js
+const corpus = [
+  { document_id: "filing-q1", text: "The Q1 dividend was 12 cents per share." },
+  { document_id: "filing-q2", text: "The Q2 dividend was 15 cents per share." },
+]
+
+const res = ask(corpus, "What was the Q1 dividend per share?")
+
+console.log(res.evidence.decision)
+console.log(res.answer)
+console.log(res.evidence.conflicts_detected)
+for (const s of res.sources) console.log(s.document, "—", s.passage)
+```
+
+```text
+answered
+The Q1 dividend was 12 cents per share.
+0
+filing-q1 — The Q1 dividend was 12 cents per share.
+```
 </TabItem>
 </Tabs>
 
-Use `strict` where a wrong answer is worse than none. Use `normal` when a human
-reads every answer anyway and wants the flag, not the block.
+**Why this does not conflict — the residual guard.** Two passages that genuinely
+disagree are otherwise word-identical. Two that merely *look* like they disagree
+differ by exactly one further content word, and that word is what makes them
+complementary — the period (`q1`/`q2`), the scope (adults/children), the route
+(oral/intravenous), the environment (staging/production), the metric
+(`p50`/`p99`).
+
+So after the numbers are set aside, the detector counts what is left over. In
+Example 1 that residual was **0** words. Here it is `q1` vs `q2` — a residual of
+**2**, past `MAX_RESIDUAL = 1`. The differing numbers are therefore treated as
+*complementary*, not contradictory, and the question is answered from the passage
+that actually addresses it.
+
+The same guard is why `p50 latency 200 ms` and `p99 latency 900 ms` are not a
+conflict — both cases are committed vectors
+(`identifier_tokenization`, `hard_negatives`).
+
+## Where the thresholds came from — and why you can't turn them
+
+Every constant below is **pinned and exposed as no caller parameter**. That is
+deliberate: a conformance vector cannot pin a value the caller controls, and each
+one trades directly against false abstention. (Python declares them in
+`answer/conflict.py`; Go and JavaScript read the identical values from their
+generated conflict tables.)
+
+| Constant | Value | What it governs |
+|---|---|---|
+| `MAX_RESIDUAL` | `1` | content divergence still allowed *after* removing the polarity signal itself |
+| `SUBJECT_OVERLAP` | `0.60` | overlap needed before two passages count as being about the same subject |
+| `MAX_SYMDIFF` | `3` | total divergence past which the pair is simply unrelated |
+| `MIN_CONTENT` | `3` | passages with fewer content tokens are not comparable |
+| `DUPLICATE_JACCARD` | `0.80` | where two same-polarity passages become surface clones |
+| `CONFLICT_TOP_K` | `6` | how many post-fusion candidates are compared pairwise |
+
+`MAX_RESIDUAL` does nearly all the work, and the ADR-0007 sweep shows why it is
+frozen at 1:
+
+| `MAX_RESIDUAL` | recall | false-conflict rate |
+|---|---|---|
+| 0 | 0.89 | 0.00 |
+| 1 | 0.89 | 0.00 |
+| **2** | 0.93 | **0.15** |
+| 3 | 0.93 | 0.19 |
+
+Relaxing it by one token buys 4 points of recall and costs **15 points of false
+conflict** — which, in strict mode, is 15 points of false *refusal*. Example 2
+answers today because that constant is 1.
+
+<Aside type="caution" title="Why the false-positive rate is the number that matters">
+In strict mode a detected conflict causes an abstention, so a **false** conflict
+is a **false refusal** — the library becomes useless long before it becomes
+wrong. Detection is therefore tuned against hard negatives: passages that look
+contradictory but are not. Measured: **0 false positives** across 27 hard
+negatives, 22 unrelated pairs and 10 held-out negatives written after the
+thresholds were frozen. The detector is deliberately precise, not exhaustive.
+</Aside>
 
 ## Detection is deterministic, and it never resolves
 
@@ -172,59 +292,180 @@ exactly three rules, tried in order:
    **Dates participate only when they read as digit-leading numbers** (`2019`);
    there is no date rule as such, and no date parsing.
 
-<Aside type="caution" title="Why the golden vectors exist anyway">
-The golden vectors are published (`conformance/cases/conflict.json`) precisely so
-the ports can be held to them when detection lands — the run above in the Go and
-JavaScript tabs is what "no detection" looks like today.
-</Aside>
-
 It deliberately **does not resolve**. Deciding *which* of two contradictory
 sources wins is a policy question about authority, recency and jurisdiction. That
 belongs to you, not to a retrieval library.
 
-<Aside type="caution" title="Why the false-positive rate is the number that matters">
-In strict mode a detected conflict causes an abstention, so a **false** conflict
-is a **false refusal** — the library becomes useless long before it becomes
-wrong. Detection is therefore tuned against hard negatives: passages that look
-contradictory but are not (a dose for adults vs one for children, p50 vs p99
-latency, staging vs production). Measured: **0 false positives** across 27 hard
-negatives and 10 held-out cases, in five unrelated domains independently — on
-**synthetic English** fixtures. That is the honest scope of the number.
+This is also the one refusal that does *not* emit the pinned refusal string — it
+says *"The available evidence disagrees, so I can't answer that."* and
+`evidence.conflicts_detected` is above zero. That pair is how you tell it apart
+from the other five ways `ask()` can refuse:
+[Why did it abstain?](/citenexus/abstention/)
+
+## Non-Latin scripts: one rule of three
+
+Conflict detection runs on the Unicode-aware v2 tokenizer
+([ADR-0011](https://github.com/muthuishere/citenexus/blob/main/docs/adr/0011-tokenizer-and-non-latin-scripts.md)),
+so a Tamil, Telugu, Arabic, Japanese or Chinese contradiction is now seen rather
+than silently skipped. **Only the value rule crosses the script boundary**, and
+the page is going to be specific about what that costs, because a partial
+capability described as a whole one is the failure this library exists to
+prevent.
+
+<Tabs syncKey="lang">
+<TabItem label="Python">
+```python
+from citenexus.answer.conflict import detect_conflict
+
+cases = [
+    ("ta value",      "அறிவிப்பு காலம் 30 நாட்கள் ஆகும்.", "அறிவிப்பு காலம் 60 நாட்கள் ஆகும்."),
+    ("ja flush",      "通知期間は30日です。",              "通知期間は60日です。"),
+    ("ja full-width", "通知期間は３０日です。",            "通知期間は６０日です。"),
+    ("ar value",      "مدة الإشعار هي 30 يوما.",            "مدة الإشعار هي 60 يوما."),
+    ("ta negation",   "ஊழியர் ரகசியத் தகவலை வெளியிடலாம்.", "ஊழியர் ரகசியத் தகவலை வெளியிடக் கூடாது."),
+    ("ta added scope", "அறிவிப்பு காலம் 30 நாட்கள் ஆகும்.", "முதல் ஆண்டில் அறிவிப்பு காலம் 60 நாட்கள் ஆகும்."),
+]
+for label, left, right in cases:
+    print(f"{label:15} {detect_conflict(left, right)}")
+```
+
+```text
+ta value        ConflictFinding(rule='value', detail='30 vs 60')
+ja flush        ConflictFinding(rule='value', detail='30 vs 60')
+ja full-width   None
+ar value        ConflictFinding(rule='value', detail='30 vs 60')
+ta negation     None
+ta added scope  None
+```
+</TabItem>
+<TabItem label="Go">
+`DetectConflict` returns the finding and an `ok` flag, in the Go idiom:
+
+```go
+cases := [][3]string{
+	{"ta value", "அறிவிப்பு காலம் 30 நாட்கள் ஆகும்.", "அறிவிப்பு காலம் 60 நாட்கள் ஆகும்."},
+	{"ja flush", "通知期間は30日です。", "通知期間は60日です。"},
+	{"ja full-width", "通知期間は３０日です。", "通知期間は６０日です。"},
+	{"ar value", "مدة الإشعار هي 30 يوما.", "مدة الإشعار هي 60 يوما."},
+	{"ta negation", "ஊழியர் ரகசியத் தகவலை வெளியிடலாம்.", "ஊழியர் ரகசியத் தகவலை வெளியிடக் கூடாது."},
+	{"ta added scope", "அறிவிப்பு காலம் 30 நாட்கள் ஆகும்.", "முதல் ஆண்டில் அறிவிப்பு காலம் 60 நாட்கள் ஆகும்."},
+}
+for _, c := range cases {
+	if f, ok := answer.DetectConflict(c[1], c[2]); ok {
+		fmt.Printf("%-15s %s: %s\n", c[0], f.Rule, f.Detail)
+	} else {
+		fmt.Printf("%-15s no conflict\n", c[0])
+	}
+}
+```
+
+```text
+ta value        value: 30 vs 60
+ja flush        value: 30 vs 60
+ja full-width   no conflict
+ar value        value: 30 vs 60
+ta negation     no conflict
+ta added scope  no conflict
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { detectConflict } from "@muthuishere/citenexus"
+
+const cases = [
+  ["ta value", "அறிவிப்பு காலம் 30 நாட்கள் ஆகும்.", "அறிவிப்பு காலம் 60 நாட்கள் ஆகும்."],
+  ["ja flush", "通知期間は30日です。", "通知期間は60日です。"],
+  ["ja full-width", "通知期間は３０日です。", "通知期間は６０日です。"],
+  ["ar value", "مدة الإشعار هي 30 يوما.", "مدة الإشعار هي 60 يوما."],
+  ["ta negation", "ஊழியர் ரகசியத் தகவலை வெளியிடலாம்.", "ஊழியர் ரகசியத் தகவலை வெளியிடக் கூடாது."],
+  ["ta added scope", "அறிவிப்பு காலம் 30 நாட்கள் ஆகும்.", "முதல் ஆண்டில் அறிவிப்பு காலம் 60 நாட்கள் ஆகும்."],
+]
+for (const [label, left, right] of cases) {
+  console.log(label.padEnd(15), detectConflict(left, right))
+}
+```
+
+```text
+ta value        { rule: 'value', detail: '30 vs 60' }
+ja flush        { rule: 'value', detail: '30 vs 60' }
+ja full-width   null
+ar value        { rule: 'value', detail: '30 vs 60' }
+ta negation     null
+ta added scope  null
+```
+</TabItem>
+</Tabs>
+
+Two of those `None`s are **capability**, and two are **known misses**:
+
+- ✅ **Same-subject rejection still works.** `notice period 30 days` vs
+  `rent amount 60 rupees` in Tamil, and the added-scope qualifier
+  (`in the first year, the notice period is 60 days`), are both declined — the
+  subject-overlap and residual guards are set arithmetic and are script-neutral.
+- ❌ **KNOWN MISS — negation and antonym cannot fire outside Latin script.**
+  Both rules are driven by **English wordlists** (`CONFLICT_NEGATIONS`,
+  `CONFLICT_ANTONYMS`). No Tamil, Telugu, Arabic, Japanese or Chinese negation or
+  antonym is in them, so a permitted/prohibited contradiction in those scripts is
+  **not detected**. This is pinned as expected behaviour in the vectors, labelled
+  `english-table: negation does not fire in tamil` — the suite records the gap
+  rather than hiding it.
+- ❌ **KNOWN MISS — full-width digits are not matched.** `３０` / `６０`
+  (U+FF10–U+FF19) do not match the number pattern, so a Japanese or Chinese
+  passage that writes its numbers full-width gets **no value rule either**. Also
+  pinned, labelled `KNOWN MISS: full-width digits are not matched by the number
+  pattern`.
+
+<Aside type="caution" title="What that means for a non-Latin corpus">
+On a Tamil, Telugu, Arabic, Japanese or Chinese corpus you get the **value rule
+and nothing else**. A numeric contradiction is caught; a polarity contradiction
+is not, and neither is a numeric one written in full-width digits. Treat
+`conflicts_detected = 0` on such a corpus as "no *numeric* conflict found", not
+as "no conflict". Of the 30 committed non-Latin vectors, 11 are expected to fire
+and all 11 do.
 </Aside>
 
-## Where the thresholds came from — and why you can't turn them
-
-Every constant below is **pinned in the source and exposed as no caller
-parameter**. That is deliberate: a conformance vector cannot pin a value the
-caller controls, and each one trades directly against false abstention.
-
-| Constant | Value | What it governs |
-|---|---|---|
-| `MAX_RESIDUAL` | `1` | content divergence still allowed *after* removing the polarity signal itself |
-| `SUBJECT_OVERLAP` | `0.60` | overlap needed before two passages count as being about the same subject |
-| `MAX_SYMDIFF` | `3` | total divergence past which the pair is simply unrelated |
-| `MIN_CONTENT` | `3` | passages with fewer content tokens are not comparable |
-| `DUPLICATE_JACCARD` | `0.80` | where two same-polarity passages become surface clones |
-| `CONFLICT_TOP_K` | `6` | how many post-fusion candidates are compared pairwise |
-
-`MAX_RESIDUAL` does nearly all the work, and the ADR-0007 sweep shows why it is
-frozen at 1: relaxing it to 2 buys 4 points of recall (0.89 → 0.93) and costs
-**15 points of false-conflict rate** (0.00 → 0.15) — in strict mode, 15 points of
-false *refusal*.
-
-<Aside type="caution" title="These were swept on synthetic English sentences">
-The sweep that produced every value above ran on **synthetic English** fixtures.
-They have never been fitted against a non-English corpus, and nothing in the
-library adapts them to one. If you run a non-English or heavily domain-specific
-corpus in `strict` mode, treat the false-refusal rate as **unmeasured for your
-data** and measure it yourself before trusting the abstention behaviour.
+<Aside type="caution" title="The thresholds were swept on synthetic English sentences">
+Every constant in the table above was fitted on **synthetic English** fixtures.
+The non-Latin vectors prove the *rules* run there; they are not a measurement of
+the false-refusal rate on a real non-English corpus. If you run one in `strict`
+mode, treat that rate as **unmeasured for your data** and measure it yourself.
 </Aside>
+
+## Choosing how much to enforce
+
+<Tabs syncKey="lang">
+<TabItem label="Python">
+```python
+from citenexus.domain.trust import TrustMode
+
+rag.ask(q, mode=TrustMode.strict)        # conflict on the claim -> abstain, cite both
+rag.ask(q, mode=TrustMode.normal)        # answer, but surface the conflict
+rag.ask(q, mode=TrustMode.exploratory)   # record only
+```
+</TabItem>
+<TabItem label="Go">
+Detection is at parity; the **mode selector is not**. `result.TrustModeStrict` is
+the only `TrustMode` constant Go defines and `Ask` takes no mode argument, so
+this port always behaves like the `strict` row above: it abstains and cites both
+sides. There is no `normal` here that answers-and-flags.
+</TabItem>
+<TabItem label="JavaScript">
+Detection is at parity; the **mode selector is not**. `TrustMode` exports the
+single value `"strict"` and `ask` takes no mode argument, so this port always
+abstains on a conflict rather than answering with a flag.
+</TabItem>
+</Tabs>
+
+Use `strict` where a wrong answer is worse than none. Use `normal` when a human
+reads every answer anyway and wants the flag, not the block.
 
 ## Duplicates stop inflating your confidence
 
 The same comparison, inverted, catches near-duplicates. One sentence mirrored
 across five document IDs used to report `distinct_documents = 5` — five
-independent confirmations of a fact that had exactly one source.
+independent confirmations of a fact that had exactly one source. Conflict is
+checked **first**, always: a contradiction must never be collapsed into a
+corroboration.
 
 <Tabs syncKey="lang">
 <TabItem label="Python">
@@ -234,15 +475,43 @@ response.evidence.supporting_sources   # 1
 ```
 </TabItem>
 <TabItem label="Go">
-Duplicate collapsing rides on the same comparison as conflict detection, so it is
-**Python-only too**. On five mirrored documents Go reports
-`Evidence.DistinctDocuments == 5` — five counts of one fact. Deduplicate the
-`[]answer.Doc` slice yourself before you pass it in.
+```go
+line := "The employee shall not disclose confidential information."
+corpus := []answer.Doc{}
+for _, id := range []string{"a", "b", "c", "d", "e"} {
+	corpus = append(corpus, answer.Doc{DocumentID: "mirror-" + id, Text: line})
+}
+
+res := answer.Ask(corpus, "Can the employee disclose confidential information?", answer.DefaultTopK)
+
+fmt.Println(res.Evidence.Decision)
+fmt.Println("DistinctDocuments", res.Evidence.DistinctDocuments)  // 1, not 5
+fmt.Println("SupportingSources", res.Evidence.SupportingSources)
+```
+
+```text
+answered
+DistinctDocuments 1
+SupportingSources 1
+```
 </TabItem>
 <TabItem label="JavaScript">
-Duplicate collapsing is **Python-only**, for the same reason as conflict
-detection. Five mirrored documents give `evidence.distinct_documents === 5` here.
-Deduplicate the corpus array before passing it to `ask`.
+```js
+const line = "The employee shall not disclose confidential information."
+const corpus = ["a", "b", "c", "d", "e"].map((id) => ({ document_id: "mirror-" + id, text: line }))
+
+const res = ask(corpus, "Can the employee disclose confidential information?")
+
+console.log(res.evidence.decision)
+console.log("distinct_documents", res.evidence.distinct_documents)  // 1, not 5
+console.log("supporting_sources", res.evidence.supporting_sources)
+```
+
+```text
+answered
+distinct_documents 1
+supporting_sources 1
+```
 </TabItem>
 </Tabs>
 

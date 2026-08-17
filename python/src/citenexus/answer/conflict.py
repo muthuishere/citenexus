@@ -46,8 +46,8 @@ from citenexus.answer.verify import _STOPWORDS
 # tokens and ``detect_conflict`` returned "no conflict" before a single rule ran.
 # A one-sided, confidently-cited answer over a corpus that contains both sides is
 # the exact failure ADR-0007 exists to prevent, so conflict runs on the
-# Unicode-aware tokenizer (ADR-0011). All 102 committed vectors are unchanged by
-# the swap — measured, not assumed.
+# Unicode-aware tokenizer (ADR-0011). Every English vector committed before the
+# swap is unchanged by it — measured over the whole suite, not assumed.
 from citenexus.tokenize import tokenize_v2
 
 __all__ = [

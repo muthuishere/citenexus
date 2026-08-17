@@ -10,9 +10,9 @@ import (
 // answer_test.go and askwith_test.go drive this fixture; neither may run against
 // a silently shrunken corpus or case list.
 var expectedE2ECounts = map[string]int{
-	"corpus": 3,
-	"cases":  4,
-	"top_k":  5,
+	"corpus": 6,
+	"cases":  8,
+	"top_k":  8,
 }
 
 func TestE2EHermeticVectorCounts(t *testing.T) {
