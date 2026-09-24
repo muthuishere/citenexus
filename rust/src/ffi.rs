@@ -99,6 +99,54 @@ pub unsafe extern "C" fn citenexus_to_markdown(
     to_c_string(payload)
 }
 
+/// Structured PDF units — the no-model base extractor (ADR-0017). `bytes`
+/// is the PDF; `opts_json` is a `PdfOptions` JSON object
+/// (`{"language":"nl","layout_text":false}`) or null for defaults. Returns
+/// malloc'd JSON: a `PdfUnitsOutput` (`units`, `pages`, `document`), or
+/// `{"error": ...}` — including when the core was built without the `pdf`
+/// feature or libpdfium cannot be loaded (`PDFIUM_DYNAMIC_LIB_PATH`).
+///
+/// # Safety
+/// `bytes` must point to `len` readable bytes; `opts_json` must be a valid
+/// NUL-terminated UTF-8 C string, or null.
+#[no_mangle]
+pub unsafe extern "C" fn citenexus_pdf_units(
+    bytes: *const u8,
+    len: usize,
+    opts_json: *const c_char,
+) -> *mut c_char {
+    if bytes.is_null() {
+        return to_c_string(error_json("null argument"));
+    }
+    let data = std::slice::from_raw_parts(bytes, len);
+    let opts: crate::units::PdfOptions = if opts_json.is_null() {
+        Default::default()
+    } else {
+        match utf8_arg(opts_json, "opts_json") {
+            Ok(raw) if raw.trim().is_empty() => Default::default(),
+            Ok(raw) => match serde_json::from_str(raw) {
+                Ok(o) => o,
+                Err(e) => return to_c_string(error_json(&format!("opts_json: {e}"))),
+            },
+            Err(msg) => return to_c_string(error_json(&msg)),
+        }
+    };
+    to_c_string(pdf_units_json(data, &opts))
+}
+
+#[cfg(feature = "pdf")]
+fn pdf_units_json(data: &[u8], opts: &crate::units::PdfOptions) -> String {
+    match crate::extract::pdf::pdf_units(data, opts) {
+        Ok(out) => serde_json::to_string(&out).unwrap_or_else(|e| error_json(&e.to_string())),
+        Err(message) => error_json(&message),
+    }
+}
+
+#[cfg(not(feature = "pdf"))]
+fn pdf_units_json(_data: &[u8], _opts: &crate::units::PdfOptions) -> String {
+    error_json("pdf support requires the `pdf` feature")
+}
+
 /// Reciprocal-rank-fuse the ranked `eu_id` lists in `lists_json` (a JSON array
 /// of arrays of strings) with constant `k`. Returns malloc'd JSON: a JSON array
 /// of fused `eu_id`s (descending fused score, ascending `eu_id` tie-break), or

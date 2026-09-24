@@ -27,9 +27,15 @@ fn doc_unit_serializes_in_declaration_order() {
 #[test]
 fn enums_are_snake_case() {
     let s = |v: serde_json::Value| v.as_str().unwrap().to_string();
-    assert_eq!(s(serde_json::to_value(TableSource::ModelGrid).unwrap()), "model_grid");
+    assert_eq!(
+        s(serde_json::to_value(TableSource::ModelGrid).unwrap()),
+        "model_grid"
+    );
     assert_eq!(s(serde_json::to_value(Route::Ooxml).unwrap()), "ooxml");
-    assert_eq!(s(serde_json::to_value(UnitKind::Furniture).unwrap()), "furniture");
+    assert_eq!(
+        s(serde_json::to_value(UnitKind::Furniture).unwrap()),
+        "furniture"
+    );
 }
 
 #[test]

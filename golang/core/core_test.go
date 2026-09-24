@@ -235,3 +235,45 @@ func TestDetect(t *testing.T) {
 		t.Fatalf("detected language = %q, want en (%s)", det.Language, out)
 	}
 }
+
+func TestPdfUnits(t *testing.T) {
+	data, err := os.ReadFile("../../conformance/fixtures/pdf/base-structure.pdf")
+	if err != nil {
+		t.Fatalf("read pdf fixture: %v", err)
+	}
+	res, err := PdfAnalyze(data, PdfOptions{Language: "nl"})
+	if err != nil {
+		if strings.Contains(err.Error(), "`pdf` feature") || strings.Contains(err.Error(), "libpdfium") {
+			t.Skipf("SKIP: %v (build the core with --features pdf and set PDFIUM_DYNAMIC_LIB_PATH)", err)
+		}
+		t.Fatalf("PdfAnalyze: %v", err)
+	}
+	var got []string
+	for _, u := range res.Units {
+		got = append(got, u.Kind+": "+u.Markdown)
+	}
+	want := []string{
+		"heading: # Leave Policy",
+		"paragraph: Staff must send an e-mail before the regulation deadline.",
+		"furniture: laatst bijgewerkt 12-03-2024",
+		"heading: ## Scope",
+		"paragraph: It applies to all staff.",
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("units:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+	if hs := res.Units[0].Provenance.HeadingSource; hs == nil || *hs != "struct_tree" {
+		t.Fatalf("heading source: %v", hs)
+	}
+	if res.Units[0].Page == nil || *res.Units[0].Page != 1 || res.Units[0].BBox == nil {
+		t.Fatalf("page/bbox missing: %+v", res.Units[0])
+	}
+
+	units, err := PdfUnits(data, PdfOptions{})
+	if err != nil || len(units) != len(res.Units) {
+		t.Fatalf("PdfUnits: %v (%d units)", err, len(units))
+	}
+	if _, err := PdfUnits([]byte("not a pdf"), PdfOptions{}); err == nil {
+		t.Fatal("expected an error for non-PDF bytes")
+	}
+}

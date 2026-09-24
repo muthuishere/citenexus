@@ -17,6 +17,7 @@ package core
 char* citenexus_extract(const uint8_t* bytes, size_t len, const char* source_type, const char* document_id);
 char* citenexus_to_markdown(const uint8_t* bytes, size_t len, const char* source_type);
 char* citenexus_rrf(const char* lists_json, int64_t k);
+char* citenexus_pdf_units(const uint8_t* bytes, size_t len, const char* opts_json);
 void citenexus_free_string(char* s);
 const char* citenexus_core_version();
 
@@ -212,4 +213,89 @@ func (s *Store) Close() {
 		C.citenexus_store_close(s.handle)
 		s.handle = nil
 	}
+}
+
+// PdfOptions configures PdfUnits. Language ("nl", "en", …) drives the hyphen
+// rules; LayoutText adds each page's pdftotext -layout-style text to
+// PdfResult.Pages.
+type PdfOptions struct {
+	Language   string `json:"language,omitempty"`
+	LayoutText bool   `json:"layout_text,omitempty"`
+}
+
+// PdfProvenance says how a unit was produced (ADR-0017 decision 6).
+type PdfProvenance struct {
+	Route             string  `json:"route"`
+	TableSource       *string `json:"table_source"`
+	VisionTranscribed bool    `json:"vision_transcribed"`
+	TableUncertain    bool    `json:"table_uncertain"`
+	FailedCheck       *string `json:"failed_check"`
+	HeadingSource     *string `json:"heading_source"`
+	JoinedHyphen      bool    `json:"joined_hyphen"`
+}
+
+// PdfUnit is one unit of a converted PDF: Kind is heading|paragraph|list|
+// table|furniture|image; BBox is [x0,y0,x1,y1] in points, top-left origin.
+type PdfUnit struct {
+	Page       *int          `json:"page"`
+	BBox       *[4]float64   `json:"bbox"`
+	Kind       string        `json:"kind"`
+	Level      *int          `json:"level"`
+	Markdown   string        `json:"markdown"`
+	Provenance PdfProvenance `json:"provenance"`
+}
+
+// PdfResult is the full base-extractor output: the units, each page's route
+// with the signals behind it, and document-level signals (heading agreement,
+// hyphen and furniture counts). Pages and Document are kept as raw JSON so the
+// binding does not freeze a signal set that is still growing.
+type PdfResult struct {
+	Units    []PdfUnit       `json:"units"`
+	Pages    json.RawMessage `json:"pages"`
+	Document json.RawMessage `json:"document"`
+}
+
+// PdfAnalyze runs the shared Rust base PDF extractor (no model, ADR-0017) and
+// returns units, per-page routes and signals. It fails when the core was built
+// without the `pdf` cargo feature, when libpdfium cannot be loaded (set
+// PDFIUM_DYNAMIC_LIB_PATH), or when the bytes are not a PDF.
+func PdfAnalyze(pdf []byte, opts PdfOptions) (*PdfResult, error) {
+	payload, err := json.Marshal(opts)
+	if err != nil {
+		return nil, err
+	}
+	var bp *C.uint8_t
+	if len(pdf) > 0 {
+		bp = (*C.uint8_t)(unsafe.Pointer(&pdf[0]))
+	} else {
+		return nil, errors.New("citenexus: empty pdf")
+	}
+	cOpts := C.CString(string(payload))
+	defer C.free(unsafe.Pointer(cOpts))
+
+	out := C.citenexus_pdf_units(bp, C.size_t(len(pdf)), cOpts)
+	defer C.citenexus_free_string(out)
+
+	raw := []byte(C.GoString(out))
+	var failure struct {
+		Error string `json:"error"`
+	}
+	if json.Unmarshal(raw, &failure) == nil && failure.Error != "" {
+		return nil, errors.New("citenexus: " + failure.Error)
+	}
+	var res PdfResult
+	if err := json.Unmarshal(raw, &res); err != nil {
+		return nil, errors.New("citenexus: unexpected pdf_units response: " + err.Error())
+	}
+	return &res, nil
+}
+
+// PdfUnits is the base-only surface rag_go uses (ADR-0017 decision 10): no
+// model, never fails for lack of a provider.
+func PdfUnits(pdf []byte, opts PdfOptions) ([]PdfUnit, error) {
+	res, err := PdfAnalyze(pdf, opts)
+	if err != nil {
+		return nil, err
+	}
+	return res.Units, nil
 }
