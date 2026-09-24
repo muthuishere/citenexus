@@ -142,6 +142,7 @@ fn fixture(name: &str) -> Vec<u8> {
     match name {
         "listtable" => listtable_fixture(),
         "cliptable" => cliptable_fixture(),
+        "invoice" => Doc::new(vec![common::fixtures::invoice_page()]),
         "table" => table_fixture(),
         "scan" => scan_fixture(),
         "region" => region_fixture(),
@@ -160,7 +161,9 @@ fn resolve(prep: &PdfPrepared, request: &str, cell: &[serde_json::Value]) -> Vec
                 return id.to_string();
             }
             let (text, nth) = match s.rsplit_once('#') {
-                Some((t, n)) if n.chars().all(|c| c.is_ascii_digit()) => {
+                Some((t, n))
+                    if !t.is_empty() && !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()) =>
+                {
                     (t, n.parse::<usize>().unwrap())
                 }
                 _ => (s, 1),
