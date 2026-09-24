@@ -3453,6 +3453,246 @@
           }
         ]
       }
+    },
+    {
+      "name": "party/adv-rx-v2-10 two named parties swapped around 'legt voor aan' (rag_go adv_v2, fictional)",
+      "must_refuse": true,
+      "answer": "De ondernemingsraad legt een voorgenomen besluit tot wijziging van de werktijdenregeling ter instemming voor aan het bestuur [eu:S1]. De ondernemingsraad deelt zijn standpunt binnen zes weken schriftelijk mee aan het bestuur [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "reglement ondernemingsraad Woonstichting Beekdal",
+          "language": "nl",
+          "text": "Instemmingsrecht. Het bestuur legt een voorgenomen besluit tot wijziging van de werktijdenregeling ter instemming voor aan de ondernemingsraad. De ondernemingsraad deelt zijn standpunt binnen zes weken schriftelijk mee aan het bestuur. Zonder instemming van de ondernemingsraad kan het bestuur het besluit alleen nemen na toestemming van de kantonrechter."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "role guard"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "party/adv-rx-v2-12 'deelt mee aan' swapped (rag_go adv_v2, fictional)",
+      "must_refuse": true,
+      "answer": "Het bestuur deelt zijn standpunt binnen zes weken schriftelijk mee aan de ondernemingsraad [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "reglement ondernemingsraad Woonstichting Beekdal",
+          "language": "nl",
+          "text": "Instemmingsrecht. Het bestuur legt een voorgenomen besluit tot wijziging van de werktijdenregeling ter instemming voor aan de ondernemingsraad. De ondernemingsraad deelt zijn standpunt binnen zes weken schriftelijk mee aan het bestuur. Zonder instemming van de ondernemingsraad kan het bestuur het besluit alleen nemen na toestemming van de kantonrechter."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "role guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "party/adv-rx-v2-09 chauffeur and planner swapped (rag_go adv_v2, fictional)",
+      "must_refuse": true,
+      "answer": "De chauffeur mag de planner niet inroosteren zolang de nascholing niet is afgerond [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "arbeidsvoorwaardenregeling De Vaart Logistiek",
+          "language": "nl",
+          "text": "Rijbewijs en certificaten. De chauffeur is verantwoordelijk voor een geldig rijbewijs en een geldige chauffeurskaart. De werkgever vergoedt de kosten van de verplichte code 95-nascholing. De planner mag een chauffeur niet inroosteren zolang de nascholing niet is afgerond."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "role guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "value-row/adv-nc-v2-16 a value moved to a wider period (rag_go adv_v2, fictional)",
+      "must_refuse": true,
+      "answer": "During the first two years of illness, you receive 100% of your salary [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "verzuimprotocol Gemeente Kraaijenburg",
+          "language": "nl",
+          "text": "Loondoorbetaling. Tijdens het eerste ziektejaar ontvangt de medewerker 100% van zijn salaris. In het tweede ziektejaar bedraagt de loondoorbetaling 70%. De eerste ziektedag wordt niet als wachtdag aangemerkt. Na twee ziektejaren eindigt de loondoorbetaling."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "value guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "party/the-reader-for-a-named-third-party",
+      "must_refuse": true,
+      "answer": "Je sluit de urenregistratie op de laatste werkdag van de maand af [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "personeelsgids",
+          "language": "nl",
+          "text": "Urenregistratie. De medewerker registreert zijn declarabele uren dagelijks in het tijdschrijfsysteem. De controller sluit de urenregistratie op de laatste werkdag van de maand af. Correcties na afsluiting worden uitsluitend door de controller doorgevoerd."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "role guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "party/the-reader-as-the-employee-is-no-swap",
+      "answer": "Je registreert je declarabele uren dagelijks in het tijdschrijfsysteem [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "personeelsgids",
+          "language": "nl",
+          "text": "Urenregistratie. De medewerker registreert zijn declarabele uren dagelijks in het tijdschrijfsysteem. De controller sluit de urenregistratie op de laatste werkdag van de maand af. Correcties na afsluiting worden uitsluitend door de controller doorgevoerd."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "party/the-same-party-by-a-synonym-is-no-swap",
+      "answer": "De werknemer registreert zijn declarabele uren dagelijks in het tijdschrijfsysteem [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "personeelsgids",
+          "language": "nl",
+          "text": "Urenregistratie. De medewerker registreert zijn declarabele uren dagelijks in het tijdschrijfsysteem. De controller sluit de urenregistratie op de laatste werkdag van de maand af. Correcties na afsluiting worden uitsluitend door de controller doorgevoerd."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "value-row/the-value-with-its-own-period-is-admitted",
+      "answer": "During the first year of illness, the employee receives 100% of the salary [eu:S1].",
+      "answer_language": "en",
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "verzuimprotocol Gemeente Kraaijenburg",
+          "language": "nl",
+          "text": "Loondoorbetaling. Tijdens het eerste ziektejaar ontvangt de medewerker 100% van zijn salaris. In het tweede ziektejaar bedraagt de loondoorbetaling 70%. De eerste ziektedag wordt niet als wachtdag aangemerkt. Na twee ziektejaren eindigt de loondoorbetaling."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
     }
   ]
 }

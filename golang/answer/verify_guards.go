@@ -391,6 +391,12 @@ func guards(claim, claimLanguage string, eu EvidenceUnit, aliases map[string][]s
 	if reason := roleGuard(claim, claimLanguage, eu, actors); reason != "" {
 		return reason
 	}
+	if reason := partySwapGuard(claim, eu.Text, actors); reason != "" {
+		return reason
+	}
+	if reason := valueRowGuard(claim, claimLanguage, eu); reason != "" {
+		return reason
+	}
 	return nameGuardWith(claim, eu.Text+"\n"+eu.DocumentID, aliases)
 }
 
