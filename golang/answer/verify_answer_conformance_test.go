@@ -11,15 +11,18 @@ import (
 )
 
 type verifyVector struct {
-	Name            string               `json:"name"`
-	MustRefuse      bool                 `json:"must_refuse"`
-	Answer          string               `json:"answer"`
-	AnswerLanguage  string               `json:"answer_language"`
-	AdmitParaphrase bool                 `json:"admit_paraphrase"`
-	NameAliases     map[string][]string  `json:"name_aliases"`
-	Checker         map[string][]float64 `json:"checker"`
-	LeadInFrames    []string             `json:"lead_in_frames"`
-	Evidence        []struct {
+	Name            string              `json:"name"`
+	MustRefuse      bool                `json:"must_refuse"`
+	Answer          string              `json:"answer"`
+	AnswerLanguage  string              `json:"answer_language"`
+	AdmitParaphrase bool                `json:"admit_paraphrase"`
+	NameAliases     map[string][]string `json:"name_aliases"`
+	// Checker scores by unit id. CheckerClaims overrides it per claim text as
+	// the checker receives it (markup already stripped).
+	Checker       map[string][]float64            `json:"checker"`
+	CheckerClaims map[string]map[string][]float64 `json:"checker_claims"`
+	LeadInFrames  []string                        `json:"lead_in_frames"`
+	Evidence      []struct {
 		ID         string `json:"id"`
 		DocumentID string `json:"document_id"`
 		Language   string `json:"language"`
@@ -35,11 +38,18 @@ type verifyVector struct {
 	} `json:"expect"`
 }
 
-// idChecker scores by passage, from a table keyed by unit id.
-type idChecker map[string][2]float64
+// idChecker scores by passage (a unit's text), and by
+// (claim, passage) where a vector pins one claim.
+type idChecker struct {
+	byPassage map[string][2]float64
+	byClaim   map[[2]string][2]float64
+}
 
-func (c idChecker) Check(_ context.Context, _ string, passage string) (float64, float64, error) {
-	s := c[passage]
+func (c idChecker) Check(_ context.Context, claim string, passage string) (float64, float64, error) {
+	if s, ok := c.byClaim[[2]string{claim, passage}]; ok {
+		return s[0], s[1], nil
+	}
+	s := c.byPassage[passage]
 	return s[0], s[1], nil
 }
 
@@ -57,8 +67,8 @@ func TestVerifyAnswerConformance(t *testing.T) {
 	if err := json.Unmarshal(raw, &file); err != nil {
 		t.Fatal(err)
 	}
-	if len(file.Cases) != 73 {
-		t.Fatalf("verify_answer.json: got %d cases, want 73", len(file.Cases))
+	if len(file.Cases) != 78 {
+		t.Fatalf("verify_answer.json: got %d cases, want 78", len(file.Cases))
 	}
 	refuseControls := 0
 	for _, c := range file.Cases {
@@ -67,15 +77,25 @@ func TestVerifyAnswerConformance(t *testing.T) {
 		}
 		t.Run(c.Name, func(t *testing.T) {
 			evidence := make([]EvidenceUnit, len(c.Evidence))
-			checker := idChecker{}
+			byID := map[string]EvidenceUnit{}
 			for i, e := range c.Evidence {
 				evidence[i] = EvidenceUnit{ID: e.ID, DocumentID: e.DocumentID, Language: e.Language, Text: e.Text}
-				if s, ok := c.Checker[e.ID]; ok {
-					checker[e.Text] = [2]float64{s[0], s[1]}
+				byID[e.ID] = evidence[i]
+			}
+			premise := func(key string) string {
+				return byID[key].Text
+			}
+			checker := idChecker{byPassage: map[string][2]float64{}, byClaim: map[[2]string][2]float64{}}
+			for key, s := range c.Checker {
+				checker.byPassage[premise(key)] = [2]float64{s[0], s[1]}
+			}
+			for key, claims := range c.CheckerClaims {
+				for claim, s := range claims {
+					checker.byClaim[[2]string{claim, premise(key)}] = [2]float64{s[0], s[1]}
 				}
 			}
 			opts := VerifyOptions{AnswerLanguage: c.AnswerLanguage, AdmitParaphrase: c.AdmitParaphrase, NameAliases: c.NameAliases, LeadInFrames: c.LeadInFrames}
-			if len(c.Checker) > 0 {
+			if len(c.Checker) > 0 || len(c.CheckerClaims) > 0 {
 				opts.Checker, opts.CheckerName = checker, "fake"
 			}
 			res, err := VerifyAnswer(context.Background(), c.Answer, evidence, opts)

@@ -470,6 +470,33 @@ func lowerFirst(item string) string {
 	return string(runes)
 }
 
+var (
+	// mdLink is an inline link or image: [text](url) / ![alt](url "title").
+	mdLink = regexp.MustCompile(`!?\[([^\[\]]*)\]\([^()\s]*(?:\([^()\s]*\)[^()\s]*)*(?:\s+"[^"]*")?\)`)
+	// mdEmphasis is single-character emphasis, *x* or _x_, opened at a word
+	// boundary and closed before one: "snake_case" and "5 * 3" are not emphasis.
+	mdEmphasis = regexp.MustCompile(`(^|[\s(\[{"'“‘])[*_]([^\s*_](?:[^*_\n]*[^\s*_])?)[*_]($|[\s)\]}"'”’.,;:!?])`)
+	mdStrong   = strings.NewReplacer("**", "", "__", "", "`", "")
+)
+
+// stripMarkup removes Markdown emphasis (**, __, *, _), code backticks and link
+// markup ([text](url) -> text) from a claim, keeping every word it marks up —
+// a label ("**Bedrag:** …") stays a label. The gate, the guards and the checker
+// see the claim as a reader does. rag_go measured 31 true claims refused and 3
+// admitted only because the markup was there, and single emphasis hid a name
+// from the name guard ("via *Cobra*" reads no capital).
+func stripMarkup(text string) string {
+	out := mdStrong.Replace(mdLink.ReplaceAllString(text, "$1"))
+	for i := 0; i < 4; i++ { // adjacent spans share a boundary character
+		next := mdEmphasis.ReplaceAllString(out, "$1$2$3")
+		if next == out {
+			break
+		}
+		out = next
+	}
+	return out
+}
+
 func appendUnique(list []string, items ...string) []string {
 	for _, item := range items {
 		dup := false
@@ -591,7 +618,10 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 	parsed := parseCitationsWith(answer, frames)
 	verdicts := make([]verdict, 0, len(parsed))
 	for _, pc := range parsed {
+		// Reported as written (a host locates it in its own answer); checked with
+		// its markup removed, so "**Bedrag:**" or a link's URL decides nothing.
 		v := verdict{text: pc.text, facets: pc.facets}
+		text := stripMarkup(pc.text)
 
 		// The units this claim may be checked against.
 		candidates := []EvidenceUnit{}
@@ -628,8 +658,8 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 		// it. Uncited: the first (most authoritative) unit that passes.
 		gateReason := ""
 		for _, eu := range candidates {
-			if gate.IsSupportedV2(pc.text, eu.Text) {
-				if reason := clauseNegationGuard(pc.text, eu.Text); reason != "" {
+			if gate.IsSupportedV2(text, eu.Text) {
+				if reason := clauseNegationGuard(text, eu.Text); reason != "" {
 					if gateReason == "" {
 						gateReason = reason // the FIRST cited unit refused, not the last
 					}
@@ -651,7 +681,7 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 		if v.supported && opts.Checker != nil {
 			kept := v.sources[:0:0]
 			for _, id := range v.sources {
-				s, err := check(pc.text, evidence[byID[id]])
+				s, err := check(text, evidence[byID[id]])
 				if err != nil {
 					return result.Result{}, err
 				}
@@ -670,13 +700,13 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 		if !v.supported && v.reason != ReasonContradicted && opts.Checker != nil && len(pc.cited) > 0 {
 			guardReason := ""
 			admit := func(eu EvidenceUnit) (bool, error) {
-				if reason := guards(pc.text, declared, eu, opts.NameAliases); reason != "" {
+				if reason := guards(text, declared, eu, opts.NameAliases); reason != "" {
 					if guardReason == "" {
 						guardReason = reason // the FIRST cited unit refused, not the last
 					}
 					return false, nil
 				}
-				s, err := check(pc.text, eu)
+				s, err := check(text, eu)
 				if err != nil {
 					return false, err
 				}
@@ -684,7 +714,7 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 			}
 
 			// 2. QUOTE: every quote in the claim passes the gate against the unit.
-			if qs := quotes(pc.text); len(qs) > 0 {
+			if qs := quotes(text); len(qs) > 0 {
 				for _, eu := range candidates {
 					anchored := true
 					for _, q := range qs {

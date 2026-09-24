@@ -2010,6 +2010,153 @@
           }
         ]
       }
+    },
+    {
+      "name": "markup/bold-label-is-checked-without-its-markup",
+      "answer": "**Bedrag:** De vergoeding is € 25 per maand [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.2,
+          0.0
+        ]
+      },
+      "checker_claims": {
+        "a": {
+          "Bedrag: De vergoeding is € 25 per maand.": [
+            0.99,
+            0.0
+          ]
+        }
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Werknemers ontvangen een vergoeding van € 25 per maand."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "markup/a-link-is-its-text-for-the-gate",
+      "answer": "De vergoeding staat in de [reiskostenregeling](https://intranet.example/rk) en bedraagt € 0,23 per kilometer [eu:a].",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De vergoeding staat in de reiskostenregeling en bedraagt € 0,23 per kilometer."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "markup/single-emphasis-label-then-capital-is-not-a-name",
+      "answer": "*Note:* You receive the allowance monthly [eu:n].",
+      "answer_language": "en",
+      "checker": {
+        "n": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "n",
+          "document_id": "n",
+          "language": "nl",
+          "text": "Je ontvangt de toelage maandelijks."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "markup/emphasis-no-longer-hides-a-name",
+      "must_refuse": true,
+      "answer": "De aanvraag loopt via *Cobra* [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.99,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De aanvraag loopt via het HR-portaal."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "name guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "markup/underscore-emphasis-no-longer-hides-a-name",
+      "must_refuse": true,
+      "answer": "De aanvraag loopt via _Cobra_ [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.99,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De aanvraag loopt via het HR-portaal."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "name guard"
+          }
+        ]
+      }
     }
   ]
 }
