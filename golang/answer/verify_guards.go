@@ -431,6 +431,9 @@ type guardConfig struct {
 	actors   ActorLexicon
 	pairs    []QualifierPair
 	glossary [][2]string
+	// fragment: the text is a list lead-in checked on its own (union rule):
+	// it states no fact, so the hedge guard does not read it.
+	fragment bool
 }
 
 func guards(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfig) string {
@@ -459,6 +462,9 @@ func guards(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfig) strin
 		return reason
 	}
 	if reason := exclusionGuard(claim, claimLanguage, eu, cfg); reason != "" {
+		return reason
+	}
+	if reason := hedgeGuard(claim, claimLanguage, eu, cfg); reason != "" {
 		return reason
 	}
 	if reason := conditionGuard(claim, claimLanguage, eu, cfg); reason != "" {

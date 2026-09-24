@@ -71,7 +71,9 @@ func unionRefusal(claim, lead, item, claimLanguage string, a, b EvidenceUnit, cf
 	if reason := leadInScope(lead, b); reason != "" {
 		return reason
 	}
-	if reason := guards(lead, claimLanguage, a, cfg); reason != "" {
+	leadCfg := cfg
+	leadCfg.fragment = true
+	if reason := guards(lead, claimLanguage, a, leadCfg); reason != "" {
 		return reason
 	}
 	if reason := guards(item, claimLanguage, b, cfg); reason != "" {

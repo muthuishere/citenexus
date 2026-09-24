@@ -5225,7 +5225,7 @@
         "claims": [
           {
             "supported": false,
-            "reason": "condition guard: the"
+            "reason": "hedge guard"
           },
           {
             "supported": true,
@@ -6821,6 +6821,439 @@
           {
             "supported": false,
             "reason": "truncation guard: th"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "hedge/adv-dh-v2-26 (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "Als de jaardoelen zijn gehaald, ontvang je een bonus van 10% van je bruto jaarsalaris [eu:S1]. Het bedrijf kan een jaarlijkse bonus van maximaal 10% van het bruto jaarsalaris betalen, mits de jaardoelen van het bedrijf zijn gehaald [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "Employee Handbook Northquay Freight",
+          "language": "en",
+          "text": "Annual bonus. The company may pay an annual bonus of up to 10% of the gross annual salary, provided that the company's annual targets have been met. The management board decides each year whether a bonus is paid."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "hedge guard: the sou"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "hedge/adv-dh-v2-25 (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "The company pays an annual bonus of 10% of the gross annual salary [eu:S1]. The management board decides each year whether a bonus is paid [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "Employee Handbook Northquay Freight",
+          "language": "en",
+          "text": "Annual bonus. The company may pay an annual bonus of up to 10% of the gross annual salary, provided that the company's annual targets have been met. The management board decides each year whether a bonus is paid."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "hedge guard: the sou"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "hedge/adv-dh-v2-19 (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "Vakantiedagen moeten worden opgenomen in het jaar waarin ze zijn opgebouwd [eu:S1]. Vakantiedagen worden in beginsel opgenomen in het jaar waarin ze zijn opgebouwd [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "vakantieregeling Gemeente Kraaijenburg",
+          "language": "nl",
+          "text": "Vakantieverlof. Vakantiedagen worden in beginsel opgenomen in het jaar waarin ze zijn opgebouwd. Niet opgenomen bovenwettelijke vakantiedagen kunnen, als de leidinggevende daarmee instemt, worden meegenomen naar het volgende kalenderjaar. Wettelijke vakantiedagen vervallen zes maanden na het einde van het jaar van opbouw."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "hedge guard: the sou"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "hedge/adv-dh-v2-14 kan turned into must, across languages through the glossary (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "After the employee reaches state pension age, the employer must offer a new employment contract [eu:S1]. After the employee reaches state pension age, the employer may offer a new employment contract [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "glossary": [
+        [
+          "werkgever",
+          "employer"
+        ],
+        [
+          "werknemer",
+          "employee"
+        ],
+        [
+          "arbeidsovereenkomst",
+          "employment contract"
+        ],
+        [
+          "aanbieden",
+          "offer"
+        ],
+        [
+          "nieuwe",
+          "new"
+        ],
+        [
+          "leeftijd",
+          "age"
+        ]
+      ],
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "wettekst Boek 7",
+          "language": "nl",
+          "text": "Artikel 7:669c lid 1. Het dienstverband eindigt van rechtswege op de dag waarop de werknemer de AOW-gerechtigde leeftijd bereikt, tenzij schriftelijk anders is overeengekomen. De werkgever kan de werknemer na het bereiken van die leeftijd een nieuwe arbeidsovereenkomst aanbieden."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "hedge guard: the sou"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "hedge/adv-dh-v2-06 (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "You can always follow the training during working hours [eu:S1]. The employer reimburses training costs up to a maximum of €2,500 per calendar year [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "opleidingsregeling Woonstichting Beekdal",
+          "language": "nl",
+          "text": "Opleidingskosten. De werkgever vergoedt de kosten van de opleiding tot een maximum van € 2.500 per kalenderjaar. Voor opleidingen die de werkgever verplicht stelt, geldt geen maximum. De medewerker kan de opleiding in beginsel in werktijd volgen."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "hedge guard: the cla"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "hedge/adv-dh-v2-24 (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "In the event of an emergency, you can take short-term leave immediately for as long as needed [eu:S1]. In exceptional cases, the employer can extend the leave with continued pay [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "verlofregeling De Vaart Logistiek",
+          "language": "nl",
+          "text": "Calamiteitenverlof. Bij een calamiteit kan de werknemer direct kort verzuimverlof opnemen, voor ten hoogste twee dagen. De werkgever kan in uitzonderlijke gevallen het verlof verlengen met behoud van loon. De werknemer meldt het verlof zo snel mogelijk bij de planner."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "hedge guard: the cla"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "hedge/a-claim-keeping-the-hedge-is-admitted",
+      "answer": "De werkgever kan de studiekosten vergoeden tot maximaal € 2.000 per jaar [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Studiekosten. De werkgever kan de studiekosten vergoeden tot een maximum van € 2.000 per jaar."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "hedge/an-equal-hedge-in-another-language-is-admitted",
+      "answer": "The employer may reimburse study costs of at most €2,000 a year [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Studiekosten. De werkgever kan de studiekosten vergoeden tot een maximum van € 2.000 per jaar."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "hedge/a-dropped-hedge-refuses",
+      "must_refuse": true,
+      "answer": "De werkgever vergoedt de studiekosten van € 2.000 per jaar [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Studiekosten. De werkgever kan de studiekosten vergoeden tot een maximum van € 2.000 per jaar."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "hedge guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hedge/an-added-absolute-refuses",
+      "must_refuse": true,
+      "answer": "De werkgever kan de studiekosten altijd vergoeden tot een maximum van € 2.000 per jaar [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Studiekosten. De werkgever kan de studiekosten vergoeden tot een maximum van € 2.000 per jaar."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "hedge guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hedge/adv-ep-v2-29 a \"tot\" target carried by \"to\" + the same amount (rag_go adv, fictional)",
+      "answer": "For the first nine weeks of parental leave taken in your child's first year, the hospital tops up the UWV benefit to 70% of your salary [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "regeling ouderschapsverlof Ziekenhuis Oosterlanden",
+          "language": "nl",
+          "text": "Betaald ouderschapsverlof. Over de eerste negen weken ouderschapsverlof die in het eerste levensjaar van het kind worden opgenomen, vult het ziekenhuis de UWV-uitkering aan tot 70% van het salaris. Het verlof wordt ten minste twee maanden van tevoren aangevraagd."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "hedge/adv-dh-v2-04 an absolute added; a prohibition is not a hedge (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "The employer may refuse permission for any reason [eu:S1]. Employees need the employer's prior written permission for side activities [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "glossary": [
+        [
+          "werkgever",
+          "employer"
+        ],
+        [
+          "werknemers",
+          "employees"
+        ],
+        [
+          "toestemming",
+          "permission"
+        ],
+        [
+          "nevenwerkzaamheden",
+          "side activities"
+        ],
+        [
+          "schriftelijke",
+          "written"
+        ]
+      ],
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "nevenwerkzaamhedenregeling De Vaart Logistiek",
+          "language": "nl",
+          "text": "Nevenwerkzaamheden. Werknemers mogen geen nevenwerkzaamheden verrichten zonder voorafgaande schriftelijke toestemming van de werkgever. De werkgever weigert de toestemming alleen als de nevenwerkzaamheden de rij- en rusttijden in gevaar brengen of concurrerend zijn."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "hedge guard: the cla"
           },
           {
             "supported": true,
