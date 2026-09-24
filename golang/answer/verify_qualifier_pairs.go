@@ -103,11 +103,14 @@ func qualifierPairGuard(claim, claimLanguage string, eu EvidenceUnit, pairs []Qu
 						if !sharesKey(keys, ukeys) {
 							continue
 						}
-						us, uform := sideNear(uc.words, j, pair)
-						switch {
-						case us == side:
+						// The claim's side anywhere in a clause holding the number
+						// agrees ("60 jaar of ouder met een voltijds dienstverband");
+						// the other side counts only right at the number.
+						if clauseHasSide(uc.words, side, pair) {
 							agrees = true
-						case us >= 0 && other == "":
+							continue
+						}
+						if us, uform := sideNear(uc.words, j, pair); us >= 0 && us != side && other == "" {
 							other = uform
 						}
 					}
@@ -127,6 +130,19 @@ func sharesKey(a, b []string) bool {
 			if x == y {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+func clauseHasSide(words []string, side int, pair QualifierPair) bool {
+	forms := pair.A
+	if side == 1 {
+		forms = pair.B
+	}
+	for _, w := range words {
+		if anyForm(w, forms) {
+			return true
 		}
 	}
 	return false

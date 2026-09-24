@@ -40,6 +40,7 @@ package answer
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/muthuishere/citenexus/golang/gate"
@@ -293,4 +294,135 @@ func valueRowGuard(claim, claimLanguage string, eu EvidenceUnit) string {
 		}
 	}
 	return ""
+}
+
+// ─── subject swap, through the glossary ─────────────────────────────────────
+
+// SUBJECT SWAP. partySwapGuard needs the claim near-verbatim to the unit, so
+// an English claim over a Dutch unit escapes it: "The team leader publishes
+// the duty roster …" over "Het teamsecretariaat publiceert het dienstrooster
+// …" (rag_go adv rx-v2-27), "the branch manager sets the holiday schedule"
+// over "De planner stelt … de vakantieplanning vast" (rx-v2-39).
+// subjectSwapGuard binds a claim's "party + verb" pair — the party a
+// determiner-introduced noun of the unit, written in the claim as itself or as
+// one of its VerifyOptions.Glossary translations, the verb the next word that
+// is not a modal — to the unit sentences whose words include that verb (as
+// itself or a translation). Each such sentence's subject is its opening
+// determiner noun, or, with the verb first ("… beslist de vestigingsmanager"),
+// the determiner noun right after the verb. A party is a noun that opens a
+// unit sentence with its determiner, or follows a glossary-covered verb so. Refused when a
+// sentence with the verb has another party as its subject and none has the
+// claim's. ACROSS LANGUAGES ONLY, through the glossary for both the party and
+// the verb — without a glossary, or in one language (partySwapGuard's), no
+// verdict.
+// Can only refuse.
+
+var modalWords = map[string]struct{}{
+	"must": {}, "may": {}, "can": {}, "will": {}, "shall": {}, "should": {}, "moet": {}, "mag": {}, "kan": {}, "zal": {}, "dient": {},
+}
+
+func subjectSwapGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfig) string {
+	// Across languages, through the glossary, only: in one language the
+	// near-verbatim party swap (partySwapGuard) is the sound check, and a
+	// "noun + next word" pair read in the same language binds too loosely.
+	cross := claimLanguage != "" && eu.Language != "" && primaryLanguage(claimLanguage) != primaryLanguage(eu.Language)
+	if !cross || len(cfg.glossary) == 0 {
+		return ""
+	}
+	gloss := glossaryIndex(cfg.glossary)
+	forms := func(w string) [][]string { return gloss[w] }
+	var sentences [][]string
+	for _, s := range sentenceBreak.Split(softJoin(eu.Text), -1) {
+		if toks := tokenize.TokenizeV2(s); len(toks) > 0 {
+			sentences = append(sentences, toks)
+		}
+	}
+	claimTokens := tokenize.TokenizeV2(claim)
+	subjectOf := func(toks []string, verb int) []string {
+		if len(toks) > 1 {
+			if _, det := partyDeterminers[toks[0]]; det && partyWord(toks[1]) && verb > 1 {
+				return []string{toks[1]}
+			}
+		}
+		if verb+2 < len(toks) {
+			if _, det := partyDeterminers[toks[verb+1]]; det && partyWord(toks[verb+2]) {
+				return []string{toks[verb+2]}
+			}
+		}
+		return nil
+	}
+	// The parties: nouns that are the SUBJECT of some unit sentence.
+	subjects := map[string]bool{}
+	for _, toks := range sentences {
+		if len(toks) > 2 {
+			if _, det := partyDeterminers[toks[0]]; det && partyWord(toks[1]) {
+				subjects[toks[1]] = true // "De teamleider beslist …"
+			}
+		}
+		for j := range toks {
+			if subj := subjectOf(toks, j); subj != nil && j > 0 {
+				if _, ok := gloss[toks[j]]; ok {
+					subjects[subj[0]] = true
+				}
+			}
+		}
+	}
+	var parties [][]string
+	for p := range subjects {
+		parties = append(parties, []string{p})
+	}
+	sort.Slice(parties, func(i, j int) bool { return parties[i][0] < parties[j][0] })
+	for _, p := range parties {
+		for _, f := range forms(p[0]) {
+			for _, sp := range findSpans(claimTokens, f) {
+				v := sp.end
+				for v < len(claimTokens) {
+					if _, modal := modalWords[claimTokens[v]]; !modal {
+						break
+					}
+					v++
+				}
+				if v >= len(claimTokens) {
+					continue
+				}
+				claimVerb := claimTokens[v]
+				agrees, other := false, ""
+				for _, toks := range sentences {
+					for j, t := range toks {
+						matched := false
+						for _, vf := range forms(t) {
+							if len(vf) == 1 && vf[0] == claimVerb {
+								matched = true
+							}
+						}
+						if !matched || gate.IsStopword(t) || !partyWord(t) {
+							continue
+						}
+						subj := subjectOf(toks, j)
+						if subj == nil {
+							continue
+						}
+						if subj[0] == p[0] || sameActorClass(subj[0], p[0], cfg.actors) {
+							agrees = true
+						} else if other == "" {
+							other = subj[0]
+						}
+					}
+				}
+				if !agrees && other != "" {
+					return fmt.Sprintf("role guard: %q %s where the passage says %q does", p[0], claimVerb, other)
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func sameActorClass(a, b string, lexicon ActorLexicon) bool {
+	for _, terms := range lexicon.Actors {
+		if hasTerm(terms, a) && hasTerm(terms, b) {
+			return true
+		}
+	}
+	return false
 }

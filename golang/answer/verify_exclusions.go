@@ -148,10 +148,21 @@ func exclusionGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfi
 		return ""
 	}
 	universal := false
-	for _, t := range claimTokens {
-		if _, ok := universalWords[t]; ok {
-			universal = true
+	for i, t := range claimTokens {
+		if _, ok := universalWords[t]; !ok {
+			continue
 		}
+		// "once every four years", "elke week": a frequency, not everyone.
+		if i+1 < len(claimTokens) {
+			next := claimTokens[i+1]
+			if _, isNum := numberValue(next, claimLanguage); isNum {
+				continue
+			}
+			if _, _, unit := unitOf(next); unit {
+				continue
+			}
+		}
+		universal = true
 	}
 	for _, s := range sentenceBreak.Split(softJoin(eu.Text), -1) {
 		for _, g := range excludedGroups(tokenize.TokenizeV2(s)) {

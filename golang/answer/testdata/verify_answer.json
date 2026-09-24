@@ -6407,6 +6407,257 @@
           }
         ]
       }
+    },
+    {
+      "name": "relation/adv-rx-v2-20 who informs whom, across languages (rag_go adv, fictional)",
+      "answer": "If a detail in the statement changes, the employee must inform the employer in writing no later than the day the change takes effect [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "wettekst Boek 7",
+          "language": "nl",
+          "text": "Artikel 7:655b lid 2. De werkgever verstrekt de werknemer binnen een maand na aanvang van de arbeid een schriftelijke opgave van de wezenlijke arbeidsvoorwaarden. De werknemer kan de werkgever verzoeken de opgave aan te vullen. Wijzigt een gegeven uit de opgave, dan deelt de werkgever dit uiterlijk op de dag van ingang van de wijziging schriftelijk mee aan de werknemer."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "role guard"
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "relation/the-same-direction-across-languages-is-admitted",
+      "answer": "If a detail in the statement changes, the employer informs the employee in writing no later than the day the change takes effect [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "wettekst Boek 7",
+          "language": "nl",
+          "text": "Artikel 7:655b lid 2. De werkgever verstrekt de werknemer binnen een maand na aanvang van de arbeid een schriftelijke opgave van de wezenlijke arbeidsvoorwaarden. De werknemer kan de werkgever verzoeken de opgave aan te vullen. Wijzigt een gegeven uit de opgave, dan deelt de werkgever dit uiterlijk op de dag van ingang van de wijziging schriftelijk mee aan de werknemer."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "relation/nl-who-informs-whom-swapped",
+      "answer": "Wijzigt een gegeven uit de opgave, dan deelt de werknemer dit schriftelijk mee aan de werkgever [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "wettekst Boek 7",
+          "language": "nl",
+          "text": "Artikel 7:655b lid 2. De werkgever verstrekt de werknemer binnen een maand na aanvang van de arbeid een schriftelijke opgave van de wezenlijke arbeidsvoorwaarden. De werknemer kan de werkgever verzoeken de opgave aan te vullen. Wijzigt een gegeven uit de opgave, dan deelt de werkgever dit uiterlijk op de dag van ingang van de wijziging schriftelijk mee aan de werknemer."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "qualifier guard"
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "qualifier/adv-gw-v2-17 the claim's side anywhere in the clause agrees (rag_go adv, fictional; its must-admit twin)",
+      "answer": "Full-time employees aged 60 or over are entitled to eight additional days off per year [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "verlofregeling Woonstichting Beekdal",
+          "language": "nl",
+          "text": "Seniorenverlof. Medewerkers van 60 jaar of ouder met een voltijds dienstverband hebben recht op acht extra verlofdagen per jaar. Deeltijders van 60 jaar of ouder krijgen deze dagen naar rato van hun arbeidsduur."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "subject/adv-rx-v2-27 who publishes, across languages through the glossary (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "The team leader publishes the duty roster no later than four weeks before the first shift [eu:S1].",
+      "answer_language": "en",
+      "glossary": [
+        [
+          "teamleider",
+          "team leader"
+        ],
+        [
+          "teamsecretariaat",
+          "team secretariat"
+        ],
+        [
+          "publiceert",
+          "publishes"
+        ],
+        [
+          "dienstrooster",
+          "duty roster"
+        ]
+      ],
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "roosterreglement Ziekenhuis Oosterlanden",
+          "language": "nl",
+          "text": "Roosters. Het teamsecretariaat publiceert het dienstrooster uiterlijk vier weken voor de eerste dienst. Een medewerker die een dienst wil ruilen, regelt zelf een collega met dezelfde deskundigheid en vraagt daarna goedkeuring aan de teamleider. De teamleider beslist binnen drie werkdagen over de ruil."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "role guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "subject/adv-rx-v2-39 who sets the schedule, across languages through the glossary (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "The holiday schedule works as follows [eu:S1]:\n- The branch manager sets the holiday schedule no later than 1 March [eu:S1].\n- If too many requests fall in the same week, the branch manager decides on the basis of the rotation system [eu:S1].",
+      "answer_language": "en",
+      "glossary": [
+        [
+          "planner",
+          "planner"
+        ],
+        [
+          "vestigingsmanager",
+          "branch manager"
+        ],
+        [
+          "stelt",
+          "sets"
+        ],
+        [
+          "beslist",
+          "decides"
+        ],
+        [
+          "vakantieplanning",
+          "holiday schedule"
+        ]
+      ],
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "verlofregeling De Vaart Logistiek",
+          "language": "nl",
+          "text": "Vakantie. De werknemer dient zijn zomervakantie vóór 1 februari in bij de planner. De planner stelt uiterlijk op 1 maart de vakantieplanning vast. Bij te veel aanvragen in dezelfde week beslist de vestigingsmanager op basis van het rouleersysteem."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "role guard"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "exclusion/every-four-years-is-a-frequency-not-everyone",
+      "answer": "Medewerkers met een aanstelling van ten minste 24 uur per week kunnen elke vier jaar een fiets aanschaffen [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Fietsregeling. Medewerkers met een aanstelling van ten minste 24 uur per week kunnen eens per vier jaar een fiets aanschaffen via de fietsregeling. Stagiairs en medewerkers in de proeftijd zijn uitgesloten."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
     }
   ]
 }

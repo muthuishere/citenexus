@@ -449,6 +449,9 @@ func guards(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfig) strin
 	if reason := roleGuard(claim, claimLanguage, eu, actors); reason != "" {
 		return reason
 	}
+	if reason := relationGuard(claim, claimLanguage, eu, actors); reason != "" {
+		return reason
+	}
 	if reason := exclusionGuard(claim, claimLanguage, eu, cfg); reason != "" {
 		return reason
 	}
@@ -459,6 +462,9 @@ func guards(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfig) strin
 		return reason
 	}
 	if reason := partySwapGuard(claim, eu.Text, actors); reason != "" {
+		return reason
+	}
+	if reason := subjectSwapGuard(claim, claimLanguage, eu, cfg); reason != "" {
 		return reason
 	}
 	if reason := valueRowGuard(claim, claimLanguage, eu); reason != "" {

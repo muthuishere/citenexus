@@ -717,6 +717,9 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 					// betaalt 4,5%" can align across two clauses of the unit.
 					reason = roleGuard(text, declared, eu, actors)
 				}
+				if reason == "" {
+					reason = relationGuard(text, declared, eu, actors)
+				}
 				if reason != "" {
 					if gateReason == "" {
 						gateReason = reason // the FIRST cited unit refused, not the last
