@@ -68,7 +68,7 @@
       "answer": "In de regeling is opgenomen dat een melder niet benadeeld mag worden [eu:a].",
       "answer_language": "nl",
       "evidence": [
-        {"id": "a", "document_id": "klokkenluider-2023", "language": "nl", "text": "In de regeling is opgenomen dat een melder niet benadeeld mag worden. Vertrouwenspersoon bereikbaar op 06-23388524."},
+        {"id": "a", "document_id": "klokkenluider-2023", "language": "nl", "text": "In de regeling is opgenomen dat een melder niet benadeeld mag worden. Vertrouwenspersoon bereikbaar op 06-23220798."},
         {"id": "b", "document_id": "klokkenluider-2024", "language": "nl", "text": "In de regeling is opgenomen dat een melder niet benadeeld mag worden. Vertrouwenspersoon bereikbaar op 06-23386524."}
       ],
       "expect": {"decision": "answered", "conflicts_reported": true, "claims": [{"supported": true, "reason": ""}]}
@@ -76,10 +76,10 @@
     {
       "name": "value/claim-carrying-the-disputed-number-is-dropped",
       "must_refuse": true,
-      "answer": "Vertrouwenspersoon bereikbaar op 06-23388524 [eu:a].",
+      "answer": "Vertrouwenspersoon bereikbaar op 06-23220798 [eu:a].",
       "answer_language": "nl",
       "evidence": [
-        {"id": "a", "document_id": "klokkenluider-2023", "language": "nl", "text": "Vertrouwenspersoon bereikbaar op 06-23388524."},
+        {"id": "a", "document_id": "klokkenluider-2023", "language": "nl", "text": "Vertrouwenspersoon bereikbaar op 06-23220798."},
         {"id": "b", "document_id": "klokkenluider-2024", "language": "nl", "text": "Vertrouwenspersoon bereikbaar op 06-23386524."}
       ],
       "expect": {"decision": "refused", "conflicts_reported": true, "claims": [{"supported": false, "reason": "cited sources disagree"}]}
@@ -89,7 +89,7 @@
       "answer": "De vertrouwenspersoon zit in kamer 13 [eu:a].",
       "answer_language": "nl",
       "evidence": [
-        {"id": "a", "document_id": "klokkenluider-2023", "language": "nl", "text": "De vertrouwenspersoon zit in kamer 13 en is bereikbaar op 23388524."},
+        {"id": "a", "document_id": "klokkenluider-2023", "language": "nl", "text": "De vertrouwenspersoon zit in kamer 13 en is bereikbaar op 23220798."},
         {"id": "b", "document_id": "klokkenluider-2024", "language": "nl", "text": "De vertrouwenspersoon zit in kamer 13 en is bereikbaar op 23386524."}
       ],
       "expect": {"decision": "answered", "conflicts_reported": true, "claims": [{"supported": true, "reason": ""}]}
@@ -101,7 +101,7 @@
       "answer_language": "en",
       "checker": {"a": [0.99, 0.0]},
       "evidence": [
-        {"id": "a", "document_id": "klokkenluider-2023", "language": "nl", "text": "De vertrouwenspersoon is telefonisch bereikbaar op 23388524."},
+        {"id": "a", "document_id": "klokkenluider-2023", "language": "nl", "text": "De vertrouwenspersoon is telefonisch bereikbaar op 23220798."},
         {"id": "b", "document_id": "klokkenluider-2024", "language": "nl", "text": "De vertrouwenspersoon is telefonisch bereikbaar op 23386524."}
       ],
       "expect": {"decision": "refused", "conflicts_reported": true, "claims": [{"supported": false, "reason": "cited sources disagree"}]}
