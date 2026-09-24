@@ -129,7 +129,7 @@ func nameGuard(claim, passage string) string {
 
 // guards runs every deterministic guard and returns the first refusal, or "".
 func guards(claim, passage string) string {
-	for _, g := range []func(string, string) string{numberGuard, negationGuard, nameGuard} {
+	for _, g := range []func(string, string) string{numberGuard, negationGuard, clauseNegationGuard, nameGuard} {
 		if reason := g(claim, passage); reason != "" {
 			return reason
 		}
@@ -156,4 +156,50 @@ func quotes(claim string) []string {
 		}
 	}
 	return out
+}
+
+// clauseBreak ends a clause: sentence punctuation followed by space or end, a
+// comma followed by space ("25,50" is not a break), or a newline.
+var clauseBreak = regexp.MustCompile(`[.!?;:]+(\s|$)|,\s|\n`)
+
+// clauseNegationGuard closes a hole in the ADR-0009 predicate for verb-final
+// languages. gate.IsSupportedV2 inspects polarity markers only INSIDE the
+// matched span, so "De werkgever vergoedt de parkeerkosten." passes against
+// "De werkgever vergoedt de parkeerkosten niet." — the negation sits after the
+// last matched token. Measured on the Dutch fixtures (feat/nl-tables); it is the
+// ordinary Dutch word order, not an edge case.
+//
+// For each clause of the passage the claim aligns within, every marker in the
+// rest of that clause must survive into the claim. Scoped to the clause so a
+// negation belonging to the NEXT clause ("…, maar niet de reiskosten") does not
+// refuse a true claim. A claim that aligns within no single clause is left to
+// the gate. Go-only for now; it can only refuse.
+func clauseNegationGuard(claim, passage string) string {
+	markers := gate.PolarityMarkers()
+	claimTokens := tokenize.TokenizeV2(claim)
+	inClaim := map[string]int{}
+	for _, tok := range claimTokens {
+		if _, ok := markers[tok]; ok {
+			inClaim[tok]++
+		}
+	}
+	for _, clause := range clauseBreak.Split(passage, -1) {
+		clauseTokens := tokenize.TokenizeV2(clause)
+		span, ok := gate.Align(claimTokens, clauseTokens)
+		if !ok {
+			continue
+		}
+		want := map[string]int{}
+		for _, tok := range clauseTokens[span.Start:] {
+			if _, ok := markers[tok]; ok {
+				want[tok]++
+			}
+		}
+		for tok, n := range want {
+			if inClaim[tok] < n {
+				return fmt.Sprintf("negation guard: the passage clause carries %q after the matched words", tok)
+			}
+		}
+	}
+	return ""
 }

@@ -332,3 +332,34 @@ func TestMissingFacetsAreNamed(t *testing.T) {
 		t.Fatalf("complete answer marked incomplete: %+v", res.Evidence)
 	}
 }
+
+func TestClauseFinalNegationIsNotDropped(t *testing.T) {
+	parking := EvidenceUnit{ID: "p#1", DocumentID: "p", Language: "nl",
+		Text: "De werkgever vergoedt de parkeerkosten niet. Reiskosten worden wel vergoed."}
+	// The shared predicate accepts the dropped negation — the hole this closes.
+	if !gateAccepts("De werkgever vergoedt de parkeerkosten.", parking.Text) {
+		t.Skip("the ADR-0009 predicate now catches this itself; the guard is redundant")
+	}
+	sure := &fakeChecker{scores: map[string][2]float64{parking.Text: {0.99, 0.0}}}
+	for _, opts := range []VerifyOptions{{}, {Checker: sure, AdmitParaphrase: true, AnswerLanguage: "nl"}} {
+		res := verify(t, "De werkgever vergoedt de parkeerkosten [eu:p#1].", []EvidenceUnit{parking}, opts)
+		if res.Evidence.Decision != result.DecisionRefused || !strings.HasPrefix(res.Claims[0].Reason, "negation guard") {
+			t.Fatalf("dropped clause-final niet admitted (checker=%v): %+v", opts.Checker != nil, res.Claims)
+		}
+	}
+	// The negated claim itself, and a claim from the next clause, still pass.
+	res := verify(t, "De werkgever vergoedt de parkeerkosten niet [eu:p#1]. Reiskosten worden vergoed [eu:p#1].",
+		[]EvidenceUnit{parking}, VerifyOptions{})
+	if res.Evidence.Decision != result.DecisionAnswered {
+		t.Fatalf("true claims refused: %+v", res.Claims)
+	}
+}
+
+func TestNextClauseNegationDoesNotRefuse(t *testing.T) {
+	ev := EvidenceUnit{ID: "c#1", DocumentID: "c", Language: "nl",
+		Text: "De werkgever vergoedt de parkeerkosten, maar niet de reiskosten."}
+	res := verify(t, "De werkgever vergoedt de parkeerkosten [eu:c#1].", []EvidenceUnit{ev}, VerifyOptions{})
+	if res.Evidence.Decision != result.DecisionAnswered {
+		t.Fatalf("a negation in the next clause refused a true claim: %+v", res.Claims)
+	}
+}

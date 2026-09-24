@@ -358,8 +358,13 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 
 		// 1. The deterministic gate. Cited: every cited unit that passes supports
 		// it. Uncited: the first (most authoritative) unit that passes.
+		gateReason := ""
 		for _, eu := range candidates {
 			if gate.IsSupportedV2(pc.text, eu.Text) {
+				if reason := clauseNegationGuard(pc.text, eu.Text); reason != "" {
+					gateReason = reason
+					continue
+				}
 				v.sources = append(v.sources, eu.ID)
 				if len(pc.cited) == 0 {
 					break
@@ -368,6 +373,8 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 		}
 		if len(v.sources) > 0 {
 			v.supported, v.verifiedBy = true, "gate"
+		} else if gateReason != "" {
+			v.reason = gateReason
 		}
 
 		// Veto: a gate-admitted source the checker says contradicts the claim.
@@ -409,7 +416,7 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 				for _, eu := range candidates {
 					anchored := true
 					for _, q := range qs {
-						if !gate.IsSupportedV2(q, eu.Text) {
+						if !gate.IsSupportedV2(q, eu.Text) || clauseNegationGuard(q, eu.Text) != "" {
 							anchored = false
 							break
 						}
