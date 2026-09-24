@@ -1,5 +1,5 @@
 {
-  "_about": "VerifyAnswer guard vectors. Go-first (golang/answer/verify_answer.go); written language-neutral so the Python and JS ports inherit them. Each case: answer + evidence units (+ optional checker scores keyed by unit id: [entailed, contradicted]) -> expected decision and, per claim in order, supported + a reason PREFIX. Cases marked must_refuse are the controls that keep the guards from being loosened.",
+  "_about": "VerifyAnswer guard vectors. Go-first (golang/answer/verify_answer.go); Go-owned test data until VerifyAnswer has a Python reference, then promoted to conformance/cases/. Written language-neutral so the Python and JS ports inherit them. Each case: answer + evidence units (+ optional checker scores keyed by unit id: [entailed, contradicted]) -> expected decision and, per claim in order, supported + a reason PREFIX. Cases marked must_refuse are the controls that keep the guards from being loosened.",
   "cases": [
     {
       "name": "negation/same-clause-verb-final-niet",

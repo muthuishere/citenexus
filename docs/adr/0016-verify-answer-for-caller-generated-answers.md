@@ -103,8 +103,9 @@ All are `omitempty`, so existing Results serialize byte-identically:
   - 0 citenexus misfires across the targeted re-runs (G-S4, R-103, G-D3, R-123,
     R-126, R-113, R-114, 2× each).
   - Quote-mode cited-claim pass rose 46% → 77% after the alignment fix.
-- **Pinned here:** `conformance/cases/verify_answer.json`, 12 language-neutral
-  vectors, 6 of them must-refuse controls. Run by
+- **Pinned here:** `golang/answer/testdata/verify_answer.json`, language-neutral
+  vectors with must-refuse controls — Go-owned until a Python reference exists,
+  then promoted to `conformance/cases/`. Run by
   `answer/verify_answer_conformance_test.go`.
 - **Go-only.** Python and JS have no `VerifyAnswer` and no `SupportChecker`.
   Python has its own authority selection (`python/src/citenexus/answer/authority.py`,

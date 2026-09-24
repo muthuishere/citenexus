@@ -2,10 +2,11 @@ package answer
 
 import (
 	"context"
+	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 
-	"github.com/muthuishere/citenexus/golang/internal/conform"
 	"github.com/muthuishere/citenexus/golang/result"
 )
 
@@ -44,7 +45,16 @@ func TestVerifyAnswerConformance(t *testing.T) {
 	var file struct {
 		Cases []verifyVector `json:"cases"`
 	}
-	conform.Case(t, "verify_answer.json", &file)
+	// Go-owned until VerifyAnswer has a Python reference: conformance/ holds only
+	// fixtures the Python generator produces (tests/test_conformance_fixtures.py).
+	// Promote this file there when the Python port lands.
+	raw, err := os.ReadFile("testdata/verify_answer.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(raw, &file); err != nil {
+		t.Fatal(err)
+	}
 	if len(file.Cases) != 35 {
 		t.Fatalf("verify_answer.json: got %d cases, want 35", len(file.Cases))
 	}
