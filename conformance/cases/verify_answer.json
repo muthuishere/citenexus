@@ -1,0 +1,110 @@
+{
+  "_about": "VerifyAnswer guard vectors. Go-first (golang/answer/verify_answer.go); written language-neutral so the Python and JS ports inherit them. Each case: answer + evidence units (+ optional checker scores keyed by unit id: [entailed, contradicted]) -> expected decision and, per claim in order, supported + a reason PREFIX. Cases marked must_refuse are the controls that keep the guards from being loosened.",
+  "cases": [
+    {
+      "name": "negation/same-clause-verb-final-niet",
+      "must_refuse": true,
+      "answer": "De werkgever vergoedt de parkeerkosten [eu:p].",
+      "answer_language": "nl",
+      "evidence": [{"id": "p", "document_id": "p", "language": "nl", "text": "De werkgever vergoedt de parkeerkosten niet. Reiskosten worden wel vergoed."}],
+      "expect": {"decision": "refused", "claims": [{"supported": false, "reason": "negation guard"}]}
+    },
+    {
+      "name": "negation/same-clause-niet-after-adverbs",
+      "must_refuse": true,
+      "answer": "De werkgever vergoedt de parkeerkosten [eu:p].",
+      "answer_language": "nl",
+      "evidence": [{"id": "p", "document_id": "p", "language": "nl", "text": "De werkgever vergoedt de parkeerkosten dan ook niet."}],
+      "expect": {"decision": "refused", "claims": [{"supported": false, "reason": "negation guard"}]}
+    },
+    {
+      "name": "negation/niet-before-a-coordinator-still-refuses",
+      "must_refuse": true,
+      "answer": "De werkgever vergoedt de parkeerkosten [eu:p].",
+      "answer_language": "nl",
+      "evidence": [{"id": "p", "document_id": "p", "language": "nl", "text": "De werkgever vergoedt de parkeerkosten niet en de reiskosten wel."}],
+      "expect": {"decision": "refused", "claims": [{"supported": false, "reason": "negation guard"}]}
+    },
+    {
+      "name": "negation/model-path-cannot-drop-a-clause-final-niet",
+      "must_refuse": true,
+      "answer": "De werkgever vergoedt de parkeerkosten [eu:p].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {"p": [0.99, 0.0]},
+      "evidence": [{"id": "p", "document_id": "p", "language": "nl", "text": "De werkgever vergoedt de parkeerkosten niet."}],
+      "expect": {"decision": "refused", "claims": [{"supported": false, "reason": "negation guard"}]}
+    },
+    {
+      "name": "negation/geen-after-a-dash-is-another-clause (R-103)",
+      "answer": "Tijdens onbetaald verlof loopt je pensioenopbouw door [eu:s10].",
+      "answer_language": "nl",
+      "evidence": [{"id": "s10", "document_id": "pensioen-faq", "language": "nl", "text": "Tijdens onbetaald verlof loopt je pensioenopbouw door — dit gaat automatisch en is geen keuze."}],
+      "expect": {"decision": "answered", "claims": [{"supported": true, "reason": ""}]}
+    },
+    {
+      "name": "negation/niet-after-en-is-another-clause (G-D3)",
+      "answer": "De werkgever heeft de werknemer tijdig gewaarschuwd [eu:s19].",
+      "answer_language": "nl",
+      "evidence": [{"id": "s19", "document_id": "bw", "language": "nl", "text": "Ontslag is mogelijk mits de werkgever heeft de werknemer tijdig gewaarschuwd en de ongeschiktheid niet het gevolg is van onvoldoende zorg."}],
+      "expect": {"decision": "answered", "claims": [{"supported": true, "reason": ""}]}
+    },
+    {
+      "name": "negation/zonder-beyond-the-tail-window (G-S4)",
+      "answer": "Een bestuurder mag zijn besluit alleen uitvoeren als de or daarmee akkoord gaat [eu:s2].",
+      "answer_language": "nl",
+      "evidence": [{"id": "s2", "document_id": "ser", "language": "nl", "text": "Een bestuurder mag zijn besluit alleen uitvoeren als de or daarmee akkoord gaat Een besluit dat de werkgever zonder instemming neemt is nietig"}],
+      "expect": {"decision": "answered", "claims": [{"supported": true, "reason": ""}]}
+    },
+    {
+      "name": "negation/claim-already-carries-the-negation (R-123)",
+      "answer": "De bonus wordt niet uitgekeerd [eu:b].",
+      "answer_language": "nl",
+      "evidence": [{"id": "b", "document_id": "b", "language": "nl", "text": "De bonus wordt niet uitgekeerd zolang het contract niet is getekend."}],
+      "expect": {"decision": "answered", "claims": [{"supported": true, "reason": ""}]}
+    },
+    {
+      "name": "value/unrelated-claim-survives-a-differing-phone-number (R-114)",
+      "answer": "In de regeling is opgenomen dat een melder niet benadeeld mag worden [eu:a].",
+      "answer_language": "nl",
+      "evidence": [
+        {"id": "a", "document_id": "klokkenluider-2023", "language": "nl", "text": "In de regeling is opgenomen dat een melder niet benadeeld mag worden. Vertrouwenspersoon bereikbaar op 06-23388524."},
+        {"id": "b", "document_id": "klokkenluider-2024", "language": "nl", "text": "In de regeling is opgenomen dat een melder niet benadeeld mag worden. Vertrouwenspersoon bereikbaar op 06-23386524."}
+      ],
+      "expect": {"decision": "answered", "conflicts_reported": true, "claims": [{"supported": true, "reason": ""}]}
+    },
+    {
+      "name": "value/claim-carrying-the-disputed-number-is-dropped",
+      "must_refuse": true,
+      "answer": "Vertrouwenspersoon bereikbaar op 06-23388524 [eu:a].",
+      "answer_language": "nl",
+      "evidence": [
+        {"id": "a", "document_id": "klokkenluider-2023", "language": "nl", "text": "Vertrouwenspersoon bereikbaar op 06-23388524."},
+        {"id": "b", "document_id": "klokkenluider-2024", "language": "nl", "text": "Vertrouwenspersoon bereikbaar op 06-23386524."}
+      ],
+      "expect": {"decision": "refused", "conflicts_reported": true, "claims": [{"supported": false, "reason": "cited sources disagree"}]}
+    },
+    {
+      "name": "value/shared-number-is-not-the-disputed-one",
+      "answer": "De vertrouwenspersoon zit in kamer 13 [eu:a].",
+      "answer_language": "nl",
+      "evidence": [
+        {"id": "a", "document_id": "klokkenluider-2023", "language": "nl", "text": "De vertrouwenspersoon zit in kamer 13 en is bereikbaar op 23388524."},
+        {"id": "b", "document_id": "klokkenluider-2024", "language": "nl", "text": "De vertrouwenspersoon zit in kamer 13 en is bereikbaar op 23386524."}
+      ],
+      "expect": {"decision": "answered", "conflicts_reported": true, "claims": [{"supported": true, "reason": ""}]}
+    },
+    {
+      "name": "value/model-paraphrase-is-never-spared",
+      "must_refuse": true,
+      "answer": "The confidant can be reached by phone [eu:a].",
+      "answer_language": "en",
+      "checker": {"a": [0.99, 0.0]},
+      "evidence": [
+        {"id": "a", "document_id": "klokkenluider-2023", "language": "nl", "text": "De vertrouwenspersoon is telefonisch bereikbaar op 23388524."},
+        {"id": "b", "document_id": "klokkenluider-2024", "language": "nl", "text": "De vertrouwenspersoon is telefonisch bereikbaar op 23386524."}
+      ],
+      "expect": {"decision": "refused", "conflicts_reported": true, "claims": [{"supported": false, "reason": "cited sources disagree"}]}
+    }
+  ]
+}

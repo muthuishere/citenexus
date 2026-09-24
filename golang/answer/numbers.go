@@ -156,6 +156,7 @@ func ReadNumber(raw string, dash bool, language string) NumberReading {
 
 // numberMatch is one number found in lowered text, with its unit (if any).
 type numberMatch struct {
+	raw     string // the matched digits and separators, as written
 	reading NumberReading
 	unit    string
 }
@@ -173,7 +174,7 @@ func numbersIn(text, language string) []numberMatch {
 				continue
 			}
 		}
-		match := numberMatch{reading: ReadNumber(lowered[m[2]:m[3]], m[4] >= 0, language)}
+		match := numberMatch{raw: lowered[m[2]:m[3]], reading: ReadNumber(lowered[m[2]:m[3]], m[4] >= 0, language)}
 		if m[6] >= 0 {
 			match.unit = lowered[m[6]:m[7]]
 		}

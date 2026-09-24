@@ -155,21 +155,40 @@ func quotes(claim string) []string {
 }
 
 // clauseBreak ends a clause: sentence punctuation followed by space or end, a
-// comma followed by space ("25,50" is not a break), or a newline.
-var clauseBreak = regexp.MustCompile(`[.!?;:]+(\s|$)|,\s|\n`)
+// comma followed by space ("25,50" is not a break), a dash used as a clause
+// separator (— / – anywhere, "-" only between spaces), or a newline.
+var clauseBreak = regexp.MustCompile(`[.!?;:]+(\s|$)|,\s|\s*[\x{2014}\x{2013}]\s*|\s-\s|\n`)
+
+// coordinators start a NEW coordinated clause: a polarity marker after one
+// belongs to that clause, not to the words the claim matched ("… te verbeteren
+// en de ongeschiktheid niet …"). Only the tail AFTER the matched words is cut at
+// them; the passage is never split on them, because a claim may itself span one
+// ("de reis- en parkeerkosten") and splitting would switch the guard off.
+var coordinators = map[string]struct{}{
+	"en": {}, "maar": {}, "of": {}, "want": {}, "dus": {},
+	"and": {}, "but": {}, "or": {}, "so": {},
+}
 
 // clauseNegationGuard closes a hole in the ADR-0009 predicate for verb-final
 // languages. gate.IsSupportedV2 inspects polarity markers only INSIDE the
 // matched span, so "De werkgever vergoedt de parkeerkosten." passes against
 // "De werkgever vergoedt de parkeerkosten niet." — the negation sits after the
-// last matched token. Measured on the Dutch fixtures (feat/nl-tables); it is the
-// ordinary Dutch word order, not an edge case.
+// last matched token. It is the ordinary Dutch word order, not an edge case.
 //
-// For each clause of the passage the claim aligns within, every marker in the
-// rest of that clause must survive into the claim. Scoped to the clause so a
-// negation belonging to the NEXT clause ("…, maar niet de reiskosten") does not
-// refuse a true claim. A claim that aligns within no single clause is left to
-// the gate. Go-only for now; it can only refuse.
+// For each clause of the passage the claim aligns within:
+//
+//   - every marker INSIDE the matched span must survive into the claim with its
+//     multiplicity (the gate's own rule — repeated here because the model path
+//     admits claims the gate never saw);
+//   - a marker in the TAIL — at most MaxSingleGap tokens after the span, cut at
+//     the first coordinator — must appear in the claim at least once. A claim
+//     that already carries the same negation is not refused for it (rag_go
+//     R-123 / R-126).
+//
+// Scoped this narrowly because a wider tail refused true claims: a "zonder" in
+// the next clause (G-S4), "geen" after a dash (R-103), "niet" after "en" (G-D3).
+// A claim that aligns within no single clause is left to the gate. Can only
+// refuse.
 func clauseNegationGuard(claim, passage string) string {
 	markers := gate.PolarityMarkers()
 	claimTokens := tokenize.TokenizeV2(claim)
@@ -185,14 +204,26 @@ func clauseNegationGuard(claim, passage string) string {
 		if !ok {
 			continue
 		}
-		want := map[string]int{}
-		for _, tok := range clauseTokens[span.Start:] {
+		inSpan := map[string]int{}
+		for _, tok := range clauseTokens[span.Start : span.End+1] {
 			if _, ok := markers[tok]; ok {
-				want[tok]++
+				inSpan[tok]++
 			}
 		}
-		for tok, n := range want {
+		for tok, n := range inSpan {
 			if inClaim[tok] < n {
+				return fmt.Sprintf("negation guard: the claim drops %q from the matched words", tok)
+			}
+		}
+		tail := clauseTokens[span.End+1:]
+		if len(tail) > gate.MaxSingleGap {
+			tail = tail[:gate.MaxSingleGap]
+		}
+		for _, tok := range tail {
+			if _, stop := coordinators[tok]; stop {
+				break
+			}
+			if _, ok := markers[tok]; ok && inClaim[tok] == 0 {
 				return fmt.Sprintf("negation guard: the passage clause carries %q after the matched words", tok)
 			}
 		}

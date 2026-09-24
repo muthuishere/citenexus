@@ -492,27 +492,38 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 	}
 	// A unit loses when something at least as authoritative contradicts it:
 	// strictly more => resolved against it; equal => unresolved, both lose.
-	outranked := map[string]bool{}
-	unresolved := map[string]bool{}
+	// Effects are recorded per unit and applied per CLAIM below, because a value
+	// conflict only touches the claims that carry the disputed value.
+	type effect struct {
+		outranked bool // false = unresolved
+		c         conflict
+		diffRuns  map[string]struct{} // value rule only: digit runs that differ
+	}
+	effects := map[string][]effect{}
 	var conflictNotes []string
-	unresolvedSides := []EvidenceUnit{}
 	for _, c := range conflicts {
 		ts, to := tierOf(c.supporting), tierOf(c.other)
 		note := fmt.Sprintf("%s: %s vs %s (%s)", c.finding.Rule, c.supporting.DocumentID, c.other.DocumentID, c.finding.Detail)
+		var runs map[string]struct{}
+		if c.finding.Rule == "value" {
+			runs = differingDigitRuns(c.supporting, c.other)
+		}
 		switch {
 		case to.Outranks(ts):
-			outranked[c.supporting.ID] = true
+			effects[c.supporting.ID] = append(effects[c.supporting.ID], effect{outranked: true, c: c, diffRuns: runs})
 			note += fmt.Sprintf(" — resolved by authority: %s outranks %s", c.other.ID, c.supporting.ID)
 		case ts.Outranks(to):
-			outranked[c.other.ID] = true
+			effects[c.other.ID] = append(effects[c.other.ID], effect{outranked: true, c: c, diffRuns: runs})
 			note += fmt.Sprintf(" — resolved by authority: %s outranks %s", c.supporting.ID, c.other.ID)
 		default:
-			unresolved[c.supporting.ID], unresolved[c.other.ID] = true, true
-			unresolvedSides = append(unresolvedSides, c.supporting, c.other)
+			e := effect{c: c, diffRuns: runs}
+			effects[c.supporting.ID] = append(effects[c.supporting.ID], e)
+			effects[c.other.ID] = append(effects[c.other.ID], e)
 		}
 		conflictNotes = append(conflictNotes, note)
 	}
 	conflictDropped := 0
+	unresolvedSides := []EvidenceUnit{}
 	for i := range verdicts {
 		v := &verdicts[i]
 		if !v.supported {
@@ -521,14 +532,22 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 		kept := v.sources[:0:0]
 		reason := ""
 		for _, id := range v.sources {
-			switch {
-			case outranked[id]:
-				reason = ReasonOutranked
-			case unresolved[id]:
-				if reason == "" {
-					reason = ReasonUnresolvedClaims
+			applied := false
+			for _, e := range effects[id] {
+				if spared(*v, e.diffRuns) {
+					continue
 				}
-			default:
+				applied = true
+				if e.outranked {
+					reason = ReasonOutranked
+				} else {
+					if reason == "" {
+						reason = ReasonUnresolvedClaims
+					}
+					unresolvedSides = append(unresolvedSides, e.c.supporting, e.c.other)
+				}
+			}
+			if !applied {
 				kept = append(kept, id)
 			}
 		}
@@ -682,6 +701,53 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 		Conflicts:       conflictNotes,
 		Provenance:      []result.ProvenanceEntry{},
 	}, nil
+}
+
+// differingDigitRuns are the digit runs of every number one unit carries and
+// the other does not (by ADR-0015 key), from both sides. A phone number that
+// differs between two versions of a contact list yields its own runs; the
+// shared "06" prefix does not.
+func differingDigitRuns(a, b EvidenceUnit) map[string]struct{} {
+	runs := map[string]struct{}{}
+	collect := func(x, y EvidenceUnit) {
+		have := map[string]struct{}{}
+		for _, m := range numbersIn(y.Text, y.Language) {
+			have[m.reading.Key] = struct{}{}
+		}
+		for _, m := range numbersIn(x.Text, x.Language) {
+			if _, ok := have[m.reading.Key]; ok {
+				continue
+			}
+			for _, run := range digitRun.FindAllString(m.raw, -1) {
+				runs[run] = struct{}{}
+			}
+		}
+	}
+	collect(a, b)
+	collect(b, a)
+	return runs
+}
+
+var digitRun = regexp.MustCompile(`[0-9]+`)
+
+// spared is true when a VALUE conflict provably does not touch this claim: the
+// claim was verified on its own words (the gate, or a gate-checked quote) and
+// carries none of the differing digit runs. A model-admitted paraphrase is
+// never spared — it may restate the disputed value in words ("dertig dagen"),
+// which no digit comparison can see. Any other conflict rule is never spared.
+func spared(v verdict, diffRuns map[string]struct{}) bool {
+	if diffRuns == nil {
+		return false
+	}
+	if v.verifiedBy != "gate" && !strings.HasPrefix(v.verifiedBy, "quote+") {
+		return false
+	}
+	for _, run := range digitRun.FindAllString(v.text, -1) {
+		if _, ok := diffRuns[run]; ok {
+			return false
+		}
+	}
+	return true
 }
 
 func sourceRefOf(eu EvidenceUnit) result.SourceRef {
