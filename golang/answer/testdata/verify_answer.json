@@ -2591,6 +2591,602 @@
           }
         ]
       }
+    },
+    {
+      "name": "role/employer-over-the-readers-own-contribution-refuses (R-101 shape)",
+      "must_refuse": true,
+      "answer": "De werkgever betaalt 4,5% van de pensioenpremie [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "actors": {
+        "employer": [
+          "zilverhaven"
+        ]
+      },
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Je eigen bijdrage is 4,5% van de pensioenpremie, de resterende premie betaalt Zilverhaven."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "role guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "role/the-gate-cannot-borrow-the-actor-of-another-clause",
+      "must_refuse": true,
+      "answer": "De werkgever betaalt 4,5% [eu:a].",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werkgever betaalt de rest; je betaalt 4,5%."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "role guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "role/employee-to-employer-in-english-over-a-dutch-unit",
+      "must_refuse": true,
+      "answer": "The employer contributes 4.5% of the pension premium [eu:a].",
+      "answer_language": "en",
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werknemer betaalt een eigen bijdrage van 4,5% van de pensioenpremie."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "role guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "role/interns-widened-to-all-employees",
+      "must_refuse": true,
+      "answer": "Alle werknemers krijgen een reiskostenvergoeding van € 50 per maand [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Stagiairs krijgen een reiskostenvergoeding van € 50 per maand."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "role guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "role/swap-in-a-list-item-on-the-union-path",
+      "must_refuse": true,
+      "answer": "Volgens artikel 12 van de pensioenregeling [eu:a]:\n- De werkgever betaalt 4,5% [eu:b]",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a+b": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Artikel 12 van de pensioenregeling regelt de premieverdeling."
+        },
+        {
+          "id": "b",
+          "document_id": "b",
+          "language": "nl",
+          "text": "Je eigen bijdrage aan de pensioenregeling is 4,5%."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "role guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "role/same-amount-paid-by-the-other-party",
+      "must_refuse": true,
+      "answer": "Je betaalt € 30 per maand aan de verzekeraar [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werkgever betaalt € 30 per maand aan de verzekeraar."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "role guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "role/verb-fact-without-a-number",
+      "must_refuse": true,
+      "answer": "Stagiairs krijgen een laptop van de zaak [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Werknemers krijgen een laptop van de zaak."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "role guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "role/implicit-second-person-is-the-employee",
+      "answer": "The employee contributes 4.5% of the pension premium [eu:a].",
+      "answer_language": "en",
+      "actors": {
+        "employer": [
+          "zilverhaven"
+        ]
+      },
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Je eigen bijdrage is 4,5% van de pensioenpremie, de resterende premie betaalt Zilverhaven."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "role/werknemer-and-medewerker-are-one-actor",
+      "answer": "Medewerkers krijgen een reiskostenvergoeding van € 50 per maand [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Werknemers krijgen een reiskostenvergoeding van € 50 per maand."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "role/unresolved-unit-actor-is-no-verdict",
+      "answer": "De werkgever betaalt 4,5% van de premie [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De premie bedraagt 4,5% van het salaris."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "role/giver-and-receiver-are-different-slots",
+      "answer": "Je ontvangt € 25 per maand [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werkgever vergoedt € 25 per maand."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "role/one-agreeing-clause-is-enough",
+      "answer": "De werkgever betaalt 4,5% [eu:a].",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werkgever betaalt 4,5%; je betaalt ook 4,5%."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "role/host-organisation-name-is-the-employer",
+      "answer": "De werkgever betaalt de resterende premie [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "actors": {
+        "employer": [
+          "zilverhaven"
+        ]
+      },
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Je eigen bijdrage is 4,5% van de pensioenpremie, de resterende premie betaalt Zilverhaven."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "role/a-label-binds-to-its-value (R-102 shape)",
+      "must_refuse": true,
+      "answer": "**Eigen bijdrage werkgever:** 2,5% van de pensioengrondslag [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De hoogte van jouw jaarlijkse bijdrage is gelijk aan 2,5% van de pensioengrondslag."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "role guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "role/a-number-without-a-slot-binds-to-its-actor",
+      "must_refuse": true,
+      "answer": "Contracts with employers under 18 who work at most 12 hours per week are excluded [eu:a].",
+      "answer_language": "en",
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De regeling geldt niet voor contracten met werknemers die jonger dan 18 jaar zijn en maximaal 12 uur per week werken."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "role guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "role/a-number-without-a-slot-and-the-same-actor-is-admitted",
+      "answer": "Contracts with employees under 18 who work at most 12 hours per week are excluded [eu:a].",
+      "answer_language": "en",
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De regeling geldt niet voor contracten met werknemers die jonger dan 18 jaar zijn en maximaal 12 uur per week werken."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "role/a-share-compound-is-bound-to-its-actor",
+      "must_refuse": true,
+      "answer": "The employer's share of the premium is 4.5% [eu:a].",
+      "answer_language": "en",
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Het werknemersdeel van de premie is 4,5%."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "role guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "role/a-word-that-starts-with-a-role-is-not-the-role",
+      "answer": "The 4.5% contribution comes from the internal pension rules [eu:a].",
+      "answer_language": "en",
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werknemer betaalt een bijdrage van 4,5% volgens de pensioenregeling."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "role/the-readers-pronoun-decides-no-fact-without-a-number",
+      "answer": "U mag niet vragen naar de oorzaak van de ziekte [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werkgever mag niet vragen naar de oorzaak van de ziekte."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "role/an-organisation-after-a-preposition-is-not-the-subject",
+      "answer": "Elke nieuwe medewerker krijgt bij indiensttreding een adviesgesprek [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "actors": {
+        "employer": [
+          "zilverhaven"
+        ]
+      },
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Binnen Zilverhaven krijgt elke nieuwe medewerker bij indiensttreding een adviesgesprek met de pensioenadviseur."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
     }
   ]
 }

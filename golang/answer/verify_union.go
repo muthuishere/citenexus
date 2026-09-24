@@ -67,17 +67,17 @@ func unionPremise(a, b EvidenceUnit) EvidenceUnit {
 // unionRefusal runs the deterministic part of the union rule for one pair —
 // A (the lead-in's unit) and B (the item's) — and returns the first refusal,
 // or "". claim is the joined claim; lead and item its parts.
-func unionRefusal(claim, lead, item, claimLanguage string, a, b EvidenceUnit, aliases map[string][]string) string {
+func unionRefusal(claim, lead, item, claimLanguage string, a, b EvidenceUnit, aliases map[string][]string, actors ActorLexicon) string {
 	if reason := leadInScope(lead, b); reason != "" {
 		return reason
 	}
-	if reason := guards(lead, claimLanguage, a, aliases); reason != "" {
+	if reason := guards(lead, claimLanguage, a, aliases, actors); reason != "" {
 		return reason
 	}
-	if reason := guards(item, claimLanguage, b, aliases); reason != "" {
+	if reason := guards(item, claimLanguage, b, aliases, actors); reason != "" {
 		return reason
 	}
-	return guards(claim, claimLanguage, unionPremise(a, b), aliases)
+	return guards(claim, claimLanguage, unionPremise(a, b), aliases, actors)
 }
 
 // leadInAttribution attribute a lead-in to a source and restrict nothing:

@@ -23,7 +23,9 @@ type verifyVector struct {
 	Checker       map[string][]float64            `json:"checker"`
 	CheckerClaims map[string]map[string][]float64 `json:"checker_claims"`
 	LeadInFrames  []string                        `json:"lead_in_frames"`
-	Evidence      []struct {
+	// Actors EXTENDS DefaultActorLexicon: actor id -> extra terms.
+	Actors   map[string][]string `json:"actors"`
+	Evidence []struct {
 		ID         string `json:"id"`
 		DocumentID string `json:"document_id"`
 		Language   string `json:"language"`
@@ -68,8 +70,8 @@ func TestVerifyAnswerConformance(t *testing.T) {
 	if err := json.Unmarshal(raw, &file); err != nil {
 		t.Fatal(err)
 	}
-	if len(file.Cases) != 90 {
-		t.Fatalf("verify_answer.json: got %d cases, want 90", len(file.Cases))
+	if len(file.Cases) != 110 {
+		t.Fatalf("verify_answer.json: got %d cases, want 110", len(file.Cases))
 	}
 	refuseControls := 0
 	for _, c := range file.Cases {
@@ -99,6 +101,13 @@ func TestVerifyAnswerConformance(t *testing.T) {
 				}
 			}
 			opts := VerifyOptions{AnswerLanguage: c.AnswerLanguage, AdmitParaphrase: c.AdmitParaphrase, NameAliases: c.NameAliases, LeadInFrames: c.LeadInFrames}
+			if len(c.Actors) > 0 {
+				lexicon := DefaultActorLexicon
+				for id, terms := range c.Actors {
+					lexicon = lexicon.With(id, terms...)
+				}
+				opts.Actors = &lexicon
+			}
 			if len(c.Checker) > 0 || len(c.CheckerClaims) > 0 {
 				opts.Checker, opts.CheckerName = checker, "fake"
 			}

@@ -412,3 +412,15 @@ func TestLeadInFramesEmptyDisablesTheRule(t *testing.T) {
 		t.Fatalf("empty frames must join the lead-in: %+v", res.Claims)
 	}
 }
+
+// An empty ActorLexicon switches the role guard off; nil means the default.
+func TestRoleGuardLexiconReplacesTheDefault(t *testing.T) {
+	ev := []EvidenceUnit{{ID: "a", DocumentID: "a", Language: "nl", Text: "De werkgever betaalt de rest; je betaalt 4,5%."}}
+	answer := "De werkgever betaalt 4,5% [eu:a]."
+	if res := verify(t, answer, ev, VerifyOptions{AnswerLanguage: "nl"}); res.Claims[0].Supported {
+		t.Fatalf("default lexicon: the role swap must be refused: %+v", res.Claims)
+	}
+	if res := verify(t, answer, ev, VerifyOptions{AnswerLanguage: "nl", Actors: &ActorLexicon{}}); !res.Claims[0].Supported {
+		t.Fatalf("empty lexicon: the role guard is off, the gate admits: %+v", res.Claims)
+	}
+}

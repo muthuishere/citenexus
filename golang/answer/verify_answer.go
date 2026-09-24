@@ -116,6 +116,12 @@ type VerifyOptions struct {
 	// content-free only when every token is inside a frame or is a stopword — any
 	// other word, number, polarity marker, exclusivity word or count means JOIN.
 	LeadInFrames []string
+	// Actors is the role guard's lexicon (verify_roles.go): actor ids with
+	// their terms in any language, the reader's pronouns, and the slot words.
+	// nil means DefaultActorLexicon. A non-nil lexicon REPLACES the default —
+	// extend it with DefaultActorLexicon.With("employer", "<organisation>");
+	// an empty ActorLexicon switches the guard off.
+	Actors *ActorLexicon
 	// AdmitParaphrase lets the checker admit SAME-language claims the gate
 	// rejected (a paraphrase), still behind the deterministic guards. Off by
 	// default: it trades the gate's guarantee for coverage, and the caller should
@@ -622,6 +628,10 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 		return cache[k], nil
 	}
 
+	actors := DefaultActorLexicon
+	if opts.Actors != nil {
+		actors = *opts.Actors
+	}
 	frames := opts.LeadInFrames
 	if frames == nil {
 		frames = DefaultLeadInFrames
@@ -670,7 +680,13 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 		gateReason := ""
 		for _, eu := range candidates {
 			if gate.IsSupportedV2(text, eu.Text) {
-				if reason := clauseNegationGuard(text, eu.Text); reason != "" {
+				reason := clauseNegationGuard(text, eu.Text)
+				if reason == "" {
+					// The gate matches tokens, not who does what: "De werkgever
+					// betaalt 4,5%" can align across two clauses of the unit.
+					reason = roleGuard(text, declared, eu, actors)
+				}
+				if reason != "" {
 					if gateReason == "" {
 						gateReason = reason // the FIRST cited unit refused, not the last
 					}
@@ -711,7 +727,7 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 		if !v.supported && v.reason != ReasonContradicted && opts.Checker != nil && len(pc.cited) > 0 {
 			guardReason := ""
 			admit := func(eu EvidenceUnit) (bool, error) {
-				if reason := guards(text, declared, eu, opts.NameAliases); reason != "" {
+				if reason := guards(text, declared, eu, opts.NameAliases, actors); reason != "" {
 					if guardReason == "" {
 						guardReason = reason // the FIRST cited unit refused, not the last
 					}
@@ -797,7 +813,7 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 						if !inLead[a.ID] || !allowed(a) {
 							continue
 						}
-						reason := unionRefusal(text, lead, item, declared, a, b, opts.NameAliases)
+						reason := unionRefusal(text, lead, item, declared, a, b, opts.NameAliases, actors)
 						if reason == "" {
 							// The checker may veto from either unit, and must entail the
 							// claim from both together.
