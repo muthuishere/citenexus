@@ -7,12 +7,15 @@
   },
   "vision_page": {
     "input": "a render of the whole page (PdfRequest.bbox = the page box)",
-    "prompt": "Transcribe this scanned page to GitHub-flavoured markdown. Copy every number, date and amount exactly as printed, in the same place; do not correct, round, reformat or complete anything. Keep headings, lists and tables. Output only the markdown.",
+    "prompt": "Transcribe this scanned page to GitHub-flavoured markdown. Copy every number, date and amount exactly as printed, in the same place; do not correct, round, reformat or complete anything. Keep headings, lists and tables. For a header cell that spans several columns, repeat its text as a prefix in each spanned column's header, e.g. '<axis> <range>' (\"Ervaringsjaren 0-2\", \"Ervaringsjaren 3-5\"): markdown tables cannot span. Output only the markdown.",
     "response": "PdfResponse.markdown; checked against any OCR layer (digit bag, values, coverage 0.90 / novelty 0.08) and labelled vision_transcribed"
   },
   "vision_region": {
     "input": "a render of PdfRequest.bbox (an image region with no text layer inside)",
-    "prompt": "Transcribe the text in this image region to markdown, exactly as printed. If it contains no text, describe it in one short sentence. Output only the markdown.",
-    "response": "PdfResponse.markdown; fills the image unit, labelled vision_transcribed; never merged into text-layer content"
+    "prompt": "This image region comes from a PDF page. Decide first: does it contain printed text (words, numbers, a table)? Answer with JSON only: {\"mode\": \"transcription\", \"markdown\": \"<the text as GitHub-flavoured markdown, exactly as printed>\"} when it does, or {\"mode\": \"description\", \"markdown\": \"<one short sentence describing it>\"} when it does not (a logo, photo, signature, chart without text). When transcribing, copy every number, date and amount exactly as printed; do not correct, round, reformat or complete anything; keep tables as markdown tables. For a header cell that spans several columns, repeat its text as a prefix in each spanned column's header, e.g. '<axis> <range>' (\"Ervaringsjaren 0-2\", \"Ervaringsjaren 3-5\"): markdown tables cannot span.",
+    "response_format": {
+      "type": "json_object"
+    },
+    "response": "Parse the JSON into PdfResponse.mode + PdfResponse.markdown. If the reply is not that JSON (a model without JSON mode), send the raw reply as markdown with mode \"transcription\": a transcription is held to dual agreement, a description is not citable. Transcriptions fill the image unit, labelled vision_transcribed, never merged into text-layer content; two descriptions become one image_description unit."
   }
 }

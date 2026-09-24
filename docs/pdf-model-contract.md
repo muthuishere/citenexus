@@ -158,6 +158,19 @@ be given as word IDs.
   - `"description"`: the region has no meaningful text (a logo, a photo) and
     the markdown describes it. On `vision_page`, `description` is
     `malformed_response`.
+  - **Let the model declare it.** The default `vision_region` prompt
+    (`rust/data/pdf_prompts.json`) asks for JSON
+    `{"mode": "transcription" | "description", "markdown": "…"}` with
+    `response_format: {"type": "json_object"}`. Parse it into `mode` +
+    `markdown`. If the reply is not that JSON (a model without JSON mode),
+    send the raw reply as `markdown` with `mode: "transcription"`: the safe
+    fallback, because a transcription must pass dual agreement to be cited.
+  - **Spanning headers in vision tables.** The default `vision_page` and
+    `vision_region` prompts ask the model to repeat a header cell that spans
+    several columns as a prefix in each spanned column (`<axis> <range>`,
+    e.g. "Ervaringsjaren 0-2"). That is the same shape the core writes for a
+    text-layer table (`header_flattened`, §6). Config only; the core does
+    not check it.
 
 From the fixture (`assemble-mixed.responses.json`):
 
@@ -276,7 +289,16 @@ The output is `{units, pages, document}`. A unit is:
 Tables are GitHub pipe tables:
 - spanned slots are empty cells;
 - `|` inside a cell is written `\|`;
-- markers and leaders are never emitted.
+- markers and leaders are never emitted;
+- a **rotated label** (a vertical corner or column label) is not a word, so
+  no grid can reference it. The core fills it into an EMPTY cell itself, from
+  the page's own rotated characters, for deterministic and model grids alike
+  (`rust/src/extract/pdf/tables.rs:347-363`, `build.rs:278`,
+  `contract.rs:388`): the empty slot its centre lies in, else the empty
+  header cell of the column it runs beside. Only a vertical run (taller than
+  wide) that overlaps no table word qualifies — a diagonal stamp or a
+  watermark crossing the cells never does. Lex5 (69 PDFs): one label placed
+  (T5 25/25), no other cell changed.
 
 The fixture's output (`assemble-mixed.golden.json`), abridged:
 
@@ -436,3 +458,14 @@ Consumer measurements with this contract (their harness, their numbers):
   with the default prompt, so it is **not usable** for tables as is.
 - **Vision descriptions of logos from two models never agree** (0.45 by line).
   That is why descriptions are `image_description`, outside dual agreement.
+- **`model_tables` gave no gain** (consumer's live acceptance run): 126
+  GT cells with it on vs 130 with it off (only uncertain regions asked), at
+  about 3× the table calls. It stays opt-in (default `false`, §1).
+- **Make the two vision variants cross-family, not two seeds of one model**
+  (same run). A mistral-small + gemma-4 pair beat same-model seeds: T6 (a
+  scanned table) scored 30 cells with the cross-family pair and 0 with the
+  seed-2 pair.
+- **Phrase chunks change request contents.** Since chunks, a
+  `table_structure` request carries `chunks` and every word a `chunk` id, so
+  a request's JSON (and its token count) differs from earlier runs. Word IDs
+  did not change.
