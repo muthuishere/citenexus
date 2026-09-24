@@ -42,6 +42,7 @@ import "C"
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"unsafe"
 )
 
@@ -333,6 +334,11 @@ type PdfRequest struct {
 	Prompt string     `json:"prompt"`
 	BBox   [4]float64 `json:"bbox"`
 	Words  []PdfWord  `json:"words"`
+	// Variant is 1 or 2 for vision requests (nil for table_structure): every
+	// vision region is asked TWICE, independently. Hint says how the host
+	// should make the two independent (a different model or sampling seed).
+	Variant *int    `json:"variant"`
+	Hint    *string `json:"hint"`
 }
 
 // PdfPrepared is phase one: the base result plus the requests.
@@ -420,4 +426,34 @@ func PdfAssembleJSON(pdf []byte, opts PdfOptions, responsesJSON []byte) ([]byte,
 		responsesJSON = []byte("[]")
 	}
 	return pdfCall("assemble", pdf, opts, responsesJSON)
+}
+
+// CitableText returns markdown with every <!-- vision_disputed … --> block
+// removed: the only text a host may cite or quote-match (ADR-0017 decision 4).
+// Mirrors the Rust core's vision::citable_text.
+func CitableText(markdown string) string {
+	const open, closing = "<!-- vision_disputed", "-->"
+	var b strings.Builder
+	rest := markdown
+	for {
+		i := strings.Index(rest, open)
+		if i < 0 {
+			b.WriteString(rest)
+			break
+		}
+		b.WriteString(rest[:i])
+		j := strings.Index(rest[i:], closing)
+		if j < 0 {
+			break
+		}
+		rest = rest[i+j+len(closing):]
+	}
+	var lines []string
+	for _, l := range strings.Split(b.String(), "\n") {
+		l = strings.TrimRight(l, " \t\r")
+		if strings.TrimSpace(l) != "" {
+			lines = append(lines, l)
+		}
+	}
+	return strings.Join(lines, "\n")
 }

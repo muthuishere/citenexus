@@ -41,6 +41,10 @@ type Provenance struct {
 	FailedCheck       *string `json:"failed_check"`
 	HeadingSource     *string `json:"heading_source"`
 	JoinedHyphen      bool    `json:"joined_hyphen"`
+	// VisionDisputed: part (or all) of this unit's vision text is disputed —
+	// the two transcriptions disagreed or only one came back. Disputed text
+	// sits in <!-- vision_disputed … --> blocks; cite only CitableText(Markdown).
+	VisionDisputed bool `json:"vision_disputed"`
 }
 
 // OoxmlUnits converts a DOCX or PPTX (sourceType "docx" | "pptx") into

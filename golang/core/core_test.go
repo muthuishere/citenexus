@@ -314,7 +314,7 @@ func TestPdfAssembleGolden(t *testing.T) {
 	for _, r := range prep.Requests {
 		ids = append(ids, r.ID)
 	}
-	if strings.Join(ids, ",") != "p1:table0,p2:page,p3:img0" {
+	if strings.Join(ids, ",") != "p1:table0,p2:page:v1,p2:page:v2,p3:img0:v1,p3:img0:v2" {
 		t.Fatalf("requests: %v", ids)
 	}
 	var typed []PdfResponse
@@ -348,5 +348,12 @@ func TestPdfAssembleGolden(t *testing.T) {
 	}
 	if string(none) != string(base) {
 		t.Fatal("PdfAssemble with no responses must equal PdfUnits")
+	}
+}
+
+func TestCitableText(t *testing.T) {
+	md := "Diner 1.250,00 vooraf betaald.\n<!-- vision_disputed\nv1: Hotel 5.100,00 per jaar.\nv2: Hotel 5.100,00 geen per jaar.\n-->\nArtikel I.3."
+	if got := CitableText(md); got != "Diner 1.250,00 vooraf betaald.\nArtikel I.3." {
+		t.Fatalf("CitableText: %q", got)
 	}
 }
