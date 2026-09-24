@@ -707,6 +707,9 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 					reason = truncationGuard(text, eu.Text)
 				}
 				if reason == "" {
+					reason = exclusionGuard(text, declared, eu, cfg)
+				}
+				if reason == "" {
 					reason = conditionGuard(text, declared, eu, cfg)
 				}
 				if reason == "" {

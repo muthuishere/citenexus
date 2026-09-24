@@ -3902,7 +3902,7 @@
         "claims": [
           {
             "supported": false,
-            "reason": "condition guard"
+            "reason": "exclusion guard"
           }
         ]
       }
@@ -3966,7 +3966,7 @@
         "claims": [
           {
             "supported": false,
-            "reason": "condition guard"
+            "reason": "exclusion guard"
           }
         ]
       }
@@ -6183,6 +6183,253 @@
             "supported": true,
             "reason": ""
           },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "exclusion/adv-gw-v2-15 an excluded group, across languages through the glossary (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "Teachers who work from home at least one day a week receive €2.35 per day worked from home [eu:S1].",
+      "answer_language": "en",
+      "glossary": [
+        [
+          "leraren",
+          "teachers"
+        ],
+        [
+          "leraar",
+          "teacher"
+        ]
+      ],
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "thuiswerkregeling Stichting Openbaar Onderwijs Duinrand",
+          "language": "nl",
+          "text": "Thuiswerkvergoeding. Medewerkers van het bestuursbureau die op grond van een thuiswerkafspraak ten minste één dag per week thuiswerken, ontvangen een vergoeding van € 2,35 per thuiswerkdag. Voor leraren en onderwijsondersteunend personeel geldt deze vergoeding niet."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "exclusion guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "exclusion/adv-gw-v2-15 without a glossary is the checker's (no verdict)",
+      "answer": "Teachers who work from home at least one day a week receive €2.35 per day worked from home [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "thuiswerkregeling Stichting Openbaar Onderwijs Duinrand",
+          "language": "nl",
+          "text": "Thuiswerkvergoeding. Medewerkers van het bestuursbureau die op grond van een thuiswerkafspraak ten minste één dag per week thuiswerken, ontvangen een vergoeding van € 2,35 per thuiswerkdag. Voor leraren en onderwijsondersteunend personeel geldt deze vergoeding niet."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "exclusion/nl-an-excluded-group-refuses",
+      "answer": "Stagiairs kunnen eens per vier jaar een fiets aanschaffen via de fietsregeling [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Fietsregeling. Medewerkers kunnen eens per vier jaar een fiets aanschaffen via de fietsregeling, met uitzondering van stagiairs en uitzendkrachten."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "exclusion guard"
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "exclusion/nl-everyone-over-an-exclusion-refuses",
+      "answer": "Iedereen kan eens per vier jaar een fiets aanschaffen via de fietsregeling [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Fietsregeling. Medewerkers kunnen eens per vier jaar een fiets aanschaffen via de fietsregeling, met uitzondering van stagiairs en uitzendkrachten."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "exclusion guard"
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "exclusion/en-an-excluded-group-refuses",
+      "answer": "Agency workers can buy a bike through the bike scheme once every four years [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "en",
+          "text": "Bike scheme. Employees can buy a bike through the bike scheme once every four years, except interns and agency workers."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "exclusion guard"
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "exclusion/nl-niet-van-toepassing-op",
+      "answer": "De thuiswerkvergoeding geldt ook voor leraren [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De thuiswerkvergoeding bedraagt € 2,35 per dag. De regeling is niet van toepassing op leraren."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "exclusion guard"
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "exclusion/a-group-the-unit-does-not-exclude-is-admitted",
+      "answer": "Medewerkers kunnen eens per vier jaar een fiets aanschaffen via de fietsregeling [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Fietsregeling. Medewerkers kunnen eens per vier jaar een fiets aanschaffen via de fietsregeling, met uitzondering van stagiairs en uitzendkrachten."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "exclusion/a-claim-restating-the-exclusion-is-admitted",
+      "answer": "Employees except interns and agency workers can buy a bike through the bike scheme once every four years [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "en",
+          "text": "Bike scheme. Employees can buy a bike through the bike scheme once every four years, except interns and agency workers."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
           {
             "supported": true,
             "reason": ""

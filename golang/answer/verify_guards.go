@@ -449,6 +449,9 @@ func guards(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfig) strin
 	if reason := roleGuard(claim, claimLanguage, eu, actors); reason != "" {
 		return reason
 	}
+	if reason := exclusionGuard(claim, claimLanguage, eu, cfg); reason != "" {
+		return reason
+	}
 	if reason := conditionGuard(claim, claimLanguage, eu, cfg); reason != "" {
 		return reason
 	}
