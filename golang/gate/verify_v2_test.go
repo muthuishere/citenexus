@@ -22,10 +22,11 @@ type v2Fixture struct {
 
 // expectedFaithfulV2Counts pins the bucket sizes of
 // conformance/cases/faithful_v2.json: twenty adversarial attacks (9 English,
-// 11 Dutch) and thirty-eight controls (30 English, 8 Dutch). A dropped attack is a silently weakened ADR-0009 contract.
+// 11 Dutch) plus two gap-budget rejects, and thirty-eight controls (30 English,
+// 8 Dutch) plus three alignment controls (the windowed-DP fix). A dropped attack is a silently weakened ADR-0009 contract.
 var expectedFaithfulV2Counts = map[string]int{
-	"attacks":  20,
-	"controls": 38,
+	"attacks":  22,
+	"controls": 41,
 }
 
 func loadFaithfulV2(t *testing.T) v2Fixture {

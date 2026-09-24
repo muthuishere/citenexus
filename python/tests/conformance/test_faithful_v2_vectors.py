@@ -23,7 +23,8 @@ from .fixtures import load_case
 VECTORS: dict[str, list[dict[str, Any]]] = load_case("faithful_v2.json")
 
 #: 9 English + 11 Dutch attacks; 30 English + 8 Dutch controls.
-EXPECTED_COUNTS: dict[str, int] = {"attacks": 20, "controls": 38}
+# 20 false answers (9 en, 11 nl) + 2 gap-budget rejects; 38 controls + 3 alignment.
+EXPECTED_COUNTS: dict[str, int] = {"attacks": 22, "controls": 41}
 
 
 def test_bucket_names_and_sizes() -> None:

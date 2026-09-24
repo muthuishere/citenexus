@@ -176,22 +176,35 @@ def align(
 
     for i in range(1, n):
         nxt: list[tuple[int, int, int] | None] = [None] * m
-        best: tuple[int, int, int] | None = None  # running best over k < j
-        best_k = -1
         for j in range(m):
-            # fold position j-1 into the running best before using it for j
-            prev = state[j - 1] if j > 0 else None
-            if prev is not None and (best is None or prev[0] < best[0]):
-                best, best_k = prev, j - 1
-            if passage_tokens[j] != claim_tokens[i] or best is None:
+            if passage_tokens[j] != claim_tokens[i]:
                 continue
-            gap = j - best_k - 1
-            if gap > max_single_gap:
-                continue
-            total = best[0] + gap
-            if total > max_total_gap:
-                continue
-            nxt[j] = (total, max(best[1], gap), best[2])
+            # Every predecessor k within the single-gap window, scored by the
+            # total it would ACTUALLY have after skipping to j. The earlier form
+            # kept one running minimum of state[k].total over all k < j and only
+            # then measured the gap from it — so a claim whose first token also
+            # occurs earlier in the passage ("the employee, the boss, ... the
+            # employee has rights") chained from the distant occurrence, blew the
+            # single-gap budget and was rejected although a verbatim match sat
+            # right there. That was stricter than the predicate this function
+            # defines, never looser.
+            #
+            # At a fixed j, equal totals imply the same start (span length is
+            # n - 1 + total), so the tie-break below — lowest max_gap — cannot
+            # change the span the polarity guard inspects.
+            chosen: tuple[int, int, int] | None = None
+            for k in range(max(0, j - 1 - max_single_gap), j):
+                prev = state[k]
+                if prev is None:
+                    continue
+                gap = j - k - 1
+                total = prev[0] + gap
+                if total > max_total_gap:
+                    continue
+                candidate = (total, max(prev[1], gap), prev[2])
+                if chosen is None or candidate[:2] < chosen[:2]:
+                    chosen = candidate
+            nxt[j] = chosen
         state = nxt
         if all(s is None for s in state):
             return None

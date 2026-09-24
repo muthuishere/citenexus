@@ -191,8 +191,8 @@ interface FaithfulVector {
 }
 
 // The bucket sizes of conformance/cases/faithful_v2.json.
-const EXPECTED_FAITHFUL_ATTACKS = 20; // 9 en + 11 nl
-const EXPECTED_FAITHFUL_CONTROLS = 38; // 30 en + 8 nl
+const EXPECTED_FAITHFUL_ATTACKS = 22; // 9 en + 11 nl + 2 gap-budget
+const EXPECTED_FAITHFUL_CONTROLS = 41; // 30 en + 8 nl + 3 alignment
 
 const faithful = fixture<{ attacks: FaithfulVector[]; controls: FaithfulVector[] }>(
   "faithful_v2.json",

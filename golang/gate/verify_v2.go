@@ -130,32 +130,43 @@ func AlignWithBudget(claimTokens, passageTokens []string, maxSingleGap, maxTotal
 		for j := range next {
 			next[j] = cell{}
 		}
-		var best cell // running best over k < j
-		bestK := -1
 		for j := 0; j < m; j++ {
-			// fold position j-1 into the running best before using it for j
-			if j > 0 {
-				prev := state[j-1]
-				if prev.ok && (!best.ok || prev.total < best.total) {
-					best, bestK = prev, j-1
+			if passageTokens[j] != claimTokens[i] {
+				continue
+			}
+			// Every predecessor k within the single-gap window, scored by the
+			// total it would ACTUALLY have after skipping to j. The earlier form
+			// kept one running minimum of state[k].total over all k < j and only
+			// then measured the gap from it, so a claim whose first token also
+			// occurs earlier in the passage chained from the distant occurrence
+			// and was rejected although a verbatim match sat right there —
+			// stricter than the predicate, never looser. At a fixed j, equal
+			// totals imply the same start, so the max-gap tie-break cannot move
+			// the span the polarity guard inspects.
+			var chosen cell
+			lo := j - 1 - maxSingleGap
+			if lo < 0 {
+				lo = 0
+			}
+			for k := lo; k < j; k++ {
+				prev := state[k]
+				if !prev.ok {
+					continue
+				}
+				gap := j - k - 1
+				total := prev.total + gap
+				if total > maxTotalGap {
+					continue
+				}
+				mx := prev.max
+				if gap > mx {
+					mx = gap
+				}
+				if !chosen.ok || total < chosen.total || (total == chosen.total && mx < chosen.max) {
+					chosen = cell{total: total, max: mx, start: prev.start, ok: true}
 				}
 			}
-			if passageTokens[j] != claimTokens[i] || !best.ok {
-				continue
-			}
-			gap := j - bestK - 1
-			if gap > maxSingleGap {
-				continue
-			}
-			total := best.total + gap
-			if total > maxTotalGap {
-				continue
-			}
-			mx := best.max
-			if gap > mx {
-				mx = gap
-			}
-			next[j] = cell{total: total, max: mx, start: best.start, ok: true}
+			next[j] = chosen
 		}
 		state, next = next, state
 		anyOK := false

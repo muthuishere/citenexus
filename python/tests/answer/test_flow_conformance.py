@@ -49,8 +49,8 @@ FAITHFUL_VECTORS: dict[str, Any] = _load("faithful_v2.json")
 EXPECTED_LANGUAGE_VECTORS = 6
 EXPECTED_CLAIMED_SCRIPT_VECTORS = 14
 EXPECTED_UNCLAIMED_SCRIPT_VECTORS = 11
-EXPECTED_FAITHFUL_ATTACKS = 20  # 9 English + 11 Dutch
-EXPECTED_FAITHFUL_CONTROLS = 38  # 30 English + 8 Dutch
+EXPECTED_FAITHFUL_ATTACKS = 22  # 9 English + 11 Dutch + 2 gap-budget
+EXPECTED_FAITHFUL_CONTROLS = 41  # 30 English + 8 Dutch + 3 alignment
 
 #: How many language vectors ``AnswerFlow.ask`` can EXPRESS. Python has both the
 #: ``default_answer_language`` constructor argument and a detector, so more cases

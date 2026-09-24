@@ -243,8 +243,8 @@ type faithfulVector struct {
 
 // The bucket sizes of conformance/cases/faithful_v2.json.
 const (
-	expectedFaithfulAttacks  = 20 // 9 en + 11 nl
-	expectedFaithfulControls = 38 // 30 en + 8 nl
+	expectedFaithfulAttacks  = 22 // 9 en + 11 nl + 2 gap-budget
+	expectedFaithfulControls = 41 // 30 en + 8 nl + 3 alignment
 )
 
 func loadFaithfulVectors(t *testing.T) (attacks, controls []faithfulVector) {

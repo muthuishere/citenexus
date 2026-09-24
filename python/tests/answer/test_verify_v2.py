@@ -312,6 +312,45 @@ CONTROLS = (
 ATTACKS += DUTCH_ATTACKS
 CONTROLS += DUTCH_CONTROLS
 
+# Alignment DP (found by the rag_go consumer, 2026-09-24). The DP used to keep a
+# running minimum of state[k].total over ALL k < j and measure the gap from it,
+# so a claim whose first token also occurs EARLIER in the passage chained from
+# the distant occurrence, blew MAX_SINGLE_GAP and was rejected although it was a
+# verbatim quote. The biggest single cause of true Dutch claims dropped
+# (de/het/een repeat constantly). The budget itself is unchanged, so genuinely
+# scattered claims must still fail — on the single gap AND on the total alone.
+CONTROLS += (
+    (
+        "alignment/repeated-first-token-nl",
+        "de werknemer, de baas, de klant, de werknemer heeft recht",
+        "de werknemer heeft recht",
+    ),
+    (
+        "alignment/repeated-first-token-en",
+        "the employee, the boss, the client, the employee has rights",
+        "the employee has rights",
+    ),
+    (
+        "alignment/nearest-occurrence-wins",
+        "The tenant, the landlord and the agent agree that the tenant must pay the rent monthly.",
+        "the tenant must pay the rent monthly",
+    ),
+)
+ATTACKS += [
+    (
+        "budget/single-gap-still-exceeded-after-a-repeated-token",
+        "De werknemer, de werknemer die tijdens de proeftijd ziek wordt en herstelt, "
+        "heeft recht op loon.",
+        "De werknemer heeft recht op loon.",
+    ),
+    (
+        "budget/total-gap-exceeded-with-every-gap-within-four",
+        "De werkgever vergoedt jaarlijks na schriftelijke goedkeuring de volledige kosten "
+        "van erkende, relevante, vooraf aangevraagde opleidingen.",
+        "De werkgever vergoedt de kosten van opleidingen.",
+    ),
+]
+
 
 @pytest.mark.parametrize(("name", "passage", "answer"), ATTACKS, ids=[a[0] for a in ATTACKS])
 def test_attack_is_rejected(name: str, passage: str, answer: str) -> None:

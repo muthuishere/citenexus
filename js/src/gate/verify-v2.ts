@@ -81,21 +81,29 @@ export function align(
 
   for (let i = 1; i < n; i++) {
     const next: (Cell | null)[] = new Array<Cell | null>(m).fill(null);
-    let best: Cell | null = null; // running best over k < j
-    let bestK = -1;
     for (let j = 0; j < m; j++) {
-      // fold position j-1 into the running best before using it for j
-      const prev = j > 0 ? (state[j - 1] ?? null) : null;
-      if (prev !== null && (best === null || prev.total < best.total)) {
-        best = prev;
-        bestK = j - 1;
+      if (passageTokens[j] !== claimTokens[i]) continue;
+      // Every predecessor k within the single-gap window, scored by the total
+      // it would ACTUALLY have after skipping to j. The earlier form kept one
+      // running minimum of state[k].total over all k < j and only then measured
+      // the gap from it, so a claim whose first token also occurs earlier in the
+      // passage chained from the distant occurrence and was rejected although a
+      // verbatim match sat right there — stricter than the predicate, never
+      // looser. At a fixed j, equal totals imply the same start, so the max-gap
+      // tie-break cannot move the span the polarity guard inspects.
+      let chosen: Cell | null = null;
+      for (let k = Math.max(0, j - 1 - maxSingleGap); k < j; k++) {
+        const prev = state[k] ?? null;
+        if (prev === null) continue;
+        const gap = j - k - 1;
+        const total = prev.total + gap;
+        if (total > maxTotalGap) continue;
+        const max = Math.max(prev.max, gap);
+        if (chosen === null || total < chosen.total || (total === chosen.total && max < chosen.max)) {
+          chosen = { total, max, start: prev.start };
+        }
       }
-      if (passageTokens[j] !== claimTokens[i] || best === null) continue;
-      const gap = j - bestK - 1;
-      if (gap > maxSingleGap) continue;
-      const total = best.total + gap;
-      if (total > maxTotalGap) continue;
-      next[j] = { total, max: Math.max(best.max, gap), start: best.start };
+      next[j] = chosen;
     }
     state = next;
     if (state.every((s) => s === null)) return null;

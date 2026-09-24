@@ -23,7 +23,8 @@ interface V2Fixture {
 // must stay accepted — measured false rejection is 0.0%.
 /** Bucket sizes, pinned. A vector silently dropped from a bucket is a weakened
  *  contract that no per-case assertion can see. */
-const EXPECTED_COUNTS: Record<string, number> = { attacks: 20, controls: 38 };
+// + 2 gap-budget rejects and 3 alignment controls (the windowed-DP fix).
+const EXPECTED_COUNTS: Record<string, number> = { attacks: 22, controls: 41 };
 
 describe("isSupportedV2 conformance", () => {
   const fixture = loadCase<V2Fixture>("faithful_v2.json");

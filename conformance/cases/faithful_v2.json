@@ -119,6 +119,18 @@
       "passage": "Het verlof wordt tenzij anders overeengekomen in hele dagen opgenomen.",
       "answer": "Het verlof wordt in hele dagen opgenomen.",
       "supported": false
+    },
+    {
+      "name": "budget/single-gap-still-exceeded-after-a-repeated-token",
+      "passage": "De werknemer, de werknemer die tijdens de proeftijd ziek wordt en herstelt, heeft recht op loon.",
+      "answer": "De werknemer heeft recht op loon.",
+      "supported": false
+    },
+    {
+      "name": "budget/total-gap-exceeded-with-every-gap-within-four",
+      "passage": "De werkgever vergoedt jaarlijks na schriftelijke goedkeuring de volledige kosten van erkende, relevante, vooraf aangevraagde opleidingen.",
+      "answer": "De werkgever vergoedt de kosten van opleidingen.",
+      "supported": false
     }
   ],
   "controls": [
@@ -348,6 +360,24 @@
       "name": "nl/restrictor-kept-compressed",
       "passage": "Alle medewerkers behalve stagiairs ontvangen jaarlijks een nieuwe laptop.",
       "answer": "Alle medewerkers behalve stagiairs ontvangen een laptop",
+      "supported": true
+    },
+    {
+      "name": "alignment/repeated-first-token-nl",
+      "passage": "de werknemer, de baas, de klant, de werknemer heeft recht",
+      "answer": "de werknemer heeft recht",
+      "supported": true
+    },
+    {
+      "name": "alignment/repeated-first-token-en",
+      "passage": "the employee, the boss, the client, the employee has rights",
+      "answer": "the employee has rights",
+      "supported": true
+    },
+    {
+      "name": "alignment/nearest-occurrence-wins",
+      "passage": "The tenant, the landlord and the agent agree that the tenant must pay the rent monthly.",
+      "answer": "the tenant must pay the rent monthly",
       "supported": true
     }
   ]
