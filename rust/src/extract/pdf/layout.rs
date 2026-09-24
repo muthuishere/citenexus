@@ -169,7 +169,6 @@ pub fn segments(page: &RawPage) -> (Vec<Segment>, Vec<Vec<usize>>, usize) {
         .filter(|&i| visible(&page.chars[i]))
         .collect();
     let c = &page.chars;
-    // Fake bold (the same glyph drawn twice at ~the same spot) counts once.
     idx.sort_by(|&a, &b| {
         c[a].baseline
             .total_cmp(&c[b].baseline)
@@ -191,10 +190,15 @@ pub fn segments(page: &RawPage) -> (Vec<Segment>, Vec<Vec<usize>>, usize) {
     for mut g in groups {
         g.sort_by(|&a, &b| c[a].x0.total_cmp(&c[b].x0).then(a.cmp(&b)));
         let before = g.len();
+        // Fake bold (the same glyph drawn twice at one spot) counts once. A
+        // ligature expanded by its ToUnicode entry ("ff" -> 'f','f' on ONE
+        // box) is not a duplicate: its characters are adjacent in the text
+        // stream, a second draw is not.
         g.dedup_by(|b, a| {
             c[*a].ch == c[*b].ch
                 && (c[*a].x0 - c[*b].x0).abs() < 0.5
                 && (c[*a].y0 - c[*b].y0).abs() < 0.5
+                && (*b as isize - *a as isize).abs() != 1
         });
         dups += before - g.len();
         let mut line = Vec::new();
