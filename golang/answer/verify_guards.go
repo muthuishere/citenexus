@@ -293,11 +293,19 @@ func absentName(names []string, passage string, aliases map[string][]string) str
 				return true
 			}
 		}
+		// An alias counts only when EVERY one of its words is present: "ov" ->
+		// "openbaar vervoer" must not be satisfied by "eigen vervoer".
 		for _, alias := range aliases[tok] {
-			for _, at := range tokenize.TokenizeV2(alias) {
-				if _, ok := have[at]; ok {
-					return true
+			words := tokenize.TokenizeV2(alias)
+			all := len(words) > 0
+			for _, at := range words {
+				if _, ok := have[at]; !ok {
+					all = false
+					break
 				}
+			}
+			if all {
+				return true
 			}
 		}
 		return false

@@ -4090,6 +4090,110 @@
           }
         ]
       }
+    },
+    {
+      "name": "name/alias-needs-every-word-of-one-alias",
+      "answer": "Het OV wordt vergoed [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "name_aliases": {
+        "ov": [
+          "openbaar vervoer"
+        ]
+      },
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "reiskostenregeling",
+          "language": "nl",
+          "text": "Het eigen vervoer wordt vergoed."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "name guard"
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "name/alias-in-a-hyphenated-name-needs-every-word",
+      "answer": "Het OV-abonnement wordt vergoed [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "name_aliases": {
+        "ov": [
+          "openbaar vervoer"
+        ]
+      },
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "reiskostenregeling",
+          "language": "nl",
+          "text": "Het eigen vervoer wordt vergoed."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "name guard"
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "name/alias-with-every-word-present-is-admitted",
+      "answer": "Het OV wordt vergoed [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "name_aliases": {
+        "ov": [
+          "openbaar vervoer"
+        ]
+      },
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "reiskostenregeling",
+          "language": "nl",
+          "text": "Het openbaar vervoer wordt vergoed."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
     }
   ]
 }
