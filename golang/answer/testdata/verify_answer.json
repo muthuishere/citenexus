@@ -7580,6 +7580,177 @@
           }
         ]
       }
+    },
+    {
+      "name": "condition/adv-dc-06 across languages through a glossary covering the dropped words (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "Employees may work from home [eu:S1]. Employees may work from home with their manager's permission [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "glossary": [
+        [
+          "toestemming",
+          "permission"
+        ],
+        [
+          "leidinggevende",
+          "manager"
+        ]
+      ],
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "thuiswerkregeling",
+          "language": "nl",
+          "text": "Thuiswerken. Werknemers mogen thuiswerken met toestemming van hun leidinggevende. De werkgever vergoedt een bureaustoel voor werknemers met een vast contract."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "condition guard: the"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "condition/adv-dc-01 across languages through a glossary covering the dropped words (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "The employer will not disadvantage the reporter for reporting a suspected wrongdoing in good faith [eu:S1]. The employer will not disadvantage the reporter for reporting a suspected wrongdoing in good faith and with due care [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "glossary": [
+        [
+          "zorgvuldig",
+          "due care"
+        ],
+        [
+          "goeder",
+          "good"
+        ],
+        [
+          "trouw",
+          "faith"
+        ],
+        [
+          "melden",
+          "reporting"
+        ],
+        [
+          "vermoeden",
+          "suspected"
+        ],
+        [
+          "misstand",
+          "wrongdoing"
+        ],
+        [
+          "werkgever",
+          "employer"
+        ],
+        [
+          "melder",
+          "reporter"
+        ]
+      ],
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "klokkenluidersregeling",
+          "language": "nl",
+          "text": "Artikel 6. Bescherming. De werkgever benadeelt de melder niet in verband met het te goeder trouw en zorgvuldig melden van een vermoeden van een misstand."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "condition guard: the"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "condition/a-consequent-sentence-holds-under-the-one-before-it (R-110 shape)",
+      "must_refuse": true,
+      "answer": "Bij ongewenst gedrag kun je terecht bij de vertrouwenspersoon [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Ongewenst gedrag. Bespreek het eerst met de betrokkene en kom je er met de betrokkene niet uit. Dan kun je terecht bij de vertrouwenspersoon."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "condition guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "condition/a-consequent-with-its-condition-is-admitted",
+      "answer": "Kom je er met de betrokkene niet uit, dan kun je terecht bij de vertrouwenspersoon [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Ongewenst gedrag. Bespreek het eerst met de betrokkene en kom je er met de betrokkene niet uit. Dan kun je terecht bij de vertrouwenspersoon."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
     }
   ]
 }

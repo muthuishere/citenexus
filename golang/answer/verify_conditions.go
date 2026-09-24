@@ -171,14 +171,32 @@ func conditionGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfi
 	// every sentence tied for it (a heading "Ongewenst gedrag." ties with the
 	// sentence that restricts it; both are read).
 	var ties []string
+	previous := map[string]string{} // sentence -> the sentence before it
 	bestN := 0
+	claimHedges := hedgesIn(claimTokens, claim)
+	prev := ""
 	for _, s := range sentenceBreak.Split(softJoin(eu.Text), -1) {
+		previous[s] = prev
+		prev = s
 		n := 0
 		seen := map[string]bool{}
 		for _, t := range tokenize.TokenizeV2(s) {
 			// Any non-stopword counts for finding the sentence ("mag" too); only
-			// the restrictor test needs content words of 4+ letters.
+			// the restrictor test needs content words of 4+ letters. Across
+			// languages a role the claim names explicitly (werknemers =
+			// employees, not the reader's "you") and a hedge of the same class
+			// (mogen = may) count too.
 			has, _ := c.carried(t)
+			if !has && cross {
+				if actorTerm(t, cfg.actors) && claimNamesRole(c.claim, t, cfg.actors) {
+					has = true
+				}
+				for class := range hedgesIn([]string{t}, t) {
+					if _, ok := claimHedges[class]; ok {
+						has = true
+					}
+				}
+			}
 			if !seen[t] && has && !gate.IsStopword(t) && !isContextStop(t) {
 				seen[t] = true
 				n++
@@ -236,6 +254,17 @@ func conditionGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfi
 
 	for _, bestText := range ties {
 		best := tokenize.TokenizeV2(bestText)
+		// A consequent sentence ("Dan kun je …", "In dat geval …") holds only
+		// under the sentence before it: that sentence is its condition.
+		if len(best) > 1 && (best[0] == "dan" || best[0] == "then" ||
+			(len(best) > 2 && best[0] == "in" && best[1] == "dat" && best[2] == "geval") ||
+			(len(best) > 2 && best[0] == "in" && best[1] == "that" && best[2] == "case")) {
+			if cond := previous[bestText]; cond != "" {
+				if ok, w := lacks(tokenize.TokenizeV2(cond), true); ok {
+					return refuse("condition", w)
+				}
+			}
+		}
 		// A conditional sentence opened by its verb: "Kom je … niet uit, dan …".
 		if len(best) > 2 {
 			if _, subj := conditionalVerbSubjects[best[1]]; subj && !gate.IsStopword(best[0]) && !isContextStop(best[0]) {
@@ -435,3 +464,19 @@ func canonicalDates(text, language string) string {
 }
 
 var exclusionOpeners = map[string]struct{}{"behalve": {}, "uitgezonderd": {}, "except": {}}
+
+// claimNamesRole: the claim names t's actor class by an explicit role term,
+// not by the reader's pronoun.
+func claimNamesRole(claim map[string]bool, t string, lexicon ActorLexicon) bool {
+	for _, terms := range lexicon.Actors {
+		if !hasTerm(terms, t) {
+			continue
+		}
+		for _, x := range terms {
+			if claim[x] {
+				return true
+			}
+		}
+	}
+	return false
+}
