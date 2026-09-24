@@ -11,6 +11,7 @@ pub mod extract;
 pub mod rrf;
 pub mod store;
 pub mod types;
+pub mod units;
 
 // Public so integration tests can exercise the exact C surface bindings use.
 pub mod ffi;
@@ -21,3 +22,4 @@ pub use extract::{extract, source_type_for_extension};
 pub use rrf::rrf;
 pub use store::LanceStore;
 pub use types::*;
+pub use units::*;
