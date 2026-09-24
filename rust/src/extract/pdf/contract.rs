@@ -220,6 +220,7 @@ fn requests(b: &Base, opts: &PdfOptions) -> Vec<PdfRequest> {
                     prompt: "vision_page".into(),
                     bbox: page_box,
                     words: vec![],
+                    chunks: vec![],
                     variant: Some(v),
                     hint: Some(variant_hint(v)),
                 });
@@ -255,6 +256,7 @@ fn requests(b: &Base, opts: &PdfOptions) -> Vec<PdfRequest> {
                 }
                 let k_here = k;
                 k += 1;
+                let chunks = chunks_of(&words);
                 out.push(PdfRequest {
                     id: format!("p{pg}:table{k_here}"),
                     page: pg,
@@ -262,6 +264,7 @@ fn requests(b: &Base, opts: &PdfOptions) -> Vec<PdfRequest> {
                     prompt: "table_structure".into(),
                     bbox: region.map(r2),
                     words,
+                    chunks,
                     variant: None,
                     hint: None,
                 });
@@ -287,6 +290,7 @@ fn requests(b: &Base, opts: &PdfOptions) -> Vec<PdfRequest> {
                         prompt: "vision_region".into(),
                         bbox: region,
                         words: vec![],
+                        chunks: vec![],
                         variant: Some(v),
                         hint: Some(variant_hint(v)),
                     });
@@ -364,14 +368,55 @@ fn table_markdown(
     out.join("\n")
 }
 
-fn to_cells(grid: &PdfGrid) -> Vec<Vec<GridCell>> {
+/// The request's phrase chunks: every chunk ALL of whose words are listed.
+fn chunks_of(words: &[PdfWord]) -> Vec<PdfChunk> {
+    let mut by: BTreeMap<&str, Vec<&PdfWord>> = BTreeMap::new();
+    let mut order: Vec<&str> = Vec::new();
+    for w in words {
+        if let Some(c) = w.chunk.as_deref() {
+            if !by.contains_key(c) {
+                order.push(c);
+            }
+            by.entry(c).or_default().push(w);
+        }
+    }
+    order
+        .into_iter()
+        .map(|c| {
+            let ws = &by[c];
+            let mut bb = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
+            for w in ws {
+                bb = [bb[0].min(w.bbox[0]), bb[1].min(w.bbox[1]), bb[2].max(w.bbox[2]), bb[3].max(w.bbox[3])];
+            }
+            PdfChunk {
+                id: c.to_string(),
+                text: ws.iter().map(|w| w.text.as_str()).collect::<Vec<_>>().join(" "),
+                bbox: bb,
+                words: ws.iter().map(|w| w.id.clone()).collect(),
+            }
+        })
+        .collect()
+}
+
+/// A cell's IDs with every chunk ID replaced by its words (in order).
+fn expand(ids: &[String], chunks: &BTreeMap<&str, &PdfChunk>) -> Vec<String> {
+    ids.iter()
+        .flat_map(|id| match chunks.get(id.as_str()) {
+            Some(c) => c.words.clone(),
+            None => vec![id.clone()],
+        })
+        .collect()
+}
+
+fn to_cells(grid: &PdfGrid, req: &PdfRequest) -> Vec<Vec<GridCell>> {
+    let chunks: BTreeMap<&str, &PdfChunk> = req.chunks.iter().map(|c| (c.id.as_str(), c)).collect();
     grid.rows
         .iter()
         .map(|row| {
             row.iter()
                 .map(|c| match c {
                     PdfCell::Words(w) => GridCell {
-                        words: w.clone(),
+                        words: expand(w, &chunks),
                         colspan: 1,
                         rowspan: 1,
                     },
@@ -380,7 +425,7 @@ fn to_cells(grid: &PdfGrid) -> Vec<Vec<GridCell>> {
                         colspan,
                         rowspan,
                     } => GridCell {
-                        words: words.clone(),
+                        words: expand(words, &chunks),
                         colspan: colspan.unwrap_or(1) as usize,
                         rowspan: rowspan.unwrap_or(1) as usize,
                     },
@@ -460,7 +505,7 @@ fn apply_table(
     let mut all: BTreeSet<String> = BTreeSet::new();
     let mut grids = Vec::new();
     for g in tables {
-        let cells = to_cells(g);
+        let cells = to_cells(g, req);
         // leaders are filler: outside the column-band test (they run across)
         let gate_cells: Vec<Vec<GridCell>> = cells
             .iter()
@@ -831,7 +876,7 @@ fn mark_failed(
         .and_then(|r| r.tables.as_ref())
         .into_iter()
         .flatten()
-        .flat_map(|g| to_cells(g).into_iter().flatten().flat_map(|c| c.words))
+        .flat_map(|g| to_cells(g, req).into_iter().flatten().flat_map(|c| c.words))
         .collect();
     let targets: Vec<usize> = match req.kind {
         PdfRequestKind::VisionRegion => region_unit(units, req).into_iter().collect(),

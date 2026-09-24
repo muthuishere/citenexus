@@ -72,20 +72,37 @@ Every request has `id`, `page` (1-based), `kind`, `prompt`, `bbox`, `words`,
 a paragraph would be a certain `partial_unit`.
 
 **`words`:** every text-layer word inside the region, plus a 12 pt margin.
-Each word is `{id, text, bbox, marker}`:
+Each word is `{id, text, bbox, marker, chunk}`:
 - `id` is `p{page}w{n}`, stable for the same bytes and options.
 - `marker: true` flags a list-marker glyph opening a line: `•`, `-`, a 1-char
-  non-alphanumeric glyph, or `1.` / `1)` / `a)` / `(a)` / `iv)`.
+  non-alphanumeric glyph other than a currency sign, or `1.` / `1)` / `a)` /
+  `(a)` / `iv)` (`rust/src/extract/pdf/layout.rs:241-263`). `€` in `€ 1.500`
+  is part of the amount, not a marker.
+- `chunk` is the phrase chunk the word belongs to, or `null` (markers and
+  pure leaders).
 - **Leaders** are words carrying a run of 4+ `.`, `…`, `·` or `_`, alone
   (`.......`) or glued to text (`Inleiding.......`). They are filler.
+
+**`chunks`: phrase chunks, one ID per phrase.** A chunk is a run of one line
+with no gap wider than 1.5 × the font size — the same segment the column
+tracks are built from (`layout.rs:10,209`) — minus a leading marker and pure
+leaders (`build.rs:465-480`). Each is `{id, text, bbox, words}`, id
+`p{page}c{n}`. A request lists every chunk ALL of whose words it lists
+(`contract.rs:372`). **Assign chunks, not words:** a cell may hold chunk IDs,
+word IDs, or both, and the core expands each chunk ID to exactly its words
+before any check (`contract.rs:402,419`). This is what keeps `€ 1.500` and
+`12 punten` in one column: a model assigning single words split them. A chunk
+that genuinely spans two columns (rare; two cells closer than 1.5 × size) must
+be given as word IDs.
 
 **`variant` and `hint`:** `null`.
 
 ```json
 {"id": "p1:table0", "page": 1, "kind": "table_structure", "prompt": "table_structure",
  "bbox": [71.75, 99.75, 472.25, 180.25],
- "words": [{"id": "p1w8", "text": "Omschrijving", "bbox": [76.43, 106.72, 139.27, 116.09], "marker": false},
-           {"id": "p1w9", "text": "Bedrag", "bbox": [226.73, 106.84, 259.81, 116.09], "marker": false}, "…"],
+ "words": [{"id": "p1w8", "text": "Omschrijving", "bbox": [76.43, 106.72, 139.27, 116.09], "marker": false, "chunk": "p1c2"},
+           {"id": "p1w9", "text": "Bedrag", "bbox": [226.73, 106.84, 259.81, 116.09], "marker": false, "chunk": "p1c3"}, "…"],
+ "chunks": [{"id": "p1c3", "text": "Bedrag", "bbox": [226.73, 106.84, 259.81, 116.09], "words": ["p1w9"]}, "…"],
  "variant": null, "hint": null}
 ```
 
@@ -118,7 +135,8 @@ Each word is `{id, text, bbox, marker}`:
 
 - **A table grid** is `{"rows": [[cell, …], …]}`, rows top to bottom and cells
   left to right. A cell is:
-  - an array of word IDs, e.g. `["p1w12"]`; `[]` for an empty cell; or
+  - an array of word and/or chunk IDs, e.g. `["p1c7"]` or `["p1w12"]`; `[]`
+    for an empty cell; or
   - `{"words": [...], "colspan": 2, "rowspan": 1}` for spans (HTML rules).
 
   Use every word that lies inside a table exactly once. **Never write text:**
@@ -287,7 +305,7 @@ var responses []core.PdfResponse
 for _, req := range prep.Requests {
 	switch req.Kind {
 	case "table_structure":
-		// send req.Words (id, text, bbox, marker) + a render of req.BBox; ask for word-ID grids
+		// send req.Chunks + req.Words + a render of req.BBox; ask for chunk-ID grids
 		raw, finish, err := tableModel(req)
 		if err != nil { continue } // timeout/error: omit -> base output
 		var g struct{ Tables []core.PdfGrid `json:"tables"` }
@@ -334,7 +352,7 @@ prep = core.pdf_prepare(pdf, opts)
 responses: list[core.PdfResponse] = []
 for req in prep.requests:
     if req.kind == "table_structure":
-        # send req.words (id, text, bbox, marker) + a render of req.bbox
+        # send req.chunks + req.words + a render of req.bbox; ask for chunk-ID grids
         grids = table_model(req)                 # your model -> list of {"rows": [...]} or []
         if grids is None:
             continue                             # error/timeout: omit -> base output

@@ -36,6 +36,7 @@ __all__ = [
     "CoreUnavailableError",
     "DocUnit",
     "PdfCell",
+    "PdfChunk",
     "PdfDocumentSignals",
     "PdfGrid",
     "PdfOptions",
@@ -142,10 +143,24 @@ class PdfWord(BaseModel):
     text: str
     bbox: tuple[float, float, float, float]
     marker: bool = False
+    chunk: str | None = None
+
+
+class PdfChunk(BaseModel):
+    """A phrase chunk: one line's words closer than the column-gap threshold
+    (minus a leading marker and leaders). A grid cell may name a chunk ID
+    instead of its words; the core expands it to exactly those words."""
+
+    model_config = _CFG
+    id: str
+    text: str
+    bbox: tuple[float, float, float, float]
+    words: list[str]
 
 
 class PdfRequest(BaseModel):
-    """kind: table_structure (answer with ``tables`` over ``words`` IDs) |
+    """kind: table_structure (answer with ``tables`` over ``words`` or
+    ``chunks`` IDs) |
     vision_page | vision_region (answer with ``markdown``; issued twice,
     ``variant`` 1 and 2, see ``hint``)."""
 
@@ -156,6 +171,7 @@ class PdfRequest(BaseModel):
     prompt: str
     bbox: tuple[float, float, float, float]
     words: list[PdfWord] = []
+    chunks: list[PdfChunk] = []
     variant: int | None = None
     hint: str | None = None
 

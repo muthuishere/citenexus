@@ -323,6 +323,20 @@ type PdfWord struct {
 	// Marker: a list-marker glyph opening a line (•, -, 1., a) …). A grid may
 	// include it or leave it out; leaving it out is not a partial unit.
 	Marker bool `json:"marker"`
+	// Chunk is the phrase chunk (PdfRequest.Chunks) this word belongs to; nil
+	// for list markers and pure leaders.
+	Chunk *string `json:"chunk"`
+}
+
+// PdfChunk is a phrase chunk: the words of one line closer than the
+// column-gap threshold (minus a leading marker and leaders). A grid cell may
+// name a chunk ID instead of its words; the core expands it to exactly those
+// words, so an amount like "€ 1.500" cannot be split across columns.
+type PdfChunk struct {
+	ID    string     `json:"id"`
+	Text  string     `json:"text"`
+	BBox  [4]float64 `json:"bbox"`
+	Words []string   `json:"words"`
 }
 
 // PdfRequest asks the host for one model call. Kind is table_structure (answer
@@ -337,6 +351,8 @@ type PdfRequest struct {
 	Prompt string     `json:"prompt"`
 	BBox   [4]float64 `json:"bbox"`
 	Words  []PdfWord  `json:"words"`
+	// Chunks (table_structure only): the phrase chunks over Words.
+	Chunks []PdfChunk `json:"chunks"`
 	// Variant is 1 or 2 for vision requests (nil for table_structure): every
 	// vision region is asked TWICE, independently. Hint says how the host
 	// should make the two independent (a different model or sampling seed).

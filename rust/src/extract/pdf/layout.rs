@@ -241,7 +241,8 @@ pub fn is_bullet(c: char) -> bool {
 pub fn is_marker_token(t: &str) -> bool {
     let mut cs = t.chars();
     if let (Some(c), None) = (cs.next(), cs.next()) {
-        return !c.is_alphanumeric();
+        // A lone currency sign ("€ 1.500") is part of the amount, not a marker.
+        return !c.is_alphanumeric() && !is_currency(c);
     }
     let core = t.trim_start_matches('(');
     let Some((cut, last)) = core.char_indices().last() else {
@@ -254,6 +255,11 @@ pub fn is_marker_token(t: &str) -> bool {
     body.chars().all(|c| c.is_ascii_digit())
         || (body.chars().count() == 1 && body.chars().all(|c| c.is_ascii_lowercase()))
         || body.chars().all(|c| matches!(c, 'i' | 'v' | 'x'))
+}
+
+/// Currency signs (Unicode Sc, the common ones): never a list marker.
+fn is_currency(c: char) -> bool {
+    matches!(c, '$' | '¢' | '£' | '¤' | '¥' | 'ƒ' | '€' | '₹' | '₽' | '₩' | '₺' | '₪' | '₫' | '₱' | '₦' | '₴' | '₿')
 }
 
 /// Does this segment open a list item?
@@ -443,7 +449,7 @@ mod tests {
         ] {
             assert!(is_marker_token(m), "{m}");
         }
-        for t in ["Reiskosten", "1.3", "2024", "A", "Art."] {
+        for t in ["Reiskosten", "1.3", "2024", "A", "Art.", "€", "$"] {
             assert!(!is_marker_token(t), "{t}");
         }
     }

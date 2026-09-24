@@ -424,6 +424,19 @@ export interface PdfWord {
   bbox: [number, number, number, number];
   /** A list-marker glyph; a grid may leave it out. */
   marker: boolean;
+  /** The phrase chunk this word belongs to; null for markers and leaders. */
+  chunk: string | null;
+}
+
+/**
+ * A phrase chunk: one line's words closer than the column-gap threshold. A
+ * grid cell may name a chunk ID instead of its words; the core expands it.
+ */
+export interface PdfChunk {
+  id: string;
+  text: string;
+  bbox: [number, number, number, number];
+  words: string[];
 }
 
 export interface PdfRequest {
@@ -433,6 +446,8 @@ export interface PdfRequest {
   prompt: string;
   bbox: [number, number, number, number];
   words: PdfWord[];
+  /** table_structure only: the phrase chunks over `words`. */
+  chunks: PdfChunk[];
   /** 1 or 2 for vision (every region is asked twice); null for tables. */
   variant: number | null;
   hint: string | null;

@@ -301,7 +301,8 @@
             139.27,
             116.09
           ],
-          "marker": false
+          "marker": false,
+          "chunk": "p1c2"
         },
         {
           "id": "p1w9",
@@ -312,7 +313,8 @@
             259.81,
             116.09
           ],
-          "marker": false
+          "marker": false,
+          "chunk": "p1c3"
         },
         {
           "id": "p1w10",
@@ -323,7 +325,8 @@
             378.15,
             116.09
           ],
-          "marker": false
+          "marker": false,
+          "chunk": "p1c4"
         },
         {
           "id": "p1w11",
@@ -334,7 +337,8 @@
             124.77,
             134.11
           ],
-          "marker": false
+          "marker": false,
+          "chunk": "p1c5"
         },
         {
           "id": "p1w12",
@@ -345,7 +349,8 @@
             264.44,
             135.41
           ],
-          "marker": false
+          "marker": false,
+          "chunk": "p1c6"
         },
         {
           "id": "p1w13",
@@ -356,7 +361,8 @@
             347.55,
             136.09
           ],
-          "marker": false
+          "marker": false,
+          "chunk": "p1c7"
         },
         {
           "id": "p1w14",
@@ -367,7 +373,8 @@
             98.64,
             154.11
           ],
-          "marker": false
+          "marker": false,
+          "chunk": "p1c8"
         },
         {
           "id": "p1w15",
@@ -378,7 +385,8 @@
             264.44,
             155.41
           ],
-          "marker": false
+          "marker": false,
+          "chunk": "p1c9"
         },
         {
           "id": "p1w16",
@@ -389,7 +397,8 @@
             100.03,
             174.11
           ],
-          "marker": false
+          "marker": false,
+          "chunk": "p1c10"
         },
         {
           "id": "p1w17",
@@ -400,7 +409,8 @@
             264.44,
             175.41
           ],
-          "marker": false
+          "marker": false,
+          "chunk": "p1c11"
         },
         {
           "id": "p1w18",
@@ -411,7 +421,153 @@
             354.14,
             174.11
           ],
-          "marker": false
+          "marker": false,
+          "chunk": "p1c12"
+        }
+      ],
+      "chunks": [
+        {
+          "id": "p1c2",
+          "text": "Omschrijving",
+          "bbox": [
+            76.43,
+            106.72,
+            139.27,
+            116.09
+          ],
+          "words": [
+            "p1w8"
+          ]
+        },
+        {
+          "id": "p1c3",
+          "text": "Bedrag",
+          "bbox": [
+            226.73,
+            106.84,
+            259.81,
+            116.09
+          ],
+          "words": [
+            "p1w9"
+          ]
+        },
+        {
+          "id": "p1c4",
+          "text": "Opmerking",
+          "bbox": [
+            326.43,
+            106.72,
+            378.15,
+            116.09
+          ],
+          "words": [
+            "p1w10"
+          ]
+        },
+        {
+          "id": "p1c5",
+          "text": "Reiskosten",
+          "bbox": [
+            76.79,
+            126.84,
+            124.77,
+            134.11
+          ],
+          "words": [
+            "p1w11"
+          ]
+        },
+        {
+          "id": "p1c6",
+          "text": "7.000,00",
+          "bbox": [
+            226.47,
+            126.81,
+            264.44,
+            135.41
+          ],
+          "words": [
+            "p1w12"
+          ]
+        },
+        {
+          "id": "p1c7",
+          "text": "geen",
+          "bbox": [
+            326.32,
+            128.7,
+            347.55,
+            136.09
+          ],
+          "words": [
+            "p1w13"
+          ]
+        },
+        {
+          "id": "p1c8",
+          "text": "Hotel",
+          "bbox": [
+            76.8,
+            146.84,
+            98.64,
+            154.11
+          ],
+          "words": [
+            "p1w14"
+          ]
+        },
+        {
+          "id": "p1c9",
+          "text": "5.100,00",
+          "bbox": [
+            226.42,
+            146.81,
+            264.44,
+            155.41
+          ],
+          "words": [
+            "p1w15"
+          ]
+        },
+        {
+          "id": "p1c10",
+          "text": "Diner",
+          "bbox": [
+            76.77,
+            166.84,
+            100.03,
+            174.11
+          ],
+          "words": [
+            "p1w16"
+          ]
+        },
+        {
+          "id": "p1c11",
+          "text": "1.250,00",
+          "bbox": [
+            227.09,
+            166.81,
+            264.44,
+            175.41
+          ],
+          "words": [
+            "p1w17"
+          ]
+        },
+        {
+          "id": "p1c12",
+          "text": "vooraf",
+          "bbox": [
+            326.13,
+            166.72,
+            354.14,
+            174.11
+          ],
+          "words": [
+            "p1w18"
+          ]
         }
       ],
       "variant": null,
@@ -429,6 +585,7 @@
         842.0
       ],
       "words": [],
+      "chunks": [],
       "variant": 1,
       "hint": "variant 1 of 2: transcribe independently of the other variant, with a different model or a different sampling seed; only sentences both variants agree on become citable content"
     },
@@ -444,6 +601,7 @@
         842.0
       ],
       "words": [],
+      "chunks": [],
       "variant": 2,
       "hint": "variant 2 of 2: transcribe independently of the other variant, with a different model or a different sampling seed; only sentences both variants agree on become citable content"
     },
@@ -459,6 +617,7 @@
         320.0
       ],
       "words": [],
+      "chunks": [],
       "variant": 1,
       "hint": "variant 1 of 2: transcribe independently of the other variant, with a different model or a different sampling seed; only sentences both variants agree on become citable content"
     },
@@ -474,6 +633,7 @@
         320.0
       ],
       "words": [],
+      "chunks": [],
       "variant": 2,
       "hint": "variant 2 of 2: transcribe independently of the other variant, with a different model or a different sampling seed; only sentences both variants agree on become citable content"
     }

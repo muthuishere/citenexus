@@ -326,6 +326,27 @@ pub struct PdfWord {
     /// include it; leaving it out is not a partial unit and not lost text.
     #[serde(default)]
     pub marker: bool,
+    /// The phrase chunk this word belongs to (`PdfRequest::chunks`), or null
+    /// (list markers and pure leaders are in no chunk).
+    #[serde(default)]
+    pub chunk: Option<String>,
+}
+
+/// A phrase chunk: the words of one line separated by less than the
+/// column-gap threshold (the layout's segment, as the column tracks use it),
+/// minus a leading list marker and pure leaders. A grid may name a chunk
+/// instead of its words; the core expands it to exactly those words, so
+/// "€ 1.500" or "12 punten" can never be split across columns and nothing
+/// is invented.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PdfChunk {
+    /// `p{page}c{n}`, stable for the same bytes and options.
+    pub id: String,
+    /// The chunk's words' text joined by single spaces.
+    pub text: String,
+    pub bbox: BBox,
+    /// Word IDs, left to right.
+    pub words: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -354,6 +375,10 @@ pub struct PdfRequest {
     /// `table_structure` only: the words the grid may reference.
     #[serde(default)]
     pub words: Vec<PdfWord>,
+    /// `table_structure` only: the phrase chunks over those words; a grid
+    /// cell may list chunk IDs, word IDs, or both.
+    #[serde(default)]
+    pub chunks: Vec<PdfChunk>,
     /// Vision requests come in two independent variants (1 and 2) of the
     /// same region; only sentences both transcriptions agree on become
     /// content. `null` for `table_structure`.

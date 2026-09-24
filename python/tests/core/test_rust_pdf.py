@@ -58,6 +58,11 @@ def test_prepare_fulfil_assemble_typed_loop(pdf_bytes: bytes) -> None:
     assert table_req.kind == "table_structure"
     assert table_req.variant is None
     assert all(w.id.startswith("p1w") for w in table_req.words)
+    # Phrase chunks: each names only listed words, and every word points back.
+    listed = {w.id for w in table_req.words}
+    assert table_req.chunks and all(set(c.words) <= listed for c in table_req.chunks)
+    by_word = {w.id: w.chunk for w in table_req.words}
+    assert all(by_word[wid] == c.id for c in table_req.chunks for wid in c.words)
     assert [r.variant for r in prep.requests[1:3]] == [1, 2]
 
     # The host fulfils each request (here: the committed answers, re-typed).

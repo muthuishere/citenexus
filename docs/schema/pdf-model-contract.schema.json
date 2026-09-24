@@ -57,6 +57,46 @@
         "marker": {
           "type": "boolean",
           "description": "A list-marker glyph opening a line (•, -, 1., a) …). A grid MAY include it; leaving it out is neither a partial unit nor lost text, and it is not emitted."
+        },
+        "chunk": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^p[0-9]+c[0-9]+$",
+          "description": "The phrase chunk (PdfRequest.chunks) this word belongs to; null for list markers and pure leaders."
+        }
+      },
+      "additionalProperties": false
+    },
+    "PdfChunk": {
+      "type": "object",
+      "description": "A phrase chunk: the words of one line separated by less than the column-gap threshold (the layout's segment), minus a leading list marker and pure leaders. A cell may name a chunk ID instead of its words; the core expands it to exactly those words.",
+      "required": [
+        "id",
+        "text",
+        "bbox",
+        "words"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^p[0-9]+c[0-9]+$"
+        },
+        "text": {
+          "type": "string",
+          "description": "The chunk's words joined by single spaces."
+        },
+        "bbox": {
+          "$ref": "#/$defs/BBox"
+        },
+        "words": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^p[0-9]+w[0-9]+$"
+          }
         }
       },
       "additionalProperties": false
@@ -70,6 +110,7 @@
         "prompt",
         "bbox",
         "words",
+        "chunks",
         "variant",
         "hint"
       ],
@@ -100,6 +141,13 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/PdfWord"
+          }
+        },
+        "chunks": {
+          "type": "array",
+          "description": "table_structure only: the phrase chunks over `words` (every chunk all of whose words are listed).",
+          "items": {
+            "$ref": "#/$defs/PdfChunk"
           }
         },
         "variant": {
@@ -171,6 +219,9 @@
               },
               "hint": {
                 "type": "string"
+              },
+              "chunks": {
+                "maxItems": 0
               }
             }
           }
@@ -199,6 +250,9 @@
               },
               "hint": {
                 "type": "string"
+              },
+              "chunks": {
+                "maxItems": 0
               }
             }
           }
@@ -206,7 +260,7 @@
       ]
     },
     "PdfCell": {
-      "description": "A cell: an array of word IDs (reading order), or an object with spans (HTML rules). An empty cell is [].",
+      "description": "A cell: an array of word IDs and/or chunk IDs (reading order), or an object with spans (HTML rules). A chunk ID expands to its words. An empty cell is [].",
       "oneOf": [
         {
           "type": "array",

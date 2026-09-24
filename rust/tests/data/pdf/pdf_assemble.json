@@ -1410,6 +1410,75 @@
           "logo"
         ]
       }
+    },
+    {
+      "name": "table (T7 shape): a grid over PHRASE CHUNKS keeps '€ 1.500' and '12 punten' whole; a chunk expands to exactly its words",
+      "fixture": "t7shape",
+      "category": "must_accept",
+      "responses": [
+        {
+          "request": "p1:table0",
+          "finish_reason": "stop",
+          "tables": [
+            {
+              "rows": [
+                [
+                  [
+                    "~Niveau"
+                  ],
+                  [
+                    "~Bedrag"
+                  ],
+                  [
+                    "~Score"
+                  ]
+                ],
+                [
+                  [
+                    "~Junior"
+                  ],
+                  [
+                    "~€ 1.500"
+                  ],
+                  [
+                    "~12 punten"
+                  ]
+                ],
+                [
+                  [
+                    "~Medior"
+                  ],
+                  [
+                    "~€ 2.250"
+                  ],
+                  [
+                    "~18 punten"
+                  ]
+                ],
+                [
+                  [
+                    "~Senior"
+                  ],
+                  [
+                    "~€ 3.100"
+                  ],
+                  [
+                    "~24 punten"
+                  ]
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "applied": 1,
+        "rejected": 0,
+        "failed_check": null,
+        "table_source": "tracks",
+        "table_uncertain": false,
+        "table": "| Niveau | Bedrag | Score |\n| --- | --- | --- |\n| Junior | € 1.500 | 12 punten |\n| Medior | € 2.250 | 18 punten |\n| Senior | € 3.100 | 24 punten |"
+      }
     }
   ]
 }

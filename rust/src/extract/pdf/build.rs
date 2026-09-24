@@ -442,10 +442,13 @@ impl Staged {
         let w = &self.work[p];
         let chars = &raw.pages[p].chars;
         let mut out = Vec::new();
+        let mut chunk_n = 0usize;
         for line in &w.pl.lines {
             for &s in line {
                 let furn = self.furn.binary_search(&(p, s)).is_ok();
-                for (k, word) in w.pl.segments[s].words.iter().enumerate() {
+                let seg = &w.pl.segments[s];
+                let mut words: Vec<PdfWord> = Vec::with_capacity(seg.words.len());
+                for (k, word) in seg.words.iter().enumerate() {
                     let mut bb = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
                     let mut text = String::new();
                     for &c in word {
@@ -459,23 +462,27 @@ impl Staged {
                         ];
                     }
                     let id = word_id(p, self.word_ord[p][s][k]);
-                    let marker = k == 0
-                        && w.pl.segments[s].words.len() > 1
-                        && layout::is_marker_token(&text);
-                    out.push((
-                        PdfWord {
-                            id,
-                            text,
-                            bbox: bb,
-                            marker,
-                        },
-                        furn,
-                    ));
+                    let marker = k == 0 && seg.words.len() > 1 && layout::is_marker_token(&text);
+                    words.push(PdfWord { id, text, bbox: bb, marker, chunk: None });
                 }
+                // The segment is the phrase chunk, minus a leading marker and
+                // pure leaders (filler).
+                let members: Vec<usize> = (0..words.len())
+                    .filter(|&k| !words[k].marker && !crate::checks::is_leader(&words[k].text))
+                    .collect();
+                if !members.is_empty() {
+                    chunk_n += 1;
+                    let cid = format!("p{}c{}", p + 1, chunk_n);
+                    for k in members {
+                        words[k].chunk = Some(cid.clone());
+                    }
+                }
+                out.extend(words.into_iter().map(|w| (w, furn)));
             }
         }
         out
     }
+
 
     pub(crate) fn hblocks(&self) -> &[HBlock] {
         &self.hblocks
