@@ -143,10 +143,18 @@ pub fn cliptable_fixture() -> Doc {
 /// chunks keep each phrase one unit the model assigns whole.
 pub fn t7shape_fixture() -> Doc {
     let mut p = Page::a4().para(72.0, 60.0, 10.0, &["Beoordeling en beloning per niveau."]);
-    let rows = [("Niveau", "Bedrag", "Score"), ("Junior", "€ 1.500", "12 punten"), ("Medior", "€ 2.250", "18 punten"), ("Senior", "€ 3.100", "24 punten")];
+    let rows = [
+        ("Niveau", "Bedrag", "Score"),
+        ("Junior", "€ 1.500", "12 punten"),
+        ("Medior", "€ 2.250", "18 punten"),
+        ("Senior", "€ 3.100", "24 punten"),
+    ];
     for (k, (a, b, c)) in rows.iter().enumerate() {
         let y = 100.0 + k as f64 * 16.0;
-        p = p.text(72.0, y, 10.0, a).text(200.0, y, 10.0, b).text(300.0, y, 10.0, c);
+        p = p
+            .text(72.0, y, 10.0, a)
+            .text(200.0, y, 10.0, b)
+            .text(300.0, y, 10.0, c);
     }
     Doc::new(vec![p])
 }
@@ -176,7 +184,13 @@ fn resolve(prep: &PdfPrepared, request: &str, cell: &[serde_json::Value]) -> Vec
             }
             if let Some(t) = s.strip_prefix('~') {
                 let req = req.unwrap_or_else(|| panic!("no request {request}"));
-                return req.chunks.iter().find(|c| c.text == t).unwrap_or_else(|| panic!("no chunk {t:?}")).id.clone();
+                return req
+                    .chunks
+                    .iter()
+                    .find(|c| c.text == t)
+                    .unwrap_or_else(|| panic!("no chunk {t:?}"))
+                    .id
+                    .clone();
             }
             let (text, nth) = match s.rsplit_once('#') {
                 Some((t, n))
@@ -583,16 +597,27 @@ fn table_requests_list_phrase_chunks() {
         return;
     }
     let prep = pdf_prepare(&fixture("t7shape"), &opts()).unwrap();
-    let req = prep.requests.iter().find(|r| r.kind == PdfRequestKind::TableStructure).unwrap();
+    let req = prep
+        .requests
+        .iter()
+        .find(|r| r.kind == PdfRequestKind::TableStructure)
+        .unwrap();
     let texts: Vec<&str> = req.chunks.iter().map(|c| c.text.as_str()).collect();
-    assert!(texts.contains(&"€ 1.500") && texts.contains(&"12 punten"), "{texts:?}");
+    assert!(
+        texts.contains(&"€ 1.500") && texts.contains(&"12 punten"),
+        "{texts:?}"
+    );
     for c in &req.chunks {
         assert!(c.id.starts_with("p1c"));
         for w in &c.words {
             let word = req.words.iter().find(|x| &x.id == w).unwrap();
             assert_eq!(word.chunk.as_deref(), Some(c.id.as_str()));
         }
-        let joined: Vec<&str> = c.words.iter().map(|w| req.words.iter().find(|x| &x.id == w).unwrap().text.as_str()).collect();
+        let joined: Vec<&str> = c
+            .words
+            .iter()
+            .map(|w| req.words.iter().find(|x| &x.id == w).unwrap().text.as_str())
+            .collect();
         assert_eq!(joined.join(" "), c.text);
     }
 }

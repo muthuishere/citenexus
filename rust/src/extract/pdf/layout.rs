@@ -259,7 +259,25 @@ pub fn is_marker_token(t: &str) -> bool {
 
 /// Currency signs (Unicode Sc, the common ones): never a list marker.
 fn is_currency(c: char) -> bool {
-    matches!(c, '$' | '¢' | '£' | '¤' | '¥' | 'ƒ' | '€' | '₹' | '₽' | '₩' | '₺' | '₪' | '₫' | '₱' | '₦' | '₴' | '₿')
+    matches!(
+        c,
+        '$' | '¢'
+            | '£'
+            | '¤'
+            | '¥'
+            | 'ƒ'
+            | '€'
+            | '₹'
+            | '₽'
+            | '₩'
+            | '₺'
+            | '₪'
+            | '₫'
+            | '₱'
+            | '₦'
+            | '₴'
+            | '₿'
+    )
 }
 
 /// Does this segment open a list item?

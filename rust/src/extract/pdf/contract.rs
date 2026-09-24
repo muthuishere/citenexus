@@ -386,11 +386,20 @@ fn chunks_of(words: &[PdfWord]) -> Vec<PdfChunk> {
             let ws = &by[c];
             let mut bb = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
             for w in ws {
-                bb = [bb[0].min(w.bbox[0]), bb[1].min(w.bbox[1]), bb[2].max(w.bbox[2]), bb[3].max(w.bbox[3])];
+                bb = [
+                    bb[0].min(w.bbox[0]),
+                    bb[1].min(w.bbox[1]),
+                    bb[2].max(w.bbox[2]),
+                    bb[3].max(w.bbox[3]),
+                ];
             }
             PdfChunk {
                 id: c.to_string(),
-                text: ws.iter().map(|w| w.text.as_str()).collect::<Vec<_>>().join(" "),
+                text: ws
+                    .iter()
+                    .map(|w| w.text.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" "),
                 bbox: bb,
                 words: ws.iter().map(|w| w.id.clone()).collect(),
             }

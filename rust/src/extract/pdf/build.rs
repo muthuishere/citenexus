@@ -463,7 +463,13 @@ impl Staged {
                     }
                     let id = word_id(p, self.word_ord[p][s][k]);
                     let marker = k == 0 && seg.words.len() > 1 && layout::is_marker_token(&text);
-                    words.push(PdfWord { id, text, bbox: bb, marker, chunk: None });
+                    words.push(PdfWord {
+                        id,
+                        text,
+                        bbox: bb,
+                        marker,
+                        chunk: None,
+                    });
                 }
                 // The segment is the phrase chunk, minus a leading marker and
                 // pure leaders (filler).
@@ -482,7 +488,6 @@ impl Staged {
         }
         out
     }
-
 
     pub(crate) fn hblocks(&self) -> &[HBlock] {
         &self.hblocks
