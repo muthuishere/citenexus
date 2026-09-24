@@ -49,6 +49,8 @@ pub struct Block {
     pub bold: bool,
     /// Struct-tree element index shared by the block (tagged pages), else None.
     pub elem: Option<usize>,
+    /// This block is deterministic table k of its page (`tables::detect`).
+    pub table: Option<usize>,
 }
 
 pub struct PageLayout {
@@ -336,6 +338,7 @@ pub fn blocks(
                     size: s.size,
                     bold: s.bold,
                     elem,
+                    table: None,
                 }),
             }
         }

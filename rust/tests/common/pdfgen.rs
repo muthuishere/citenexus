@@ -157,6 +157,99 @@ fn f(v: f64) -> String {
     s.trim_end_matches('0').trim_end_matches('.').to_string()
 }
 
+enum Kid {
+    Mcid(usize),
+    Elem(usize),
+}
+
+struct Elem {
+    id: usize,
+    role: String,
+    page: usize,
+    key: String,
+    parent: Option<usize>,
+    kids: Vec<Kid>,
+    rowspan: u32,
+    colspan: u32,
+}
+
+/// Parse one path segment: `Role`, `Role#id` / `Role:id`, optional `{rs=2,cs=3}`.
+fn segment(seg: &str) -> (String, Option<String>, u32, u32) {
+    let (head, attrs) = match seg.split_once('{') {
+        Some((h, a)) => (h, a.trim_end_matches('}')),
+        None => (seg, ""),
+    };
+    let (role, id) = match head.find(['#', ':']) {
+        Some(i) => (head[..i].to_string(), Some(head[i + 1..].to_string())),
+        None => (head.to_string(), None),
+    };
+    let (mut rs, mut cs) = (1, 1);
+    for kv in attrs.split(',').filter(|x| !x.is_empty()) {
+        if let Some((k, v)) = kv.split_once('=') {
+            let n: u32 = v.trim().parse().unwrap_or(1);
+            match k.trim() {
+                "rs" => rs = n,
+                "cs" => cs = n,
+                _ => {}
+            }
+        }
+    }
+    (role, id, rs, cs)
+}
+
+/// Add one marked run to the element tree; returns the leaf's object id.
+fn add_tag(
+    elems: &mut Vec<Elem>,
+    unique: &mut usize,
+    tag: &str,
+    page: usize,
+    mcid: usize,
+    alloc: &mut dyn FnMut() -> usize,
+) -> usize {
+    let segs: Vec<&str> = tag.split('/').collect();
+    let mut parent: Option<usize> = None;
+    let mut key = String::new();
+    for (lvl, seg) in segs.iter().enumerate() {
+        let (role, id, rs, cs) = segment(seg);
+        key.push('/');
+        match &id {
+            Some(i) => key.push_str(&format!("{role}#{i}")),
+            None => {
+                *unique += 1;
+                key.push_str(&format!("{role}~{unique}"));
+            }
+        }
+        let found = elems.iter().position(|e| e.page == page && e.key == key);
+        let idx = match found {
+            Some(i) => i,
+            None => {
+                let obj = alloc();
+                elems.push(Elem {
+                    id: obj,
+                    role,
+                    page,
+                    key: key.clone(),
+                    parent,
+                    kids: vec![],
+                    rowspan: rs,
+                    colspan: cs,
+                });
+                let i = elems.len() - 1;
+                if let Some(p) = parent {
+                    elems[p].kids.push(Kid::Elem(i));
+                }
+                i
+            }
+        };
+        if lvl + 1 == segs.len() {
+            elems[idx].kids.push(Kid::Mcid(mcid));
+            return elems[idx].id;
+        }
+        parent = Some(idx);
+    }
+    unreachable!("a tag has at least one segment")
+}
+
 impl Doc {
     pub fn new(pages: Vec<Page>) -> Self {
         Doc {
@@ -193,9 +286,9 @@ impl Doc {
             (0, 0, 0)
         };
 
-        // Struct elements: (id, role, page index, mcids, group)
-        type Elem = (usize, String, usize, Vec<usize>, Option<String>);
+        // Struct elements, built from tag PATHS (see `Page::tagged`).
         let mut elems: Vec<Elem> = vec![];
+        let mut unique = 0usize;
         let mut per_page_elems: Vec<Vec<usize>> = vec![vec![]; self.pages.len()];
 
         for (pi, page) in self.pages.iter().enumerate() {
@@ -223,28 +316,9 @@ impl Doc {
                         c.extend(b") Tj ET\n");
                         if let Some(t) = tag {
                             c.extend(b"EMC\n");
-                            // "P#g": every run tagged with the same group on a
-                            // page shares ONE element (several MCIDs).
-                            let (role, group) = match t.split_once('#') {
-                                Some((r, g)) => (r.to_string(), Some(g.to_string())),
-                                None => (t.clone(), None),
-                            };
-                            let existing = group.as_ref().and_then(|g| {
-                                elems
-                                    .iter()
-                                    .position(|e| e.2 == pi && e.4.as_deref() == Some(g.as_str()))
+                            let id = add_tag(&mut elems, &mut unique, t, pi, mcid, &mut || {
+                                alloc(&mut objs)
                             });
-                            let id = match existing {
-                                Some(k) => {
-                                    elems[k].3.push(mcid);
-                                    elems[k].0
-                                }
-                                None => {
-                                    let id = alloc(&mut objs);
-                                    elems.push((id, role, pi, vec![mcid], group));
-                                    id
-                                }
-                            };
                             per_page_elems[pi].push(id);
                             mcid += 1;
                         }
@@ -330,16 +404,37 @@ impl Doc {
 
         let mut catalog = String::from("<< /Type /Catalog /Pages 2 0 R");
         if tagged {
-            for (id, tag, pi, mcids, _) in &elems {
-                let k: Vec<String> = mcids.iter().map(|m| m.to_string()).collect();
-                objs[id - 1] = format!(
-                    "<< /Type /StructElem /S /{tag} /P {doc_elem_id} 0 R /Pg {} 0 R /K [{}] >>",
-                    page_ids[*pi],
-                    k.join(" ")
+            for e in &elems {
+                let kids: Vec<String> = e
+                    .kids
+                    .iter()
+                    .map(|k| match k {
+                        Kid::Mcid(m) => m.to_string(),
+                        Kid::Elem(i) => format!("{} 0 R", elems[*i].id),
+                    })
+                    .collect();
+                let parent = e.parent.map(|i| elems[i].id).unwrap_or(doc_elem_id);
+                let attrs = if e.rowspan > 1 || e.colspan > 1 {
+                    format!(
+                        " /A << /O /Table /RowSpan {} /ColSpan {} >>",
+                        e.rowspan, e.colspan
+                    )
+                } else {
+                    String::new()
+                };
+                objs[e.id - 1] = format!(
+                    "<< /Type /StructElem /S /{} /P {parent} 0 R /Pg {} 0 R /K [{}]{attrs} >>",
+                    e.role,
+                    page_ids[e.page],
+                    kids.join(" ")
                 )
                 .into_bytes();
             }
-            let all: Vec<String> = elems.iter().map(|e| format!("{} 0 R", e.0)).collect();
+            let all: Vec<String> = elems
+                .iter()
+                .filter(|e| e.parent.is_none())
+                .map(|e| format!("{} 0 R", e.id))
+                .collect();
             objs[doc_elem_id - 1] = format!(
                 "<< /Type /StructElem /S /Document /P {root_id} 0 R /K [{}] >>",
                 all.join(" ")

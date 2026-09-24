@@ -41,8 +41,9 @@ pdftext (Apache-2.0), commit not pinned
 LiteParse (Apache-2.0) @ b754dc3d
   https://github.com/run-llama/liteparse
   extract.rs "is-complex" routing reasons; markdown_layout/repetition.rs
-  header/footer repetition.
-  -> src/extract/pdf/route.rs, src/extract/pdf/furniture.rs
+  header/footer repetition; tables.rs ruled grid + inferred column tracks.
+  -> src/extract/pdf/route.rs, src/extract/pdf/furniture.rs,
+     src/extract/pdf/tables.rs
 
 opendataloader-pdf (Apache-2.0) @ 323578b
   https://github.com/opendataloader-project/opendataloader-pdf
@@ -60,6 +61,27 @@ Marker (Apache-2.0 since 2026-07-17), commit not pinned
   https://github.com/datalab-to/marker
   The >2% garbled-character threshold for an unsound text layer.
   -> src/extract/pdf/route.rs
+
+Marker table_recon (Apache-2.0), commit not pinned
+  https://github.com/datalab-to/marker
+  Scored grid search over text-layer columns; the 0.75 acceptance threshold.
+  -> src/extract/pdf/tables.rs
+
+Xberg table_core.rs / table_reconstruct.rs (MIT) @ b4331e0
+  Fake-table validators (one column, prose in columns, TOC).
+  -> src/extract/pdf/tables.rs
+
+pdfplumber lines strategy (MIT), commit not pinned
+  https://github.com/jsvine/pdfplumber
+  Ruling lines AND rectangle edges, snapped and intersected into cells.
+  -> src/extract/pdf/tables.rs
+
+GriTS (paper, arXiv 2203.12555; reference code microsoft/table-transformer
+  src/grits.py, MIT, commit not pinned)
+  GriTS-Con with the factored 2-D most-similar-substructure, reimplemented
+  from the paper's algorithm. The reference file's AGPL `fitz` import is
+  not used and was not read.
+  -> src/checks.rs (grits_con), used by tables::choose and the contract
 
 XY-Cut++ (paper, arXiv 2504.10258)
   Projection-profile XY-cut as the reading-order fallback. The paper's

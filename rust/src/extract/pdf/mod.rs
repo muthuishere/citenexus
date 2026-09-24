@@ -20,6 +20,7 @@ pub mod layout;
 pub mod order;
 pub mod raw;
 pub mod route;
+pub mod tables;
 
 pub use build::analyze;
 pub use contract::{pdf_assemble, pdf_prepare, pdf_units};

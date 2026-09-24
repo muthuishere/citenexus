@@ -234,3 +234,33 @@ pub fn diagnose_raw(raw: &RawDoc, opts: &PdfOptions) -> HeadingDiag {
         agreement_rates,
     }
 }
+
+/// Table detection per page (diagnostics): accepted sources + shapes,
+/// uncertain regions and rejection reasons. No text.
+pub fn tables(bytes: &[u8], opts: &PdfOptions) -> Result<Vec<TableDiag>, String> {
+    let raw = raw::read(bytes)?;
+    let st = build::stage(&raw, opts);
+    Ok(st.table_diag())
+}
+
+#[derive(Debug, Clone)]
+pub struct TableDiag {
+    pub page: usize,
+    /// (source, rows, cols, score)
+    pub accepted: Vec<(crate::units::TableSource, usize, usize, f64)>,
+    pub uncertain: usize,
+    pub rejected: Vec<(crate::units::TableSource, super::tables::Reject)>,
+}
+
+/// Every text-layer word per page (IDs, text from pdfium chars, boxes), for
+/// independent integrity checks in measurement tools.
+pub fn page_words(
+    bytes: &[u8],
+    opts: &PdfOptions,
+) -> Result<Vec<Vec<crate::units::PdfWord>>, String> {
+    let raw = raw::read(bytes)?;
+    let st = build::stage(&raw, opts);
+    Ok((0..raw.pages.len())
+        .map(|p| st.page_words(&raw, p).into_iter().map(|(w, _)| w).collect())
+        .collect())
+}

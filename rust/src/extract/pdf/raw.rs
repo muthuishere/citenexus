@@ -121,6 +121,9 @@ pub struct StructNode {
     pub kind: String,
     pub depth: u32,
     pub mcids: Vec<i32>,
+    /// Table-cell `RowSpan` / `ColSpan` attributes (1 when absent).
+    pub rowspan: u32,
+    pub colspan: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -360,7 +363,33 @@ unsafe fn read_struct(
             mcids.push(id);
         }
     }
-    out.push(StructNode { kind, depth, mcids });
+    let (mut rowspan, mut colspan) = (1u32, 1u32);
+    if kind == "TD" || kind == "TH" {
+        let n_attr = b.FPDF_StructElement_GetAttributeCount(el).max(0);
+        for a in 0..n_attr.min(16) {
+            let attr = b.FPDF_StructElement_GetAttributeAtIndex(el, a);
+            if attr.is_null() {
+                continue;
+            }
+            for (name, slot) in [("RowSpan", &mut rowspan), ("ColSpan", &mut colspan)] {
+                let v = b.FPDF_StructElement_Attr_GetValue(attr, name);
+                let mut f = 0f32;
+                if !v.is_null()
+                    && b.FPDF_StructElement_Attr_GetNumberValue(v, &mut f) != 0
+                    && (1.0..=1000.0).contains(&f)
+                {
+                    *slot = f.round() as u32;
+                }
+            }
+        }
+    }
+    out.push(StructNode {
+        kind,
+        depth,
+        mcids,
+        rowspan,
+        colspan,
+    });
     let kids = b.FPDF_StructElement_CountChildren(el).max(0);
     for k in 0..kids {
         let child = b.FPDF_StructElement_GetChildAtIndex(el, k);

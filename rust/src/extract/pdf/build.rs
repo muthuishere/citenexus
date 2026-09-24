@@ -4,7 +4,7 @@
 //! order → hyphen resolution → headings (per document) → lists → units, with
 //! per-page routes and signals. `PdfUnits` in every binding is exactly this.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::furniture::{self, Band};
 use super::headings::{self, HBlock};
@@ -13,6 +13,7 @@ use super::layout::{self, Block, PageLayout, Segment, HYPHEN_MARK};
 use super::order;
 use super::raw::{r2, RawDoc, StructNode};
 use super::route;
+use super::tables;
 use crate::units::*;
 
 const BLOCK_ROLES: &[&str] = &[
@@ -78,6 +79,8 @@ struct PageWork {
     group_tag: BTreeMap<usize, Option<u32>>,
     /// Struct group node index -> its role ("P", "TD", "H2", ...).
     group_role: BTreeMap<usize, String>,
+    /// Deterministic tables (accepted ones are blocks with `table: Some`).
+    tables: tables::PageTables,
 }
 
 /// Everything before the heading decision: the shared first half of
@@ -189,17 +192,37 @@ pub(crate) fn stage(raw: &RawDoc, opts: &PdfOptions) -> Staged {
             .map(|&g| (g, page.struct_nodes[g].kind.clone()))
             .collect();
         let elem_of = |m: i32| mcid_group.get(&m).copied();
+        let is_furn = |s: usize| furn.binary_search(&(p, s)).is_ok();
+        let page_tables = tables::detect(page, &segs, &lines, &is_furn);
+        let in_table: BTreeSet<usize> = page_tables
+            .accepted
+            .iter()
+            .flat_map(|t| t.segs.iter().copied())
+            .collect();
         let body_lines: Vec<Vec<usize>> = lines
             .iter()
             .map(|l| {
                 l.iter()
                     .copied()
-                    .filter(|&s| furn.binary_search(&(p, s)).is_err())
+                    .filter(|&s| !is_furn(s) && !in_table.contains(&s))
                     .collect::<Vec<_>>()
             })
             .filter(|l: &Vec<usize>| !l.is_empty())
             .collect();
-        let (blocks, pitch) = layout::blocks(&segs, &body_lines, &elem_of);
+        let (mut blocks, pitch) = layout::blocks(&segs, &body_lines, &elem_of);
+        for (k, t) in page_tables.accepted.iter().enumerate() {
+            let size =
+                layout::mode_half(t.segs.iter().map(|&s| (segs[s].size, segs[s].chars.len())))
+                    .unwrap_or(0.0);
+            blocks.push(Block {
+                segs: t.segs.clone(),
+                bbox: t.bbox,
+                size,
+                bold: false,
+                elem: t.struct_node,
+                table: Some(k),
+            });
+        }
         let tagged_chars = segs
             .iter()
             .filter(|s| mcid_group.contains_key(&s.mcid))
@@ -226,6 +249,7 @@ pub(crate) fn stage(raw: &RawDoc, opts: &PdfOptions) -> Staged {
             method,
             group_tag,
             group_role,
+            tables: page_tables,
         });
     }
 
@@ -245,11 +269,23 @@ pub(crate) fn stage(raw: &RawDoc, opts: &PdfOptions) -> Staged {
     let mut texts: Vec<String> = Vec::with_capacity(doc_blocks.len());
     let mut joined: Vec<bool> = Vec::with_capacity(doc_blocks.len());
     for &(p, b) in &doc_blocks {
-        let lines = lines_of(&work[p].pl, &work[p].pl.blocks[b]);
+        let blk = &work[p].pl.blocks[b];
+        if let Some(k) = blk.table {
+            let t = &work[p].tables.accepted[k];
+            let grid = tables::text_grid(&work[p].pl.segments, &raw.pages[p], &t.rows);
+            texts.push(tables::markdown(&grid));
+            joined.push(false);
+            continue;
+        }
+        let lines = lines_of(&work[p].pl, blk);
         let (t, j) = hyphen::join_lines(&lines, lang, &wit, &mut stats);
         texts.push(t);
         joined.push(j);
     }
+    let is_table_block: Vec<bool> = doc_blocks
+        .iter()
+        .map(|&(p, b)| work[p].pl.blocks[b].table.is_some())
+        .collect();
     // a marker ending a block continues into the next block (column/page break)
     for k in 0..texts.len() {
         if !texts[k].ends_with(HYPHEN_MARK) {
@@ -259,7 +295,8 @@ pub(crate) fn stage(raw: &RawDoc, opts: &PdfOptions) -> Staged {
         texts[k].pop();
         let next = texts.get(k + 1).cloned().unwrap_or_default();
         let is_list_next = layout::starts_list_item(&next);
-        let d = if next.trim().is_empty() || is_list_next {
+        let table_next = is_table_block.get(k + 1).copied().unwrap_or(false);
+        let d = if next.trim().is_empty() || is_list_next || table_next {
             Decision::Keep
         } else {
             hyphen::decide(&texts[k], &next, lang, &wit, true)
@@ -306,7 +343,8 @@ pub(crate) fn stage(raw: &RawDoc, opts: &PdfOptions) -> Staged {
                 .elem
                 .and_then(|g| work[p].group_tag.get(&g).copied().flatten());
             let role = blk.elem.and_then(|g| work[p].group_role.get(&g));
-            let in_table = matches!(role.map(String::as_str), Some("TD" | "TH"))
+            let in_table = blk.table.is_some()
+                || matches!(role.map(String::as_str), Some("TD" | "TH"))
                 || in_ruled_region(&raw.pages[p].paths, blk.bbox);
             HBlock {
                 page: p,
@@ -314,7 +352,8 @@ pub(crate) fn stage(raw: &RawDoc, opts: &PdfOptions) -> Staged {
                 lines: blk.segs.len(),
                 size: blk.size,
                 bold: blk.bold,
-                list: layout::starts_list_item(&work[p].pl.segments[blk.segs[0]].text),
+                list: blk.table.is_none()
+                    && layout::starts_list_item(&work[p].pl.segments[blk.segs[0]].text),
                 in_table,
                 struct_tag,
             }
@@ -349,7 +388,49 @@ pub(crate) fn stage(raw: &RawDoc, opts: &PdfOptions) -> Staged {
     }
 }
 
+/// Per page: (accepted table boxes, uncertain table regions).
+pub(crate) type TableRegions = (Vec<[f64; 4]>, Vec<[f64; 4]>);
+
 impl Staged {
+    /// Per page: (accepted table boxes, uncertain table regions).
+    pub(crate) fn table_regions(&self) -> Vec<TableRegions> {
+        self.work
+            .iter()
+            .map(|w| {
+                (
+                    w.tables.accepted.iter().map(|t| t.bbox).collect(),
+                    w.tables.uncertain.clone(),
+                )
+            })
+            .collect()
+    }
+
+    pub(crate) fn table_diag(&self) -> Vec<super::diag::TableDiag> {
+        self.work
+            .iter()
+            .enumerate()
+            .map(|(p, w)| super::diag::TableDiag {
+                page: p,
+                accepted: w
+                    .tables
+                    .accepted
+                    .iter()
+                    .map(|t| {
+                        let cols = t
+                            .rows
+                            .iter()
+                            .map(|r| r.iter().map(|c| c.colspan.max(1)).sum::<usize>())
+                            .max()
+                            .unwrap_or(0);
+                        (t.source, t.rows.len(), cols, t.score)
+                    })
+                    .collect(),
+                uncertain: w.tables.uncertain.len(),
+                rejected: w.tables.rejected.clone(),
+            })
+            .collect()
+    }
+
     /// Every word on page `p` in ID order, and whether it is running furniture.
     pub(crate) fn page_words(&self, raw: &RawDoc, p: usize) -> Vec<(PdfWord, bool)> {
         let w = &self.work[p];
@@ -454,6 +535,36 @@ pub(crate) fn emit(
             let idx = k + i;
             let b = &w.pl.blocks[doc_blocks[idx].1];
             let text = texts[idx].trim().to_string();
+            if let Some(tk) = b.table {
+                structure = true;
+                let t = &w.tables.accepted[tk];
+                let mut prov = Provenance::new(Route::Plain);
+                prov.table_source = Some(t.source);
+                prov.table_uncertain = t.uncertain;
+                let ids: Vec<String> = t
+                    .rows
+                    .iter()
+                    .flatten()
+                    .flat_map(|c| {
+                        c.words
+                            .iter()
+                            .map(|&(s, wi)| word_id(p, word_ord[p][s][wi]))
+                    })
+                    .collect();
+                body.push((
+                    DocUnit {
+                        page: Some(pg),
+                        bbox: Some(t.bbox.map(r2)),
+                        kind: UnitKind::Table,
+                        level: None,
+                        markdown: text,
+                        provenance: prov,
+                    },
+                    ids,
+                ));
+                i += 1;
+                continue;
+            }
             if let Some((lvl, src)) = plan.levels[idx] {
                 structure = true;
                 let mut text = text;
@@ -645,6 +756,21 @@ pub(crate) fn emit(
         }
         for (mut u, ids) in top.into_iter().chain(body).chain(bottom) {
             u.provenance.route = rt;
+            if matches!(
+                u.kind,
+                UnitKind::Paragraph | UnitKind::List | UnitKind::Heading
+            ) {
+                if let Some(b) = u.bbox {
+                    let (cx, cy) = ((b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0);
+                    if w.tables
+                        .uncertain
+                        .iter()
+                        .any(|r| cx >= r[0] && cx <= r[2] && cy >= r[1] && cy <= r[3])
+                    {
+                        u.provenance.table_uncertain = true;
+                    }
+                }
+            }
             units.push(u);
             unit_words.push(ids);
         }
