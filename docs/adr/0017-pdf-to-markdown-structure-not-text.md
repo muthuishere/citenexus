@@ -1,6 +1,6 @@
 # 0017 — PDF→markdown in the Rust core: models propose structure, the PDF supplies the text
 
-Status: proposed · 2026-09-24 · research: [`docs/research/2026-09-24-pdf-to-markdown.md`](../research/2026-09-24-pdf-to-markdown.md) (`f3d9458`)
+Status: accepted · 2026-09-24 (consumer-approved with additions 8–11) · research: [`docs/research/2026-09-24-pdf-to-markdown.md`](../research/2026-09-24-pdf-to-markdown.md) (`f3d9458`)
 
 ## Context
 
@@ -94,6 +94,41 @@ under ADR-0010: real parsing over pdfium character boxes.
    Docling reading order and text quality, GriTS, olmOCR guards. Nothing
    AGPL, GPL or non-commercial anywhere in the stack.
 
+8. **DOCX and PPTX use the same output, from their own structure, with no
+   model.** OOXML already carries real structure: `w:tbl` (including merged
+   cells via `gridSpan`/`vMerge`), heading styles, list numbering, and PPTX
+   `a:tbl` and title placeholders. The extractor emits markdown tables and
+   headings from that deterministically, with the same unit, bbox-where-known
+   and provenance shape (`route` = `ooxml`).
+9. **An image region on a text-layer page** (for example a screenshot of a
+   form inside a policy page) is its own unit, `vision_transcribed`. It is
+   never merged into text-layer content and never overrides it. Where a vision
+   region overlaps text-layer characters, **the text layer wins** and those
+   characters are removed from the vision unit's claim to coverage.
+10. **Go binding shape.** rag_go uses exactly this surface:
+
+    ```go
+    // Base only: no model, never fails for lack of a provider.
+    units, err := core.PdfUnits(pdf, core.PdfOptions{Language: "nl"})
+    // each unit: Page, BBox, Kind (heading|paragraph|table|list|furniture|image),
+    // Markdown, Route, Provenance{TableSource, VisionTranscribed, TableUncertain, FailedCheck}
+
+    // With models: two-phase, the host owns transport and keys.
+    prep, err := core.PdfPrepare(pdf, opts)      // routes, signals, prep.Requests
+    responses := fulfil(prep.Requests)           // the host's own text-LLM / vision calls
+    units, err = core.PdfAssemble(pdf, opts, responses)
+    // a missing or failed response == base output for that page, with FailedCheck set
+    ```
+
+    `PdfUnits` is exactly `PdfAssemble` with no responses. So ingestion
+    degrades gracefully to the base output when the model provider is down,
+    and the same functions exist in Python and JS.
+11. **Determinism.** The same PDF, options and responses give **byte-identical**
+    output: no hash-map iteration order, no clock, no randomness, and
+    floating-point geometry rounded before any comparison is serialized. A
+    conformance test runs `assemble` twice, and across the ports, and compares
+    bytes. This matters for audits with legal clients.
+
 ## Runtime (Linux amd64, Scaleway container)
 
 - `pdfium-render` keeps binding **libpdfium dynamically** (`rust/Cargo.toml`,
@@ -115,7 +150,9 @@ under ADR-0010: real parsing over pdfium character boxes.
   check tests, olmOCR-bench-style present / absent / order / cell-neighbour
   tests, and a **must-reject** adversarial set: swapped row amounts, a dropped
   digit, `7.000,00` → `70.000,0`, a moved "geen". The dehyphenation vectors
-  include "e-mail", "long-term" and "in- en verkoop".
+  include "e-mail", "long-term" and "in- en verkoop". OOXML vectors: a DOCX
+  table with merged cells, a DOCX heading hierarchy, and a PPTX table. A
+  determinism vector: the same input twice gives byte-identical output.
 - **Lex5, 82 originals, read in place and never copied:**
   - cells ≥127/149 and rows ≥32/36;
   - quote support ≥282/468;
