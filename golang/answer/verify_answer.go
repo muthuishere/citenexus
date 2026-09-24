@@ -99,6 +99,12 @@ type VerifyOptions struct {
 	Checker contracts.SupportChecker
 	// CheckerName labels model-admitted claims: VerifiedBy = "model:"+CheckerName.
 	CheckerName string
+	// NameAliases lets the name guard accept a claim name through a caller-owned,
+	// closed alias list keyed by ONE lowercase name word, as the guard extracts
+	// them: "gdpr" -> ["avg"], "civil" -> ["burgerlijk"]. A name is present when
+	// all tokens of any one alias are in the passage. Nothing is guessed: without
+	// an entry a name must appear as written.
+	NameAliases map[string][]string
 	// AdmitParaphrase lets the checker admit SAME-language claims the gate
 	// rejected (a paraphrase), still behind the deterministic guards. Off by
 	// default: it trades the gate's guarantee for coverage, and the caller should
@@ -438,7 +444,9 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 		for _, eu := range candidates {
 			if gate.IsSupportedV2(pc.text, eu.Text) {
 				if reason := clauseNegationGuard(pc.text, eu.Text); reason != "" {
-					gateReason = reason
+					if gateReason == "" {
+						gateReason = reason // the FIRST cited unit refused, not the last
+					}
 					continue
 				}
 				v.sources = append(v.sources, eu.ID)
@@ -476,8 +484,10 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 		if !v.supported && v.reason != ReasonContradicted && opts.Checker != nil && len(pc.cited) > 0 {
 			guardReason := ""
 			admit := func(eu EvidenceUnit) (bool, error) {
-				if reason := guards(pc.text, opts.AnswerLanguage, eu); reason != "" {
-					guardReason = reason
+				if reason := guards(pc.text, opts.AnswerLanguage, eu, opts.NameAliases); reason != "" {
+					if guardReason == "" {
+						guardReason = reason // the FIRST cited unit refused, not the last
+					}
 					return false, nil
 				}
 				s, err := check(pc.text, eu)

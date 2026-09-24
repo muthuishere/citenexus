@@ -8,6 +8,7 @@ package answer
 
 import (
 	"fmt"
+	"math/big"
 	"regexp"
 	"strings"
 
@@ -103,38 +104,143 @@ var numberWords = map[string]string{
 
 var unitScan = regexp.MustCompile(`[0-9]+(?:[.,][0-9]+)*|½|\p{L}+`)
 
+// unitSuffixes read a time unit inside a Dutch compound ("vakantiedagen",
+// "levensjaar"), longest first. Only for tokens of 6+ letters, and never a
+// weekday: "maandag" ends in "dag" but is not a quantity of days.
+var unitSuffixes = []struct{ suffix, class string }{
+	{"werkdagen", "workday"}, {"werkdag", "workday"},
+	{"maanden", "month"}, {"dagen", "day"}, {"weken", "week"}, {"jaren", "year"},
+	{"maand", "month"}, {"jaar", "year"}, {"uren", "hour"}, {"dag", "day"}, {"uur", "hour"},
+}
+
+var weekdays = map[string]struct{}{
+	"maandag": {}, "dinsdag": {}, "woensdag": {}, "donderdag": {}, "vrijdag": {}, "zaterdag": {}, "zondag": {},
+}
+
+// unitOf is a token's time-unit class: a unit word, or a Dutch compound ending
+// in one. compound is true for the latter.
+func unitOf(token string) (class string, compound bool, ok bool) {
+	if c, found := timeUnits[token]; found {
+		return c, false, true
+	}
+	if len([]rune(token)) < 6 {
+		return "", false, false
+	}
+	if _, isWeekday := weekdays[token]; isWeekday {
+		return "", false, false
+	}
+	for _, u := range unitSuffixes {
+		if strings.HasSuffix(token, u.suffix) && token != u.suffix {
+			return u.class, true, true
+		}
+	}
+	return "", false, false
+}
+
+// quantityLinks may sit between a number and its unit when several numbers
+// share one ("2 respectievelijk 3 werkdagen", "1 of 2 dagen").
+var quantityLinks = map[string]struct{}{
+	"respectievelijk": {}, "resp": {}, "en": {}, "of": {}, "tot": {}, "à": {},
+	"and": {}, "or": {}, "to": {},
+}
+
+func numberValue(token, language string) (string, bool) {
+	switch {
+	case token == "½":
+		return "0.5", true
+	case token[0] >= '0' && token[0] <= '9':
+		return ReadNumber(token, false, language).Key, true
+	default:
+		v, ok := numberWords[token]
+		return v, ok
+	}
+}
+
 // quantities are the (value key, unit class) pairs in text: a number — digits
-// read by ADR-0015 key, or a number word — directly followed by a time unit.
-// A parenthesised digit restating a number word ("twee (2) maanden") is
-// skipped, so it is read once.
+// read by ADR-0015 key, or a number word — followed by a time unit, looking
+// past a parenthesised restatement ("twee (2) maanden") and past other numbers
+// and links that share the unit ("2 respectievelijk 3 werkdagen"). The unit may
+// sit in a compound ("dertig (30) vakantiedagen"). Also read: "half jaar" /
+// "halfjaar" / "half (a) year" as 6 months, and an ordinal before a year
+// compound ("eerste levensjaar") as 1 year.
 func quantities(text, language string) map[[2]string]struct{} {
 	tokens := unitScan.FindAllString(strings.ToLower(text), -1)
 	out := map[[2]string]struct{}{}
 	for i := 0; i < len(tokens); i++ {
-		value, isNumber := "", false
-		switch t := tokens[i]; {
-		case t == "½":
-			value, isNumber = "0.5", true
-		case t[0] >= '0' && t[0] <= '9':
-			value, isNumber = ReadNumber(t, false, language).Key, true
-		default:
-			value, isNumber = numberWords[t]
+		t := tokens[i]
+		if t == "halfjaar" {
+			out[[2]string{"6", "month"}] = struct{}{}
+			continue
 		}
+		if t == "half" {
+			j := i + 1
+			if j < len(tokens) && tokens[j] == "a" {
+				j++
+			}
+			if j < len(tokens) && (tokens[j] == "jaar" || tokens[j] == "year") {
+				out[[2]string{"6", "month"}] = struct{}{}
+			}
+			continue
+		}
+		if ord, isOrdinal := ordinalWords[t]; isOrdinal && i+1 < len(tokens) {
+			if class, compound, ok := unitOf(tokens[i+1]); ok && compound && class == "year" {
+				out[[2]string{ord, "year"}] = struct{}{}
+			}
+			continue
+		}
+		value, isNumber := numberValue(t, language)
 		if !isNumber {
 			continue
 		}
+		// Look past a restatement of the SAME value ("twee (2) maanden") and
+		// past "link number" pairs sharing the unit ("2 respectievelijk 3
+		// werkdagen"). A bare second number stops the scan: in a table row
+		// "12,5 ✓ 1 dag" the 1 belongs to "dag", the 12,5 does not.
 		j := i + 1
-		if j < len(tokens) && tokens[j][0] >= '0' && tokens[j][0] <= '9' &&
-			ReadNumber(tokens[j], false, language).Key == value {
-			j++ // "twee (2) maanden"
+		if j < len(tokens) {
+			if v, n := numberValue(tokens[j], language); n && v == value {
+				j++
+			}
+		}
+		for j+1 < len(tokens) && j-i <= 6 {
+			if _, link := quantityLinks[tokens[j]]; !link {
+				break
+			}
+			if _, n := numberValue(tokens[j+1], language); !n {
+				break
+			}
+			linked, _ := numberValue(tokens[j+1], language)
+			j += 2
+			if j < len(tokens) {
+				if v, n := numberValue(tokens[j], language); n && v == linked {
+					j++ // "drie (3)" after the link
+				}
+			}
 		}
 		if j >= len(tokens) {
 			continue
 		}
-		class, ok := timeUnits[tokens[j]]
+		class, _, ok := unitOf(tokens[j])
 		if mod, isMod := unitModifiers[tokens[j]]; isMod && j+1 < len(tokens) {
-			if c := timeUnits[tokens[j+1]]; c == "day" {
+			if c, _, _ := unitOf(tokens[j+1]); c == "day" {
 				class, ok = mod, true
+			}
+		}
+		// English puts one modifier between the number and a plain unit word
+		// ("30 vacation days", "1 extra day"). Only a unit WORD may follow it,
+		// never a compound, and only one modifier: "2 employees per day" is not a
+		// quantity of days.
+		if !ok && j+1 < len(tokens) {
+			if _, n := numberValue(tokens[j], language); !n {
+				if c, found := timeUnits[tokens[j+1]]; found {
+					class, ok = c, true
+					// "een halve maand" is half a month, not one month.
+					if tokens[j] == "half" || tokens[j] == "halve" {
+						if v, parsed := new(big.Rat).SetString(value); parsed {
+							value = ratKey(v.Mul(v, big.NewRat(1, 2)))
+						}
+					}
+				}
 			}
 		}
 		if ok {
@@ -142,6 +248,32 @@ func quantities(text, language string) map[[2]string]struct{} {
 		}
 	}
 	return out
+}
+
+// equivalentQuantity is the same period in the other unit, when exact: v years
+// <-> 12v months. "een half jaar" (6 months) then matches "0.5 year" and a
+// claim of "1 year" matches "12 maanden".
+func equivalentQuantity(q [2]string) ([2]string, bool) {
+	v, ok := new(big.Rat).SetString(q[0])
+	if !ok {
+		return q, false
+	}
+	switch q[1] {
+	case "year":
+		return [2]string{ratKey(new(big.Rat).Mul(v, big.NewRat(12, 1))), "month"}, true
+	case "month":
+		r := new(big.Rat).Quo(v, big.NewRat(12, 1))
+		return [2]string{ratKey(r), "year"}, true
+	}
+	return q, false
+}
+
+func ratKey(r *big.Rat) string {
+	if r.IsInt() {
+		return r.Num().String()
+	}
+	s := r.FloatString(6)
+	return strings.TrimRight(strings.TrimRight(s, "0"), ".")
 }
 
 // unitGuard refuses a SWAP of a quantity: the claim's number-with-a-time-unit
@@ -160,6 +292,11 @@ func unitGuard(claim, claimLanguage, passage, passageLanguage string) string {
 	for q := range quantities(claim, claimLanguage) {
 		if _, ok := have[q]; ok {
 			continue
+		}
+		if eq, ok := equivalentQuantity(q); ok {
+			if _, found := have[eq]; found {
+				continue
+			}
 		}
 		var sameValue, sameUnit []string
 		for p := range have {
@@ -202,7 +339,7 @@ type qualifierSide struct{ nl, en []string }
 var qualifierPairs = [][2]qualifierSide{
 	{{nl: []string{"bruto"}, en: []string{"gross"}}, {nl: []string{"netto"}, en: []string{"net"}}},
 	{{nl: []string{"werkgever"}, en: []string{"employer"}}, {nl: []string{"werknemer"}, en: []string{"employee"}}},
-	{{nl: []string{"vóór", "voordat"}, en: []string{"before"}}, {nl: []string{"na", "nadat"}, en: []string{"after"}}},
+	{{nl: []string{"vóór", "voordat"}, en: []string{"before"}}, {nl: []string{"na", "ná", "nadat"}, en: []string{"after"}}},
 	{{nl: []string{"eerder"}, en: []string{"earlier"}}, {nl: []string{"later"}, en: []string{"later"}}},
 	{{nl: []string{"minimaal"}, en: []string{"minimum"}}, {nl: []string{"maximaal"}, en: []string{"maximum"}}},
 	{{nl: []string{"schriftelijk", "schriftelijke"}, en: []string{"written", "writing"}},
@@ -248,13 +385,19 @@ const qualifierWindow = 5
 // De werknemer ontvangt …" must not give "werknemer" the context "premie".
 func clauseTokens(text string) [][]string {
 	out := [][]string{}
-	for _, clause := range clauseBreak.Split(text, -1) {
+	for _, clause := range clauseBreak.Split(softJoin(text), -1) {
 		if tokens := tokenize.TokenizeV2(clause); len(tokens) > 0 {
 			out = append(out, tokens)
 		}
 	}
 	return out
 }
+
+// softLineBreak is a line break that does not end a sentence — a PDF wrap. It
+// is joined so a pair word keeps the context it had before the wrap.
+var softLineBreak = regexp.MustCompile(`([^.!?:;\n])[ \t]*\n[ \t]*([^\n\-*•·0-9])`)
+
+func softJoin(text string) string { return softLineBreak.ReplaceAllString(text, "$1 $2") }
 
 // window is the content tokens within qualifierWindow of index i in the same
 // clause, minus any form of the pair.
@@ -313,6 +456,20 @@ func qualifierGuard(claim, passage string) string {
 						if !anyForm(t, same) || anyForm(t, other) {
 							continue
 						}
+						// The claim names both sides itself ("werknemer en werkgever",
+						// "voor/na"): it is not asserting one against the other.
+						if namesBoth(claimTokens, i, other) {
+							continue
+						}
+						// before/after and earlier/later are relational: swapped only when
+						// the other side governs the SAME next word.
+						if pair[0].en[0] == "before" || pair[0].en[0] == "earlier" {
+							if relationalSwap(claimTokens, i, passageClauses, same, other) {
+								return fmt.Sprintf("qualifier guard: the claim says %q where the passage says %s",
+									t, strings.Join(other, "/"))
+							}
+							continue
+						}
 						context := window(claimTokens, i, pair)
 						bestSame, bestOther, sawSame, sawOther := -1, -1, false, false
 						for _, passageTokens := range passageClauses {
@@ -350,6 +507,57 @@ func qualifierGuard(claim, passage string) string {
 		}
 	}
 	return ""
+}
+
+// namesBoth is true when a form of the other side sits within the qualifier
+// window of the claim's own occurrence.
+func namesBoth(tokens []string, i int, other []string) bool {
+	for k := i - qualifierWindow; k <= i+qualifierWindow; k++ {
+		if k >= 0 && k < len(tokens) && k != i && anyForm(tokens[k], other) {
+			return true
+		}
+	}
+	return false
+}
+
+// nextContent is the first content token after index i, or "".
+func nextContent(tokens []string, i int) string {
+	for k := i + 1; k < len(tokens); k++ {
+		if gate.IsStopword(tokens[k]) {
+			continue
+		}
+		if _, stop := contextStop[tokens[k]]; stop {
+			continue
+		}
+		return tokens[k]
+	}
+	return ""
+}
+
+// relationalSwap: the passage puts the OTHER side before the word that follows
+// the claim's side ("na de proeftijd" vs a claim "voor de proeftijd"), and
+// never the claim's own side before it. Nearby words alone decide nothing for
+// a relation.
+func relationalSwap(claimTokens []string, i int, passageClauses [][]string, same, other []string) bool {
+	target := nextContent(claimTokens, i)
+	if target == "" {
+		return false
+	}
+	sawOther := false
+	for _, tokens := range passageClauses {
+		for j, p := range tokens {
+			if nextContent(tokens, j) != target {
+				continue
+			}
+			if anyForm(p, same) {
+				return false
+			}
+			if anyForm(p, other) {
+				sawOther = true
+			}
+		}
+	}
+	return sawOther
 }
 
 // ─── scope guard ─────────────────────────────────────────────────────────────

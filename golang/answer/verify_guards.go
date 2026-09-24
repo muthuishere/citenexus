@@ -116,8 +116,22 @@ func names(claim string) []string {
 			initial = true
 			continue
 		}
+		if f == "|" {
+			initial = true // a table cell starts like a sentence
+			continue
+		}
 		opensQuote := strings.IndexAny(f, `"“„«([{'‘`) == 0
-		word := strings.Trim(f, `"“”„«»()[]{},;:.!?'‘’`)
+		word := strings.Trim(f, `"“”„«»()[]{},;:.!?'‘’|`)
+		// Possessive: "Ploum's" names Ploum; the tokenizer would add an "s".
+		word = strings.TrimSuffix(strings.TrimSuffix(word, "'s"), "’s")
+		// A hyphenated word whose capitalised parts are all lowercase ("e-mail")
+		// names nothing; one with a capitalised part stays whole here and falls
+		// back to its capitalised parts in nameGuardWith.
+		if strings.Contains(word, "-") && len(capitalisedParts(word)) == 0 &&
+			!strings.ContainsAny(word, "0123456789") {
+			initial = false
+			continue
+		}
 		runes := []rune(word)
 		if ordinalToken.MatchString(strings.ToLower(word)) {
 			initial = false
@@ -146,7 +160,8 @@ func names(claim string) []string {
 		// A terminator or colon ends a sentence or label; the next word is initial.
 		trimmed := strings.TrimRight(f, `"”»)]}'’`)
 		initial = strings.HasSuffix(trimmed, ".") || strings.HasSuffix(trimmed, "!") ||
-			strings.HasSuffix(trimmed, "?") || strings.HasSuffix(trimmed, ":")
+			strings.HasSuffix(trimmed, "?") || strings.HasSuffix(trimmed, ":") ||
+			strings.HasSuffix(trimmed, ";") || strings.HasSuffix(trimmed, "|")
 	}
 	return out
 }
@@ -160,18 +175,82 @@ func isListMarker(field string) bool { return listMarker.MatchString(field) }
 
 // nameGuard: every name in the claim is present in the passage.
 //
-// Deliberately strict across languages: an English claim naming "Monday" over a
-// Dutch "maandag" is refused. That is a false ABSTENTION, which is the cheap
-// failure; a model paraphrase swapping one employer, law or form for another is
-// the expensive one.
-func nameGuard(claim, passage string) string {
+// Deliberately strict across languages: a model paraphrase swapping one
+// employer, law or form for another is the expensive failure, a refused true
+// claim the cheap one. Three narrow, closed escapes:
+//
+//   - months and weekdays fold NL <-> EN ("January" <-> "januari"); a swapped
+//     month still refuses;
+//   - the caller's aliases (VerifyOptions.NameAliases, e.g. "gdpr" -> "avg"):
+//     a claim name is present when any alias is. Injected, never guessed;
+//   - guards() passes the unit's DocumentID along with its text, so a company
+//     named in the document title ("Ploum") is present even when the body says
+//     "werkgever".
+func nameGuard(claim, passage string) string { return nameGuardWith(claim, passage, nil) }
+
+func nameGuardWith(claim, passage string, aliases map[string][]string) string {
 	have := map[string]struct{}{}
 	for _, tok := range tokenize.TokenizeV2(passage) {
 		have[tok] = struct{}{}
+		if folded, ok := calendarFold[tok]; ok {
+			have[folded] = struct{}{}
+		}
+	}
+	present := func(tok string) bool {
+		if _, ok := have[tok]; ok {
+			return true
+		}
+		if folded, ok := calendarFold[tok]; ok {
+			if _, ok := have[folded]; ok {
+				return true
+			}
+		}
+		for _, alias := range aliases[tok] {
+			for _, at := range tokenize.TokenizeV2(alias) {
+				if _, ok := have[at]; ok {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	allPresent := func(text string) bool {
+		for _, tok := range tokenize.TokenizeV2(text) {
+			if !present(tok) {
+				return false
+			}
+		}
+		return true
 	}
 	for _, name := range names(claim) {
+		// "Wwft-related": the whole word first, then only its capitalised parts
+		// ("Wwft"). A word with digits stays whole ("104-week").
+		if strings.Contains(name, "-") && !allPresent(name) && !strings.ContainsAny(name, "0123456789") {
+			if parts := capitalisedParts(name); len(parts) > 0 && allPresent(strings.Join(parts, " ")) {
+				continue
+			}
+		}
+		if alts, ok := aliases[strings.ToLower(name)]; ok {
+			found := false
+			for _, alt := range alts {
+				all := true
+				for _, at := range tokenize.TokenizeV2(alt) {
+					if _, ok := have[at]; !ok {
+						all = false
+						break
+					}
+				}
+				if all {
+					found = true
+					break
+				}
+			}
+			if found {
+				continue
+			}
+		}
 		for _, tok := range tokenize.TokenizeV2(name) {
-			if _, ok := have[tok]; !ok {
+			if !present(tok) {
 				return fmt.Sprintf("name guard: %q is not in the passage", name)
 			}
 		}
@@ -179,20 +258,49 @@ func nameGuard(claim, passage string) string {
 	return ""
 }
 
+// capitalisedParts are the hyphen-separated parts starting with a capital.
+func capitalisedParts(word string) []string {
+	parts := []string{}
+	for _, part := range strings.Split(word, "-") {
+		if r := []rune(part); len(r) > 0 && unicode.IsUpper(r[0]) {
+			parts = append(parts, part)
+		}
+	}
+	return parts
+}
+
+// calendarFold maps English month and weekday names to Dutch, both directions,
+// to ONE canonical form (the Dutch). Closed on purpose.
+var calendarFold = func() map[string]string {
+	pairs := [][2]string{
+		{"january", "januari"}, {"february", "februari"}, {"march", "maart"}, {"april", "april"},
+		{"may", "mei"}, {"june", "juni"}, {"july", "juli"}, {"august", "augustus"},
+		{"september", "september"}, {"october", "oktober"}, {"november", "november"}, {"december", "december"},
+		{"monday", "maandag"}, {"tuesday", "dinsdag"}, {"wednesday", "woensdag"}, {"thursday", "donderdag"},
+		{"friday", "vrijdag"}, {"saturday", "zaterdag"}, {"sunday", "zondag"},
+	}
+	out := map[string]string{}
+	for _, p := range pairs {
+		out[p[0]] = p[1]
+		out[p[1]] = p[1]
+	}
+	return out
+}()
+
 // guards runs every deterministic guard and returns the first refusal, or "".
-func guards(claim, claimLanguage string, eu EvidenceUnit) string {
+func guards(claim, claimLanguage string, eu EvidenceUnit, aliases map[string][]string) string {
 	if reason := numberGuard(claim, claimLanguage, eu.Text, eu.Language); reason != "" {
 		return reason
 	}
 	if reason := unitGuard(claim, claimLanguage, eu.Text, eu.Language); reason != "" {
 		return reason
 	}
-	for _, g := range []func(string, string) string{negationGuard, clauseNegationGuard, polaritySwapGuard, qualifierGuard, scopeGuard, nameGuard} {
+	for _, g := range []func(string, string) string{negationGuard, clauseNegationGuard, polaritySwapGuard, qualifierGuard, scopeGuard} {
 		if reason := g(claim, eu.Text); reason != "" {
 			return reason
 		}
 	}
-	return ""
+	return nameGuardWith(claim, eu.Text+"\n"+eu.DocumentID, aliases)
 }
 
 // quotePattern matches double-quoted spans in the common typographic styles.

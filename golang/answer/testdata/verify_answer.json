@@ -1029,6 +1029,496 @@
           }
         ]
       }
+    },
+    {
+      "name": "name/month-folds-across-languages",
+      "answer": "The allowance is paid on 1 January [eu:m].",
+      "answer_language": "en",
+      "checker": {
+        "m": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "m",
+          "document_id": "m",
+          "language": "nl",
+          "text": "De toelage wordt op 1 januari betaald."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "name/a-swapped-month-still-refuses",
+      "must_refuse": true,
+      "answer": "The allowance is paid on 1 February [eu:m].",
+      "answer_language": "en",
+      "checker": {
+        "m": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "m",
+          "document_id": "m",
+          "language": "nl",
+          "text": "De toelage wordt op 1 januari betaald."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "name guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "name/company-named-in-the-document-title",
+      "answer": "The Ploum policy grants two days of leave [eu:t].",
+      "answer_language": "en",
+      "checker": {
+        "t": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "t",
+          "document_id": "Ploum HR-handboek",
+          "language": "nl",
+          "text": "Het beleid geeft twee dagen verlof."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "name/possessive-is-the-name",
+      "answer": "Under Ploum's policy you get two days of leave [eu:t].",
+      "answer_language": "en",
+      "checker": {
+        "t": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "t",
+          "document_id": "Ploum HR-handboek",
+          "language": "nl",
+          "text": "Het beleid geeft twee dagen verlof."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "name/alias-supplied-by-the-caller",
+      "answer": "Under the GDPR consent is required [eu:g].",
+      "answer_language": "en",
+      "name_aliases": {
+        "gdpr": [
+          "avg"
+        ]
+      },
+      "checker": {
+        "g": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "g",
+          "document_id": "g",
+          "language": "nl",
+          "text": "Onder de AVG is toestemming vereist."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "name/no-alias-is-guessed",
+      "must_refuse": true,
+      "answer": "Under the GDPR consent is required [eu:g].",
+      "answer_language": "en",
+      "checker": {
+        "g": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "g",
+          "document_id": "g",
+          "language": "nl",
+          "text": "Onder de AVG is toestemming vereist."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "name guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "name/word-after-a-semicolon-is-initial",
+      "answer": "Rules apply; Employees receive the allowance monthly [eu:n].",
+      "answer_language": "en",
+      "checker": {
+        "n": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "n",
+          "document_id": "n",
+          "language": "nl",
+          "text": "Medewerkers ontvangen de toelage maandelijks."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "name/hyphenated-capitalised-part",
+      "answer": "This is a Wwft-related duty [eu:w].",
+      "answer_language": "en",
+      "checker": {
+        "w": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "w",
+          "document_id": "w",
+          "language": "nl",
+          "text": "Dit is een plicht op grond van de Wwft."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "name/hyphenated-unknown-name-still-refuses",
+      "must_refuse": true,
+      "answer": "This is an Acme-related duty [eu:w].",
+      "answer_language": "en",
+      "checker": {
+        "w": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "w",
+          "document_id": "w",
+          "language": "nl",
+          "text": "Dit is een plicht op grond van de Wwft."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "name guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "unit/unit-inside-a-dutch-compound",
+      "answer": "You receive 30 vacation days per year [eu:v].",
+      "answer_language": "en",
+      "checker": {
+        "v": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "v",
+          "document_id": "v",
+          "language": "nl",
+          "text": "Je ontvangt dertig (30) vakantiedagen per jaar."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "unit/compound-unit-swap-still-refuses",
+      "must_refuse": true,
+      "answer": "You receive 30 vacation hours per year [eu:v].",
+      "answer_language": "en",
+      "checker": {
+        "v": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "v",
+          "document_id": "v",
+          "language": "nl",
+          "text": "Je ontvangt dertig (30) vakantiedagen per jaar."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "unit guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "unit/half-a-year-is-six-months",
+      "answer": "The trial period lasts six months [eu:h].",
+      "answer_language": "en",
+      "checker": {
+        "h": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "h",
+          "document_id": "h",
+          "language": "nl",
+          "text": "De proeftijd duurt een half jaar."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "unit/six-weeks-over-half-a-year-refuses",
+      "must_refuse": true,
+      "answer": "The trial period lasts six weeks [eu:h].",
+      "answer_language": "en",
+      "checker": {
+        "h": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "h",
+          "document_id": "h",
+          "language": "nl",
+          "text": "De proeftijd duurt een half jaar."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "unit guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "unit/unit-shared-across-respectievelijk",
+      "answer": "The request takes 3 working days [eu:r].",
+      "answer_language": "en",
+      "checker": {
+        "r": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "r",
+          "document_id": "r",
+          "language": "nl",
+          "text": "Een verzoek duurt twee respectievelijk drie werkdagen."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "unit/table-row-is-not-misread",
+      "answer": "Na 12,5 jaar dienst volgt een halve maand loon [eu:t].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "t": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "t",
+          "document_id": "t",
+          "language": "nl",
+          "text": "Jaren in dienst 12,5 ✓ 1 dag ½ maand loon"
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "qualifier/claim-that-names-both-roles",
+      "answer": "Werkgever en werknemer betalen de premie samen [eu:b].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "b": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "b",
+          "document_id": "b",
+          "language": "nl",
+          "text": "De premie wordt door de werkgever en de werknemer samen betaald."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "qualifier/relational-swap-refuses",
+      "must_refuse": true,
+      "answer": "Je meldt het verlof na de ingangsdatum [eu:v].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "v": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "v",
+          "document_id": "v",
+          "language": "nl",
+          "text": "Meld het verlof vóór de ingangsdatum."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "qualifier guard"
+          }
+        ]
+      }
     }
   ]
 }
