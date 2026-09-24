@@ -165,12 +165,15 @@ be given as word IDs.
     `markdown`. If the reply is not that JSON (a model without JSON mode),
     send the raw reply as `markdown` with `mode: "transcription"`: the safe
     fallback, because a transcription must pass dual agreement to be cited.
-  - **Spanning headers in vision tables.** The default `vision_page` and
-    `vision_region` prompts ask the model to repeat a header cell that spans
+  - **Spanning headers in vision tables: opt-in only.** The default
+    `vision_region` prompt asks the model to repeat a header cell that spans
     several columns as a prefix in each spanned column (`<axis> <range>`,
-    e.g. "Ervaringsjaren 0-2"). That is the same shape the core writes for a
-    text-layer table (`header_flattened`, §6). Config only; the core does
-    not check it.
+    e.g. "Ervaringsjaren 0-2"), the shape the core writes for text-layer
+    tables (`header_flattened`, §6). The default `vision_page` prompt does
+    NOT; that instruction is the named variant
+    `vision_page_spanning_headers` in `rust/data/pdf_prompts.json`, for a
+    host to select per model (§9: it degraded mistral-small). Config only;
+    the core does not check it.
 
 From the fixture (`assemble-mixed.responses.json`):
 
@@ -465,6 +468,17 @@ Consumer measurements with this contract (their harness, their numbers):
   (same run). A mistral-small + gemma-4 pair beat same-model seeds: T6 (a
   scanned table) scored 30 cells with the cross-family pair and 0 with the
   seed-2 pair.
+- **The spanning-header instruction degraded mistral-small row labels;
+  opt-in only** (consumer's live run). In the default `vision_page` prompt it
+  made mistral-small write a digits token in place of the printed row label
+  in all 5 body rows of T6, at both seeds; gemma-4 flattened only partly.
+  Every row was disputed and citable T6 went from 30 cells / 5 rows to 0/0.
+  Without it T6 is back to 30/5.
+- **One sentence in the table prompt fixed T7.** "A table has ≥2 columns
+  whose phrases line up vertically on several consecutive lines; a bulleted
+  or numbered list, headings and running text are not tables." With it,
+  gpt-oss gridded T7 as a 6×3 model grid from chunk ids (positional 62/62);
+  without it, it gridded the bulleted list above the table instead.
 - **Phrase chunks change request contents.** Since chunks, a
   `table_structure` request carries `chunks` and every word a `chunk` id, so
   a request's JSON (and its token count) differs from earlier runs. Word IDs
