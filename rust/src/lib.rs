@@ -5,9 +5,11 @@
 //! orchestration, cite-or-abstain, hooks, and model IO stay in each host
 //! language. Boundary: JSON in/out, no callbacks.
 
+pub mod checks;
 pub mod detect;
 pub mod emit;
 pub mod extract;
+pub mod numbers;
 pub mod rrf;
 pub mod store;
 pub mod types;

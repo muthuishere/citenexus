@@ -43,6 +43,9 @@ arrow-json = "58"
 # Python.
 fasttext = "0.8"
 tree-sitter = "0.26"
+# checks: NFKC before comparing model text with a text layer (already in the
+# lock via lance).
+unicode-normalization = "0.1"
 tree-sitter-python = "0.25"
 tree-sitter-go = "0.25"
 
@@ -62,9 +65,6 @@ codegen-units = 16
 
 [dev-dependencies]
 tempfile = "3.27.0"
-# examples/pdf_measure.rs only: the spike-185 quote-support token view
-# (NFKC). Already in the lock via lance.
-unicode-normalization = "0.1"
 
 [[example]]
 name = "pdf_measure"
