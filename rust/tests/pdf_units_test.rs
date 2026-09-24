@@ -473,3 +473,123 @@ fn garbage_bytes_are_an_error_not_a_crash() {
     }
     assert!(pdf_units(b"not a pdf", &PdfOptions::default()).is_err());
 }
+
+// ------------------------------------------ heading rules (diagnosis A) ----
+
+fn headings_of(out: &PdfUnitsOutput) -> Vec<String> {
+    out.units
+        .iter()
+        .filter(|u| u.kind == UnitKind::Heading)
+        .map(|u| u.markdown.clone())
+        .collect()
+}
+
+#[test]
+fn bold_alone_never_makes_a_font_heading() {
+    if !have_pdfium() {
+        return;
+    }
+    // Untagged: a bold body-size label ending in ":" and a bold lead-in
+    // followed by same-size text stay paragraphs; a bold numbered section and
+    // a larger title are headings.
+    let page = Page::a4()
+        .bold(72.0, 50.0, 16.0, "Verlofregeling")
+        .bold(72.0, 90.0, 11.0, "Voorwaarden:")
+        .para(
+            72.0,
+            106.0,
+            11.0,
+            &["Verlof wordt vooraf aangevraagd bij de leidinggevende."],
+        )
+        .bold(72.0, 140.0, 11.0, "Let op")
+        .para(
+            72.0,
+            156.0,
+            11.0,
+            &["Niet opgenomen dagen vervallen na vijf jaar."],
+        )
+        .bold(72.0, 190.0, 11.0, "3.2 Bijzonder verlof")
+        .para(
+            72.0,
+            206.0,
+            11.0,
+            &["Bij verhuizing heeft de werknemer recht op een dag."],
+        );
+    let out = run(&Doc::new(vec![page]), Some("nl"));
+    assert_eq!(
+        headings_of(&out),
+        vec!["# Verlofregeling", "## 3.2 Bijzonder verlof"]
+    );
+    assert!(out
+        .units
+        .iter()
+        .any(|u| u.kind == UnitKind::Paragraph && u.markdown == "Voorwaarden:"));
+    assert!(out
+        .units
+        .iter()
+        .any(|u| u.kind == UnitKind::Paragraph && u.markdown == "Let op"));
+}
+
+#[test]
+fn article_label_and_title_merge_into_one_heading() {
+    if !have_pdfium() {
+        return;
+    }
+    // Word writes "Artikel 5." and its title as two paragraphs in one heading
+    // style; the tree tags both H1. One heading, not a label with no body.
+    let page = Page::a4()
+        .tagged("H1", 72.0, 60.0, 11.0, true, "Artikel 5.")
+        .tagged("H1", 72.0, 76.0, 11.0, true, "Vakantiedagen")
+        .tagged(
+            "P#a",
+            72.0,
+            100.0,
+            11.0,
+            false,
+            "De werknemer heeft recht op vakantie.",
+        )
+        .tagged("H1", 72.0, 130.0, 11.0, true, "Artikel 6.")
+        .tagged("H1", 72.0, 146.0, 11.0, true, "Ziekte")
+        .tagged(
+            "P#b",
+            72.0,
+            170.0,
+            11.0,
+            false,
+            "Ziekte wordt direct gemeld.",
+        );
+    let out = run(&Doc::new(vec![page]), Some("nl"));
+    assert_eq!(
+        headings_of(&out),
+        vec!["# Artikel 5. Vakantiedagen", "# Artikel 6. Ziekte"]
+    );
+    let h = out
+        .units
+        .iter()
+        .find(|u| u.kind == UnitKind::Heading)
+        .unwrap();
+    let bb = h.bbox.unwrap();
+    assert!(bb[3] > 76.0, "merged bbox spans both lines: {bb:?}");
+}
+
+#[test]
+fn a_larger_bold_cell_in_a_ruled_table_is_not_a_heading() {
+    if !have_pdfium() {
+        return;
+    }
+    let mut page = Page::a4().para(72.0, 60.0, 11.0, &["Tarieven gelden per jaar."]);
+    for k in 0..3 {
+        let y = 100.0 + k as f64 * 24.0;
+        page = page.line(72.0, y, 372.0, y);
+    }
+    for x in [72.0, 222.0, 372.0] {
+        page = page.line(x, 100.0, x, 148.0);
+    }
+    page = page
+        .bold(76.0, 104.0, 14.0, "Categorie")
+        .bold(226.0, 104.0, 14.0, "Bedrag")
+        .text(76.0, 128.0, 11.0, "Reiskosten")
+        .text(226.0, 128.0, 11.0, "1.250,00");
+    let out = run(&Doc::new(vec![page]), Some("nl"));
+    assert!(headings_of(&out).is_empty(), "{:?}", headings_of(&out));
+}

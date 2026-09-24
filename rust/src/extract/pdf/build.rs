@@ -82,6 +82,48 @@ struct PageWork {
     method: order::Method,
     /// Struct group node index -> heading tag.
     group_tag: BTreeMap<usize, Option<u32>>,
+    /// Struct group node index -> its role ("P", "TD", "H2", ...).
+    group_role: BTreeMap<usize, String>,
+}
+
+/// Everything before the heading decision: the shared first half of
+/// `analyze` and of the heading diagnostics.
+pub(crate) struct Staged {
+    work: Vec<PageWork>,
+    furn: Vec<(usize, usize)>,
+    /// Document-order (page, block) pairs.
+    doc_blocks: Vec<(usize, usize)>,
+    texts: Vec<String>,
+    joined: Vec<bool>,
+    hblocks: Vec<HBlock>,
+    pub(crate) body_size: f64,
+    stats: HyphenStats,
+}
+
+/// The block's centre lies inside the box spanned by the page's ruling lines
+/// (≥2 horizontal and ≥2 vertical thin paths): a ruled table region.
+pub(crate) fn in_ruled_region(paths: &[[f64; 4]], bbox: [f64; 4]) -> bool {
+    let h: Vec<&[f64; 4]> = paths
+        .iter()
+        .filter(|p| p[3] - p[1] <= 2.0 && p[2] - p[0] >= 15.0)
+        .collect();
+    let v: Vec<&[f64; 4]> = paths
+        .iter()
+        .filter(|p| p[2] - p[0] <= 2.0 && p[3] - p[1] >= 15.0)
+        .collect();
+    if h.len() < 2 || v.len() < 2 {
+        return false;
+    }
+    let all = h.iter().chain(v.iter());
+    let (mut x0, mut y0, mut x1, mut y1) = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
+    for p in all {
+        x0 = x0.min(p[0]);
+        y0 = y0.min(p[1]);
+        x1 = x1.max(p[2]);
+        y1 = y1.max(p[3]);
+    }
+    let (cx, cy) = ((bbox[0] + bbox[2]) / 2.0, (bbox[1] + bbox[3]) / 2.0);
+    cx >= x0 && cx <= x1 && cy >= y0 && cy <= y1
 }
 
 fn lines_of(pl: &PageLayout, b: &Block) -> Vec<String> {
@@ -104,6 +146,12 @@ fn list_markdown(text: &str) -> String {
 }
 
 pub fn analyze(raw: &RawDoc, opts: &PdfOptions) -> PdfUnitsOutput {
+    let st = stage(raw, opts);
+    let plan = headings::plan(&st.hblocks, st.body_size, &raw.outline, raw.pages.len());
+    emit(raw, opts, st, plan)
+}
+
+pub(crate) fn stage(raw: &RawDoc, opts: &PdfOptions) -> Staged {
     let lang = Lang::parse(opts.language.as_deref());
     let n_pages = raw.pages.len();
 
@@ -133,6 +181,10 @@ pub fn analyze(raw: &RawDoc, opts: &PdfOptions) -> PdfUnitsOutput {
         let group_tag: BTreeMap<usize, Option<u32>> = groups
             .iter()
             .map(|&g| (g, heading_tag(&page.struct_nodes[g].kind)))
+            .collect();
+        let group_role: BTreeMap<usize, String> = groups
+            .iter()
+            .map(|&g| (g, page.struct_nodes[g].kind.clone()))
             .collect();
         let elem_of = |m: i32| mcid_group.get(&m).copied();
         let body_lines: Vec<Vec<usize>> = lines
@@ -171,6 +223,7 @@ pub fn analyze(raw: &RawDoc, opts: &PdfOptions) -> PdfUnitsOutput {
             order: ord,
             method,
             group_tag,
+            group_role,
         });
     }
 
@@ -250,6 +303,9 @@ pub fn analyze(raw: &RawDoc, opts: &PdfOptions) -> PdfUnitsOutput {
             let struct_tag = blk
                 .elem
                 .and_then(|g| work[p].group_tag.get(&g).copied().flatten());
+            let role = blk.elem.and_then(|g| work[p].group_role.get(&g));
+            let in_table = matches!(role.map(String::as_str), Some("TD" | "TH"))
+                || in_ruled_region(&raw.pages[p].paths, blk.bbox);
             HBlock {
                 page: p,
                 text: t.clone(),
@@ -257,11 +313,63 @@ pub fn analyze(raw: &RawDoc, opts: &PdfOptions) -> PdfUnitsOutput {
                 size: blk.size,
                 bold: blk.bold,
                 list: layout::starts_list_item(&work[p].pl.segments[blk.segs[0]].text),
+                in_table,
                 struct_tag,
             }
         })
         .collect();
-    let plan = headings::plan(&hblocks, body_size, &raw.outline, n_pages);
+    Staged {
+        work,
+        furn,
+        doc_blocks,
+        texts,
+        joined,
+        hblocks,
+        body_size,
+        stats,
+    }
+}
+
+impl Staged {
+    pub(crate) fn hblocks(&self) -> &[HBlock] {
+        &self.hblocks
+    }
+    pub(crate) fn bbox(&self, i: usize) -> [f64; 4] {
+        let (p, b) = self.doc_blocks[i];
+        self.work[p].pl.blocks[b].bbox
+    }
+    /// Struct role of block i: its group's role, "none" when untagged on a
+    /// tagged page, "" on an untagged page.
+    pub(crate) fn role(&self, i: usize, page_tagged: bool) -> String {
+        let (p, b) = self.doc_blocks[i];
+        match self.work[p].pl.blocks[b]
+            .elem
+            .and_then(|g| self.work[p].group_role.get(&g))
+        {
+            Some(r) => r.clone(),
+            None if page_tagged => "none".into(),
+            None => String::new(),
+        }
+    }
+}
+
+pub(crate) fn emit(
+    raw: &RawDoc,
+    opts: &PdfOptions,
+    st: Staged,
+    plan: headings::Plan,
+) -> PdfUnitsOutput {
+    let Staged {
+        work,
+        furn,
+        doc_blocks,
+        texts,
+        joined,
+        hblocks,
+        stats,
+        ..
+    } = st;
+    let n_pages = raw.pages.len();
     let struct_headings = raw.pages.iter().any(|p| {
         p.struct_nodes
             .iter()
@@ -287,13 +395,30 @@ pub fn analyze(raw: &RawDoc, opts: &PdfOptions) -> PdfUnitsOutput {
             let text = texts[idx].trim().to_string();
             if let Some((lvl, src)) = plan.levels[idx] {
                 structure = true;
+                let mut text = text;
+                let mut bbox = b.bbox;
+                let mut joined_h = joined[idx];
+                if plan.merge_next[idx] && i + 1 < count {
+                    let nb = &w.pl.blocks[doc_blocks[idx + 1].1];
+                    text = format!("{} {}", text, texts[idx + 1].trim())
+                        .trim()
+                        .to_string();
+                    bbox = [
+                        bbox[0].min(nb.bbox[0]),
+                        bbox[1].min(nb.bbox[1]),
+                        bbox[2].max(nb.bbox[2]),
+                        bbox[3].max(nb.bbox[3]),
+                    ];
+                    joined_h |= joined[idx + 1];
+                    i += 1; // the title block is consumed
+                }
                 if !text.is_empty() {
                     let mut prov = Provenance::new(Route::Plain);
                     prov.heading_source = Some(src);
-                    prov.joined_hyphen = joined[idx];
+                    prov.joined_hyphen = joined_h;
                     body.push(DocUnit {
                         page: Some(pg),
-                        bbox: Some(b.bbox),
+                        bbox: Some(bbox),
                         kind: UnitKind::Heading,
                         level: Some(lvl),
                         markdown: format!("{} {}", "#".repeat(lvl as usize), text),
