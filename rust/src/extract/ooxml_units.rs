@@ -18,12 +18,26 @@
 //!   clamped to 6 (markdown has six).
 //! - Lists: `w:numPr` on the paragraph or inherited from its style chain,
 //!   resolved through `numbering.xml` (`w:num` → `w:abstractNum`, one
-//!   `w:numStyleLink` hop, `w:lvlOverride`/`w:startOverride`). `numFmt=bullet`
-//!   renders `-`; every other format renders as a decimal counter `N.` (markdown
-//!   has no lettered/roman list); `numFmt=none` and `numId=0` are not lists.
-//!   Counters are per `numId` and a shallower item resets deeper counters.
-//!   Consecutive list paragraphs form ONE `list` unit; nesting is indented to
-//!   the parent's content column (a skipped level is clamped to parent+1).
+//!   `w:numStyleLink` hop, `w:lvlOverride`). Every item carries the
+//!   document's REAL label — a label is a citation anchor ("artikel 3 lid b",
+//!   "sub ii") — built from `w:lvlText` (`%1.`, `(%1)`, `%1.%2`) with each
+//!   `%N` rendered in that level's `w:numFmt` (decimal, decimalZero,
+//!   lower/upperLetter as a, …, z, aa, lower/upperRoman; `w:isLgl` forces
+//!   other levels to decimal). A pure-decimal label (`3.`, `3)`) is a native
+//!   markdown ordered marker; any other label is literal text after `- `,
+//!   markdown-escaped, so nesting survives (`- b. text`, `- (ii) text`,
+//!   `- 2.b text`). An unknown `numFmt` renders the decimal value and the unit
+//!   gets `failed_check = "list_label_unknown_format"` — never a silent `1.`.
+//!   Counting: `w:start`; counters are per abstract list (nums sharing an
+//!   abstractNum continue one sequence, as Word does); a `w:startOverride`
+//!   restarts the sequence the first time its num is used; a deeper level
+//!   restarts after a shallower one is used unless `w:lvlRestart` says
+//!   otherwise (`0` = never). Numbered headings keep their label
+//!   (`# Artikel 3 Huurprijs`) and advance the counters, so sub-levels restart
+//!   under them. `numFmt=bullet` renders `-`; `numFmt=none` and `numId=0` are
+//!   not lists. Consecutive list paragraphs form ONE `list` unit; an item
+//!   nests under the nearest preceding item of a shallower level, indented to
+//!   that parent's content column.
 //! - `w:tbl` → a pipe table (see "tables" below). Tables nested in a cell are
 //!   lifted out: each becomes its own `table` unit right after its parent, with
 //!   `failed_check = "nested_table"`; both tables are `table_uncertain`. A 1×1
@@ -46,7 +60,10 @@
 //! only when that is missing), `page` = 1-based slide position, shapes in
 //! `p:spTree` order (groups recursed). A `title`/`ctrTitle` placeholder is a
 //! level-1 heading; `a:tbl` is a table (`gridSpan`/`rowSpan`/`hMerge`/`vMerge`);
-//! paragraphs with an explicit `a:buAutoNum`/`a:buChar` are list items, other
+//! paragraphs with an explicit `a:buAutoNum`/`a:buChar` are list items (an
+//! `a:buAutoNum@type` renders its real label: arabic/alphaLc/alphaUc/romanLc/
+//! romanUc × Period/ParenR/ParenBoth/Plain; any other scheme falls back to `N.`
+//! with `failed_check = "list_label_unknown_format"`), other
 //! paragraphs of a shape form one paragraph unit. `ftr`/`dt`/`hdr` placeholders
 //! are furniture kept once per deck; `sldNum` is dropped (it is `page`).
 //! `bbox` comes from `a:xfrm` (EMU / 12700 = points, top-left origin, group
@@ -109,7 +126,6 @@ impl El {
             .map(|a| {
                 let key = String::from_utf8_lossy(a.key.as_ref()).to_string();
                 let value = a
-                    
                     .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
                     .map(|v| v.to_string())
                     .unwrap_or_else(|_| String::from_utf8_lossy(&a.value).to_string());
@@ -167,7 +183,11 @@ impl El {
     }
 
     fn num_attr(&self, local: &str) -> Option<f64> {
-        self.attr(local)?.trim().parse::<i64>().ok().map(|v| v as f64)
+        self.attr(local)?
+            .trim()
+            .parse::<i64>()
+            .ok()
+            .map(|v| v as f64)
     }
 }
 
@@ -408,32 +428,208 @@ fn heading_unit(page: Option<u32>, bbox: Option<BBox>, level: u32, text: &str) -
     }
 }
 
+/// How a list item is marked. A list label is a citation anchor ("artikel 3
+/// lid b", "sub ii"), so it is always the document's OWN label:
+/// - `Native("3.")` — a pure-decimal label (`N.` / `N)`) IS a markdown ordered
+///   marker, so it is used as one;
+/// - `Literal("b.")` — any other label ("b.", "(ii)", "2.b", "Artikel 3") is
+///   written as literal text after a `- ` marker, markdown-escaped, so the
+///   nesting survives and the label is never renumbered;
+/// - `Bullet` — `-`.
+#[derive(Clone, Debug, PartialEq)]
+enum Marker {
+    Bullet,
+    Native(String),
+    Literal(String),
+}
+
+impl Marker {
+    fn from_label(label: String) -> Marker {
+        let label = label.trim().to_string();
+        if label.is_empty() {
+            return Marker::Bullet;
+        }
+        let digits = label.trim_end_matches(['.', ')']);
+        let punct = label.len() - digits.len();
+        if punct == 1
+            && !digits.is_empty()
+            && digits.len() <= 9
+            && digits.bytes().all(|b| b.is_ascii_digit())
+        {
+            Marker::Native(label)
+        } else {
+            Marker::Literal(label)
+        }
+    }
+
+    /// The label as the document prints it (headings carry it verbatim).
+    fn label(&self) -> Option<&str> {
+        match self {
+            Marker::Bullet => None,
+            Marker::Native(l) | Marker::Literal(l) => Some(l),
+        }
+    }
+}
+
+/// Backslash-escape the markdown-significant characters of a literal label.
+fn escape_label(label: &str) -> String {
+    let mut out = String::with_capacity(label.len());
+    for ch in label.chars() {
+        if matches!(
+            ch,
+            '\\' | '*' | '_' | '[' | ']' | '<' | '>' | '#' | '|' | '`'
+        ) {
+            out.push('\\');
+        }
+        out.push(ch);
+    }
+    out
+}
+
 /// Builds one markdown list from consecutive items, nesting each item under
 /// its parent's content column (valid CommonMark nesting).
 #[derive(Default)]
 struct ListBuilder {
     lines: Vec<String>,
-    cols: Vec<usize>,
+    /// Open items: (source level, content column).
+    cols: Vec<(usize, usize)>,
     bbox: Option<BBox>,
+    /// Some label used a number format we cannot render; it fell back to the
+    /// decimal value and the unit says so (`failed_check`).
+    unknown_format: bool,
 }
 
 impl ListBuilder {
-    fn push(&mut self, depth: usize, marker: &str, text: &str) {
-        let depth = depth.min(self.cols.len());
-        self.cols.truncate(depth);
-        let indent = if depth == 0 { 0 } else { self.cols[depth - 1] };
-        self.lines
-            .push(format!("{}{} {}", " ".repeat(indent), marker, one_line(text)));
-        self.cols.push(indent + marker.chars().count() + 1);
+    fn push(&mut self, level: usize, marker: &Marker, text: &str) {
+        // parent = nearest open item at a shallower level; a list may start at
+        // any level (e.g. ilvl 1 under a numbered heading) and skip levels
+        while self.cols.last().is_some_and(|(l, _)| *l >= level) {
+            self.cols.pop();
+        }
+        let indent = self.cols.last().map_or(0, |(_, col)| *col);
+        let (md_marker, literal) = match marker {
+            Marker::Bullet => ("-".to_string(), String::new()),
+            Marker::Native(l) => (l.clone(), String::new()),
+            Marker::Literal(l) => ("-".to_string(), format!("{} ", escape_label(l))),
+        };
+        self.lines.push(format!(
+            "{}{} {}{}",
+            " ".repeat(indent),
+            md_marker,
+            literal,
+            one_line(text)
+        ));
+        self.cols
+            .push((level, indent + md_marker.chars().count() + 1));
     }
 
     fn flush(&mut self, page: Option<u32>, units: &mut Vec<DocUnit>) {
         if !self.lines.is_empty() {
             let md = self.lines.join("\n");
-            units.push(unit(page, self.bbox, UnitKind::List, md));
+            let mut u = unit(page, self.bbox, UnitKind::List, md);
+            if self.unknown_format {
+                u.provenance.failed_check = Some(UNKNOWN_FORMAT.to_string());
+            }
+            units.push(u);
         }
         *self = ListBuilder::default();
     }
+}
+
+const UNKNOWN_FORMAT: &str = "list_label_unknown_format";
+
+/// Word's repeated-letter style: 1→a … 26→z, 27→aa, 28→bb.
+fn letters(n: i64, upper: bool) -> Option<String> {
+    if n < 1 {
+        return None;
+    }
+    let idx = ((n - 1) % 26) as u8;
+    let times = ((n - 1) / 26 + 1) as usize;
+    let ch = (if upper { b'A' } else { b'a' } + idx) as char;
+    Some(ch.to_string().repeat(times))
+}
+
+fn roman(n: i64, upper: bool) -> Option<String> {
+    if !(1..=3999).contains(&n) {
+        return None;
+    }
+    const TABLE: [(i64, &str); 13] = [
+        (1000, "m"),
+        (900, "cm"),
+        (500, "d"),
+        (400, "cd"),
+        (100, "c"),
+        (90, "xc"),
+        (50, "l"),
+        (40, "xl"),
+        (10, "x"),
+        (9, "ix"),
+        (5, "v"),
+        (4, "iv"),
+        (1, "i"),
+    ];
+    let mut n = n;
+    let mut out = String::new();
+    for (v, s) in TABLE {
+        while n >= v {
+            out.push_str(s);
+            n -= v;
+        }
+    }
+    Some(if upper { out.to_uppercase() } else { out })
+}
+
+/// A counter value in a number format → `(text, known)`. An unknown format
+/// (or a value the format cannot express) falls back to the decimal value
+/// with `known = false` — never silently.
+fn format_number(n: i64, fmt: &str) -> (String, bool) {
+    let rendered = match fmt {
+        "decimal" | "bullet" => Some(n.to_string()),
+        "decimalZero" => Some(if (0..10).contains(&n) {
+            format!("0{n}")
+        } else {
+            n.to_string()
+        }),
+        "lowerLetter" => letters(n, false),
+        "upperLetter" => letters(n, true),
+        "lowerRoman" => roman(n, false),
+        "upperRoman" => roman(n, true),
+        "none" => Some(String::new()),
+        _ => None,
+    };
+    match rendered {
+        Some(r) => (r, true),
+        None => (n.to_string(), false),
+    }
+}
+
+/// PPTX `a:buAutoNum@type` → label text. Covers the five scripts DrawingML
+/// shares with Word (arabic, alphaLc/Uc, romanLc/Uc) in their four
+/// punctuations (Period, ParenR, ParenBoth, Plain); anything else falls back
+/// to `N.` with `known = false`.
+fn pptx_label(scheme: &str, n: i64) -> (String, bool) {
+    const BASES: [(&str, &str); 5] = [
+        ("alphaLc", "lowerLetter"),
+        ("alphaUc", "upperLetter"),
+        ("arabic", "decimal"),
+        ("romanLc", "lowerRoman"),
+        ("romanUc", "upperRoman"),
+    ];
+    for (base, fmt) in BASES {
+        let Some(punct) = scheme.strip_prefix(base) else {
+            continue;
+        };
+        let (value, ok) = format_number(n, fmt);
+        let label = match punct {
+            "Period" => format!("{value}."),
+            "ParenR" => format!("{value})"),
+            "ParenBoth" => format!("({value})"),
+            "Plain" => value,
+            _ => continue,
+        };
+        return (label, ok);
+    }
+    (format!("{n}."), false)
 }
 
 // ------------------------------------------------------------ tables ----
@@ -471,7 +667,9 @@ impl Grid {
             .max(self.cols);
         for row in &mut self.rows {
             while row.len() < width {
-                row.push(Cell { text: String::new() });
+                row.push(Cell {
+                    text: String::new(),
+                });
             }
         }
         let text_of: Vec<Vec<String>> = self
@@ -664,28 +862,43 @@ fn name_level(name: &str) -> Option<u32> {
 
 #[derive(Clone)]
 struct LvlDef {
-    ordered: bool,
-    is_list: bool,
-    start: u32,
+    /// `w:numFmt` (default `decimal`).
+    fmt: String,
+    /// `w:lvlText` (`%1.`, `(%1)`, `%1.%2`); `None` when absent.
+    text: Option<String>,
+    start: i64,
+    /// `w:lvlRestart`: restart after a use of this 1-based level or any
+    /// shallower one; `0` = never. `None` = after any shallower level.
+    restart: Option<u32>,
+    /// `w:isLgl`: other levels' numbers render as decimals in this label.
+    is_lgl: bool,
 }
 
 fn lvl_def(lvl: &El) -> LvlDef {
-    let fmt = lvl.child("numFmt").and_then(El::val).unwrap_or("decimal");
-    LvlDef {
-        ordered: fmt != "bullet",
-        is_list: fmt != "none",
-        start: lvl
-            .child("start")
+    let num = |name: &str| {
+        lvl.child(name)
             .and_then(El::val)
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(1),
+            .and_then(|v| v.trim().parse::<i64>().ok())
+    };
+    LvlDef {
+        fmt: lvl
+            .child("numFmt")
+            .and_then(El::val)
+            .unwrap_or("decimal")
+            .to_string(),
+        text: lvl.child("lvlText").and_then(El::val).map(str::to_string),
+        start: num("start").unwrap_or(1),
+        restart: num("lvlRestart").and_then(|v| u32::try_from(v).ok()),
+        is_lgl: lvl
+            .child("isLgl")
+            .is_some_and(|e| !matches!(e.val(), Some("0") | Some("false"))),
     }
 }
 
 #[derive(Default)]
 struct Numbering {
     /// numId → (abstractNumId, ilvl → (startOverride, lvl override))
-    nums: BTreeMap<String, (String, BTreeMap<u32, (Option<u32>, Option<LvlDef>)>)>,
+    nums: BTreeMap<String, (String, BTreeMap<u32, (Option<i64>, Option<LvlDef>)>)>,
     /// abstractNumId → (ilvl → def, numStyleLink)
     abstracts: BTreeMap<String, (BTreeMap<u32, LvlDef>, Option<String>)>,
 }
@@ -705,7 +918,10 @@ impl Numbering {
                         levels.insert(i, lvl_def(lvl));
                     }
                 }
-                let link = abs.child("numStyleLink").and_then(El::val).map(str::to_string);
+                let link = abs
+                    .child("numStyleLink")
+                    .and_then(El::val)
+                    .map(str::to_string);
                 n.abstracts.insert(id.to_string(), (levels, link));
             }
             for num in top.kids_named("num") {
@@ -731,32 +947,54 @@ impl Numbering {
         n
     }
 
-    fn level(&self, num_id: &str, ilvl: u32, styles: &Styles) -> Option<LvlDef> {
-        let (abs_id, overrides) = self.nums.get(num_id)?;
-        let (start_override, lvl_override) = overrides.get(&ilvl).cloned().unwrap_or((None, None));
-        let mut def = match lvl_override {
-            Some(d) => Some(d),
-            None => {
-                let (levels, link) = self.abstracts.get(abs_id)?;
-                levels.get(&ilvl).cloned().or_else(|| {
-                    // one numStyleLink hop: style → its numId → that abstract
-                    let style_num = styles.by_id.get(link.as_ref()?)?.num_id.as_ref()?;
-                    let (abs2, _) = self.nums.get(style_num)?;
-                    self.abstracts.get(abs2)?.0.get(&ilvl).cloned()
-                })
+    /// The abstract list a num instance counts in, following one
+    /// `numStyleLink` hop (style → its numId → that abstract).
+    fn abstract_of(&self, num_id: &str, styles: &Styles) -> Option<String> {
+        let (abs_id, _) = self.nums.get(num_id)?;
+        let (levels, link) = self.abstracts.get(abs_id)?;
+        if levels.is_empty() {
+            if let Some(style_num) = link
+                .as_ref()
+                .and_then(|l| styles.by_id.get(l))
+                .and_then(|s| s.num_id.as_ref())
+            {
+                if let Some((abs2, _)) = self.nums.get(style_num) {
+                    return Some(abs2.clone());
+                }
             }
-        }?;
-        if let Some(s) = start_override {
-            def.start = s;
         }
-        Some(def)
+        Some(abs_id.clone())
+    }
+
+    fn level(&self, num_id: &str, ilvl: u32, styles: &Styles) -> Option<LvlDef> {
+        let (_, overrides) = self.nums.get(num_id)?;
+        if let Some((_, Some(d))) = overrides.get(&ilvl) {
+            return Some(d.clone());
+        }
+        let abs = self.abstract_of(num_id, styles)?;
+        self.abstracts.get(&abs)?.0.get(&ilvl).cloned()
+    }
+
+    fn start_overrides(&self, num_id: &str) -> Vec<(u32, i64)> {
+        self.nums
+            .get(num_id)
+            .map(|(_, o)| {
+                o.iter()
+                    .filter_map(|(l, (s, _))| s.map(|s| (*l, s)))
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 }
 
 struct Docx {
     styles: Styles,
     numbering: Numbering,
-    counters: BTreeMap<String, [Option<u32>; 10]>,
+    /// Current value per level, per ABSTRACT list: num instances that share an
+    /// abstractNum continue one sequence (Word); a `startOverride` restarts it
+    /// the first time its num is used.
+    counters: BTreeMap<String, [Option<i64>; 10]>,
+    started_nums: BTreeSet<String>,
 }
 
 impl Docx {
@@ -797,11 +1035,23 @@ impl Docx {
         let text = clean(&raw);
 
         if !text.is_empty() {
+            let numbered = self.list_item(ppr, style);
             if let Some(level) = self.styles.heading_level(style, outline) {
                 list.flush(None, units);
-                units.push(heading_unit(None, None, level, &text));
-            } else if let Some((depth, marker)) = self.list_item(ppr, style) {
+                // a numbered heading ("Artikel 3") keeps its label; its number
+                // also advanced the counters, so sub-levels restart under it
+                let text = match numbered.as_ref().and_then(|(_, m, _)| m.label()) {
+                    Some(label) => format!("{label} {text}"),
+                    None => text,
+                };
+                let mut u = heading_unit(None, None, level, &text);
+                if numbered.as_ref().is_some_and(|(_, _, unknown)| *unknown) {
+                    u.provenance.failed_check = Some(UNKNOWN_FORMAT.to_string());
+                }
+                units.push(u);
+            } else if let Some((depth, marker, unknown)) = numbered {
                 list.push(depth, &marker, &text);
+                list.unknown_format |= unknown;
             } else {
                 list.flush(None, units);
                 units.push(unit(None, None, UnitKind::Paragraph, text));
@@ -813,8 +1063,13 @@ impl Docx {
         }
     }
 
-    /// `(ilvl, marker)` when the paragraph is a list item.
-    fn list_item(&mut self, ppr: Option<&El>, style: Option<&str>) -> Option<(usize, String)> {
+    /// `(ilvl, marker, unknown_format)` when the paragraph is numbered.
+    /// Advances the counters (headings included).
+    fn list_item(
+        &mut self,
+        ppr: Option<&El>,
+        style: Option<&str>,
+    ) -> Option<(usize, Marker, bool)> {
         let num_pr = ppr.and_then(|x| x.child("numPr"));
         let direct_num = num_pr
             .and_then(|n| n.child("numId"))
@@ -831,22 +1086,69 @@ impl Docx {
         }
         let ilvl = direct_ilvl.or(style_ilvl).unwrap_or(0).min(9);
         let def = self.numbering.level(&num_id, ilvl, &self.styles)?;
-        if !def.is_list {
+        if def.fmt == "none" {
             return None;
         }
-        let counters = self.counters.entry(num_id).or_insert([None; 10]);
-        let i = ilvl as usize;
-        let n = counters[i].map(|c| c + 1).unwrap_or(def.start);
-        counters[i] = Some(n);
-        for c in counters.iter_mut().skip(i + 1) {
-            *c = None;
+        let abs = self.numbering.abstract_of(&num_id, &self.styles)?;
+        let levels: Vec<Option<LvlDef>> = (0..10u32)
+            .map(|l| self.numbering.level(&num_id, l, &self.styles))
+            .collect();
+        let counters = self.counters.entry(abs).or_insert([None; 10]);
+        if self.started_nums.insert(num_id.clone()) {
+            for (l, start) in self.numbering.start_overrides(&num_id) {
+                if let Some(c) = counters.get_mut(l as usize) {
+                    *c = Some(start - 1);
+                }
+            }
         }
-        let marker = if def.ordered {
-            format!("{n}.")
-        } else {
-            "-".to_string()
-        };
-        Some((i, marker))
+        let i = ilvl as usize;
+        counters[i] = Some(counters[i].map(|c| c + 1).unwrap_or(def.start));
+        for (d, c) in counters.iter_mut().enumerate().skip(i + 1) {
+            let restart = levels[d].as_ref().and_then(|x| x.restart);
+            let reset = match restart {
+                None => true,
+                Some(0) => false,
+                Some(r) => (ilvl) < r,
+            };
+            if reset {
+                *c = None;
+            }
+        }
+        if def.fmt == "bullet" {
+            return Some((i, Marker::Bullet, false));
+        }
+
+        let template = def.text.clone().unwrap_or_else(|| format!("%{}.", i + 1));
+        let mut label = String::new();
+        let mut unknown = false;
+        let mut chars = template.chars().peekable();
+        while let Some(ch) = chars.next() {
+            let level_ref = if ch == '%' {
+                chars
+                    .peek()
+                    .and_then(|d| d.to_digit(10))
+                    .filter(|d| (1..=9).contains(d))
+            } else {
+                None
+            };
+            let Some(k) = level_ref else {
+                label.push(ch);
+                continue;
+            };
+            chars.next();
+            let l = (k - 1) as usize;
+            let ldef = levels[l].as_ref();
+            let value = counters[l].unwrap_or_else(|| ldef.map(|x| x.start).unwrap_or(1));
+            let fmt = if def.is_lgl && l != i {
+                "decimal"
+            } else {
+                ldef.map(|x| x.fmt.as_str()).unwrap_or("decimal")
+            };
+            let (text, known) = format_number(value, fmt);
+            unknown |= !known;
+            label.push_str(&text);
+        }
+        Some((i, Marker::from_label(label), unknown))
     }
 
     /// All paragraph text of a cell (joined by spaces); nested tables are
@@ -934,7 +1236,9 @@ impl Docx {
             };
             let mut row: Vec<Cell> = Vec::new();
             for _ in 0..skip("gridBefore") {
-                row.push(Cell { text: String::new() });
+                row.push(Cell {
+                    text: String::new(),
+                });
             }
             let mut tcs = Vec::new();
             cells_of(tr, &mut tcs);
@@ -962,11 +1266,15 @@ impl Docx {
                     text: parts.join(" "),
                 });
                 for _ in 1..span {
-                    row.push(Cell { text: String::new() });
+                    row.push(Cell {
+                        text: String::new(),
+                    });
                 }
             }
             for _ in 0..skip("gridAfter") {
-                row.push(Cell { text: String::new() });
+                row.push(Cell {
+                    text: String::new(),
+                });
             }
             grid.rows.push(row);
         }
@@ -1006,6 +1314,7 @@ fn docx_units(pkg: &mut Package) -> Result<Vec<DocUnit>, String> {
         styles: Styles::parse(pkg.xml("word/styles.xml")),
         numbering: Numbering::parse(pkg.xml("word/numbering.xml")),
         counters: BTreeMap::new(),
+        started_nums: BTreeSet::new(),
     };
 
     // header/footer parts referenced by the main document, in part-number order
@@ -1204,10 +1513,15 @@ impl Pptx {
             ..ListBuilder::default()
         };
         let mut plain: Vec<String> = Vec::new();
-        let mut counters: [Option<u32>; 10] = [None; 10];
+        let mut counters: [Option<i64>; 10] = [None; 10];
         let flush_plain = |plain: &mut Vec<String>, units: &mut Vec<DocUnit>| {
             if !plain.is_empty() {
-                units.push(unit(Some(page), bbox, UnitKind::Paragraph, plain.join("\n")));
+                units.push(unit(
+                    Some(page),
+                    bbox,
+                    UnitKind::Paragraph,
+                    plain.join("\n"),
+                ));
                 plain.clear();
             }
         };
@@ -1226,19 +1540,21 @@ impl Pptx {
             let bullet = ppr.and_then(|x| x.child("buChar")).is_some();
             if let Some(a) = auto {
                 flush_plain(&mut plain, units);
-                let start: u32 = a.attr("startAt").and_then(|v| v.parse().ok()).unwrap_or(1);
+                let start: i64 = a.attr("startAt").and_then(|v| v.parse().ok()).unwrap_or(1);
                 let n = counters[lvl].map(|c| c + 1).unwrap_or(start);
                 counters[lvl] = Some(n);
                 for c in counters.iter_mut().skip(lvl + 1) {
                     *c = None;
                 }
-                list.push(lvl, &format!("{n}."), &text);
+                let (label, known) = pptx_label(a.attr("type").unwrap_or("arabicPeriod"), n);
+                list.unknown_format |= !known;
+                list.push(lvl, &Marker::from_label(label), &text);
             } else if bullet {
                 flush_plain(&mut plain, units);
                 for c in counters.iter_mut().skip(lvl + 1) {
                     *c = None;
                 }
-                list.push(lvl, "-", &text);
+                list.push(lvl, &Marker::Bullet, &text);
             } else {
                 list.flush(Some(page), units);
                 list.bbox = bbox;
@@ -1265,8 +1581,16 @@ fn pptx_grid(tbl: &El) -> Grid {
         let mut row = Vec::new();
         for tc in tr.kids_named("tc") {
             let continuation = truthy(tc.attr("hMerge")) || truthy(tc.attr("vMerge"));
-            let spans = tc.attr("gridSpan").and_then(|v| v.parse::<u32>().ok()).unwrap_or(1) > 1
-                || tc.attr("rowSpan").and_then(|v| v.parse::<u32>().ok()).unwrap_or(1) > 1;
+            let spans = tc
+                .attr("gridSpan")
+                .and_then(|v| v.parse::<u32>().ok())
+                .unwrap_or(1)
+                > 1
+                || tc
+                    .attr("rowSpan")
+                    .and_then(|v| v.parse::<u32>().ok())
+                    .unwrap_or(1)
+                    > 1;
             if continuation || spans {
                 grid.merged = true;
             }
@@ -1355,7 +1679,10 @@ pub fn ooxml_units(bytes: &[u8], kind_hint: SourceType) -> Result<Vec<DocUnit>, 
     let mut pkg = Package::open(bytes)?;
     let is_docx = pkg.has("word/document.xml");
     let is_pptx = pkg.has("ppt/presentation.xml")
-        || pkg.names().iter().any(|n| n.starts_with("ppt/slides/slide"));
+        || pkg
+            .names()
+            .iter()
+            .any(|n| n.starts_with("ppt/slides/slide"));
     match (kind_hint, is_docx, is_pptx) {
         (SourceType::Docx, true, _) | (SourceType::Pptx, true, false) => docx_units(&mut pkg),
         (SourceType::Pptx, _, true) | (SourceType::Docx, false, true) => pptx_units(&mut pkg),

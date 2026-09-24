@@ -4,9 +4,9 @@
 
 use std::io::Write;
 
+use citenexus_core::ooxml_units;
 use citenexus_core::types::SourceType;
 use citenexus_core::units::*;
-use citenexus_core::ooxml_units;
 
 fn zip_of(entries: &[(&str, &str)]) -> Vec<u8> {
     let mut buf = Vec::new();
@@ -25,7 +25,9 @@ fn zip_of(entries: &[(&str, &str)]) -> Vec<u8> {
 const W: &str = r#"xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships""#;
 
 fn document(body: &str) -> String {
-    format!(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document {W}><w:body>{body}</w:body></w:document>"#)
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document {W}><w:body>{body}</w:body></w:document>"#
+    )
 }
 
 fn para(style: Option<&str>, text: &str) -> String {
@@ -137,7 +139,10 @@ fn docx_nested_table_is_emitted_after_its_parent_with_provenance() {
     assert_eq!(us[0].markdown, "| A | B |\n| --- | --- |\n| see | b2 |");
     assert!(us[0].provenance.table_uncertain);
     assert_eq!(us[1].markdown, "| x | y |\n| --- | --- |\n| 1 | 2 |");
-    assert_eq!(us[1].provenance.failed_check.as_deref(), Some("nested_table"));
+    assert_eq!(
+        us[1].provenance.failed_check.as_deref(),
+        Some("nested_table")
+    );
     assert!(us[1].provenance.table_uncertain);
 }
 
@@ -284,7 +289,11 @@ fn docx_numbered_and_nested_lists_from_numbering_xml() {
     assert_eq!(
         got,
         vec![
-            (UnitKind::List, "1. One\n   - Sub a\n     1. Deep i\n   - Sub b\n2. Two"),
+            // lowerLetter renders its real label, never "1."
+            (
+                UnitKind::List,
+                "1. One\n   - Sub a\n     - a. Deep i\n   - Sub b\n2. Two"
+            ),
             (UnitKind::Paragraph, "Between."),
             (UnitKind::List, "- Bullet\n- Via style"),
             (UnitKind::Paragraph, "Gap."),
@@ -304,7 +313,9 @@ fn docx_headers_and_footers_are_furniture_kept_once() {
       <Relationship Id="rId7" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>
     </Relationships>"#;
     let hdr = |t: &str| {
-        format!(r#"<?xml version="1.0"?><w:hdr {W}><w:p><w:r><w:t>{t}</w:t></w:r></w:p><w:p/></w:hdr>"#)
+        format!(
+            r#"<?xml version="1.0"?><w:hdr {W}><w:p><w:r><w:t>{t}</w:t></w:r></w:p><w:p/></w:hdr>"#
+        )
     };
     let ftr = format!(
         r#"<?xml version="1.0"?><w:ftr {W}><w:p><w:r><w:t>Laatst bijgewerkt 1 januari 2026</w:t></w:r></w:p></w:ftr>"#
@@ -388,7 +399,9 @@ fn docx_reading_order_is_document_order_and_sdt_is_unwrapped() {
 const P: &str = r#"xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships""#;
 
 fn slide(tree: &str) -> String {
-    format!(r#"<?xml version="1.0"?><p:sld {P}><p:cSld><p:spTree>{tree}</p:spTree></p:cSld></p:sld>"#)
+    format!(
+        r#"<?xml version="1.0"?><p:sld {P}><p:cSld><p:spTree>{tree}</p:spTree></p:cSld></p:sld>"#
+    )
 }
 
 fn title_shape(ph: &str, text: &str) -> String {
@@ -435,7 +448,10 @@ fn pptx_fixture() -> Vec<u8> {
 <p:sp><p:nvSpPr><p:cNvPr id="12" name="Num"/><p:cNvSpPr/><p:nvPr><p:ph type="sldNum"/></p:nvPr></p:nvSpPr><p:spPr/><p:txBody><a:p><a:fld type="slidenum"><a:t>1</a:t></a:fld></a:p></p:txBody></p:sp>"#;
     // File names are deliberately out of deck order: the deck order lives in
     // presentation.xml's sldIdLst, not in the slide file numbers.
-    let first = slide(&format!("{}{table}{grouped}", title_shape("ctrTitle", "Deck")));
+    let first = slide(&format!(
+        "{}{table}{grouped}",
+        title_shape("ctrTitle", "Deck")
+    ));
     let second = slide(&format!(
         "{}{body}<p:sp><p:nvSpPr><p:cNvPr id=\"11\" name=\"Footer\"/><p:cNvSpPr/><p:nvPr><p:ph type=\"ftr\"/></p:nvPr></p:nvSpPr><p:spPr/><p:txBody><a:p><a:r><a:t>Vertrouwelijk</a:t></a:r></a:p></p:txBody></p:sp>",
         title_shape("title", "Agenda")
@@ -480,7 +496,10 @@ fn pptx_titles_tables_lists_in_slide_then_shape_order() {
     );
     let heading = &us[0];
     assert_eq!(heading.level, Some(1));
-    assert_eq!(heading.provenance.heading_source, Some(HeadingSource::Style));
+    assert_eq!(
+        heading.provenance.heading_source,
+        Some(HeadingSource::Style)
+    );
     // EMU / 12700 = points; top-left origin like the slide itself.
     assert_eq!(heading.bbox, Some([1.0, 2.0, 101.0, 12.0]));
     let table = &us[1];
@@ -495,12 +514,272 @@ fn pptx_titles_tables_lists_in_slide_then_shape_order() {
 #[test]
 fn pptx_falls_back_to_file_order_without_presentation_xml() {
     let bytes = zip_of(&[
-        ("ppt/slides/slide10.xml", &slide(&title_shape("title", "Ten"))),
-        ("ppt/slides/slide2.xml", &slide(&title_shape("title", "Two"))),
+        (
+            "ppt/slides/slide10.xml",
+            &slide(&title_shape("title", "Ten")),
+        ),
+        (
+            "ppt/slides/slide2.xml",
+            &slide(&title_shape("title", "Two")),
+        ),
     ]);
     let us = units(&bytes, SourceType::Pptx);
     let got: Vec<(Option<u32>, &str)> = us.iter().map(|u| (u.page, u.markdown.as_str())).collect();
     assert_eq!(got, vec![(Some(1), "# Two"), (Some(2), "# Ten")]);
+}
+
+// ------------------------------------------------------- list labels ----
+//
+// A list label is a citation anchor ("artikel 3 lid b", "sub ii"): it must be
+// the document's own label, never a renumbered "1.". Pure-decimal labels use
+// markdown's own ordered marker; every other label is literal text after a
+// "- " marker (escaped so it stays literal), keeping the nesting.
+
+fn numbering_doc(numbering: &str, body: &str, styles: Option<&str>) -> Vec<u8> {
+    let numbering = format!(
+        r#"<?xml version="1.0"?><w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{numbering}</w:numbering>"#
+    );
+    let doc = document(body);
+    let mut entries = vec![
+        ("word/document.xml", doc.as_str()),
+        ("word/numbering.xml", numbering.as_str()),
+    ];
+    if let Some(st) = styles {
+        entries.push(("word/styles.xml", st));
+    }
+    zip_of(&entries)
+}
+
+fn lvl(ilvl: u32, fmt: &str, text: &str, extra: &str) -> String {
+    format!(
+        r#"<w:lvl w:ilvl="{ilvl}"><w:start w:val="1"/><w:numFmt w:val="{fmt}"/><w:lvlText w:val="{text}"/>{extra}</w:lvl>"#
+    )
+}
+
+fn list_md(bytes: &[u8]) -> Vec<(UnitKind, String)> {
+    units(bytes, SourceType::Docx)
+        .into_iter()
+        .map(|u| (u.kind, u.markdown))
+        .collect()
+}
+
+#[test]
+fn docx_lower_letter_upper_roman_and_parenthesised_lower_roman() {
+    let numbering = format!(
+        r#"<w:abstractNum w:abstractNumId="1">{}</w:abstractNum>
+<w:abstractNum w:abstractNumId="2"><w:lvl w:ilvl="0"><w:start w:val="3"/><w:numFmt w:val="upperRoman"/><w:lvlText w:val="%1."/></w:lvl></w:abstractNum>
+<w:abstractNum w:abstractNumId="3">{}</w:abstractNum>
+<w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>
+<w:num w:numId="2"><w:abstractNumId w:val="2"/></w:num>
+<w:num w:numId="3"><w:abstractNumId w:val="3"/></w:num>"#,
+        lvl(0, "lowerLetter", "%1.", ""),
+        lvl(0, "lowerRoman", "(%1)", ""),
+    );
+    let body = [
+        item("1", 0, "eerste"),
+        item("1", 0, "tweede"),
+        para(None, "-"),
+        item("2", 0, "three"),
+        item("2", 0, "four"),
+        para(None, "-"),
+        item("3", 0, "one"),
+        item("3", 0, "two"),
+        item("3", 0, "three"),
+        item("3", 0, "four"),
+    ]
+    .concat();
+    let got = list_md(&numbering_doc(&numbering, &body, None));
+    let lists: Vec<&str> = got
+        .iter()
+        .filter(|(k, _)| *k == UnitKind::List)
+        .map(|(_, m)| m.as_str())
+        .collect();
+    assert_eq!(
+        lists,
+        vec![
+            "- a. eerste\n- b. tweede",
+            "- III. three\n- IV. four",
+            "- (i) one\n- (ii) two\n- (iii) three\n- (iv) four",
+        ]
+    );
+}
+
+#[test]
+fn docx_multi_level_label_2_b() {
+    let numbering = format!(
+        r#"<w:abstractNum w:abstractNumId="1">{}{}</w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>"#,
+        lvl(0, "decimal", "%1.", ""),
+        lvl(1, "lowerLetter", "%1.%2", ""),
+    );
+    let body = [
+        item("1", 0, "A"),
+        item("1", 1, "B"),
+        item("1", 1, "C"),
+        item("1", 0, "D"),
+        item("1", 1, "E"),
+    ]
+    .concat();
+    let got = list_md(&numbering_doc(&numbering, &body, None));
+    assert_eq!(
+        got,
+        vec![(
+            UnitKind::List,
+            "1. A\n   - 1.a B\n   - 1.b C\n2. D\n   - 2.a E".to_string()
+        )]
+    );
+}
+
+#[test]
+fn docx_numbered_heading_restarts_its_sub_levels() {
+    // "Artikel %1" numbers the heading itself; its sub-level restarts after
+    // every heading, except a level with lvlRestart=0 which never restarts.
+    let numbering = format!(
+        r#"<w:abstractNum w:abstractNumId="1">{}{}{}</w:abstractNum><w:num w:numId="5"><w:abstractNumId w:val="1"/></w:num>"#,
+        lvl(0, "decimal", "Artikel %1", ""),
+        lvl(1, "lowerLetter", "%2.", ""),
+        lvl(2, "decimal", "[%3]", r#"<w:lvlRestart w:val="0"/>"#),
+    );
+    let heading = |t: &str| {
+        format!(
+            r#"<w:p><w:pPr><w:pStyle w:val="Heading1"/><w:numPr><w:ilvl w:val="0"/><w:numId w:val="5"/></w:numPr></w:pPr><w:r><w:t>{t}</w:t></w:r></w:p>"#
+        )
+    };
+    let body = [
+        heading("Scope"),
+        item("5", 1, "x"),
+        item("5", 1, "y"),
+        item("5", 2, "note"),
+        heading("Rent"),
+        item("5", 1, "z"),
+        item("5", 2, "note2"),
+    ]
+    .concat();
+    let got = list_md(&numbering_doc(&numbering, &body, None));
+    assert_eq!(
+        got,
+        vec![
+            (UnitKind::Heading, "# Artikel 1 Scope".to_string()),
+            (
+                UnitKind::List,
+                "- a. x\n- b. y\n  - \\[1\\] note".to_string()
+            ),
+            (UnitKind::Heading, "# Artikel 2 Rent".to_string()),
+            (UnitKind::List, "- a. z\n  - \\[2\\] note2".to_string()),
+        ]
+    );
+}
+
+#[test]
+fn docx_start_override_restarts_and_shared_abstract_continues() {
+    let numbering = format!(
+        r#"<w:abstractNum w:abstractNumId="1">{}</w:abstractNum>
+<w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>
+<w:num w:numId="2"><w:abstractNumId w:val="1"/></w:num>
+<w:num w:numId="3"><w:abstractNumId w:val="1"/><w:lvlOverride w:ilvl="0"><w:startOverride w:val="4"/></w:lvlOverride></w:num>"#,
+        lvl(0, "lowerLetter", "%1)", ""),
+    );
+    let body = [
+        item("1", 0, "p"),
+        item("1", 0, "q"),
+        para(None, "-"),
+        // a second num on the same abstract continues the sequence (Word)
+        item("2", 0, "r"),
+        para(None, "-"),
+        // startOverride restarts it at d
+        item("3", 0, "s"),
+        item("3", 0, "t"),
+    ]
+    .concat();
+    let lists: Vec<String> = list_md(&numbering_doc(&numbering, &body, None))
+        .into_iter()
+        .filter(|(k, _)| *k == UnitKind::List)
+        .map(|(_, m)| m)
+        .collect();
+    assert_eq!(lists, vec!["- a) p\n- b) q", "- c) r", "- d) s\n- e) t"]);
+}
+
+#[test]
+fn docx_unknown_number_format_is_decimal_and_marked() {
+    let numbering = format!(
+        r#"<w:abstractNum w:abstractNumId="1">{}</w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>"#,
+        lvl(0, "chineseCounting", "%1.", ""),
+    );
+    let body = [item("1", 0, "x"), item("1", 0, "y")].concat();
+    let us = units(&numbering_doc(&numbering, &body, None), SourceType::Docx);
+    assert_eq!(us.len(), 1);
+    assert_eq!(us[0].markdown, "1. x\n2. y");
+    assert_eq!(
+        us[0].provenance.failed_check.as_deref(),
+        Some("list_label_unknown_format")
+    );
+}
+
+#[test]
+fn docx_known_formats_are_not_marked() {
+    let numbering = format!(
+        r#"<w:abstractNum w:abstractNumId="1">{}</w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>"#,
+        lvl(0, "decimalZero", "%1.", ""),
+    );
+    let us = units(
+        &numbering_doc(&numbering, &item("1", 0, "x"), None),
+        SourceType::Docx,
+    );
+    assert_eq!(us[0].markdown, "01. x");
+    assert_eq!(us[0].provenance.failed_check, None);
+}
+
+#[test]
+fn pptx_auto_number_schemes_render_real_labels() {
+    let para = |ty: &str, lvl: u32, text: &str| {
+        format!(
+            r#"<a:p><a:pPr lvl="{lvl}"><a:buAutoNum type="{ty}"/></a:pPr><a:r><a:t>{text}</a:t></a:r></a:p>"#
+        )
+    };
+    let shape = |paras: &str| {
+        format!(
+            r#"<p:sp><p:nvSpPr><p:cNvPr id="3" name="Body"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr/><p:txBody>{paras}</p:txBody></p:sp>"#
+        )
+    };
+    let tree = [
+        shape(
+            &[
+                para("alphaLcPeriod", 0, "a1"),
+                para("alphaLcPeriod", 0, "a2"),
+            ]
+            .concat(),
+        ),
+        shape(
+            &[
+                para("romanUcPeriod", 0, "r1"),
+                para("romanUcPeriod", 0, "r2"),
+            ]
+            .concat(),
+        ),
+        shape(
+            &[
+                para("arabicParenR", 0, "n1"),
+                para("alphaLcParenBoth", 1, "sub"),
+            ]
+            .concat(),
+        ),
+        shape(&para("circleNumDbPlain", 0, "odd")),
+    ]
+    .concat();
+    let bytes = zip_of(&[("ppt/slides/slide1.xml", &slide(&tree))]);
+    let us = units(&bytes, SourceType::Pptx);
+    let got: Vec<(&str, Option<&str>)> = us
+        .iter()
+        .map(|u| (u.markdown.as_str(), u.provenance.failed_check.as_deref()))
+        .collect();
+    assert_eq!(
+        got,
+        vec![
+            ("- a. a1\n- b. a2", None),
+            ("- I. r1\n- II. r2", None),
+            ("1) n1\n   - (a) sub", None),
+            ("1. odd", Some("list_label_unknown_format")),
+        ]
+    );
 }
 
 // -------------------------------------------------- errors / dispatch ----
