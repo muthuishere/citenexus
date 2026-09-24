@@ -503,7 +503,7 @@ fn main() {
     let mut by_src: BTreeMap<String, usize> = BTreeMap::new();
     let mut rejected: BTreeMap<String, usize> = BTreeMap::new();
     let (mut uncertain, mut uncertain_units) = (0, 0);
-    let (mut treq, mut twords, mut tmax) = (0usize, 0usize, 0usize);
+    let (mut treq, mut twords, mut tmax, mut tchunks) = (0usize, 0usize, 0usize, 0usize);
     let (mut leader_reqs, mut leader_words) = (0usize, 0usize);
     let mut leader_shapes: BTreeMap<&str, usize> = BTreeMap::new();
     for f in &files {
@@ -582,6 +582,7 @@ fn main() {
                 }
                 treq += 1;
                 twords += r.words.len();
+                tchunks += r.chunks.len();
                 tmax = tmax.max(r.words.len());
             }
         }
@@ -591,7 +592,7 @@ fn main() {
     println!("uncertain table regions: {uncertain} (paragraph/list units marked table_uncertain: {uncertain_units})");
     println!("rejected candidates: {rejected:?}");
     println!(
-        "table_structure requests: {treq}, words listed {twords} (mean {:.1}, max {tmax})",
+        "table_structure requests: {treq}, words listed {twords} (mean {:.1}, max {tmax}), phrase chunks {tchunks}",
         if treq > 0 {
             twords as f64 / treq as f64
         } else {

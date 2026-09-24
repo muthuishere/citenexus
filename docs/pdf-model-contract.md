@@ -447,7 +447,7 @@ Measured at the branch head with `examples/pdf_measure.rs`, counts only:
 
 | request kind | count | words listed |
 |---|---|---|
-| `table_structure` | 15 | 1,480 (mean 99, max 306); no TOC regions |
+| `table_structure` | 15 | 1,480 (mean 99, max 306) in 258 phrase chunks; no TOC regions |
 | `vision_page` | 10 (5 pages × 2) | — |
 | `vision_region` | 142 (71 regions × 2) | — |
 
