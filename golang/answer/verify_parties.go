@@ -340,11 +340,17 @@ func subjectSwapGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardCon
 	claimTokens := tokenize.TokenizeV2(claim)
 	subjectOf := func(toks []string, verb int) []string {
 		if len(toks) > 1 {
-			if _, det := partyDeterminers[toks[0]]; det && partyWord(toks[1]) && verb > 1 {
+			// The verb right after the opening subject (Dutch V2: "De controller
+			// sluit …"); a word further on is not bound to it.
+			_, modal := modalWords[toks[2%len(toks)]]
+			if _, det := partyDeterminers[toks[0]]; det && partyWord(toks[1]) && (verb == 2 || (verb == 3 && modal)) {
 				return []string{toks[1]}
 			}
 		}
-		if verb+2 < len(toks) {
+		// Verb-first with the subject after it is Dutch word order ("Bij te
+		// veel aanvragen beslist de vestigingsmanager"); in English the noun
+		// after a verb is its object.
+		if primaryLanguage(eu.Language) == "nl" && verb+2 < len(toks) {
 			if _, det := partyDeterminers[toks[verb+1]]; det && partyWord(toks[verb+2]) {
 				return []string{toks[verb+2]}
 			}
@@ -372,50 +378,111 @@ func subjectSwapGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardCon
 		parties = append(parties, []string{p})
 	}
 	sort.Slice(parties, func(i, j int) bool { return parties[i][0] < parties[j][0] })
+	// verbMatches: unit token t (at j in toks) is the claim's verb, directly
+	// or as a separable verb whose particle comes later in the sentence ("De
+	// controller sluit … af" = afsluiten = close).
+	verbMatches := func(toks []string, j int, claimVerb string) bool {
+		t := toks[j]
+		if gate.IsStopword(t) || !partyWord(t) {
+			return false
+		}
+		for _, vf := range forms(t) {
+			if len(vf) == 1 && vf[0] == claimVerb {
+				return true
+			}
+		}
+		for k := j + 1; k < len(toks); k++ {
+			if _, particle := separableParticles[toks[k]]; !particle {
+				continue
+			}
+			stem := strings.TrimSuffix(strings.TrimSuffix(t, "t"), "en")
+			for key, trs := range gloss {
+				if !strings.HasPrefix(key, toks[k]) || !strings.HasPrefix(key[len(toks[k]):], stem) || len(stem) < 3 {
+					continue
+				}
+				for _, vf := range trs {
+					if len(vf) == 1 && vf[0] == claimVerb {
+						return true
+					}
+				}
+			}
+		}
+		return false
+	}
+	verbAfter := func(from int) string {
+		v := from
+		for v < len(claimTokens) {
+			if _, modal := modalWords[claimTokens[v]]; !modal {
+				break
+			}
+			v++
+		}
+		if v >= len(claimTokens) {
+			return ""
+		}
+		return claimTokens[v]
+	}
+	// check binds the claim party (a unit party, or the reader) to claimVerb.
+	check := func(party string, reader bool, claimVerb string) string {
+		agrees, other := false, ""
+		for _, toks := range sentences {
+			for j := range toks {
+				if !verbMatches(toks, j, claimVerb) {
+					continue
+				}
+				subj := subjectOf(toks, j)
+				if subj == nil {
+					continue
+				}
+				switch {
+				case reader && actorTerm(subj[0], cfg.actors):
+					// The reader may be that employee or that employer: no verdict.
+					agrees = true
+				case !reader && (subj[0] == party || sameActorClass(subj[0], party, cfg.actors)):
+					agrees = true
+				case other == "":
+					other = subj[0]
+				}
+			}
+		}
+		if !agrees && other != "" {
+			return fmt.Sprintf("role guard: %q %s where the passage says %q does", party, claimVerb, other)
+		}
+		return ""
+	}
 	for _, p := range parties {
 		for _, f := range forms(p[0]) {
 			for _, sp := range findSpans(claimTokens, f) {
-				v := sp.end
-				for v < len(claimTokens) {
-					if _, modal := modalWords[claimTokens[v]]; !modal {
-						break
+				if claimVerb := verbAfter(sp.end); claimVerb != "" {
+					if reason := check(p[0], false, claimVerb); reason != "" {
+						return reason
 					}
-					v++
-				}
-				if v >= len(claimTokens) {
-					continue
-				}
-				claimVerb := claimTokens[v]
-				agrees, other := false, ""
-				for _, toks := range sentences {
-					for j, t := range toks {
-						matched := false
-						for _, vf := range forms(t) {
-							if len(vf) == 1 && vf[0] == claimVerb {
-								matched = true
-							}
-						}
-						if !matched || gate.IsStopword(t) || !partyWord(t) {
-							continue
-						}
-						subj := subjectOf(toks, j)
-						if subj == nil {
-							continue
-						}
-						if subj[0] == p[0] || sameActorClass(subj[0], p[0], cfg.actors) {
-							agrees = true
-						} else if other == "" {
-							other = subj[0]
-						}
-					}
-				}
-				if !agrees && other != "" {
-					return fmt.Sprintf("role guard: %q %s where the passage says %q does", p[0], claimVerb, other)
 				}
 			}
 		}
 	}
+	// The reader as the claim's subject ("You close …") against a THIRD party
+	// — one the lexicon does not name: who "you" is (employee or employer)
+	// depends on who asked, so only a party that is neither decides.
+	for i, t := range claimTokens {
+		// Subject forms only: "your salary" is a possessive, not the actor.
+		if _, subject := readerSubjects[t]; !subject {
+			continue
+		}
+		if claimVerb := verbAfter(i + 1); claimVerb != "" {
+			if reason := check(t, true, claimVerb); reason != "" {
+				return reason
+			}
+		}
+	}
 	return ""
+}
+
+// separableParticles open a Dutch separable verb split around its object
+// ("sluit … af", "vraagt … aan").
+var separableParticles = map[string]struct{}{
+	"af": {}, "aan": {}, "op": {}, "in": {}, "uit": {}, "mee": {}, "door": {}, "over": {},
+	"terug": {}, "vast": {}, "toe": {}, "voor": {}, "bij": {}, "na": {},
 }
 
 func sameActorClass(a, b string, lexicon ActorLexicon) bool {
@@ -426,3 +493,6 @@ func sameActorClass(a, b string, lexicon ActorLexicon) bool {
 	}
 	return false
 }
+
+// readerSubjects are the reader's pronouns in subject form.
+var readerSubjects = map[string]struct{}{"you": {}, "je": {}, "jij": {}, "u": {}}

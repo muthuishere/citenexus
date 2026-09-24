@@ -7810,6 +7810,101 @@
           }
         ]
       }
+    },
+    {
+      "name": "subject/adv-ri-v2-09 the reader for a third party, a separable verb through the glossary (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "You close the time registration on the last working day of the month [eu:S1].",
+      "answer_language": "en",
+      "glossary": [
+        [
+          "afsluiten",
+          "close"
+        ],
+        [
+          "urenregistratie",
+          "time registration"
+        ],
+        [
+          "registreert",
+          "records"
+        ],
+        [
+          "controller",
+          "controller"
+        ]
+      ],
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "personeelsgids Maasoever Advocaten",
+          "language": "nl",
+          "text": "Urenregistratie. De medewerker registreert zijn declarabele uren dagelijks in het tijdschrijfsysteem. De controller sluit de urenregistratie op de laatste werkdag van de maand af. Correcties na afsluiting worden uitsluitend door de controller doorgevoerd."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "role guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "subject/the-reader-for-the-employee-is-no-swap",
+      "answer": "You record your billable hours daily in the time recording system [eu:S1].",
+      "answer_language": "en",
+      "glossary": [
+        [
+          "afsluiten",
+          "close"
+        ],
+        [
+          "urenregistratie",
+          "time registration"
+        ],
+        [
+          "registreert",
+          "records"
+        ],
+        [
+          "controller",
+          "controller"
+        ]
+      ],
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "personeelsgids Maasoever Advocaten",
+          "language": "nl",
+          "text": "Urenregistratie. De medewerker registreert zijn declarabele uren dagelijks in het tijdschrijfsysteem. De controller sluit de urenregistratie op de laatste werkdag van de maand af. Correcties na afsluiting worden uitsluitend door de controller doorgevoerd."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
     }
   ]
 }
