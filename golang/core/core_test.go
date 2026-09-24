@@ -277,3 +277,74 @@ func TestPdfUnits(t *testing.T) {
 		t.Fatal("expected an error for non-PDF bytes")
 	}
 }
+
+// The cross-port determinism vector (ADR-0017 decision 11): the committed
+// fixture and responses give exactly the bytes the Rust core committed.
+func TestPdfAssembleGolden(t *testing.T) {
+	dir := "../../rust/tests/data/pdf/"
+	pdf, err := os.ReadFile(dir + "assemble-mixed.pdf")
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	responses, err := os.ReadFile(dir + "assemble-mixed.responses.json")
+	if err != nil {
+		t.Fatalf("read responses: %v", err)
+	}
+	golden, err := os.ReadFile(dir + "assemble-mixed.golden.json")
+	if err != nil {
+		t.Fatalf("read golden: %v", err)
+	}
+	got, err := PdfAssembleJSON(pdf, PdfOptions{Language: "nl"}, responses)
+	if err != nil {
+		if strings.Contains(err.Error(), "`pdf` feature") || strings.Contains(err.Error(), "libpdfium") {
+			t.Skipf("SKIP: %v", err)
+		}
+		t.Fatalf("PdfAssembleJSON: %v", err)
+	}
+	if string(got) != string(golden) {
+		t.Fatalf("assemble bytes differ from the Rust golden")
+	}
+
+	// Typed round trip: prepare lists the requests, assemble applies them.
+	prep, err := PdfPrepare(pdf, PdfOptions{Language: "nl"})
+	if err != nil {
+		t.Fatalf("PdfPrepare: %v", err)
+	}
+	var ids []string
+	for _, r := range prep.Requests {
+		ids = append(ids, r.ID)
+	}
+	if strings.Join(ids, ",") != "p1:table,p2:page,p3:img0" {
+		t.Fatalf("requests: %v", ids)
+	}
+	var typed []PdfResponse
+	if err := json.Unmarshal(responses, &typed); err != nil {
+		t.Fatalf("responses decode: %v", err)
+	}
+	res, err := PdfAssemble(pdf, PdfOptions{Language: "nl"}, typed)
+	if err != nil {
+		t.Fatalf("PdfAssemble: %v", err)
+	}
+	tables := 0
+	for _, u := range res.Units {
+		if u.Kind == "table" && u.Provenance.TableSource != nil && *u.Provenance.TableSource == "model_grid" {
+			tables++
+		}
+	}
+	if tables != 1 {
+		t.Fatalf("expected one model_grid table, got %d", tables)
+	}
+
+	// No responses == PdfUnits, byte for byte.
+	none, err := PdfAssembleJSON(pdf, PdfOptions{Language: "nl"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	base, err := pdfCall("units", pdf, PdfOptions{Language: "nl"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(none) != string(base) {
+		t.Fatal("PdfAssemble with no responses must equal PdfUnits")
+	}
+}

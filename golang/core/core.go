@@ -18,6 +18,8 @@ char* citenexus_extract(const uint8_t* bytes, size_t len, const char* source_typ
 char* citenexus_to_markdown(const uint8_t* bytes, size_t len, const char* source_type);
 char* citenexus_rrf(const char* lists_json, int64_t k);
 char* citenexus_pdf_units(const uint8_t* bytes, size_t len, const char* opts_json);
+char* citenexus_pdf_prepare(const uint8_t* bytes, size_t len, const char* opts_json);
+char* citenexus_pdf_assemble(const uint8_t* bytes, size_t len, const char* opts_json, const char* responses_json);
 void citenexus_free_string(char* s);
 const char* citenexus_core_version();
 
@@ -240,25 +242,34 @@ type PdfResult struct {
 	Document json.RawMessage `json:"document"`
 }
 
-// PdfAnalyze runs the shared Rust base PDF extractor (no model, ADR-0017) and
-// returns units, per-page routes and signals. It fails when the core was built
-// without the `pdf` cargo feature, when libpdfium cannot be loaded (set
-// PDFIUM_DYNAMIC_LIB_PATH), or when the bytes are not a PDF.
-func PdfAnalyze(pdf []byte, opts PdfOptions) (*PdfResult, error) {
+// pdfCall runs one of the three PDF entry points and returns the raw JSON, or
+// the core's {"error":...} as a Go error. responses is nil except for assemble.
+func pdfCall(which string, pdf []byte, opts PdfOptions, responses []byte) ([]byte, error) {
+	if len(pdf) == 0 {
+		return nil, errors.New("citenexus: empty pdf")
+	}
 	payload, err := json.Marshal(opts)
 	if err != nil {
 		return nil, err
 	}
-	var bp *C.uint8_t
-	if len(pdf) > 0 {
-		bp = (*C.uint8_t)(unsafe.Pointer(&pdf[0]))
-	} else {
-		return nil, errors.New("citenexus: empty pdf")
-	}
+	bp := (*C.uint8_t)(unsafe.Pointer(&pdf[0]))
 	cOpts := C.CString(string(payload))
 	defer C.free(unsafe.Pointer(cOpts))
 
-	out := C.citenexus_pdf_units(bp, C.size_t(len(pdf)), cOpts)
+	var out *C.char
+	switch which {
+	case "units":
+		out = C.citenexus_pdf_units(bp, C.size_t(len(pdf)), cOpts)
+	case "prepare":
+		out = C.citenexus_pdf_prepare(bp, C.size_t(len(pdf)), cOpts)
+	default:
+		var cResp *C.char
+		if responses != nil {
+			cResp = C.CString(string(responses))
+			defer C.free(unsafe.Pointer(cResp))
+		}
+		out = C.citenexus_pdf_assemble(bp, C.size_t(len(pdf)), cOpts, cResp)
+	}
 	defer C.citenexus_free_string(out)
 
 	raw := []byte(C.GoString(out))
@@ -268,6 +279,18 @@ func PdfAnalyze(pdf []byte, opts PdfOptions) (*PdfResult, error) {
 	if json.Unmarshal(raw, &failure) == nil && failure.Error != "" {
 		return nil, errors.New("citenexus: " + failure.Error)
 	}
+	return raw, nil
+}
+
+// PdfAnalyze runs the shared Rust base PDF extractor (no model, ADR-0017) and
+// returns units, per-page routes and signals. It fails when the core was built
+// without the `pdf` cargo feature, when libpdfium cannot be loaded (set
+// PDFIUM_DYNAMIC_LIB_PATH), or when the bytes are not a PDF.
+func PdfAnalyze(pdf []byte, opts PdfOptions) (*PdfResult, error) {
+	raw, err := pdfCall("units", pdf, opts, nil)
+	if err != nil {
+		return nil, err
+	}
 	var res PdfResult
 	if err := json.Unmarshal(raw, &res); err != nil {
 		return nil, errors.New("citenexus: unexpected pdf_units response: " + err.Error())
@@ -276,11 +299,120 @@ func PdfAnalyze(pdf []byte, opts PdfOptions) (*PdfResult, error) {
 }
 
 // PdfUnits is the base-only surface rag_go uses (ADR-0017 decision 10): no
-// model, never fails for lack of a provider.
+// model, never fails for lack of a provider. It is exactly PdfAssemble with no
+// responses.
 func PdfUnits(pdf []byte, opts PdfOptions) ([]PdfUnit, error) {
 	res, err := PdfAnalyze(pdf, opts)
 	if err != nil {
 		return nil, err
 	}
 	return res.Units, nil
+}
+
+// PdfWord is one text-layer word a table grid may reference by ID.
+type PdfWord struct {
+	ID   string     `json:"id"`
+	Text string     `json:"text"`
+	BBox [4]float64 `json:"bbox"`
+}
+
+// PdfRequest asks the host for one model call. Kind is table_structure (answer
+// with Tables over Words' IDs; model-written text is never used on a
+// text-layer page), vision_page or vision_region (answer with Markdown).
+// Prompt is a key into the host's prompt config (default:
+// rust/data/pdf_prompts.json).
+type PdfRequest struct {
+	ID     string     `json:"id"`
+	Page   int        `json:"page"`
+	Kind   string     `json:"kind"`
+	Prompt string     `json:"prompt"`
+	BBox   [4]float64 `json:"bbox"`
+	Words  []PdfWord  `json:"words"`
+}
+
+// PdfPrepared is phase one: the base result plus the requests.
+type PdfPrepared struct {
+	PdfResult
+	Requests []PdfRequest `json:"requests"`
+}
+
+// PdfCell is one grid cell: word IDs, with optional spans (HTML rules).
+type PdfCell struct {
+	Words   []string `json:"words"`
+	Colspan int      `json:"colspan,omitempty"`
+	Rowspan int      `json:"rowspan,omitempty"`
+}
+
+// UnmarshalJSON accepts both cell forms the core speaks: a bare array of word
+// IDs, or an object with words and spans.
+func (c *PdfCell) UnmarshalJSON(b []byte) error {
+	var ids []string
+	if err := json.Unmarshal(b, &ids); err == nil {
+		*c = PdfCell{Words: ids}
+		return nil
+	}
+	type plain PdfCell
+	var p plain
+	if err := json.Unmarshal(b, &p); err != nil {
+		return err
+	}
+	*c = PdfCell(p)
+	return nil
+}
+
+// PdfGrid is one table: rows top to bottom, cells left to right.
+type PdfGrid struct {
+	Rows [][]PdfCell `json:"rows"`
+}
+
+// PdfResponse is the host's answer to the request with ID RequestID.
+type PdfResponse struct {
+	RequestID    string    `json:"request_id"`
+	FinishReason string    `json:"finish_reason,omitempty"`
+	Tables       []PdfGrid `json:"tables,omitempty"`
+	Markdown     *string   `json:"markdown,omitempty"`
+}
+
+// PdfPrepare is phase one of the model contract (ADR-0017 decision 4).
+func PdfPrepare(pdf []byte, opts PdfOptions) (*PdfPrepared, error) {
+	raw, err := pdfCall("prepare", pdf, opts, nil)
+	if err != nil {
+		return nil, err
+	}
+	var res PdfPrepared
+	if err := json.Unmarshal(raw, &res); err != nil {
+		return nil, errors.New("citenexus: unexpected pdf_prepare response: " + err.Error())
+	}
+	return &res, nil
+}
+
+// PdfAssemble is phase two: the PDF is re-parsed and every response that
+// passes the deterministic checks is applied. A missing response is base
+// output; a failed one is base output with Provenance.FailedCheck set.
+func PdfAssemble(pdf []byte, opts PdfOptions, responses []PdfResponse) (*PdfResult, error) {
+	if responses == nil {
+		responses = []PdfResponse{}
+	}
+	payload, err := json.Marshal(responses)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := PdfAssembleJSON(pdf, opts, payload)
+	if err != nil {
+		return nil, err
+	}
+	var res PdfResult
+	if err := json.Unmarshal(raw, &res); err != nil {
+		return nil, errors.New("citenexus: unexpected pdf_assemble response: " + err.Error())
+	}
+	return &res, nil
+}
+
+// PdfAssembleJSON is PdfAssemble over raw JSON, returning the core's bytes
+// untouched (for byte-level determinism checks and pass-through hosts).
+func PdfAssembleJSON(pdf []byte, opts PdfOptions, responsesJSON []byte) ([]byte, error) {
+	if responsesJSON == nil {
+		responsesJSON = []byte("[]")
+	}
+	return pdfCall("assemble", pdf, opts, responsesJSON)
 }
