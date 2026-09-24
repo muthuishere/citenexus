@@ -523,3 +523,172 @@ mod tests {
         assert_eq!(guard_text("Normal text.", Some("STOP")), Ok(()));
     }
 }
+
+// -------------------------------------------------------------- GriTS ----
+
+/// Character LCS similarity, 2·LCS / (|a| + |b|); two empty strings are 1
+/// (GriTS-Con's cell reward, `table-transformer/src/grits.py`).
+pub fn lcs_similarity(a: &str, b: &str) -> f64 {
+    let a: Vec<char> = a.chars().collect();
+    let b: Vec<char> = b.chars().collect();
+    if a.is_empty() && b.is_empty() {
+        return 1.0;
+    }
+    if a.is_empty() || b.is_empty() {
+        return 0.0;
+    }
+    let mut prev = vec![0usize; b.len() + 1];
+    for &x in &a {
+        let mut cur = vec![0usize; b.len() + 1];
+        for (j, &y) in b.iter().enumerate() {
+            cur[j + 1] = if x == y {
+                prev[j] + 1
+            } else {
+                prev[j + 1].max(cur[j])
+            };
+        }
+        prev = cur;
+    }
+    2.0 * prev[b.len()] as f64 / (a.len() + b.len()) as f64
+}
+
+/// Order-preserving 1-D alignment maximising the summed reward (no gap
+/// penalty); returns the aligned index pairs.
+fn align_1d(n: usize, m: usize, reward: &dyn Fn(usize, usize) -> f64) -> Vec<(usize, usize)> {
+    let mut dp = vec![vec![0.0f64; m + 1]; n + 1];
+    for i in 1..=n {
+        for j in 1..=m {
+            let diag = dp[i - 1][j - 1] + reward(i - 1, j - 1);
+            dp[i][j] = diag.max(dp[i - 1][j]).max(dp[i][j - 1]);
+        }
+    }
+    let (mut i, mut j) = (n, m);
+    let mut pairs = Vec::new();
+    while i > 0 && j > 0 {
+        let diag = dp[i - 1][j - 1] + reward(i - 1, j - 1);
+        if (dp[i][j] - diag).abs() < 1e-12 && diag >= dp[i - 1][j] && diag >= dp[i][j - 1] {
+            pairs.push((i - 1, j - 1));
+            i -= 1;
+            j -= 1;
+        } else if dp[i - 1][j] >= dp[i][j - 1] {
+            i -= 1;
+        } else {
+            j -= 1;
+        }
+    }
+    pairs.reverse();
+    pairs
+}
+
+/// GriTS-Con between two text grids (spans already expanded or flattened):
+/// the factored 2-D most-similar-substructure of Smock et al. 2022
+/// (arXiv 2203.12555), reimplemented from the published algorithm
+/// (`factored_2dmss`); `2·score / (|A| + |B|)` in 0..1.
+pub fn grits_con(a: &[Vec<String>], b: &[Vec<String>]) -> f64 {
+    let cols = |g: &[Vec<String>]| g.iter().map(|r| r.len()).max().unwrap_or(0);
+    let (ar, ac, br, bc) = (a.len(), cols(a), b.len(), cols(b));
+    if ar == 0 || br == 0 || ac == 0 || bc == 0 {
+        return if ar + br == 0 { 1.0 } else { 0.0 };
+    }
+    let cell = |g: &[Vec<String>], r: usize, c: usize| {
+        g[r].get(c).map(String::as_str).unwrap_or("").to_string()
+    };
+    let mut rw = vec![vec![vec![vec![0.0f64; bc]; br]; ac]; ar];
+    for (i, plane) in rw.iter_mut().enumerate() {
+        for (j, block) in plane.iter_mut().enumerate() {
+            let x = cell(a, i, j);
+            for (k, row) in block.iter_mut().enumerate() {
+                for (l, slot) in row.iter_mut().enumerate() {
+                    *slot = lcs_similarity(&x, &cell(b, k, l));
+                }
+            }
+        }
+    }
+    let row_score = |i: usize, k: usize| {
+        align_1d(ac, bc, &|j, l| rw[i][j][k][l])
+            .iter()
+            .map(|&(j, l)| rw[i][j][k][l])
+            .sum::<f64>()
+    };
+    let col_score = |j: usize, l: usize| {
+        align_1d(ar, br, &|i, k| rw[i][j][k][l])
+            .iter()
+            .map(|&(i, k)| rw[i][j][k][l])
+            .sum::<f64>()
+    };
+    let rows = align_1d(ar, br, &row_score);
+    let colp = align_1d(ac, bc, &col_score);
+    let mut score = 0.0;
+    for &(i, k) in &rows {
+        for &(j, l) in &colp {
+            score += rw[i][j][k][l];
+        }
+    }
+    2.0 * score / ((ar * ac + br * bc) as f64)
+}
+
+/// Parse markdown pipe-table rows back into a text grid (separator row
+/// dropped, `\|` unescaped).
+pub fn pipe_grid(md: &str) -> Vec<Vec<String>> {
+    let mut out = Vec::new();
+    for line in md.lines() {
+        let t = line.trim();
+        if !t.starts_with('|') {
+            continue;
+        }
+        let inner = t.trim_start_matches('|').trim_end_matches('|');
+        let mut cells = Vec::new();
+        let mut cur = String::new();
+        let mut esc = false;
+        for ch in inner.chars() {
+            if esc {
+                cur.push(ch);
+                esc = false;
+            } else if ch == '\\' {
+                esc = true;
+            } else if ch == '|' {
+                cells.push(cur.trim().to_string());
+                cur.clear();
+            } else {
+                cur.push(ch);
+            }
+        }
+        cells.push(cur.trim().to_string());
+        if cells
+            .iter()
+            .all(|c| c.chars().all(|x| x == '-' || x == ':') && !c.is_empty())
+        {
+            continue;
+        }
+        out.push(cells);
+    }
+    out
+}
+
+#[cfg(test)]
+mod grits_tests {
+    use super::*;
+
+    fn g(rows: &[&[&str]]) -> Vec<Vec<String>> {
+        rows.iter()
+            .map(|r| r.iter().map(|s| s.to_string()).collect())
+            .collect()
+    }
+
+    #[test]
+    fn grits_is_one_on_identity_and_drops_on_a_swap() {
+        let a = g(&[&["a", "1"], &["b", "2"], &["c", "3"]]);
+        assert!((grits_con(&a, &a) - 1.0).abs() < 1e-9);
+        let swapped = g(&[&["a", "2"], &["b", "1"], &["c", "3"]]);
+        assert!(grits_con(&a, &swapped) < 0.9);
+        let extra_row = g(&[&["a", "1"], &["b", "2"], &["c", "3"], &["d", "4"]]);
+        let s = grits_con(&a, &extra_row);
+        assert!(s > 0.8 && s < 1.0, "{s}");
+    }
+
+    #[test]
+    fn pipe_grid_round_trip() {
+        let md = "| a | b\\|c |\n| --- | --- |\n| 1 |  |";
+        assert_eq!(pipe_grid(md), g(&[&["a", "b|c"], &["1", ""]]));
+    }
+}
