@@ -53,6 +53,9 @@ pub struct Page {
     pub width: f64,
     pub height: f64,
     pub items: Vec<Item>,
+    /// MediaBox lower-left corner (0, 0 by default). A non-zero origin moves
+    /// the box and translates the content with it, so the page looks the same.
+    pub origin: (f64, f64),
 }
 
 impl Page {
@@ -61,6 +64,7 @@ impl Page {
             width: 595.0,
             height: 842.0,
             items: vec![],
+            origin: (0.0, 0.0),
         }
     }
     pub fn text(mut self, x: f64, y: f64, size: f64, text: &str) -> Self {
@@ -363,6 +367,14 @@ impl Doc {
                     ),
                 }
             }
+            if page.origin != (0.0, 0.0) {
+                let mut wrapped =
+                    format!("q 1 0 0 1 {} {} cm\n", f(page.origin.0), f(page.origin.1))
+                        .into_bytes();
+                wrapped.extend(&c);
+                wrapped.extend(b"Q\n");
+                c = wrapped;
+            }
             let mut stream = format!("<< /Length {} >>\nstream\n", c.len()).into_bytes();
             stream.extend(&c);
             stream.extend(b"\nendstream");
@@ -373,9 +385,11 @@ impl Doc {
                 String::new()
             };
             objs[page_ids[pi] - 1] = format!(
-                "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {} {}] /Contents {} 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << /Im0 5 0 R >> >>{sp} >>",
-                f(page.width),
-                f(page.height),
+                "<< /Type /Page /Parent 2 0 R /MediaBox [{} {} {} {}] /Contents {} 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << /Im0 5 0 R >> >>{sp} >>",
+                f(page.origin.0),
+                f(page.origin.1),
+                f(page.origin.0 + page.width),
+                f(page.origin.1 + page.height),
                 content_ids[pi]
             )
             .into_bytes();

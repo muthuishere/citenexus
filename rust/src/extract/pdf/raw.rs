@@ -210,6 +210,25 @@ unsafe fn read_doc(b: &dyn PdfiumLibraryBindings, doc: FPDF_DOCUMENT) -> RawDoc 
 unsafe fn read_page(b: &dyn PdfiumLibraryBindings, page: FPDF_PAGE) -> RawPage {
     let width = b.FPDF_GetPageWidthF(page) as f64;
     let height = b.FPDF_GetPageHeightF(page) as f64;
+    // Coordinates are made relative to the VISIBLE page box (CropBox ∩
+    // MediaBox), which need not start at (0, 0): x' = x - left, y' = top - y.
+    // Every band, margin and region downstream is measured from this box,
+    // never from the ink extent.
+    let mut pb = FS_RECTF {
+        left: 0.0,
+        top: height as f32,
+        right: width as f32,
+        bottom: 0.0,
+    };
+    if b.FPDF_GetPageBoundingBox(page, &mut pb) == 0 {
+        pb = FS_RECTF {
+            left: 0.0,
+            top: height as f32,
+            right: width as f32,
+            bottom: 0.0,
+        };
+    }
+    let (left, top) = (pb.left as f64, pb.top as f64);
     let mut out = RawPage {
         width: r2(width),
         height: r2(height),
@@ -275,7 +294,7 @@ unsafe fn read_page(b: &dyn PdfiumLibraryBindings, page: FPDF_PAGE) -> RawPage {
             };
             let has_loose = b.FPDFText_GetLooseCharBox(tp, i, &mut loose) != 0;
             let (x0, x1, y0, y1) = if has_box {
-                (r2(l), r2(r), r2(height - t), r2(height - bo))
+                (r2(l - left), r2(r - left), r2(top - t), r2(top - bo))
             } else {
                 (0.0, 0.0, 0.0, 0.0)
             };
@@ -285,13 +304,17 @@ unsafe fn read_page(b: &dyn PdfiumLibraryBindings, page: FPDF_PAGE) -> RawPage {
                 y0,
                 x1,
                 y1,
-                lx0: if has_loose { r2(loose.left as f64) } else { x0 },
+                lx0: if has_loose {
+                    r2(loose.left as f64 - left)
+                } else {
+                    x0
+                },
                 lx1: if has_loose {
-                    r2(loose.right as f64)
+                    r2(loose.right as f64 - left)
                 } else {
                     x1
                 },
-                baseline: r2(height - oy),
+                baseline: r2(top - oy),
                 size: r2(size),
                 bold,
                 rotated,
@@ -321,10 +344,10 @@ unsafe fn read_page(b: &dyn PdfiumLibraryBindings, page: FPDF_PAGE) -> RawPage {
             continue;
         }
         let bx = [
-            r2(l as f64),
-            r2(height - t as f64),
-            r2(r as f64),
-            r2(height - bo as f64),
+            r2(l as f64 - left),
+            r2(top - t as f64),
+            r2(r as f64 - left),
+            r2(top - bo as f64),
         ];
         if kind == FPDF_PAGEOBJ_IMAGE {
             out.images.push(bx);
