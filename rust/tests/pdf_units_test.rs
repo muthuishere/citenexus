@@ -25,6 +25,7 @@ fn run(doc: &Doc, lang: Option<&str>) -> PdfUnitsOutput {
     let opts = PdfOptions {
         language: lang.map(String::from),
         layout_text: true,
+        ..Default::default()
     };
     pdf_units(&doc.build(), &opts).expect("pdf_units failed")
 }
@@ -464,6 +465,7 @@ fn same_bytes_twice_give_identical_json() {
     let opts = PdfOptions {
         language: Some("nl".into()),
         layout_text: true,
+        ..Default::default()
     };
     let a = serde_json::to_string(&pdf_units(&bytes, &opts).unwrap()).unwrap();
     let b = serde_json::to_string(&pdf_units(&bytes, &opts).unwrap()).unwrap();
