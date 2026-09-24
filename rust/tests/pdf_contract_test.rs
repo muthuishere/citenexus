@@ -205,12 +205,22 @@ fn prepare_emits_the_expected_requests() {
     let s = pdf_prepare(&fixture("scan"), &opts()).unwrap();
     assert_eq!(
         s.requests.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(),
-        vec!["p1:page"]
+        vec!["p1:page:v1", "p1:page:v2"]
     );
+    // two independent variants, each told to use another model or seed
+    assert_eq!(
+        s.requests.iter().map(|r| r.variant).collect::<Vec<_>>(),
+        vec![Some(1), Some(2)]
+    );
+    assert!(s.requests.iter().all(|r| r
+        .hint
+        .as_deref()
+        .is_some_and(|h| h.contains("different model"))));
+    assert_eq!(r.variant, None);
     let g = pdf_prepare(&fixture("region"), &opts()).unwrap();
     assert_eq!(
         g.requests.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(),
-        vec!["p1:img0"]
+        vec!["p1:img0:v1", "p1:img0:v2"]
     );
 }
 
@@ -251,12 +261,14 @@ fn assemble_vectors() {
                     !failed.is_empty() && failed.iter().all(|x| *x == f),
                     "{name}: {failed:?} != {f}"
                 );
-                // A rejected response leaves the base text in place.
-                assert_eq!(
-                    out.units.iter().map(|u| &u.markdown).collect::<Vec<_>>(),
-                    prep.units.iter().map(|u| &u.markdown).collect::<Vec<_>>(),
-                    "{name}: base text must survive a rejection"
-                );
+                if e["base_kept"].as_bool() == Some(true) {
+                    // A rejected response leaves the base text in place.
+                    assert_eq!(
+                        out.units.iter().map(|u| &u.markdown).collect::<Vec<_>>(),
+                        prep.units.iter().map(|u| &u.markdown).collect::<Vec<_>>(),
+                        "{name}: base text must survive a rejection"
+                    );
+                }
             }
             None => assert!(failed.is_empty(), "{name}: {failed:?}"),
         }
@@ -296,7 +308,34 @@ fn assemble_vectors() {
                 .filter(|u| u.provenance.vision_transcribed)
                 .collect();
             assert_eq!(vt.len(), 1, "{name}");
-            assert!(!vt[0].markdown.is_empty());
+            let u = vt[0];
+            assert!(!u.markdown.is_empty());
+            if let Some(dsp) = e["vision_disputed"].as_bool() {
+                assert_eq!(u.provenance.vision_disputed, dsp, "{name}: {}", u.markdown);
+            }
+            let citable = citenexus_core::vision::citable_text(&u.markdown);
+            for want in e["citable_contains"].as_array().into_iter().flatten() {
+                let w = want.as_str().unwrap();
+                assert!(
+                    citable.contains(w),
+                    "{name}: citable lacks {w:?}:\n{citable}"
+                );
+            }
+            for bad in e["citable_excludes"].as_array().into_iter().flatten() {
+                let b = bad.as_str().unwrap();
+                assert!(
+                    !citable.contains(b),
+                    "{name}: citable has {b:?}:\n{citable}"
+                );
+            }
+            for want in e["markdown_contains"].as_array().into_iter().flatten() {
+                let w = want.as_str().unwrap();
+                assert!(
+                    u.markdown.contains(w),
+                    "{name}: markdown lacks {w:?}:\n{}",
+                    u.markdown
+                );
+            }
         }
         *tally
             .entry(c["category"].as_str().unwrap().to_string())
@@ -314,15 +353,26 @@ fn mixed() -> (Vec<u8>, Vec<PdfResponse>) {
     let bytes = doc.build();
     let prep = pdf_prepare(&bytes, &opts()).unwrap();
     let ids: Vec<&str> = prep.requests.iter().map(|r| r.id.as_str()).collect();
-    assert_eq!(ids, vec!["p1:table0", "p2:page", "p3:img0"]);
+    assert_eq!(
+        ids,
+        vec![
+            "p1:table0",
+            "p2:page:v1",
+            "p2:page:v2",
+            "p3:img0:v1",
+            "p3:img0:v2"
+        ]
+    );
     let spec = serde_json::json!([
         {"request": "p1:table0", "finish_reason": "stop", "tables": [{"rows": [
             [["Omschrijving"], ["Bedrag"], ["Opmerking"]],
             [["Reiskosten"], ["7.000,00"], ["geen"]],
             [["Hotel"], ["5.100,00"], []],
             [["Diner"], ["1.250,00"], ["vooraf"]]]}]},
-        {"request": "p2:page", "markdown": "Declaratie reiskosten 2024\nReiskosten 7.000,00 geen voorschot\nHotel 5.100,00 per jaar\nDiner 1.250,00 vooraf betaald\nArtikel I.3 is van toepassing"},
-        {"request": "p3:img0", "markdown": "Formulier: naam, datum, handtekening"}
+        {"request": "p2:page:v1", "markdown": "Declaratie reiskosten 2024\nReiskosten 7.000,00 geen voorschot\nHotel 5.100,00 per jaar\nDiner 1.250,00 vooraf betaald\nArtikel I.3 is van toepassing"},
+        {"request": "p2:page:v2", "markdown": "Declaratie reiskosten 2024\nReiskosten 7.000,00 voorschot\nHotel 5.100,00 geen per jaar\nDiner 1.250,00 vooraf betaald\nArtikel I.3 is van toepassing"},
+        {"request": "p3:img0:v1", "markdown": "Formulier: naam, datum, handtekening"},
+        {"request": "p3:img0:v2", "markdown": "Formulier: naam, datum, handtekening"}
     ]);
     let rs = responses(&prep, &spec);
     (bytes, rs)
@@ -338,7 +388,7 @@ fn assemble_is_deterministic_and_units_is_assemble_without_responses() {
     let b = serde_json::to_string(&pdf_assemble(&bytes, &opts(), &rs).unwrap()).unwrap();
     assert_eq!(a, b);
     let out: PdfUnitsOutput = serde_json::from_str(&a).unwrap();
-    assert_eq!(out.document.responses_applied, 3, "{:?}", out.document);
+    assert_eq!(out.document.responses_applied, 5, "{:?}", out.document);
     let base = serde_json::to_string(&pdf_units(&bytes, &opts()).unwrap()).unwrap();
     let none = serde_json::to_string(&pdf_assemble(&bytes, &opts(), &[]).unwrap()).unwrap();
     assert_eq!(base, none);

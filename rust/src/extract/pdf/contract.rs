@@ -40,6 +40,7 @@ use super::headings;
 use super::raw::{self, r2, RawDoc};
 use crate::checks::{self, Failure, GridCell, WordBox};
 use crate::units::*;
+use crate::vision::{self, Reconciled};
 
 /// A region with this many text-layer words or more is the text layer's.
 pub const REGION_MAX_WORDS: usize = 5;
@@ -81,13 +82,34 @@ fn inside(b: &[f64; 4], region: &[f64; 4]) -> bool {
 }
 
 /// Sort key: page, then kind (table, page, region), then region index.
-fn request_key(r: &PdfRequest) -> (u32, PdfRequestKind, usize) {
-    let idx =
-        r.id.rsplit("img")
-            .next()
-            .and_then(|n| n.parse().ok())
-            .unwrap_or(0);
-    (r.page, r.kind, idx)
+/// Two independent transcriptions per vision region (`crate::vision`).
+pub const VARIANTS: u32 = 2;
+
+fn variant_hint(v: u32) -> String {
+    format!(
+        "variant {v} of {VARIANTS}: transcribe independently of the other variant, with a different model or a different sampling seed; only sentences both variants agree on become citable content"
+    )
+}
+
+/// The request id without its `:v{n}` variant suffix.
+pub fn base_id(id: &str) -> &str {
+    match id.rsplit_once(":v") {
+        Some((b, v)) if !v.is_empty() && v.chars().all(|c| c.is_ascii_digit()) => b,
+        _ => id,
+    }
+}
+
+/// The number after `img` or `table` in a request id (0 when absent).
+fn id_index(id: &str) -> usize {
+    let b = base_id(id);
+    let tail = b.rsplit(':').next().unwrap_or("");
+    let digits: String = tail.chars().skip_while(|c| !c.is_ascii_digit()).collect();
+    digits.parse().unwrap_or(0)
+}
+
+/// Sort key: page, kind (table, page, region), region index, variant.
+fn request_key(r: &PdfRequest) -> (u32, PdfRequestKind, usize, u32) {
+    (r.page, r.kind, id_index(&r.id), r.variant.unwrap_or(0))
 }
 
 /// Words within this margin (points) of a table region are listed too, so a
@@ -115,14 +137,18 @@ fn requests(b: &Base, opts: &PdfOptions) -> Vec<PdfRequest> {
         let pg = info.page;
         let page_box = [0.0, 0.0, page.width, page.height];
         if info.route == Route::Scan {
-            out.push(PdfRequest {
-                id: format!("p{pg}:page"),
-                page: pg,
-                kind: PdfRequestKind::VisionPage,
-                prompt: "vision_page".into(),
-                bbox: page_box,
-                words: vec![],
-            });
+            for v in 1..=VARIANTS {
+                out.push(PdfRequest {
+                    id: format!("p{pg}:page:v{v}"),
+                    page: pg,
+                    kind: PdfRequestKind::VisionPage,
+                    prompt: "vision_page".into(),
+                    bbox: page_box,
+                    words: vec![],
+                    variant: Some(v),
+                    hint: Some(variant_hint(v)),
+                });
+            }
             continue;
         }
         // Table regions: every uncertain candidate, and every accepted table
@@ -150,6 +176,8 @@ fn requests(b: &Base, opts: &PdfOptions) -> Vec<PdfRequest> {
                     prompt: "table_structure".into(),
                     bbox: region.map(r2),
                     words,
+                    variant: None,
+                    hint: None,
                 });
             }
         }
@@ -165,14 +193,18 @@ fn requests(b: &Base, opts: &PdfOptions) -> Vec<PdfRequest> {
                 .filter(|(w, _)| inside(&w.bbox, &region))
                 .count();
             if n < REGION_MAX_WORDS {
-                out.push(PdfRequest {
-                    id: format!("p{pg}:img{k}"),
-                    page: pg,
-                    kind: PdfRequestKind::VisionRegion,
-                    prompt: "vision_region".into(),
-                    bbox: region,
-                    words: vec![],
-                });
+                for v in 1..=VARIANTS {
+                    out.push(PdfRequest {
+                        id: format!("p{pg}:img{k}:v{v}"),
+                        page: pg,
+                        kind: PdfRequestKind::VisionRegion,
+                        prompt: "vision_region".into(),
+                        bbox: region,
+                        words: vec![],
+                        variant: Some(v),
+                        hint: Some(variant_hint(v)),
+                    });
+                }
             }
         }
     }
@@ -265,13 +297,20 @@ fn to_cells(grid: &PdfGrid) -> Vec<Vec<GridCell>> {
         .collect()
 }
 
+struct Fill {
+    unit: usize,
+    markdown: String,
+    disputed: bool,
+    failed: Option<Failure>,
+}
+
 struct Edit {
     /// Unit indices to remove.
     remove: BTreeSet<usize>,
     /// (insert before this original index, units + their words)
     insert: Vec<(usize, DocUnit, Vec<String>)>,
-    /// In-place markdown fills: (unit index, markdown).
-    fill: Vec<(usize, String)>,
+    /// In-place vision fills.
+    fill: Vec<Fill>,
     /// Kept deterministic tables a disagreeing model grid made uncertain.
     uncertain: Vec<usize>,
 }
@@ -429,31 +468,68 @@ fn apply_table(
     })
 }
 
-fn apply_vision_page(
+/// One vision variant's checks: markdown present, output guards, and (for a
+/// page with an OCR/garbled layer) the text checks against that layer.
+fn validate_vision(
     units: &[DocUnit],
     req: &PdfRequest,
     resp: &PdfResponse,
     lang: Option<&str>,
-) -> Result<Edit, Failure> {
+) -> Result<String, Failure> {
     let Some(md) = resp.markdown.as_deref() else {
         return Err(Failure::Malformed);
     };
     checks::guard_text(md, resp.finish_reason.as_deref())?;
-    let page_units = on_page(units, req.page);
-    let text_units: Vec<usize> = page_units
-        .iter()
-        .copied()
+    if req.kind == PdfRequestKind::VisionPage {
+        let reference = page_reference(units, req.page);
+        if checks::tokens(&reference).len() >= MIN_REFERENCE_TOKENS {
+            checks::check_text(md, &reference, lang)?;
+        }
+    }
+    Ok(md.trim().to_string())
+}
+
+fn page_text_units(units: &[DocUnit], pg: u32) -> Vec<usize> {
+    on_page(units, pg)
+        .into_iter()
         .filter(|&i| !matches!(units[i].kind, UnitKind::Furniture | UnitKind::Image))
-        .collect();
-    let reference: String = text_units
+        .collect()
+}
+
+fn page_reference(units: &[DocUnit], pg: u32) -> String {
+    page_text_units(units, pg)
         .iter()
         .map(|&i| units[i].markdown.as_str())
         .collect::<Vec<_>>()
-        .join("\n");
-    if checks::tokens(&reference).len() >= MIN_REFERENCE_TOKENS {
-        checks::check_text(md, &reference, lang)?;
+        .join("\n")
+}
+
+/// Place a reconciled transcription: a page replaces the page's text units
+/// and lands in its largest image unit (or a new paragraph); a region fills
+/// its image unit. `failed` records a variant that failed its checks.
+fn vision_edit(
+    units: &[DocUnit],
+    req: &PdfRequest,
+    rec: Reconciled,
+    failed: Option<Failure>,
+) -> Result<Edit, Failure> {
+    let fill = |i: usize| Fill {
+        unit: i,
+        markdown: rec.markdown.clone(),
+        disputed: rec.disputed,
+        failed,
+    };
+    if req.kind == PdfRequestKind::VisionRegion {
+        let i = region_unit(units, req).ok_or(Failure::Malformed)?;
+        return Ok(Edit {
+            remove: BTreeSet::new(),
+            insert: vec![],
+            fill: vec![fill(i)],
+            uncertain: vec![],
+        });
     }
-    let md = md.trim().to_string();
+    let page_units = on_page(units, req.page);
+    let text_units = page_text_units(units, req.page);
     let image = page_units
         .iter()
         .copied()
@@ -467,7 +543,7 @@ fn apply_vision_page(
         Some(i) => Ok(Edit {
             remove,
             insert: vec![],
-            fill: vec![(i, md)],
+            fill: vec![fill(i)],
             uncertain: vec![],
         }),
         None => {
@@ -478,12 +554,14 @@ fn apply_vision_page(
                 .unwrap_or(units.len());
             let mut prov = Provenance::new(Route::Scan);
             prov.vision_transcribed = true;
+            prov.vision_disputed = rec.disputed;
+            prov.failed_check = failed.map(|f| f.as_str().to_string());
             let unit = DocUnit {
                 page: Some(req.page),
                 bbox: Some(req.bbox),
                 kind: UnitKind::Paragraph,
                 level: None,
-                markdown: md,
+                markdown: rec.markdown,
                 provenance: prov,
             };
             Ok(Edit {
@@ -497,38 +575,28 @@ fn apply_vision_page(
 }
 
 fn region_unit(units: &[DocUnit], req: &PdfRequest) -> Option<usize> {
-    let k: usize = req.id.rsplit("img").next()?.parse().ok()?;
+    if !base_id(&req.id).contains(":img") {
+        return None;
+    }
+    let k = id_index(&req.id);
     on_page(units, req.page)
         .into_iter()
         .filter(|&i| units[i].kind == UnitKind::Image)
         .nth(k)
 }
 
-fn apply_vision_region(
-    units: &[DocUnit],
-    req: &PdfRequest,
-    resp: &PdfResponse,
-) -> Result<Edit, Failure> {
-    let Some(md) = resp.markdown.as_deref() else {
-        return Err(Failure::Malformed);
-    };
-    checks::guard_text(md, resp.finish_reason.as_deref())?;
-    let i = region_unit(units, req).ok_or(Failure::Malformed)?;
-    Ok(Edit {
-        remove: BTreeSet::new(),
-        insert: vec![],
-        fill: vec![(i, md.trim().to_string())],
-        uncertain: vec![],
-    })
-}
-
 fn commit(units: &mut Vec<DocUnit>, unit_words: &mut Vec<Vec<String>>, edit: Edit) {
     for &i in &edit.uncertain {
         units[i].provenance.table_uncertain = true;
     }
-    for (i, md) in edit.fill {
-        units[i].markdown = md;
-        units[i].provenance.vision_transcribed = true;
+    for f in edit.fill {
+        let u = &mut units[f.unit];
+        u.markdown = f.markdown;
+        u.provenance.vision_transcribed = true;
+        u.provenance.vision_disputed = f.disputed;
+        if let Some(fail) = f.failed {
+            u.provenance.failed_check = Some(fail.as_str().to_string());
+        }
     }
     let mut ins = edit.insert;
     ins.sort_by_key(|x| x.0);
@@ -597,18 +665,65 @@ pub fn pdf_assemble(
     let mut units = b.out.units.clone();
     let mut unit_words = b.unit_words.clone();
     let (mut applied, mut rejected) = (0u32, 0u32);
+    let mut paired: BTreeSet<String> = BTreeSet::new();
     for req in &reqs {
+        if req.kind != PdfRequestKind::TableStructure {
+            // Vision: handle both variants of this region together, once.
+            let base = base_id(&req.id).to_string();
+            if !paired.insert(base.clone()) {
+                continue;
+            }
+            let variants: Vec<&PdfRequest> =
+                reqs.iter().filter(|r| base_id(&r.id) == base).collect();
+            let mut texts: Vec<Option<String>> = vec![None; VARIANTS as usize];
+            let mut first_fail: Option<Failure> = None;
+            let mut any = false;
+            for vr in &variants {
+                let Some(rs) = by_id.get(vr.id.as_str()) else {
+                    continue;
+                };
+                any = true;
+                let res = if rs.len() > 1 {
+                    Err(Failure::DuplicateResponse)
+                } else {
+                    validate_vision(&units, vr, rs[0], lang)
+                };
+                match res {
+                    Ok(t) => {
+                        let slot = vr.variant.unwrap_or(1).clamp(1, VARIANTS) as usize - 1;
+                        texts[slot] = Some(t);
+                        applied += 1;
+                    }
+                    Err(f) => {
+                        rejected += 1;
+                        first_fail.get_or_insert(f);
+                    }
+                }
+            }
+            if !any {
+                continue;
+            }
+            match vision::reconcile(texts[0].as_deref(), texts[1].as_deref(), lang) {
+                Some(rec) => match vision_edit(&units, req, rec, first_fail) {
+                    Ok(edit) => commit(&mut units, &mut unit_words, edit),
+                    Err(f) => mark_failed(&mut units, &unit_words, req, f),
+                },
+                None => mark_failed(
+                    &mut units,
+                    &unit_words,
+                    req,
+                    first_fail.unwrap_or(Failure::Malformed),
+                ),
+            }
+            continue;
+        }
         let Some(rs) = by_id.get(req.id.as_str()) else {
             continue;
         };
         let result = if rs.len() > 1 {
             Err(Failure::DuplicateResponse)
         } else {
-            match req.kind {
-                PdfRequestKind::TableStructure => apply_table(&b, &units, &unit_words, req, rs[0]),
-                PdfRequestKind::VisionPage => apply_vision_page(&units, req, rs[0], lang),
-                PdfRequestKind::VisionRegion => apply_vision_region(&units, req, rs[0]),
-            }
+            apply_table(&b, &units, &unit_words, req, rs[0])
         };
         match result {
             Ok(edit) => {
