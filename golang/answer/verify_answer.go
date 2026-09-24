@@ -682,6 +682,9 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 			if gate.IsSupportedV2(text, eu.Text) {
 				reason := clauseNegationGuard(text, eu.Text)
 				if reason == "" {
+					reason = truncationGuard(text, eu.Text)
+				}
+				if reason == "" {
 					// The gate matches tokens, not who does what: "De werkgever
 					// betaalt 4,5%" can align across two clauses of the unit.
 					reason = roleGuard(text, declared, eu, actors)

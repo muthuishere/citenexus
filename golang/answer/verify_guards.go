@@ -492,3 +492,65 @@ func clauseNegationGuard(claim, passage string) string {
 	}
 	return ""
 }
+
+// restrictiveTail open a clause-internal continuation that narrows what came
+// before it: a preposition, a relative, a condition. NL + EN; "up to" is two
+// tokens.
+var restrictiveTail = map[string]struct{}{
+	"met": {}, "van": {}, "voor": {}, "tot": {}, "boven": {}, "onder": {}, "bij": {}, "aan": {},
+	"zonder": {}, "behalve": {}, "uitgezonderd": {}, "alleen": {}, "uitsluitend": {},
+	"mits": {}, "tenzij": {}, "indien": {}, "als": {}, "wanneer": {}, "die": {}, "dat": {}, "waarvan": {},
+	"with": {}, "of": {}, "for": {}, "above": {}, "below": {}, "over": {}, "provided": {},
+	"unless": {}, "if": {}, "when": {}, "who": {}, "that": {}, "which": {},
+	"without": {}, "except": {}, "only": {},
+}
+
+// truncationGuard runs AFTER a gate admission. The gate (gate.IsSupportedV2,
+// ADR-0009) admits a claim that is a verbatim span of a unit sentence, and a
+// span can stop exactly where the sentence restricts it: "Medewerkers mogen
+// geen geschenken aannemen." over "… aannemen met een waarde van meer dan
+// € 50." Admitted as "gate", no guard or model ever saw it.
+//
+// For every clause of the passage the claim aligns within, it looks at the
+// clause's next word after the aligned span: a restrictive word (a preposition,
+// a relative, a condition — restrictiveTail, or "up to") means that clause
+// narrows the claim. The claim keeps its gate admission when ANY clause it
+// aligns in does not continue that way (it ends there, or a new clause starts:
+// ", en …"), and when it aligns in no single clause (the gate's own verdict
+// stands). Otherwise the gate admission is withdrawn and the claim goes on to
+// the guards and the model, as if the gate had refused.
+//
+// It lives here, above the gate, on purpose: the gate predicate is pinned
+// byte for byte in Python, Go and JS by conformance vectors, and this check is
+// Go-only VerifyAnswer behaviour. It is a candidate for a cross-port ADR-0009
+// amendment later.
+func truncationGuard(claim, passage string) string {
+	claimTokens := tokenize.TokenizeV2(claim)
+	restricted := ""
+	for _, clause := range clauseBreak.Split(softJoin(passage), -1) {
+		clauseTokens := tokenize.TokenizeV2(clause)
+		span, ok := gate.Align(claimTokens, clauseTokens)
+		if !ok {
+			continue
+		}
+		tail := clauseTokens[span.End+1:]
+		next := ""
+		if len(tail) > 0 {
+			next = tail[0]
+		}
+		_, narrows := restrictiveTail[next]
+		if next == "up" && len(tail) > 1 && tail[1] == "to" {
+			narrows, next = true, "up to"
+		}
+		if !narrows {
+			return "" // a clause that states the claim as it is
+		}
+		if restricted == "" {
+			restricted = next
+		}
+	}
+	if restricted == "" {
+		return ""
+	}
+	return fmt.Sprintf("truncation guard: the passage continues with %q after the matched words", restricted)
+}

@@ -3187,6 +3187,272 @@
           }
         ]
       }
+    },
+    {
+      "name": "truncation/a-prohibition-cut-before-its-threshold",
+      "answer": "Medewerkers mogen geen geschenken aannemen [eu:a].",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Medewerkers mogen geen geschenken aannemen met een waarde van meer dan € 50."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "truncation guard"
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "truncation/a-permission-cut-before-its-condition",
+      "answer": "Je mag thuiswerken [eu:a].",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Je mag thuiswerken met toestemming van je leidinggevende."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "truncation guard"
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "truncation/an-allowance-cut-before-who-gets-it",
+      "answer": "De werkgever vergoedt een bureaustoel [eu:a].",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werkgever vergoedt een bureaustoel voor werknemers met een vast contract."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "truncation guard"
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "truncation/en-permission-cut-before-its-condition",
+      "answer": "Employees may work from home [eu:a].",
+      "answer_language": "en",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "en",
+          "text": "Employees may work from home with their manager's permission."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "truncation guard"
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "truncation/the-whole-sentence-is-admitted",
+      "answer": "De opzegtermijn is één maand [eu:a].",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De opzegtermijn is één maand."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "truncation/a-full-sentence-inside-a-longer-unit-is-admitted",
+      "answer": "Opzegging geschiedt schriftelijk [eu:a].",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De arbeidsovereenkomst kan door beide partijen worden opgezegd. Opzegging geschiedt schriftelijk. De termijn gaat in op de eerste dag van de maand."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "truncation/a-coordinated-new-clause-is-not-a-restriction",
+      "answer": "Je mag thuiswerken [eu:a].",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Je mag thuiswerken, en je krijgt daarvoor een internetvergoeding."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "truncation/adv-dh-v2-05 (rag_go adv_v2, fictional)",
+      "must_refuse": true,
+      "answer": "De werkgever vergoedt de kosten van de opleiding [eu:S1]. Voor opleidingen die de werkgever verplicht stelt, geldt geen maximum [eu:S1].",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "opleidingsregeling Woonstichting Beekdal",
+          "language": "nl",
+          "text": "Opleidingskosten. De werkgever vergoedt de kosten van de opleiding tot een maximum van € 2.500 per kalenderjaar. Voor opleidingen die de werkgever verplicht stelt, geldt geen maximum. De medewerker kan de opleiding in beginsel in werktijd volgen."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "truncation guard"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "truncation/adv-dh-v2-09 (rag_go adv_v2, fictional)",
+      "must_refuse": true,
+      "answer": "Medewerkers mogen tijdens hun dienst geen privételefoon gebruiken [eu:S1]. In de pauzeruimte is gebruik van de privételefoon toegestaan [eu:S1].",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "huisregels Ziekenhuis Oosterlanden",
+          "language": "nl",
+          "text": "Telefoongebruik. Medewerkers mogen tijdens hun dienst geen privételefoon gebruiken aan het bed van de patiënt. In de pauzeruimte is gebruik toegestaan. In noodgevallen kan de teamleider een uitzondering toestaan. Zakelijke oproepen via de afdelingstelefoon vallen niet onder deze regel."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "truncation guard"
+          },
+          {
+            "supported": false,
+            "reason": "not supported"
+          }
+        ]
+      }
+    },
+    {
+      "name": "truncation/adv-dh-v2-17 (rag_go adv_v2, fictional)",
+      "must_refuse": true,
+      "answer": "The employer will reimburse the costs of reading glasses [eu:S1]. The reimbursement is capped at €150 per three years [eu:S1].",
+      "answer_language": "en",
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "Health and Safety Policy Northquay Freight",
+          "language": "en",
+          "text": "Screen work. The employer will reimburse the costs of reading glasses if the occupational physician confirms they are needed for screen work. The reimbursement is capped at €150 per three years."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "truncation guard"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "truncation/adv-dh-v2-29 (rag_go adv_v2, fictional)",
+      "must_refuse": true,
+      "answer": "Medewerkers mogen op sociale media geen informatie delen [eu:S1]. Algemene juridische onderwerpen mogen op sociale media worden besproken, mits er geen herleidbare cliëntinformatie wordt genoemd [eu:S1].",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "gedragscode Maasoever Advocaten",
+          "language": "nl",
+          "text": "Sociale media. Medewerkers mogen op sociale media geen informatie delen over zaken van cliënten. Algemene juridische onderwerpen mogen worden besproken, mits er geen herleidbare cliëntinformatie wordt genoemd. Bij twijfel wordt vooraf contact opgenomen met de afdeling communicatie."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "truncation guard"
+          },
+          {
+            "supported": false,
+            "reason": "not supported"
+          }
+        ]
+      }
     }
   ]
 }
