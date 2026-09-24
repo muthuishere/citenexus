@@ -223,27 +223,12 @@ type PdfOptions struct {
 	LayoutText bool   `json:"layout_text,omitempty"`
 }
 
-// PdfProvenance says how a unit was produced (ADR-0017 decision 6).
-type PdfProvenance struct {
-	Route             string  `json:"route"`
-	TableSource       *string `json:"table_source"`
-	VisionTranscribed bool    `json:"vision_transcribed"`
-	TableUncertain    bool    `json:"table_uncertain"`
-	FailedCheck       *string `json:"failed_check"`
-	HeadingSource     *string `json:"heading_source"`
-	JoinedHyphen      bool    `json:"joined_hyphen"`
-}
-
-// PdfUnit is one unit of a converted PDF: Kind is heading|paragraph|list|
-// table|furniture|image; BBox is [x0,y0,x1,y1] in points, top-left origin.
-type PdfUnit struct {
-	Page       *int          `json:"page"`
-	BBox       *[4]float64   `json:"bbox"`
-	Kind       string        `json:"kind"`
-	Level      *int          `json:"level"`
-	Markdown   string        `json:"markdown"`
-	Provenance PdfProvenance `json:"provenance"`
-}
+// PdfUnit and PdfProvenance are the PDF names for the one shared unit shape
+// (DocUnit / Provenance, ooxml.go) — PDF, DOCX and PPTX return the same type.
+type (
+	PdfUnit       = DocUnit
+	PdfProvenance = Provenance
+)
 
 // PdfResult is the full base-extractor output: the units, each page's route
 // with the signals behind it, and document-level signals (heading agreement,
