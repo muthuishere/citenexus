@@ -320,6 +320,9 @@ type PdfWord struct {
 	ID   string     `json:"id"`
 	Text string     `json:"text"`
 	BBox [4]float64 `json:"bbox"`
+	// Marker: a list-marker glyph opening a line (•, -, 1., a) …). A grid may
+	// include it or leave it out; leaving it out is not a partial unit.
+	Marker bool `json:"marker"`
 }
 
 // PdfRequest asks the host for one model call. Kind is table_structure (answer

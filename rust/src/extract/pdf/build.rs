@@ -453,7 +453,18 @@ impl Staged {
                         ];
                     }
                     let id = word_id(p, self.word_ord[p][s][k]);
-                    out.push((PdfWord { id, text, bbox: bb }, furn));
+                    let marker = k == 0
+                        && w.pl.segments[s].words.len() > 1
+                        && layout::is_marker_token(&text);
+                    out.push((
+                        PdfWord {
+                            id,
+                            text,
+                            bbox: bb,
+                            marker,
+                        },
+                        furn,
+                    ));
                 }
             }
         }

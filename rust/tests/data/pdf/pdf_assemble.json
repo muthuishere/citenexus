@@ -129,6 +129,155 @@
       }
     },
     {
+      "name": "table (T7 shape): a grid over list units that leaves out ONLY the list-marker glyphs is accepted; the markers are not emitted",
+      "fixture": "listtable",
+      "category": "must_accept",
+      "responses": [
+        {
+          "request": "p1:table0",
+          "finish_reason": "stop",
+          "tables": [
+            {
+              "rows": [
+                [
+                  [
+                    "Reiskosten"
+                  ],
+                  [
+                    "Vergoed",
+                    "per#2",
+                    "kilometer"
+                  ]
+                ],
+                [
+                  [
+                    "Hotel"
+                  ],
+                  [
+                    "Vergoed#2",
+                    "per#3",
+                    "nacht"
+                  ]
+                ],
+                [
+                  {
+                    "words": [
+                      "Dit",
+                      "geldt",
+                      "voor",
+                      "alle",
+                      "medewerkers",
+                      "van",
+                      "de",
+                      "organisatie."
+                    ],
+                    "colspan": 2
+                  }
+                ],
+                [
+                  [
+                    "Diner"
+                  ],
+                  [
+                    "Vergoed#3",
+                    "tot",
+                    "een",
+                    "maximum",
+                    "bedrag"
+                  ]
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "applied": 1,
+        "rejected": 0,
+        "failed_check": null,
+        "table_source": "model_grid",
+        "table": "| Reiskosten | Vergoed per kilometer |\n| --- | --- |\n| Hotel | Vergoed per nacht |\n| Dit geldt voor alle medewerkers van de organisatie. |  |\n| Diner | Vergoed tot een maximum bedrag |",
+        "kept": [
+          "Vergoedingen zijn per jaar.",
+          "Declaraties gaan naar de administratie."
+        ]
+      }
+    },
+    {
+      "name": "table (T7 shape): a grid leaving out a REAL word of a unit (not a marker) is partial_unit; only the table region's units carry failed_check, the prose around it does not",
+      "fixture": "listtable",
+      "category": "must_reject",
+      "responses": [
+        {
+          "request": "p1:table0",
+          "finish_reason": "stop",
+          "tables": [
+            {
+              "rows": [
+                [
+                  [
+                    "Reiskosten"
+                  ],
+                  [
+                    "Vergoed",
+                    "per#2",
+                    "kilometer"
+                  ]
+                ],
+                [
+                  [
+                    "Hotel"
+                  ],
+                  [
+                    "Vergoed#2",
+                    "per#3",
+                    "nacht"
+                  ]
+                ],
+                [
+                  {
+                    "words": [
+                      "Dit",
+                      "geldt",
+                      "voor",
+                      "alle",
+                      "medewerkers",
+                      "van",
+                      "de",
+                      "organisatie."
+                    ],
+                    "colspan": 2
+                  }
+                ],
+                [
+                  [
+                    "Diner"
+                  ],
+                  [
+                    "Vergoed#3",
+                    "tot",
+                    "een",
+                    "maximum"
+                  ]
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "applied": 0,
+        "rejected": 1,
+        "failed_check": "partial_unit",
+        "base_kept": true,
+        "not_failed": [
+          "Vergoedingen zijn per jaar.",
+          "Declaraties gaan naar de administratie."
+        ],
+        "failed_units": 3
+      }
+    },
+    {
       "name": "table: amounts swapped between rows",
       "fixture": "table",
       "category": "must_reject",

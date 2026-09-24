@@ -370,13 +370,18 @@ fn apply_table(
         if req
             .words
             .iter()
-            .any(|w| !ids.contains(&w.id) && inside(&w.bbox, &gb))
+            .any(|w| !w.marker && !ids.contains(&w.id) && inside(&w.bbox, &gb))
         {
             return Err(Failure::GridCoverage);
         }
         grids.push((cells, placement, ids));
     }
     let page_units = on_page(units, req.page);
+    let markers: BTreeSet<&str> = b.words[p]
+        .iter()
+        .filter(|(w, _)| w.marker)
+        .map(|(w, _)| w.id.as_str())
+        .collect();
     let mut touched: Vec<Vec<usize>> = vec![Vec::new(); grids.len()];
     for &i in &page_units {
         let w: BTreeSet<&String> = unit_words[i].iter().collect();
@@ -384,7 +389,11 @@ fn apply_table(
         if hit == 0 {
             continue;
         }
-        if hit != w.len() {
+        // A grid may take a unit minus its list-marker glyphs (they are not
+        // content and are not emitted); any other word left out splits it.
+        if w.iter()
+            .any(|x| !all.contains(*x) && !markers.contains(x.as_str()))
+        {
             return Err(Failure::PartialUnit);
         }
         for (g, (_, _, ids)) in grids.iter().enumerate() {
@@ -626,13 +635,38 @@ fn commit(units: &mut Vec<DocUnit>, unit_words: &mut Vec<Vec<String>>, edit: Edi
     *unit_words = out_w;
 }
 
-fn mark_failed(units: &mut [DocUnit], unit_words: &[Vec<String>], req: &PdfRequest, f: Failure) {
-    let req_words: BTreeSet<&str> = req.words.iter().map(|w| w.id.as_str()).collect();
+/// The units a failed response is recorded on. A table request: the units of
+/// the table REGION — a word whose centre lies inside the request's region
+/// box (not the 12 pt listing margin) — plus any unit the response's grid
+/// referenced. Prose around the table keeps its base provenance.
+fn mark_failed(
+    units: &mut [DocUnit],
+    unit_words: &[Vec<String>],
+    req: &PdfRequest,
+    resp: Option<&PdfResponse>,
+    f: Failure,
+) {
+    let in_region: BTreeSet<&str> = req
+        .words
+        .iter()
+        .filter(|w| inside(&w.bbox, &req.bbox))
+        .map(|w| w.id.as_str())
+        .collect();
+    let referenced: BTreeSet<String> = resp
+        .and_then(|r| r.tables.as_ref())
+        .into_iter()
+        .flatten()
+        .flat_map(|g| to_cells(g).into_iter().flatten().flat_map(|c| c.words))
+        .collect();
     let targets: Vec<usize> = match req.kind {
         PdfRequestKind::VisionRegion => region_unit(units, req).into_iter().collect(),
-        // a table request: exactly the units whose words it listed
         PdfRequestKind::TableStructure => (0..units.len())
-            .filter(|&i| unit_words[i].iter().any(|w| req_words.contains(w.as_str())))
+            .filter(|&i| {
+                units[i].page == Some(req.page)
+                    && unit_words[i]
+                        .iter()
+                        .any(|w| in_region.contains(w.as_str()) || referenced.contains(w))
+            })
             .collect(),
         _ => on_page(units, req.page)
             .into_iter()
@@ -706,12 +740,13 @@ pub fn pdf_assemble(
             match vision::reconcile(texts[0].as_deref(), texts[1].as_deref(), lang) {
                 Some(rec) => match vision_edit(&units, req, rec, first_fail) {
                     Ok(edit) => commit(&mut units, &mut unit_words, edit),
-                    Err(f) => mark_failed(&mut units, &unit_words, req, f),
+                    Err(f) => mark_failed(&mut units, &unit_words, req, None, f),
                 },
                 None => mark_failed(
                     &mut units,
                     &unit_words,
                     req,
+                    None,
                     first_fail.unwrap_or(Failure::Malformed),
                 ),
             }
@@ -731,7 +766,7 @@ pub fn pdf_assemble(
                 applied += 1;
             }
             Err(f) => {
-                mark_failed(&mut units, &unit_words, req, f);
+                mark_failed(&mut units, &unit_words, req, rs.first().copied(), f);
                 rejected += 1;
             }
         }

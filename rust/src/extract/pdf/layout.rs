@@ -230,6 +230,28 @@ pub fn is_bullet(c: char) -> bool {
     )
 }
 
+/// A list-marker token: a single non-alphanumeric glyph (`-`, `•`, `·`,
+/// `*`, U+F0B7, …) or a list number (`1.`, `1)`, `a)`, `(a)`, `iv)`). As a
+/// segment's FIRST word it marks a list item; it is not content (ADR-0017:
+/// a table grid may leave it out).
+pub fn is_marker_token(t: &str) -> bool {
+    let mut cs = t.chars();
+    if let (Some(c), None) = (cs.next(), cs.next()) {
+        return !c.is_alphanumeric();
+    }
+    let core = t.trim_start_matches('(');
+    let Some((cut, last)) = core.char_indices().last() else {
+        return false;
+    };
+    if !matches!(last, '.' | ')') || cut == 0 || core.chars().count() > 5 {
+        return false;
+    }
+    let body = &core[..cut];
+    body.chars().all(|c| c.is_ascii_digit())
+        || (body.chars().count() == 1 && body.chars().all(|c| c.is_ascii_lowercase()))
+        || body.chars().all(|c| matches!(c, 'i' | 'v' | 'x'))
+}
+
 /// Does this segment open a list item?
 pub fn starts_list_item(text: &str) -> bool {
     let t = text.trim_start();
@@ -408,6 +430,18 @@ mod tests {
         assert!(starts_list_item("iv) fourth"));
         assert!(!starts_list_item("1. Scope"));
         assert!(!starts_list_item("Leave policy"));
+    }
+
+    #[test]
+    fn marker_tokens() {
+        for m in [
+            "\u{2022}", "-", "*", "\u{F0B7}", "1.", "12)", "a)", "(b)", "iv)",
+        ] {
+            assert!(is_marker_token(m), "{m}");
+        }
+        for t in ["Reiskosten", "1.3", "2024", "A", "Art."] {
+            assert!(!is_marker_token(t), "{t}");
+        }
     }
 
     #[test]

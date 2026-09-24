@@ -306,6 +306,10 @@ pub struct PdfWord {
     /// The PDF's own characters (a pdfium hyphen marker prints as `-`).
     pub text: String,
     pub bbox: BBox,
+    /// A list-marker glyph opening a line (`•`, `-`, `1.`, `a)` …). A grid MAY
+    /// include it; leaving it out is not a partial unit and not lost text.
+    #[serde(default)]
+    pub marker: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]

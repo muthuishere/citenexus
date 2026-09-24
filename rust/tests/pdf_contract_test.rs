@@ -99,8 +99,37 @@ pub fn region_fixture() -> Doc {
     Doc::new(vec![page])
 }
 
+/// A T7-like label | description layout: bullet list labels, descriptions to
+/// the right, one full-width sentence inside the run (so the tracks candidate
+/// fails geometry and becomes an uncertain region = a model request), and a
+/// prose line just above, inside the request's 12 pt margin.
+pub fn listtable_fixture() -> Doc {
+    let page = Page::a4()
+        .para(72.0, 88.0, 10.0, &["Vergoedingen zijn per jaar."])
+        .text(72.0, 104.0, 10.0, "\u{2022} Reiskosten")
+        .text(250.0, 104.0, 10.0, "Vergoed per kilometer")
+        .text(72.0, 118.0, 10.0, "\u{2022} Hotel")
+        .text(250.0, 118.0, 10.0, "Vergoed per nacht")
+        .text(
+            72.0,
+            132.0,
+            10.0,
+            "Dit geldt voor alle medewerkers van de organisatie.",
+        )
+        .text(72.0, 146.0, 10.0, "\u{2022} Diner")
+        .text(250.0, 146.0, 10.0, "Vergoed tot een maximum bedrag")
+        .para(
+            72.0,
+            240.0,
+            10.0,
+            &["Declaraties gaan naar de administratie."],
+        );
+    Doc::new(vec![page])
+}
+
 fn fixture(name: &str) -> Vec<u8> {
     match name {
+        "listtable" => listtable_fixture(),
         "table" => table_fixture(),
         "scan" => scan_fixture(),
         "region" => region_fixture(),
@@ -153,12 +182,17 @@ fn responses(prep: &PdfPrepared, spec: &serde_json::Value) -> Vec<PdfResponse> {
                                 row.as_array()
                                     .unwrap()
                                     .iter()
-                                    .map(|c| {
-                                        PdfCell::Words(resolve(
-                                            prep,
-                                            request,
-                                            c.as_array().unwrap(),
-                                        ))
+                                    .map(|c| match c.as_array() {
+                                        Some(ids) => PdfCell::Words(resolve(prep, request, ids)),
+                                        None => PdfCell::Spanned {
+                                            words: resolve(
+                                                prep,
+                                                request,
+                                                c["words"].as_array().unwrap(),
+                                            ),
+                                            colspan: c["colspan"].as_u64().map(|x| x as u32),
+                                            rowspan: c["rowspan"].as_u64().map(|x| x as u32),
+                                        },
                                     })
                                     .collect()
                             })
@@ -272,6 +306,26 @@ fn assemble_vectors() {
             }
             None => assert!(failed.is_empty(), "{name}: {failed:?}"),
         }
+        if let Some(n) = e["failed_units"].as_u64() {
+            assert_eq!(failed.len() as u64, n, "{name}: units with failed_check");
+        }
+        for keep in e["not_failed"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .chain(e["kept"].as_array().into_iter().flatten())
+        {
+            let k = keep.as_str().unwrap();
+            let u = out
+                .units
+                .iter()
+                .find(|u| u.markdown == k)
+                .unwrap_or_else(|| panic!("{name}: unit {k:?} missing"));
+            assert!(
+                u.provenance.failed_check.is_none(),
+                "{name}: {k:?} must keep its base provenance"
+            );
+        }
         if let Some(t) = e["table"].as_str() {
             let tables: Vec<&DocUnit> = out
                 .units
@@ -291,15 +345,17 @@ fn assemble_vectors() {
                 assert_eq!(tables[0].provenance.table_uncertain, u, "{name}");
             }
             assert!(!tables[0].provenance.vision_transcribed);
-            // the table sits between the two paragraphs, which survive
-            let md: Vec<&str> = out.units.iter().map(|u| u.markdown.as_str()).collect();
-            assert_eq!(
-                md.first(),
-                Some(&"Declaraties over het jaar 2024 staan hieronder."),
-                "{md:?}"
-            );
-            assert_eq!(md.last(), Some(&"Bedragen zijn exclusief btw."), "{md:?}");
-            assert_eq!(md.len(), 3, "{md:?}");
+            if c["fixture"] == "table" {
+                // the table sits between the two paragraphs, which survive
+                let md: Vec<&str> = out.units.iter().map(|u| u.markdown.as_str()).collect();
+                assert_eq!(
+                    md.first(),
+                    Some(&"Declaraties over het jaar 2024 staan hieronder."),
+                    "{md:?}"
+                );
+                assert_eq!(md.last(), Some(&"Bedragen zijn exclusief btw."), "{md:?}");
+                assert_eq!(md.len(), 3, "{md:?}");
+            }
         }
         if e["vision_transcribed"].as_bool() == Some(true) {
             let vt: Vec<&DocUnit> = out
