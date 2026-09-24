@@ -25,6 +25,7 @@ fn opts() -> PdfOptions {
     PdfOptions {
         language: Some("nl".into()),
         layout_text: false,
+        model_tables: true,
     }
 }
 
@@ -193,7 +194,7 @@ fn prepare_emits_the_expected_requests() {
     let r = &t.requests[0];
     assert_eq!(
         (r.id.as_str(), r.kind),
-        ("p1:table", PdfRequestKind::TableStructure)
+        ("p1:table0", PdfRequestKind::TableStructure)
     );
     let texts: Vec<&str> = r.words.iter().map(|w| w.text.as_str()).collect();
     assert!(
@@ -267,10 +268,16 @@ fn assemble_vectors() {
                 .collect();
             assert_eq!(tables.len(), 1, "{name}");
             assert_eq!(tables[0].markdown, t, "{name}");
-            assert_eq!(
-                tables[0].provenance.table_source,
-                Some(TableSource::ModelGrid)
-            );
+            let want_src = match e["table_source"].as_str() {
+                Some("ruled") => TableSource::Ruled,
+                Some("tracks") => TableSource::Tracks,
+                Some("struct_tree") => TableSource::StructTree,
+                _ => TableSource::ModelGrid,
+            };
+            assert_eq!(tables[0].provenance.table_source, Some(want_src), "{name}");
+            if let Some(u) = e["table_uncertain"].as_bool() {
+                assert_eq!(tables[0].provenance.table_uncertain, u, "{name}");
+            }
             assert!(!tables[0].provenance.vision_transcribed);
             // the table sits between the two paragraphs, which survive
             let md: Vec<&str> = out.units.iter().map(|u| u.markdown.as_str()).collect();
@@ -307,9 +314,9 @@ fn mixed() -> (Vec<u8>, Vec<PdfResponse>) {
     let bytes = doc.build();
     let prep = pdf_prepare(&bytes, &opts()).unwrap();
     let ids: Vec<&str> = prep.requests.iter().map(|r| r.id.as_str()).collect();
-    assert_eq!(ids, vec!["p1:table", "p2:page", "p3:img0"]);
+    assert_eq!(ids, vec!["p1:table0", "p2:page", "p3:img0"]);
     let spec = serde_json::json!([
-        {"request": "p1:table", "finish_reason": "stop", "tables": [{"rows": [
+        {"request": "p1:table0", "finish_reason": "stop", "tables": [{"rows": [
             [["Omschrijving"], ["Bedrag"], ["Opmerking"]],
             [["Reiskosten"], ["7.000,00"], ["geen"]],
             [["Hotel"], ["5.100,00"], []],
@@ -368,6 +375,6 @@ fn committed_golden_assemble_vector() {
             std::fs::write(&path, &content).unwrap();
         }
         let on_disk = std::fs::read(&path).expect("regenerate with CITENEXUS_WRITE_PDF_FIXTURES=1");
-        assert_eq!(on_disk, content, "{name} drifted");
+        assert!(on_disk == content, "{name} drifted from its generator");
     }
 }

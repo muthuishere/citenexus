@@ -1,166 +1,719 @@
 {
-  "_about": "ADR-0017 step 3: pdf_assemble vectors over SYNTHETIC PDFs (fixtures built by tests/common/pdfgen.rs in tests/pdf_contract_test.rs; invented text). Grid cells name words by their printed text ('text', 'text#2' = 2nd occurrence on the page, '@p1w999' = a literal ID); the harness resolves them through pdf_prepare's request words. category: must_accept | must_reject | known_gap. A known_gap vector documents an error class the checks cannot see; it is expected to be ACCEPTED, and the unit is labelled vision_transcribed.",
+  "_about": "ADR-0017 step 3: pdf_assemble vectors over SYNTHETIC PDFs (fixtures built by tests/common/pdfgen.rs in tests/pdf_contract_test.rs; invented text). Run with model_tables=true, so the ruled table the deterministic path accepts is ALSO a model request (p1:table0) and every model grid competes with it (tables::choose). Grid cells name words by their printed text ('text', 'text#2' = 2nd occurrence on the page, '@p1w999' = a literal ID); the harness resolves them through pdf_prepare's request words. category: must_accept | must_reject | known_gap. A known_gap vector documents an error class the checks cannot see; it is expected to be ACCEPTED, and the unit is labelled vision_transcribed.",
   "cases": [
     {
-      "name": "table: the true grid is accepted and cells are filled from the text layer",
-      "fixture": "table", "category": "must_accept",
-      "responses": [{"request": "p1:table", "finish_reason": "stop", "tables": [{"rows": [
-        [["Omschrijving"], ["Bedrag"], ["Opmerking"]],
-        [["Reiskosten"], ["7.000,00"], ["geen"]],
-        [["Hotel"], ["5.100,00"], []],
-        [["Diner"], ["1.250,00"], ["vooraf"]]
-      ]}]}],
-      "expect": {"applied": 1, "rejected": 0, "failed_check": null,
-        "table": "| Omschrijving | Bedrag | Opmerking |\n| --- | --- | --- |\n| Reiskosten | 7.000,00 | geen |\n| Hotel | 5.100,00 |  |\n| Diner | 1.250,00 | vooraf |"}
+      "name": "table: a true model grid agrees with the ruled grid (GriTS >= 0.9): the ruled table stays, confirmed",
+      "fixture": "table",
+      "category": "must_accept",
+      "responses": [
+        {
+          "request": "p1:table0",
+          "finish_reason": "stop",
+          "tables": [
+            {
+              "rows": [
+                [
+                  [
+                    "Omschrijving"
+                  ],
+                  [
+                    "Bedrag"
+                  ],
+                  [
+                    "Opmerking"
+                  ]
+                ],
+                [
+                  [
+                    "Reiskosten"
+                  ],
+                  [
+                    "7.000,00"
+                  ],
+                  [
+                    "geen"
+                  ]
+                ],
+                [
+                  [
+                    "Hotel"
+                  ],
+                  [
+                    "5.100,00"
+                  ],
+                  []
+                ],
+                [
+                  [
+                    "Diner"
+                  ],
+                  [
+                    "1.250,00"
+                  ],
+                  [
+                    "vooraf"
+                  ]
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "applied": 1,
+        "rejected": 0,
+        "failed_check": null,
+        "table": "| Omschrijving | Bedrag | Opmerking |\n| --- | --- | --- |\n| Reiskosten | 7.000,00 | geen |\n| Hotel | 5.100,00 |  |\n| Diner | 1.250,00 | vooraf |",
+        "table_source": "ruled",
+        "table_uncertain": false
+      }
+    },
+    {
+      "name": "table: a model grid that passes the gate but DISAGREES (merges two columns): drawn lines win, the table is marked uncertain",
+      "fixture": "table",
+      "category": "must_accept",
+      "responses": [
+        {
+          "request": "p1:table0",
+          "finish_reason": "stop",
+          "tables": [
+            {
+              "rows": [
+                [
+                  [
+                    "Omschrijving"
+                  ],
+                  [
+                    "Bedrag",
+                    "Opmerking"
+                  ]
+                ],
+                [
+                  [
+                    "Reiskosten"
+                  ],
+                  [
+                    "7.000,00",
+                    "geen"
+                  ]
+                ],
+                [
+                  [
+                    "Hotel"
+                  ],
+                  [
+                    "5.100,00"
+                  ]
+                ],
+                [
+                  [
+                    "Diner"
+                  ],
+                  [
+                    "1.250,00",
+                    "vooraf"
+                  ]
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "applied": 1,
+        "rejected": 0,
+        "failed_check": null,
+        "table_source": "ruled",
+        "table_uncertain": true,
+        "table": "| Omschrijving | Bedrag | Opmerking |\n| --- | --- | --- |\n| Reiskosten | 7.000,00 | geen |\n| Hotel | 5.100,00 |  |\n| Diner | 1.250,00 | vooraf |"
+      }
     },
     {
       "name": "table: amounts swapped between rows",
-      "fixture": "table", "category": "must_reject",
-      "responses": [{"request": "p1:table", "tables": [{"rows": [
-        [["Omschrijving"], ["Bedrag"], ["Opmerking"]],
-        [["Reiskosten"], ["5.100,00"], ["geen"]],
-        [["Hotel"], ["7.000,00"], []],
-        [["Diner"], ["1.250,00"], ["vooraf"]]
-      ]}]}],
-      "expect": {"applied": 0, "rejected": 1, "failed_check": "geometry_rows"}
+      "fixture": "table",
+      "category": "must_reject",
+      "responses": [
+        {
+          "request": "p1:table0",
+          "tables": [
+            {
+              "rows": [
+                [
+                  [
+                    "Omschrijving"
+                  ],
+                  [
+                    "Bedrag"
+                  ],
+                  [
+                    "Opmerking"
+                  ]
+                ],
+                [
+                  [
+                    "Reiskosten"
+                  ],
+                  [
+                    "5.100,00"
+                  ],
+                  [
+                    "geen"
+                  ]
+                ],
+                [
+                  [
+                    "Hotel"
+                  ],
+                  [
+                    "7.000,00"
+                  ],
+                  []
+                ],
+                [
+                  [
+                    "Diner"
+                  ],
+                  [
+                    "1.250,00"
+                  ],
+                  [
+                    "vooraf"
+                  ]
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "applied": 0,
+        "rejected": 1,
+        "failed_check": "geometry_rows"
+      }
     },
     {
       "name": "table: a 'geen' moved into another row's empty cell",
-      "fixture": "table", "category": "must_reject",
-      "responses": [{"request": "p1:table", "tables": [{"rows": [
-        [["Omschrijving"], ["Bedrag"], ["Opmerking"]],
-        [["Reiskosten"], ["7.000,00"], []],
-        [["Hotel"], ["5.100,00"], ["geen"]],
-        [["Diner"], ["1.250,00"], ["vooraf"]]
-      ]}]}],
-      "expect": {"applied": 0, "rejected": 1, "failed_check": "geometry_rows"}
+      "fixture": "table",
+      "category": "must_reject",
+      "responses": [
+        {
+          "request": "p1:table0",
+          "tables": [
+            {
+              "rows": [
+                [
+                  [
+                    "Omschrijving"
+                  ],
+                  [
+                    "Bedrag"
+                  ],
+                  [
+                    "Opmerking"
+                  ]
+                ],
+                [
+                  [
+                    "Reiskosten"
+                  ],
+                  [
+                    "7.000,00"
+                  ],
+                  []
+                ],
+                [
+                  [
+                    "Hotel"
+                  ],
+                  [
+                    "5.100,00"
+                  ],
+                  [
+                    "geen"
+                  ]
+                ],
+                [
+                  [
+                    "Diner"
+                  ],
+                  [
+                    "1.250,00"
+                  ],
+                  [
+                    "vooraf"
+                  ]
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "applied": 0,
+        "rejected": 1,
+        "failed_check": "geometry_rows"
+      }
     },
     {
       "name": "table: an empty cell filled with a value used elsewhere",
-      "fixture": "table", "category": "must_reject",
-      "responses": [{"request": "p1:table", "tables": [{"rows": [
-        [["Omschrijving"], ["Bedrag"], ["Opmerking"]],
-        [["Reiskosten"], ["7.000,00"], ["geen"]],
-        [["Hotel"], ["5.100,00"], ["vooraf"]],
-        [["Diner"], ["1.250,00"], ["vooraf"]]
-      ]}]}],
-      "expect": {"applied": 0, "rejected": 1, "failed_check": "duplicate_word"}
+      "fixture": "table",
+      "category": "must_reject",
+      "responses": [
+        {
+          "request": "p1:table0",
+          "tables": [
+            {
+              "rows": [
+                [
+                  [
+                    "Omschrijving"
+                  ],
+                  [
+                    "Bedrag"
+                  ],
+                  [
+                    "Opmerking"
+                  ]
+                ],
+                [
+                  [
+                    "Reiskosten"
+                  ],
+                  [
+                    "7.000,00"
+                  ],
+                  [
+                    "geen"
+                  ]
+                ],
+                [
+                  [
+                    "Hotel"
+                  ],
+                  [
+                    "5.100,00"
+                  ],
+                  [
+                    "vooraf"
+                  ]
+                ],
+                [
+                  [
+                    "Diner"
+                  ],
+                  [
+                    "1.250,00"
+                  ],
+                  [
+                    "vooraf"
+                  ]
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "applied": 0,
+        "rejected": 1,
+        "failed_check": "duplicate_word"
+      }
     },
     {
       "name": "table: values swapped between columns of one row",
-      "fixture": "table", "category": "must_reject",
-      "responses": [{"request": "p1:table", "tables": [{"rows": [
-        [["Omschrijving"], ["Bedrag"], ["Opmerking"]],
-        [["Reiskosten"], ["geen"], ["7.000,00"]],
-        [["Hotel"], ["5.100,00"], []],
-        [["Diner"], ["1.250,00"], ["vooraf"]]
-      ]}]}],
-      "expect": {"applied": 0, "rejected": 1, "failed_check": "geometry_columns"}
+      "fixture": "table",
+      "category": "must_reject",
+      "responses": [
+        {
+          "request": "p1:table0",
+          "tables": [
+            {
+              "rows": [
+                [
+                  [
+                    "Omschrijving"
+                  ],
+                  [
+                    "Bedrag"
+                  ],
+                  [
+                    "Opmerking"
+                  ]
+                ],
+                [
+                  [
+                    "Reiskosten"
+                  ],
+                  [
+                    "geen"
+                  ],
+                  [
+                    "7.000,00"
+                  ]
+                ],
+                [
+                  [
+                    "Hotel"
+                  ],
+                  [
+                    "5.100,00"
+                  ],
+                  []
+                ],
+                [
+                  [
+                    "Diner"
+                  ],
+                  [
+                    "1.250,00"
+                  ],
+                  [
+                    "vooraf"
+                  ]
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "applied": 0,
+        "rejected": 1,
+        "failed_check": "geometry_columns"
+      }
     },
     {
       "name": "table: model-written text (7.000,00 -> 70.000,0, 5.100,00 -> 100) on a text-layer page is never used",
-      "fixture": "table", "category": "must_reject",
-      "responses": [{"request": "p1:table", "finish_reason": "stop",
-        "markdown": "| Omschrijving | Bedrag |\n| --- | --- |\n| Reiskosten | 70.000,0 |\n| Hotel | 100 |"}],
-      "expect": {"applied": 0, "rejected": 1, "failed_check": "model_text_on_text_layer"}
+      "fixture": "table",
+      "category": "must_reject",
+      "responses": [
+        {
+          "request": "p1:table0",
+          "finish_reason": "stop",
+          "markdown": "| Omschrijving | Bedrag |\n| --- | --- |\n| Reiskosten | 70.000,0 |\n| Hotel | 100 |"
+        }
+      ],
+      "expect": {
+        "applied": 0,
+        "rejected": 1,
+        "failed_check": "model_text_on_text_layer"
+      }
     },
     {
       "name": "table: an ID the request never listed",
-      "fixture": "table", "category": "must_reject",
-      "responses": [{"request": "p1:table", "tables": [{"rows": [
-        [["Omschrijving"], ["Bedrag"], ["@p1w999"]]
-      ]}]}],
-      "expect": {"applied": 0, "rejected": 1, "failed_check": "unknown_word"}
+      "fixture": "table",
+      "category": "must_reject",
+      "responses": [
+        {
+          "request": "p1:table0",
+          "tables": [
+            {
+              "rows": [
+                [
+                  [
+                    "Omschrijving"
+                  ],
+                  [
+                    "Bedrag"
+                  ],
+                  [
+                    "@p1w999"
+                  ]
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "applied": 0,
+        "rejected": 1,
+        "failed_check": "unknown_word"
+      }
     },
     {
       "name": "table: a dropped cell is lost text, not a smaller table",
-      "fixture": "table", "category": "must_reject",
-      "responses": [{"request": "p1:table", "tables": [{"rows": [
-        [["Omschrijving"], ["Bedrag"], ["Opmerking"]],
-        [["Reiskosten"], ["7.000,00"], ["geen"]],
-        [["Hotel"], ["5.100,00"], []],
-        [["Diner"], ["1.250,00"], []]
-      ]}]}],
-      "expect": {"applied": 0, "rejected": 1, "failed_check": "grid_coverage"}
+      "fixture": "table",
+      "category": "must_reject",
+      "responses": [
+        {
+          "request": "p1:table0",
+          "tables": [
+            {
+              "rows": [
+                [
+                  [
+                    "Omschrijving"
+                  ],
+                  [
+                    "Bedrag"
+                  ],
+                  [
+                    "Opmerking"
+                  ]
+                ],
+                [
+                  [
+                    "Reiskosten"
+                  ],
+                  [
+                    "7.000,00"
+                  ],
+                  [
+                    "geen"
+                  ]
+                ],
+                [
+                  [
+                    "Hotel"
+                  ],
+                  [
+                    "5.100,00"
+                  ],
+                  []
+                ],
+                [
+                  [
+                    "Diner"
+                  ],
+                  [
+                    "1.250,00"
+                  ],
+                  []
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "applied": 0,
+        "rejected": 1,
+        "failed_check": "grid_coverage"
+      }
     },
     {
       "name": "table: a truncated generation",
-      "fixture": "table", "category": "must_reject",
-      "responses": [{"request": "p1:table", "finish_reason": "length", "tables": [{"rows": [
-        [["Omschrijving"], ["Bedrag"], ["Opmerking"]]
-      ]}]}],
-      "expect": {"applied": 0, "rejected": 1, "failed_check": "finish_reason"}
+      "fixture": "table",
+      "category": "must_reject",
+      "responses": [
+        {
+          "request": "p1:table0",
+          "finish_reason": "length",
+          "tables": [
+            {
+              "rows": [
+                [
+                  [
+                    "Omschrijving"
+                  ],
+                  [
+                    "Bedrag"
+                  ],
+                  [
+                    "Opmerking"
+                  ]
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "applied": 0,
+        "rejected": 1,
+        "failed_check": "finish_reason"
+      }
     },
     {
       "name": "table: two answers to one request",
-      "fixture": "table", "category": "must_reject",
+      "fixture": "table",
+      "category": "must_reject",
       "responses": [
-        {"request": "p1:table", "tables": [{"rows": [[["Omschrijving"]]]}]},
-        {"request": "p1:table", "tables": [{"rows": [[["Bedrag"]]]}]}
+        {
+          "request": "p1:table0",
+          "tables": [
+            {
+              "rows": [
+                [
+                  [
+                    "Omschrijving"
+                  ]
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "request": "p1:table0",
+          "tables": [
+            {
+              "rows": [
+                [
+                  [
+                    "Bedrag"
+                  ]
+                ]
+              ]
+            }
+          ]
+        }
       ],
-      "expect": {"applied": 0, "rejected": 1, "failed_check": "duplicate_response"}
+      "expect": {
+        "applied": 0,
+        "rejected": 1,
+        "failed_check": "duplicate_response"
+      }
     },
     {
       "name": "scan: a faithful transcription (with added list markers) is accepted and labelled",
-      "fixture": "scan", "category": "must_accept",
-      "responses": [{"request": "p1:page", "finish_reason": "stop",
-        "markdown": "# Declaratie reiskosten 2024\n\n1. Reiskosten 7.000,00 geen voorschot\n2. Hotel 5.100,00 per jaar\n3. Diner 1.250,00 vooraf betaald\n\n- Artikel I.3 is van toepassing"}],
-      "expect": {"applied": 1, "rejected": 0, "failed_check": null, "vision_transcribed": true}
+      "fixture": "scan",
+      "category": "must_accept",
+      "responses": [
+        {
+          "request": "p1:page",
+          "finish_reason": "stop",
+          "markdown": "# Declaratie reiskosten 2024\n\n1. Reiskosten 7.000,00 geen voorschot\n2. Hotel 5.100,00 per jaar\n3. Diner 1.250,00 vooraf betaald\n\n- Artikel I.3 is van toepassing"
+        }
+      ],
+      "expect": {
+        "applied": 1,
+        "rejected": 0,
+        "failed_check": null,
+        "vision_transcribed": true
+      }
     },
     {
       "name": "scan: 7.000,00 -> 70.000,0",
-      "fixture": "scan", "category": "must_reject",
-      "responses": [{"request": "p1:page",
-        "markdown": "Declaratie reiskosten 2024\nReiskosten 70.000,0 geen voorschot\nHotel 5.100,00 per jaar\nDiner 1.250,00 vooraf betaald\nArtikel I.3 is van toepassing"}],
-      "expect": {"applied": 0, "rejected": 1, "failed_check": "value_novel"}
+      "fixture": "scan",
+      "category": "must_reject",
+      "responses": [
+        {
+          "request": "p1:page",
+          "markdown": "Declaratie reiskosten 2024\nReiskosten 70.000,0 geen voorschot\nHotel 5.100,00 per jaar\nDiner 1.250,00 vooraf betaald\nArtikel I.3 is van toepassing"
+        }
+      ],
+      "expect": {
+        "applied": 0,
+        "rejected": 1,
+        "failed_check": "value_novel"
+      }
     },
     {
       "name": "scan: 5.100,00 -> 100",
-      "fixture": "scan", "category": "must_reject",
-      "responses": [{"request": "p1:page",
-        "markdown": "Declaratie reiskosten 2024\nReiskosten 7.000,00 geen voorschot\nHotel 100 per jaar\nDiner 1.250,00 vooraf betaald\nArtikel I.3 is van toepassing"}],
-      "expect": {"applied": 0, "rejected": 1, "failed_check": "digit_bag", "why": "3 of the 23 reference digits go missing (0.87 < 0.90) before the value check runs; the value 100 is also novel"}
+      "fixture": "scan",
+      "category": "must_reject",
+      "responses": [
+        {
+          "request": "p1:page",
+          "markdown": "Declaratie reiskosten 2024\nReiskosten 7.000,00 geen voorschot\nHotel 100 per jaar\nDiner 1.250,00 vooraf betaald\nArtikel I.3 is van toepassing"
+        }
+      ],
+      "expect": {
+        "applied": 0,
+        "rejected": 1,
+        "failed_check": "digit_bag",
+        "why": "3 of the 23 reference digits go missing (0.87 < 0.90) before the value check runs; the value 100 is also novel"
+      }
     },
     {
       "name": "scan: a dropped digit (1.250,00 -> 125,00)",
-      "fixture": "scan", "category": "must_reject",
-      "responses": [{"request": "p1:page",
-        "markdown": "Declaratie reiskosten 2024\nReiskosten 7.000,00 geen voorschot\nHotel 5.100,00 per jaar\nDiner 125,00 vooraf betaald\nArtikel I.3 is van toepassing"}],
-      "expect": {"applied": 0, "rejected": 1, "failed_check": "value_novel"}
+      "fixture": "scan",
+      "category": "must_reject",
+      "responses": [
+        {
+          "request": "p1:page",
+          "markdown": "Declaratie reiskosten 2024\nReiskosten 7.000,00 geen voorschot\nHotel 5.100,00 per jaar\nDiner 125,00 vooraf betaald\nArtikel I.3 is van toepassing"
+        }
+      ],
+      "expect": {
+        "applied": 0,
+        "rejected": 1,
+        "failed_check": "value_novel"
+      }
     },
     {
       "name": "scan: I.3 -> 1.3",
-      "fixture": "scan", "category": "must_reject",
-      "responses": [{"request": "p1:page",
-        "markdown": "Declaratie reiskosten 2024\nReiskosten 7.000,00 geen voorschot\nHotel 5.100,00 per jaar\nDiner 1.250,00 vooraf betaald\nArtikel 1.3 is van toepassing"}],
-      "expect": {"applied": 0, "rejected": 1, "failed_check": "digit_bag"}
+      "fixture": "scan",
+      "category": "must_reject",
+      "responses": [
+        {
+          "request": "p1:page",
+          "markdown": "Declaratie reiskosten 2024\nReiskosten 7.000,00 geen voorschot\nHotel 5.100,00 per jaar\nDiner 1.250,00 vooraf betaald\nArtikel 1.3 is van toepassing"
+        }
+      ],
+      "expect": {
+        "applied": 0,
+        "rejected": 1,
+        "failed_check": "digit_bag"
+      }
     },
     {
       "name": "scan: an empty place filled with an amount from another line",
-      "fixture": "scan", "category": "must_reject",
-      "responses": [{"request": "p1:page",
-        "markdown": "Declaratie reiskosten 2024\nReiskosten 7.000,00 geen voorschot\nHotel 5.100,00 per jaar 7.000,00\nDiner 1.250,00 vooraf betaald\nArtikel I.3 is van toepassing"}],
-      "expect": {"applied": 0, "rejected": 1, "failed_check": "digit_bag"}
+      "fixture": "scan",
+      "category": "must_reject",
+      "responses": [
+        {
+          "request": "p1:page",
+          "markdown": "Declaratie reiskosten 2024\nReiskosten 7.000,00 geen voorschot\nHotel 5.100,00 per jaar 7.000,00\nDiner 1.250,00 vooraf betaald\nArtikel I.3 is van toepassing"
+        }
+      ],
+      "expect": {
+        "applied": 0,
+        "rejected": 1,
+        "failed_check": "digit_bag"
+      }
     },
     {
       "name": "scan: a generation loop",
-      "fixture": "scan", "category": "must_reject",
-      "responses": [{"request": "p1:page",
-        "markdown": "Declaratie reiskosten 2024 geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen"}],
-      "expect": {"applied": 0, "rejected": 1, "failed_check": "repetition"}
+      "fixture": "scan",
+      "category": "must_reject",
+      "responses": [
+        {
+          "request": "p1:page",
+          "markdown": "Declaratie reiskosten 2024 geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen geen"
+        }
+      ],
+      "expect": {
+        "applied": 0,
+        "rejected": 1,
+        "failed_check": "repetition"
+      }
     },
     {
       "name": "scan: 'geen' moved to another line: NO bag can see a move",
-      "fixture": "scan", "category": "known_gap",
-      "responses": [{"request": "p1:page",
-        "markdown": "Declaratie reiskosten 2024\nReiskosten 7.000,00 voorschot\nHotel 5.100,00 geen per jaar\nDiner 1.250,00 vooraf betaald\nArtikel I.3 is van toepassing"}],
-      "expect": {"applied": 1, "rejected": 0, "failed_check": null, "vision_transcribed": true}
+      "fixture": "scan",
+      "category": "known_gap",
+      "responses": [
+        {
+          "request": "p1:page",
+          "markdown": "Declaratie reiskosten 2024\nReiskosten 7.000,00 voorschot\nHotel 5.100,00 geen per jaar\nDiner 1.250,00 vooraf betaald\nArtikel I.3 is van toepassing"
+        }
+      ],
+      "expect": {
+        "applied": 1,
+        "rejected": 0,
+        "failed_check": null,
+        "vision_transcribed": true
+      }
     },
     {
       "name": "region: an image region with no text layer is transcribed into its own unit",
-      "fixture": "region", "category": "must_accept",
-      "responses": [{"request": "p1:img0", "finish_reason": "stop", "markdown": "Formulier: naam, datum, handtekening"}],
-      "expect": {"applied": 1, "rejected": 0, "failed_check": null, "vision_transcribed": true}
+      "fixture": "region",
+      "category": "must_accept",
+      "responses": [
+        {
+          "request": "p1:img0",
+          "finish_reason": "stop",
+          "markdown": "Formulier: naam, datum, handtekening"
+        }
+      ],
+      "expect": {
+        "applied": 1,
+        "rejected": 0,
+        "failed_check": null,
+        "vision_transcribed": true
+      }
     }
   ]
 }

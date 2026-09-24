@@ -167,6 +167,11 @@ pub struct PdfOptions {
     /// Include each page's `pdftotext -layout`-style text in `pages[]`.
     #[serde(default)]
     pub layout_text: bool,
+    /// `pdf_prepare` also asks the model about tables the deterministic
+    /// path accepted (review mode; the two grids then compete in assemble).
+    /// Off by default: only uncertain regions cost a model call.
+    #[serde(default)]
+    pub model_tables: bool,
 }
 
 /// The evidence behind one page's route (ADR-0017 decision 2). Shares are in

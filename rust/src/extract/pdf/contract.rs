@@ -53,6 +53,8 @@ struct Base {
     unit_words: Vec<Vec<String>>,
     /// Per page: words (with the furniture flag), in ID order.
     words: Vec<Vec<(PdfWord, bool)>>,
+    /// Per page: (accepted table boxes, uncertain table regions).
+    regions: Vec<build::TableRegions>,
 }
 
 fn base(bytes: &[u8], opts: &PdfOptions) -> Result<Base, String> {
@@ -61,6 +63,7 @@ fn base(bytes: &[u8], opts: &PdfOptions) -> Result<Base, String> {
     let words = (0..raw.pages.len())
         .map(|p| st.page_words(&raw, p))
         .collect();
+    let regions = st.table_regions();
     let plan = headings::plan(st.hblocks(), st.body_size, &raw.outline, raw.pages.len());
     let (out, unit_words) = build::emit(&raw, opts, st, plan);
     Ok(Base {
@@ -68,31 +71,8 @@ fn base(bytes: &[u8], opts: &PdfOptions) -> Result<Base, String> {
         out,
         unit_words,
         words,
+        regions,
     })
-}
-
-fn ruled_box(paths: &[[f64; 4]]) -> Option<[f64; 4]> {
-    let lines: Vec<&[f64; 4]> = paths
-        .iter()
-        .filter(|p| {
-            (p[3] - p[1] <= 2.0 && p[2] - p[0] >= 15.0)
-                || (p[2] - p[0] <= 2.0 && p[3] - p[1] >= 15.0)
-        })
-        .collect();
-    let h = lines.iter().filter(|p| p[3] - p[1] <= 2.0).count();
-    if h < 2 || lines.len() - h < 2 {
-        return None;
-    }
-    let mut b = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
-    for p in lines {
-        b = [
-            b[0].min(p[0]),
-            b[1].min(p[1]),
-            b[2].max(p[2]),
-            b[3].max(p[3]),
-        ];
-    }
-    Some(b)
 }
 
 fn inside(b: &[f64; 4], region: &[f64; 4]) -> bool {
@@ -110,74 +90,89 @@ fn request_key(r: &PdfRequest) -> (u32, PdfRequestKind, usize) {
     (r.page, r.kind, idx)
 }
 
-fn requests(b: &Base) -> Vec<PdfRequest> {
+/// Words within this margin (points) of a table region are listed too, so a
+/// grid may include a border word the region box clipped.
+pub const REGION_MARGIN: f64 = 12.0;
+
+fn words_in(b: &Base, p: usize, region: &[f64; 4]) -> Vec<PdfWord> {
+    let r = [
+        region[0] - REGION_MARGIN,
+        region[1] - REGION_MARGIN,
+        region[2] + REGION_MARGIN,
+        region[3] + REGION_MARGIN,
+    ];
+    b.words[p]
+        .iter()
+        .filter(|(w, furn)| !furn && inside(&w.bbox, &r))
+        .map(|(w, _)| w.clone())
+        .collect()
+}
+
+fn requests(b: &Base, opts: &PdfOptions) -> Vec<PdfRequest> {
     let mut out = Vec::new();
     for (p, info) in b.out.pages.iter().enumerate() {
         let page = &b.raw.pages[p];
         let pg = info.page;
         let page_box = [0.0, 0.0, page.width, page.height];
-        match info.route {
-            Route::Table if info.signals.text_sound => {
-                let words: Vec<PdfWord> = b.words[p]
-                    .iter()
-                    .filter(|(_, f)| !f)
-                    .map(|(w, _)| w.clone())
-                    .collect();
-                if words.is_empty() {
-                    continue;
-                }
-                let bbox = ruled_box(&page.paths).unwrap_or_else(|| {
-                    let mut bb = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
-                    for w in &words {
-                        bb = [
-                            bb[0].min(w.bbox[0]),
-                            bb[1].min(w.bbox[1]),
-                            bb[2].max(w.bbox[2]),
-                            bb[3].max(w.bbox[3]),
-                        ];
-                    }
-                    bb
-                });
-                out.push(PdfRequest {
-                    id: format!("p{pg}:table"),
-                    page: pg,
-                    kind: PdfRequestKind::TableStructure,
-                    prompt: "table_structure".into(),
-                    bbox: bbox.map(r2),
-                    words,
-                });
-            }
-            Route::Scan => out.push(PdfRequest {
+        if info.route == Route::Scan {
+            out.push(PdfRequest {
                 id: format!("p{pg}:page"),
                 page: pg,
                 kind: PdfRequestKind::VisionPage,
                 prompt: "vision_page".into(),
                 bbox: page_box,
                 words: vec![],
-            }),
-            _ => {
-                let images = b
-                    .out
-                    .units
-                    .iter()
-                    .filter(|u| u.page == Some(pg) && u.kind == UnitKind::Image);
-                for (k, u) in images.enumerate() {
-                    let region = u.bbox.unwrap_or(page_box);
-                    let n = b.words[p]
-                        .iter()
-                        .filter(|(w, _)| inside(&w.bbox, &region))
-                        .count();
-                    if n < REGION_MAX_WORDS {
-                        out.push(PdfRequest {
-                            id: format!("p{pg}:img{k}"),
-                            page: pg,
-                            kind: PdfRequestKind::VisionRegion,
-                            prompt: "vision_region".into(),
-                            bbox: region,
-                            words: vec![],
-                        });
-                    }
+            });
+            continue;
+        }
+        // Table regions: every uncertain candidate, and every accepted table
+        // when the host asked for model review (`model_tables`). A page the
+        // router calls `table` where the deterministic path found no
+        // candidate asks nothing: its evidence was a box or a rejected
+        // (prose / TOC / key-value) layout, and a page-wide request costs
+        // ~260 words for no table (measured on Lex5).
+        if info.signals.text_sound {
+            let (accepted, uncertain) = &b.regions[p];
+            let mut regions: Vec<[f64; 4]> = uncertain.clone();
+            if opts.model_tables {
+                regions.extend(accepted.iter().copied());
+            }
+            regions.sort_by(|a, c| a[1].total_cmp(&c[1]).then(a[0].total_cmp(&c[0])));
+            for (k, region) in regions.iter().enumerate() {
+                let words = words_in(b, p, region);
+                if words.is_empty() {
+                    continue;
                 }
+                out.push(PdfRequest {
+                    id: format!("p{pg}:table{k}"),
+                    page: pg,
+                    kind: PdfRequestKind::TableStructure,
+                    prompt: "table_structure".into(),
+                    bbox: region.map(r2),
+                    words,
+                });
+            }
+        }
+        let images = b
+            .out
+            .units
+            .iter()
+            .filter(|u| u.page == Some(pg) && u.kind == UnitKind::Image);
+        for (k, u) in images.enumerate() {
+            let region = u.bbox.unwrap_or(page_box);
+            let n = b.words[p]
+                .iter()
+                .filter(|(w, _)| inside(&w.bbox, &region))
+                .count();
+            if n < REGION_MAX_WORDS {
+                out.push(PdfRequest {
+                    id: format!("p{pg}:img{k}"),
+                    page: pg,
+                    kind: PdfRequestKind::VisionRegion,
+                    prompt: "vision_region".into(),
+                    bbox: region,
+                    words: vec![],
+                });
             }
         }
     }
@@ -188,7 +183,7 @@ fn requests(b: &Base) -> Vec<PdfRequest> {
 /// `pdf_prepare`: the base output plus the model requests.
 pub fn pdf_prepare(bytes: &[u8], opts: &PdfOptions) -> Result<PdfPrepared, String> {
     let b = base(bytes, opts)?;
-    let requests = requests(&b);
+    let requests = requests(&b, opts);
     Ok(PdfPrepared {
         units: b.out.units,
         pages: b.out.pages,
@@ -277,6 +272,8 @@ struct Edit {
     insert: Vec<(usize, DocUnit, Vec<String>)>,
     /// In-place markdown fills: (unit index, markdown).
     fill: Vec<(usize, String)>,
+    /// Kept deterministic tables a disagreeing model grid made uncertain.
+    uncertain: Vec<usize>,
 }
 
 fn apply_table(
@@ -341,8 +338,7 @@ fn apply_table(
         grids.push((cells, placement, ids));
     }
     let page_units = on_page(units, req.page);
-    let mut remove = BTreeSet::new();
-    let mut first: Vec<Option<usize>> = vec![None; grids.len()];
+    let mut touched: Vec<Vec<usize>> = vec![Vec::new(); grids.len()];
     for &i in &page_units {
         let w: BTreeSet<&String> = unit_words[i].iter().collect();
         let hit = w.iter().filter(|x| all.contains(**x)).count();
@@ -352,17 +348,54 @@ fn apply_table(
         if hit != w.len() {
             return Err(Failure::PartialUnit);
         }
-        remove.insert(i);
         for (g, (_, _, ids)) in grids.iter().enumerate() {
-            if w.iter().any(|x| ids.contains(*x)) && first[g].is_none() {
-                first[g] = Some(i);
+            if w.iter().any(|x| ids.contains(*x)) {
+                touched[g].push(i);
             }
         }
     }
     let route = b.out.pages[p].route;
     let end = page_units.last().map(|&i| i + 1).unwrap_or(units.len());
     let mut insert = Vec::new();
+    let mut remove = BTreeSet::new();
+    let mut marks = Vec::new();
     for (g, (cells, placement, ids)) in grids.into_iter().enumerate() {
+        let md = table_markdown(&cells, &placement, &order);
+        // A deterministic table under this grid: the two compete (GriTS +
+        // the position check both already passed), never "more rows wins".
+        let rivals: Vec<usize> = touched[g]
+            .iter()
+            .copied()
+            .filter(|&i| {
+                units[i].kind == UnitKind::Table
+                    && units[i].provenance.table_source != Some(TableSource::ModelGrid)
+            })
+            .collect();
+        let mut uncertain = false;
+        let mut keep_det = false;
+        for &d in &rivals {
+            let src = units[d]
+                .provenance
+                .table_source
+                .unwrap_or(TableSource::Tracks);
+            let (det_wins, disagree) = super::tables::choose(
+                src,
+                &checks::pipe_grid(&units[d].markdown),
+                TableSource::ModelGrid,
+                &checks::pipe_grid(&md),
+            );
+            uncertain |= disagree;
+            if det_wins {
+                keep_det = true;
+                if disagree {
+                    marks.push(d);
+                }
+            }
+        }
+        if keep_det {
+            continue; // the deterministic grid stays; the model grid is dropped
+        }
+        remove.extend(touched[g].iter().copied());
         let mut bb = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
         for id in &ids {
             let w = boxes[id];
@@ -375,22 +408,24 @@ fn apply_table(
         }
         let mut prov = Provenance::new(route);
         prov.table_source = Some(TableSource::ModelGrid);
+        prov.table_uncertain = uncertain;
         let unit = DocUnit {
             page: Some(req.page),
             bbox: Some(bb),
             kind: UnitKind::Table,
             level: None,
-            markdown: table_markdown(&cells, &placement, &order),
+            markdown: md,
             provenance: prov,
         };
         let mut words: Vec<String> = ids.into_iter().collect();
         words.sort_by_key(|w| order.get(w.as_str()).map(|x| x.0));
-        insert.push((first[g].unwrap_or(end), unit, words));
+        insert.push((touched[g].first().copied().unwrap_or(end), unit, words));
     }
     Ok(Edit {
         remove,
         insert,
         fill: vec![],
+        uncertain: marks,
     })
 }
 
@@ -433,6 +468,7 @@ fn apply_vision_page(
             remove,
             insert: vec![],
             fill: vec![(i, md)],
+            uncertain: vec![],
         }),
         None => {
             let at = text_units
@@ -454,6 +490,7 @@ fn apply_vision_page(
                 remove,
                 insert: vec![(at, unit, vec![])],
                 fill: vec![],
+                uncertain: vec![],
             })
         }
     }
@@ -481,10 +518,14 @@ fn apply_vision_region(
         remove: BTreeSet::new(),
         insert: vec![],
         fill: vec![(i, md.trim().to_string())],
+        uncertain: vec![],
     })
 }
 
 fn commit(units: &mut Vec<DocUnit>, unit_words: &mut Vec<Vec<String>>, edit: Edit) {
+    for &i in &edit.uncertain {
+        units[i].provenance.table_uncertain = true;
+    }
     for (i, md) in edit.fill {
         units[i].markdown = md;
         units[i].provenance.vision_transcribed = true;
@@ -517,9 +558,14 @@ fn commit(units: &mut Vec<DocUnit>, unit_words: &mut Vec<Vec<String>>, edit: Edi
     *unit_words = out_w;
 }
 
-fn mark_failed(units: &mut [DocUnit], req: &PdfRequest, f: Failure) {
+fn mark_failed(units: &mut [DocUnit], unit_words: &[Vec<String>], req: &PdfRequest, f: Failure) {
+    let req_words: BTreeSet<&str> = req.words.iter().map(|w| w.id.as_str()).collect();
     let targets: Vec<usize> = match req.kind {
         PdfRequestKind::VisionRegion => region_unit(units, req).into_iter().collect(),
+        // a table request: exactly the units whose words it listed
+        PdfRequestKind::TableStructure => (0..units.len())
+            .filter(|&i| unit_words[i].iter().any(|w| req_words.contains(w.as_str())))
+            .collect(),
         _ => on_page(units, req.page)
             .into_iter()
             .filter(|&i| !matches!(units[i].kind, UnitKind::Furniture | UnitKind::Image))
@@ -542,7 +588,7 @@ pub fn pdf_assemble(
     if responses.is_empty() {
         return Ok(b.out);
     }
-    let reqs = requests(&b);
+    let reqs = requests(&b, opts);
     let mut by_id: BTreeMap<&str, Vec<&PdfResponse>> = BTreeMap::new();
     for r in responses {
         by_id.entry(r.request_id.as_str()).or_default().push(r);
@@ -570,7 +616,7 @@ pub fn pdf_assemble(
                 applied += 1;
             }
             Err(f) => {
-                mark_failed(&mut units, req, f);
+                mark_failed(&mut units, &unit_words, req, f);
                 rejected += 1;
             }
         }

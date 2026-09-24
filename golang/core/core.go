@@ -217,12 +217,17 @@ func (s *Store) Close() {
 	}
 }
 
-// PdfOptions configures PdfUnits. Language ("nl", "en", …) drives the hyphen
-// rules; LayoutText adds each page's pdftotext -layout-style text to
-// PdfResult.Pages.
+// PdfOptions configures the PDF calls. Language ("nl", "en", …) drives the
+// hyphen rules and number reading; LayoutText adds each page's
+// pdftotext -layout-style text to PdfResult.Pages.
 type PdfOptions struct {
 	Language   string `json:"language,omitempty"`
 	LayoutText bool   `json:"layout_text,omitempty"`
+	// ModelTables makes PdfPrepare also request a model grid for tables the
+	// deterministic path already accepted (review mode); assemble then lets
+	// the two grids compete (GriTS + position check). Off by default: only
+	// uncertain table regions cost a model call.
+	ModelTables bool `json:"model_tables,omitempty"`
 }
 
 // PdfUnit and PdfProvenance are the PDF names for the one shared unit shape
