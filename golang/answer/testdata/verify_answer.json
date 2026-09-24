@@ -4194,6 +4194,112 @@
           }
         ]
       }
+    },
+    {
+      "name": "reason/model-refused-when-another-unit-passed-every-guard",
+      "answer": "De vergoeding is € 30 per maand [eu:a, eu:b].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.99,
+          0.0
+        ],
+        "b": [
+          0.42,
+          0.03
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De vergoeding is € 25 per maand."
+        },
+        {
+          "id": "b",
+          "document_id": "b",
+          "language": "nl",
+          "text": "Werknemers krijgen maandelijks € 30 als vergoeding voor thuiswerken."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "not supported by the cited evidence (model: best entailment 0.420, contradiction 0.030 on b)"
+          }
+        ]
+      }
+    },
+    {
+      "name": "reason/a-guard-is-named-when-every-cited-unit-failed-one",
+      "answer": "De vergoeding is € 30 per maand [eu:a, eu:b].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.99,
+          0.0
+        ],
+        "b": [
+          0.99,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De vergoeding is € 25 per maand."
+        },
+        {
+          "id": "b",
+          "document_id": "b",
+          "language": "nl",
+          "text": "De vergoeding is € 35 per maand."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard: 30 is not in the passage"
+          }
+        ]
+      }
+    },
+    {
+      "name": "reason/without-a-checker-a-unit-that-only-missed-the-gate-means-not-supported",
+      "answer": "Je mag thuiswerken [eu:a, eu:b].",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Je mag thuiswerken met toestemming van je leidinggevende."
+        },
+        {
+          "id": "b",
+          "document_id": "b",
+          "language": "nl",
+          "text": "Thuiswerken is geregeld in de thuiswerkregeling."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "not supported by the cited evidence"
+          }
+        ]
+      }
     }
   ]
 }

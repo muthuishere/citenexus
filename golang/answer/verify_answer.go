@@ -61,6 +61,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 	"unicode"
 
@@ -693,6 +694,12 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 		// 1. The deterministic gate. Cited: every cited unit that passes supports
 		// it. Uncited: the first (most authoritative) unit that passes.
 		gateReason := ""
+		reasonUnits := candidates // whose outcomes decide the refusal reason (F0)
+		// Per cited unit: the first guard that refused it, or the checker's
+		// scores when the model decided (F0: an honest reason, below).
+		guardOf := map[string]string{}
+		scoredOf := map[string]scores{}
+		scoredOrder := []string{}
 		for _, eu := range candidates {
 			if gate.IsSupportedV2(text, eu.Text) {
 				reason := clauseNegationGuard(text, eu.Text)
@@ -710,6 +717,9 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 				if reason != "" {
 					if gateReason == "" {
 						gateReason = reason // the FIRST cited unit refused, not the last
+					}
+					if _, seen := guardOf[eu.ID]; !seen {
+						guardOf[eu.ID] = reason
 					}
 					continue
 				}
@@ -752,12 +762,19 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 					if guardReason == "" {
 						guardReason = reason // the FIRST cited unit refused, not the last
 					}
+					if _, seen := guardOf[eu.ID]; !seen {
+						guardOf[eu.ID] = reason
+					}
 					return false, nil
 				}
 				s, err := check(text, eu)
 				if err != nil {
 					return false, err
 				}
+				if _, seen := scoredOf[eu.ID]; !seen {
+					scoredOrder = append(scoredOrder, eu.ID)
+				}
+				scoredOf[eu.ID] = s
 				return s.entailed >= entailAt && s.contradicted < contradictAt, nil
 			}
 
@@ -813,6 +830,7 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 			// other part's facts, and the guards refuse a true item for the
 			// lead-in's article number. See unionRefusal for what it takes.
 			unionReason := ""
+			unionPairs, unionScored := 0, map[string]scores{}
 			if !v.supported && pc.lead != "" && len(pc.itemCited) > 0 {
 				lead, item := stripMarkup(pc.lead), stripMarkup(pc.item)
 				inItem, inLead := map[string]bool{}, map[string]bool{}
@@ -834,6 +852,7 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 						if !inLead[a.ID] || !allowed(a) {
 							continue
 						}
+						unionPairs++
 						reason := unionRefusal(text, lead, item, declared, a, b, cfg)
 						if reason == "" {
 							// The checker may veto from either unit, and must entail the
@@ -842,6 +861,9 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 								s, err := check(text, p)
 								if err != nil {
 									return result.Result{}, err
+								}
+								if p.ID == unionPremise(a, b).ID {
+									unionScored[a.ID+"+"+b.ID] = s
 								}
 								switch {
 								case s.contradicted >= contradictAt:
@@ -867,12 +889,57 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 					v.supported, v.verifiedBy, v.reason = true, modelLabel, ""
 				}
 			}
+			if !v.supported && unionReason == ReasonContradicted {
+				v.reason = ReasonContradicted
+			}
+			// A joined claim checked as a union is decided by its pairs, not by
+			// its units one at a time: every pair refused by a guard names the
+			// guard; a pair the checker scored makes it the model's refusal.
+			if !v.supported && unionPairs > 0 && v.reason != ReasonContradicted {
+				guardOf, scoredOf, scoredOrder = map[string]string{}, map[string]scores{}, nil
+				reasonUnits = []EvidenceUnit{{ID: "union"}}
+				if len(unionScored) == 0 {
+					guardOf["union"] = unionReason
+				} else {
+					for label, sc := range unionScored {
+						scoredOf[label] = sc
+						scoredOrder = append(scoredOrder, label)
+					}
+					sort.Strings(scoredOrder)
+				}
+			}
+		}
+
+		// F0 — an honest reason. A guard is named only when EVERY cited unit
+		// failed a guard; when any unit reached the checker and it would not
+		// admit, the claim was refused by the MODEL, and the reason says so
+		// with the best unit's scores. rag_go measured 932 of 1,354 "guard"
+		// refusals (69%) where another cited unit passed every guard and the
+		// model refused. Reporting only: nothing is admitted or refused here.
+		if !v.supported && v.reason != ReasonContradicted && len(reasonUnits) > 0 {
+			allGuarded := true
+			for _, eu := range reasonUnits {
+				if _, ok := guardOf[eu.ID]; !ok {
+					allGuarded = false
+					break
+				}
+			}
 			switch {
-			case v.supported:
-			case unionReason != "":
-				v.reason = unionReason
-			case guardReason != "":
-				v.reason = guardReason
+			case allGuarded:
+				v.reason = guardOf[reasonUnits[0].ID] // the first cited unit's guard
+			case len(scoredOf) > 0:
+				best := scoredOrder[0]
+				for _, id := range scoredOrder[1:] {
+					b, s := scoredOf[best], scoredOf[id]
+					if s.entailed > b.entailed || (s.entailed == b.entailed && s.contradicted < b.contradicted) {
+						best = id
+					}
+				}
+				bs := scoredOf[best]
+				v.reason = fmt.Sprintf("%s (model: best entailment %.3f, contradiction %.3f on %s)",
+					ReasonNotSupported, bs.entailed, bs.contradicted, best)
+			default:
+				v.reason = ReasonNotSupported
 			}
 		}
 
