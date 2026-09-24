@@ -3693,6 +3693,124 @@
           }
         ]
       }
+    },
+    {
+      "name": "qualifier/adv-nc-v2-11 gross over netto across languages (rag_go adv_v2, fictional)",
+      "answer": "The personal contribution for the lease car is €150 gross per month [eu:S1]. Lawyers from senior associate level are eligible for a lease car with a list price of up to €45,000 [eu:S1].",
+      "answer_language": "en",
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "arbeidsvoorwaarden Maasoever Advocaten",
+          "language": "nl",
+          "text": "Leaseauto. Advocaten vanaf senior associate komen in aanmerking voor een leaseauto met een cataloguswaarde van ten hoogste € 45.000. De eigen bijdrage bedraagt € 150 netto per maand. Het contract heeft een looptijd van vier jaar."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "qualifier guard"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      },
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "qualifier/net-over-netto-across-languages-is-admitted",
+      "answer": "The personal contribution for the lease car is €150 net per month [eu:S1].",
+      "answer_language": "en",
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "arbeidsvoorwaarden Maasoever Advocaten",
+          "language": "nl",
+          "text": "Leaseauto. Advocaten vanaf senior associate komen in aanmerking voor een leaseauto met een cataloguswaarde van ten hoogste € 45.000. De eigen bijdrage bedraagt € 150 netto per maand. Het contract heeft een looptijd van vier jaar."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      },
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      }
+    },
+    {
+      "name": "qualifier/permanent-over-tijdelijk-at-the-same-number",
+      "answer": "Employees on a permanent contract receive 8% holiday pay [eu:S1].",
+      "answer_language": "en",
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "cao",
+          "language": "nl",
+          "text": "Vakantietoeslag. Medewerkers met een tijdelijk contract ontvangen 8% vakantietoeslag over het brutosalaris."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "qualifier guard"
+          }
+        ]
+      },
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "qualifier/temporary-over-tijdelijk-is-admitted",
+      "answer": "Employees on a temporary contract receive 8% holiday pay [eu:S1].",
+      "answer_language": "en",
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "cao",
+          "language": "nl",
+          "text": "Vakantietoeslag. Medewerkers met een tijdelijk contract ontvangen 8% vakantietoeslag over het brutosalaris."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      },
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      }
     }
   ]
 }

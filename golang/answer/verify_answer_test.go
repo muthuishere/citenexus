@@ -424,3 +424,20 @@ func TestRoleGuardLexiconReplacesTheDefault(t *testing.T) {
 		t.Fatalf("empty lexicon: the role guard is off, the gate admits: %+v", res.Claims)
 	}
 }
+
+// Host qualifier pairs extend (append) or replace the default; empty turns the
+// number-bound comparison off.
+func TestQualifierPairsAreHostExtensible(t *testing.T) {
+	ev := []EvidenceUnit{{ID: "a", DocumentID: "a", Language: "nl", Text: "De daluren-toeslag bedraagt 15% tijdens de daluren."}}
+	answer := "The peak-hours supplement is 15% [eu:a]."
+	chk := &fakeChecker{scores: map[string][2]float64{ev[0].Text: {0.999, 0}}}
+	base := VerifyOptions{AnswerLanguage: "en", Checker: chk, CheckerName: "fake"}
+	if res := verify(t, answer, ev, base); !res.Claims[0].Supported {
+		t.Fatalf("no pair for peak/off-peak by default: the checker decides: %+v", res.Claims)
+	}
+	withPair := base
+	withPair.QualifierPairs = append(append([]QualifierPair{}, DefaultQualifierPairs...), QualifierPair{A: []string{"peak-hours", "spits"}, B: []string{"daluren", "off-peak"}})
+	if res := verify(t, answer, ev, withPair); res.Claims[0].Supported {
+		t.Fatalf("a host pair must refuse peak over daluren: %+v", res.Claims)
+	}
+}
