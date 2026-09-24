@@ -1519,6 +1519,179 @@
           }
         ]
       }
+    },
+    {
+      "name": "list/exclusive-lead-in-admits-a-subset-of-the-list",
+      "answer": "De werkgever mag alleen de volgende gegevens vragen:\n- naam [eu:a]\n- adres [eu:a]",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werkgever mag alleen de volgende gegevens vragen: naam, adres, geboortedatum, BSN, IBAN en telefoonnummer."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          },
+          {
+            "supported": true,
+            "reason": ""
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "list/exclusive-lead-in-refuses-an-item-not-in-the-list",
+      "must_refuse": true,
+      "answer": "De werkgever mag alleen de volgende gegevens vragen:\n- naam [eu:a]\n- e-mailadres [eu:a]",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werkgever mag alleen de volgende gegevens vragen: naam, adres, geboortedatum, BSN, IBAN en telefoonnummer."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          },
+          {
+            "supported": true,
+            "reason": ""
+          },
+          {
+            "supported": false,
+            "reason": "not supported"
+          }
+        ]
+      }
+    },
+    {
+      "name": "list/counted-lead-in-admits-one-member",
+      "answer": "Je kunt op drie manieren melden:\n- via HR [eu:a]",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Je kunt op drie manieren melden: via de leidinggevende, via HR of via de vertrouwenspersoon."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "list/counted-lead-in-with-a-wrong-count-refuses",
+      "must_refuse": true,
+      "answer": "Je kunt op twee manieren melden:\n- via HR [eu:a]",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Je kunt op drie manieren melden: via de leidinggevende, via HR of via de vertrouwenspersoon."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "not supported"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "number/model-path-count-word-swap-refuses",
+      "must_refuse": true,
+      "answer": "Je kunt op twee manieren melden [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Je kunt op drie manieren melden: via de leidinggevende, via HR of via de vertrouwenspersoon."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "number/model-path-count-word-without-a-conflicting-count-admits",
+      "answer": "Er zijn twee manieren om het te melden [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Je meldt het via de leidinggevende of via HR."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
     }
   ]
 }

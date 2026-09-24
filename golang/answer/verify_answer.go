@@ -238,6 +238,15 @@ var (
 //   - such a lead-in is not a claim of its own; its citations and facets pass
 //     to each item;
 //   - an item with no lead-in is verified with its marker removed.
+//
+// A lead-in that is EXCLUSIVE or COUNTED ("mag alleen de volgende gegevens
+// vragen:", "op drie manieren melden:") is the exception: joined to one item it
+// says something the source does not ("mag alleen … vragen: naam" when the
+// source lists six; "drie manieren: via HR"). So such a lead-in IS verified as a
+// claim of its own, carrying its items' citations, which is where a wrong count
+// is refused, and each item is joined to the lead-in with the exclusivity word
+// and the count removed ("De werkgever mag de volgende gegevens vragen naam").
+// The answer may list a subset; each item must still be in the source.
 func joinListItems(claims []citedClaim) []citedClaim {
 	merged := make([]citedClaim, 0, len(claims))
 	for i := 0; i < len(claims); i++ {
@@ -255,16 +264,24 @@ func joinListItems(claims []citedClaim) []citedClaim {
 
 	out := make([]citedClaim, 0, len(merged))
 	var leadIn *citedClaim
+	joinText := ""
+	ownClaim := -1 // index in out of a verified exclusive/counted lead-in
 	for i := range merged {
 		c := merged[i]
 		loc := listItemPrefix.FindStringIndex(c.text)
 		if loc == nil {
-			leadIn = nil
+			leadIn, ownClaim = nil, -1
 			if strings.HasSuffix(strings.TrimSpace(c.text), ":") && i+1 < len(merged) &&
 				listItemPrefix.MatchString(merged[i+1].text) {
 				lead := c
 				leadIn = &lead
-				continue // structural: carried into its items, not a claim of its own
+				stripped, marked := stripListQualifiers(strings.TrimSuffix(strings.TrimSpace(c.text), ":"))
+				joinText = stripped
+				if marked {
+					ownClaim = len(out)
+					out = append(out, c)
+				}
+				continue // otherwise structural: carried into its items only
 			}
 			out = append(out, c)
 			continue
@@ -275,12 +292,81 @@ func joinListItems(claims []citedClaim) []citedClaim {
 			out = append(out, c)
 			continue
 		}
-		c.text = strings.TrimSuffix(strings.TrimSpace(leadIn.text), ":") + " " + lowerFirst(item)
+		c.text = joinText + " " + lowerFirst(item)
 		c.cited = appendUnique(append([]string{}, c.cited...), leadIn.cited...)
 		c.facets = appendUnique(append([]string{}, c.facets...), leadIn.facets...)
+		if ownClaim >= 0 {
+			out[ownClaim].cited = appendUnique(out[ownClaim].cited, c.cited...)
+			out[ownClaim].facets = appendUnique(out[ownClaim].facets, c.facets...)
+		}
 		out = append(out, c)
 	}
 	return out
+}
+
+// listExclusives make a lead-in exclusive: "mag alleen de volgende …".
+var listExclusives = map[string]struct{}{
+	"alleen": {}, "uitsluitend": {}, "enkel": {}, "slechts": {},
+	"only": {}, "solely": {}, "exclusively": {},
+}
+
+// listReferenceNouns precede a number that names a provision, not a count:
+// "volgens artikel 7 geldt:".
+var listReferenceNouns = map[string]struct{}{
+	"artikel": {}, "art": {}, "lid": {}, "hoofdstuk": {}, "paragraaf": {}, "bijlage": {},
+	"article": {}, "section": {}, "chapter": {}, "paragraph": {}, "annex": {}, "clause": {},
+}
+
+var listLeadToken = regexp.MustCompile(`\S+`)
+
+// stripListQualifiers removes a lead-in's exclusivity words and item count, and
+// reports whether it removed anything. A count is a cardinal 2–12 (a word or
+// digits) that is not a period ("binnen 2 weken:") and does not name a
+// provision ("artikel 7"). "een"/"one" are never a count: they are also the
+// article.
+func stripListQualifiers(lead string) (string, bool) {
+	words := listLeadToken.FindAllString(lead, -1)
+	kept := make([]string, 0, len(words))
+	marked := false
+	for i, w := range words {
+		bare := strings.ToLower(strings.Trim(w, ",;()\"'"))
+		if _, ok := listExclusives[bare]; ok {
+			marked = true
+			continue
+		}
+		if isListCount(bare, words, i) {
+			marked = true
+			continue
+		}
+		kept = append(kept, w)
+	}
+	return strings.Join(kept, " "), marked
+}
+
+func isListCount(bare string, words []string, i int) bool {
+	value, ok := numberWords[bare]
+	if !ok && bare != "" && bare[0] >= '0' && bare[0] <= '9' {
+		value, ok = bare, true
+	}
+	if !ok {
+		return false
+	}
+	switch value {
+	case "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12":
+	default:
+		return false
+	}
+	if i > 0 {
+		if _, ref := listReferenceNouns[strings.ToLower(strings.Trim(words[i-1], ".,;()"))]; ref {
+			return false
+		}
+	}
+	if i+1 < len(words) {
+		if _, _, unit := unitOf(strings.ToLower(strings.Trim(words[i+1], ".,;()"))); unit {
+			return false
+		}
+	}
+	return true
 }
 
 // lowerFirst lowercases an item's first letter when joined mid-sentence —

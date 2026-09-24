@@ -55,7 +55,85 @@ func numberGuard(claim, claimLanguage, passage, passageLanguage string) string {
 			return fmt.Sprintf("number guard: %s is not in the passage", strings.TrimPrefix(strings.TrimPrefix(key, "ord:"), "?"))
 		}
 	}
+	// A spelled-out COUNT in the claim is refused only against a CONFLICTING
+	// count: the passage puts a different number before the same noun ("op
+	// twee manieren" over "op drie manieren"). Reading every claim number word
+	// as a number to find refused 31 of 1,626 true claims in rag_go's data
+	// ("two options" over a passage listing both; Dutch "ten minste") and caught
+	// no leak. A number word before a time unit is a period — the unit guard's.
+	if reason := countConflict(claim, passage, passageLanguage); reason != "" {
+		return reason
+	}
 	return ""
+}
+
+// countConflict: a number word in the claim, followed by a noun, where the
+// passage counts that same noun only with other values. "een"/"one" are never a
+// count (article, pronoun); a following time unit makes it a period.
+func countConflict(claim, passage, passageLanguage string) string {
+	words := unitScan.FindAllString(strings.ToLower(claim), -1)
+	ptoks := unitScan.FindAllString(strings.ToLower(passage), -1)
+	for i, word := range words {
+		value, ok := numberWords[word]
+		if !ok || word == "een" || word == "one" || i+1 >= len(words) {
+			continue
+		}
+		noun := words[i+1]
+		if _, function := countFunctionWords[noun]; function {
+			continue // "één voor één", "two of the …": not a counted noun
+		}
+		if _, _, period := unitOf(noun); period {
+			continue
+		}
+		if _, isNumber := numberValue(noun, passageLanguage); isNumber {
+			continue
+		}
+		// An inflected adjective ("drie opvolgende maanden") is not the thing
+		// counted: compare adjective and noun together.
+		span := []string{noun}
+		if strings.HasSuffix(noun, "e") && i+2 < len(words) {
+			span = append(span, words[i+2])
+		}
+		var others []string
+		agrees := false
+		for k := 0; k+len(span) < len(ptoks); k++ {
+			if !equalTokens(ptoks[k+1:k+1+len(span)], span) || ptoks[k] == "een" || ptoks[k] == "one" {
+				continue
+			}
+			pv, isNumber := numberValue(ptoks[k], passageLanguage)
+			if !isNumber {
+				continue
+			}
+			if pv == value {
+				agrees = true
+			} else {
+				others = append(others, ptoks[k])
+			}
+		}
+		if !agrees && len(others) > 0 {
+			return fmt.Sprintf("number guard: %s %s, the passage says %s %s", word, noun, others[0], noun)
+		}
+	}
+	return ""
+}
+
+// countFunctionWords follow a number without being what it counts.
+var countFunctionWords = map[string]struct{}{
+	"voor": {}, "na": {}, "van": {}, "op": {}, "in": {}, "of": {}, "en": {}, "per": {},
+	"uit": {}, "bij": {}, "tot": {}, "met": {}, "aan": {}, "keer": {},
+	"for": {}, "the": {}, "and": {}, "or": {}, "to": {}, "times": {}, "at": {}, "by": {},
+}
+
+func equalTokens(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // ordinalSuffixes follow a digit to make it an ordinal: 1st, 2nd, 3rd, 4th,
