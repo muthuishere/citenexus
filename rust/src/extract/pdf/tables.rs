@@ -1098,7 +1098,8 @@ fn priority(s: TableSource) -> u8 {
 }
 
 /// Decide between two candidate grids for one region, both of which passed
-/// the geometry gate. Returns (a wins?, uncertain).
+/// the geometry gate; `a` is the incumbent (deterministic) grid. Returns
+/// (a wins?, they disagree).
 pub fn choose(
     a: TableSource,
     a_grid: &[Vec<String>],
@@ -1106,7 +1107,9 @@ pub fn choose(
     b_grid: &[Vec<String>],
 ) -> (bool, bool) {
     let agree = checks::grits_con(a_grid, b_grid) >= AGREE;
-    let a_wins = priority(a) >= priority(b);
+    // Agreement keeps the incumbent `a` (the deterministic grid): same
+    // content, text-layer provenance. Disagreement: the stronger evidence.
+    let a_wins = agree || priority(a) >= priority(b);
     (a_wins, !agree)
 }
 
@@ -1224,4 +1227,36 @@ pub fn detect(
     out.uncertain
         .sort_by(|a, b| a[1].total_cmp(&b[1]).then(a[0].total_cmp(&b[0])));
     out
+}
+
+#[cfg(test)]
+mod choose_tests {
+    use super::*;
+
+    fn g(rows: &[&[&str]]) -> Vec<Vec<String>> {
+        rows.iter()
+            .map(|r| r.iter().map(|s| s.to_string()).collect())
+            .collect()
+    }
+
+    #[test]
+    fn agreement_keeps_the_incumbent_disagreement_the_stronger_evidence() {
+        let a = g(&[&["a", "1"], &["b", "2"], &["c", "3"]]);
+        let b = g(&[&["a", "2"], &["b", "1"], &["c", "3"]]);
+        // tracks vs an agreeing model grid: tracks stays, not uncertain
+        assert_eq!(
+            choose(TableSource::Tracks, &a, TableSource::ModelGrid, &a),
+            (true, false)
+        );
+        // tracks vs a disagreeing model grid: the model wins, uncertain
+        assert_eq!(
+            choose(TableSource::Tracks, &a, TableSource::ModelGrid, &b),
+            (false, true)
+        );
+        // ruled vs a disagreeing model grid: ruled stays, uncertain
+        assert_eq!(
+            choose(TableSource::Ruled, &a, TableSource::ModelGrid, &b),
+            (true, true)
+        );
+    }
 }
