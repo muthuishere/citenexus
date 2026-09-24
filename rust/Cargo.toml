@@ -73,3 +73,7 @@ required-features = ["pdf"]
 [[example]]
 name = "pdf_headings"
 required-features = ["pdf"]
+
+[[example]]
+name = "pdf_tables"
+required-features = ["pdf"]

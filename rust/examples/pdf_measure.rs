@@ -81,6 +81,7 @@ fn main() {
     let opts = PdfOptions {
         language: lang,
         layout_text: false,
+        ..Default::default()
     };
 
     let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)
