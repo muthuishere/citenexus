@@ -376,7 +376,16 @@ var calendarFold = func() map[string]string {
 }()
 
 // guards runs every deterministic guard and returns the first refusal, or "".
-func guards(claim, claimLanguage string, eu EvidenceUnit, aliases map[string][]string, actors ActorLexicon, pairs []QualifierPair) string {
+// guardConfig is the caller's configuration the guards read.
+type guardConfig struct {
+	aliases  map[string][]string
+	actors   ActorLexicon
+	pairs    []QualifierPair
+	glossary [][2]string
+}
+
+func guards(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfig) string {
+	aliases, actors, pairs := cfg.aliases, cfg.actors, cfg.pairs
 	if reason := numberGuard(claim, claimLanguage, eu.Text, eu.Language); reason != "" {
 		return reason
 	}
@@ -389,6 +398,9 @@ func guards(claim, claimLanguage string, eu EvidenceUnit, aliases map[string][]s
 		}
 	}
 	if reason := roleGuard(claim, claimLanguage, eu, actors); reason != "" {
+		return reason
+	}
+	if reason := conditionGuard(claim, claimLanguage, eu, cfg); reason != "" {
 		return reason
 	}
 	if reason := qualifierPairGuard(claim, claimLanguage, eu, pairs); reason != "" {

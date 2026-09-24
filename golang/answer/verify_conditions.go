@@ -1,0 +1,294 @@
+// The condition guard: a model-admitted claim that drops the unit's condition.
+//
+// The model admits a claim that states the rule without its condition or
+// scope: "Werknemers ontvangen een eindejaarsuitkering" over "Werknemers met
+// een vast dienstverband die ten minste twaalf maanden in dienst zijn,
+// ontvangen …"; "Tijdens verlof …" over "Tijdens het onbetaald verlof …";
+// "Bij ongewenst gedrag kun je terecht bij de vertrouwenspersoon" over "Kom je
+// er met de betrokkene niet uit, dan kun je terecht …". The gate cannot admit
+// always refuse these: its alignment may skip a qualifier inside a gap
+// ("Tijdens verlof …" over "Tijdens het onbetaald verlof …"). So this guard
+// runs on the model path (in guards()) and after every gate admission.
+//
+// It finds the unit sentence the claim follows (the most shared content
+// words, at least two) and reads its restrictors:
+//
+//   - an opener and what follows it, up to the next word the claim shares or
+//     the clause end: mits, indien, tenzij, (op) voorwaarde, alleen,
+//     uitsluitend, enkel, slechts, eerst, pas, zolang, behalve, uitgezonderd,
+//     "ten minste", "met toestemming" (not "niet alleen"); "die" and "met" right
+//     after a party the actor lexicon names ("Werknemers met een vast
+//     dienstverband", "Advocaat-stagiaires die in het eerste jaar …") — and
+//     their English counterparts;
+//   - a conditional sentence opened by its verb ("Kom je … niet uit, dan …"):
+//     everything before "dan";
+//   - a scope qualifier right before a word the claim shares ("onbetaald
+//     verlof", "vaste en variabele toeslagen");
+//   - a coordinated requirement dropped from inside the claim's span ("te
+//     goeder trouw en zorgvuldig melden" where the claim keeps both ends).
+//
+// A restrictor whose content words the claim lacks — all of them for a
+// qualifier or a coordinated word, at least half for an opener's segment —
+// refuses the claim. Can only refuse.
+//
+// SAME LANGUAGE, OR THROUGH THE CALLER'S GLOSSARY. "The claim lacks the word"
+// is only testable in the unit's language. For a claim in another language the
+// guard needs VerifyOptions.Glossary: a unit word counts as carried when the
+// claim holds it or every word of one of its translations; a restrictor with a
+// word the glossary does not cover gives no verdict, and without a glossary no
+// cross-language claim is judged. That is what can be made sound here: a
+// glossary miss must never turn into a refusal, and never into an admission.
+
+package answer
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/muthuishere/citenexus/golang/gate"
+	"github.com/muthuishere/citenexus/golang/tokenize"
+)
+
+var conditionOpeners = map[string]struct{}{
+	"mits": {}, "indien": {}, "tenzij": {}, "voorwaarde": {}, "alleen": {}, "uitsluitend": {},
+	"enkel": {}, "slechts": {}, "eerst": {}, "pas": {}, "zolang": {}, "behalve": {}, "uitgezonderd": {},
+	"provided": {}, "unless": {}, "only": {}, "solely": {}, "first": {}, "except": {}, "once": {},
+}
+
+// conditionPhrases are two-word openers.
+var conditionPhrases = [][2]string{
+	{"ten", "minste"}, {"met", "toestemming"}, {"at", "least"}, {"with", "permission"},
+}
+
+// partyRestrictors open a restriction only right after a party: "Werknemers
+// met …", "Advocaat-stagiaires die …".
+var partyRestrictors = map[string]struct{}{"met": {}, "die": {}, "with": {}, "who": {}}
+
+var scopeQualifiers = map[string]struct{}{
+	"onbetaald": {}, "onbetaalde": {}, "betaald": {}, "betaalde": {}, "aanvullend": {}, "aanvullende": {},
+	"bijzonder": {}, "bijzondere": {}, "vast": {}, "vaste": {}, "tijdelijk": {}, "tijdelijke": {},
+	"variabel": {}, "variabele": {}, "gewoon": {}, "gewone": {},
+	"unpaid": {}, "paid": {}, "additional": {}, "special": {}, "fixed": {}, "variable": {},
+	"regular": {}, "temporary": {}, "permanent": {},
+}
+
+var conditionalVerbSubjects = map[string]struct{}{"je": {}, "jij": {}, "u": {}, "de": {}, "het": {}}
+
+func conditionContent(t string) bool {
+	if gate.IsStopword(t) {
+		return false
+	}
+	if _, stop := contextStop[t]; stop {
+		return false
+	}
+	return len([]rune(t)) >= 2
+}
+
+// carried reports whether the claim carries unit word w: directly, or (other
+// language) through a glossary translation. known is false when w has no
+// glossary entry and the claim is in another language.
+type carrier struct {
+	claim        map[string]bool
+	crossLang    bool
+	translations map[string][][]string
+}
+
+func (c carrier) carried(w string) (has, known bool) {
+	if c.claim[w] {
+		return true, true
+	}
+	if !c.crossLang {
+		return false, true
+	}
+	trs, ok := c.translations[w]
+	if !ok {
+		if strings.ContainsAny(w, "0123456789") {
+			return false, true // a number reads the same in both languages
+		}
+		return false, false
+	}
+	for _, tr := range trs {
+		all := true
+		for _, t := range tr {
+			if !c.claim[t] {
+				all = false
+				break
+			}
+		}
+		if all {
+			return true, true
+		}
+	}
+	return false, true
+}
+
+func glossaryIndex(glossary [][2]string) map[string][][]string {
+	out := map[string][][]string{}
+	for _, pair := range glossary {
+		for k := 0; k < 2; k++ {
+			from, to := tokenize.TokenizeV2(pair[k]), tokenize.TokenizeV2(pair[1-k])
+			if len(from) == 1 && len(to) > 0 {
+				out[from[0]] = append(out[from[0]], to)
+			}
+		}
+	}
+	return out
+}
+
+// conditionGuard: see the file comment.
+func conditionGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfig) string {
+	cross := claimLanguage != "" && eu.Language != "" && primaryLanguage(claimLanguage) != primaryLanguage(eu.Language)
+	if cross && len(cfg.glossary) == 0 {
+		return ""
+	}
+	c := carrier{claim: map[string]bool{}, crossLang: cross, translations: glossaryIndex(cfg.glossary)}
+	for _, t := range tokenize.TokenizeV2(claim) {
+		c.claim[t] = true
+	}
+	shared := func(t string) bool {
+		has, _ := c.carried(t)
+		return conditionContent(t) && has
+	}
+	// The unit sentence the claim follows.
+	var best []string
+	var bestText string
+	bestN := 0
+	for _, s := range sentenceBreak.Split(softJoin(eu.Text), -1) {
+		n := 0
+		seen := map[string]bool{}
+		for _, t := range tokenize.TokenizeV2(s) {
+			if !seen[t] && shared(t) {
+				seen[t] = true
+				n++
+			}
+		}
+		if n > bestN {
+			best, bestText, bestN = tokenize.TokenizeV2(s), s, n
+		}
+	}
+	if bestN < 2 {
+		return ""
+	}
+	// lacks: the claim drops the restrictor. Same language: all its content
+	// words missing (a qualifier, a coordinated word) or at least half (an
+	// opener's segment). Across languages only glossary-covered words are
+	// judged: every covered word must be missing, and the covered words must
+	// be at least half of the segment — otherwise no verdict.
+	lacks := func(words []string, half bool) (bool, string) {
+		content, known, missing := 0, 0, 0
+		first := ""
+		for _, w := range words {
+			if !conditionContent(w) {
+				continue
+			}
+			content++
+			has, ok := c.carried(w)
+			if !ok {
+				continue
+			}
+			known++
+			if !has {
+				missing++
+				if first == "" {
+					first = w
+				}
+			}
+		}
+		if content == 0 || known == 0 {
+			return false, ""
+		}
+		if c.crossLang {
+			return missing == known && 2*known >= content, first
+		}
+		if half {
+			return 2*missing >= content && missing > 0, first
+		}
+		return missing == content, first
+	}
+	refuse := func(kind, word string) string {
+		return fmt.Sprintf("condition guard: the passage restricts it (%s %q) and the claim drops it", kind, word)
+	}
+
+	// A conditional sentence opened by its verb: "Kom je … niet uit, dan …".
+	if len(best) > 2 {
+		if _, subj := conditionalVerbSubjects[best[1]]; subj && conditionContent(best[0]) {
+			for i, t := range best {
+				if t == "dan" && i > 2 && strings.Contains(bestText, ", dan") {
+					if ok, w := lacks(best[:i], false); ok {
+						return refuse("condition", w)
+					}
+					break
+				}
+			}
+		}
+	}
+	for _, clause := range clauseBreak.Split(softJoin(bestText), -1) {
+		toks := tokenize.TokenizeV2(clause)
+		for i := 0; i < len(toks); i++ {
+			start := -1
+			negated := i > 0 && (toks[i-1] == "niet" || toks[i-1] == "not") // "niet alleen … maar ook"
+			if _, ok := conditionOpeners[toks[i]]; ok && !negated {
+				start = i + 1
+			}
+			for _, ph := range conditionPhrases {
+				if i+1 < len(toks) && toks[i] == ph[0] && toks[i+1] == ph[1] {
+					start = i + 1 // "toestemming", "minste" belong to the condition
+				}
+			}
+			if _, ok := partyRestrictors[toks[i]]; ok && i > 0 && actorTerm(toks[i-1], cfg.actors) {
+				start = i + 1
+			}
+			if start < 0 || start >= len(toks) {
+				continue
+			}
+			end := start
+			for end < len(toks) && !shared(toks[end]) {
+				end++
+			}
+			if _, alreadyOpener := conditionOpeners[toks[i]]; !alreadyOpener && end == start {
+				continue
+			}
+			if ok, w := lacks(toks[start:end], true); ok {
+				return refuse("condition", toks[i]+" … "+w)
+			}
+		}
+		// Scope qualifiers right before a shared word; "vaste en variabele
+		// toeslagen" qualifies through the coordination.
+		for i := 0; i+1 < len(toks); i++ {
+			if _, q := scopeQualifiers[toks[i]]; !q {
+				continue
+			}
+			j := i + 1
+			for j+1 < len(toks) && (toks[j] == "en" || toks[j] == "and") {
+				j += 2
+			}
+			if j < len(toks) && shared(toks[j]) {
+				if ok, w := lacks([]string{toks[i]}, false); ok {
+					return refuse("qualifier", w)
+				}
+			}
+		}
+		// A coordinated requirement dropped from inside the claim's span:
+		// shared, "en", missing, shared.
+		for i := 0; i+3 < len(toks); i++ {
+			if shared(toks[i]) && (toks[i+1] == "en" || toks[i+1] == "and") && conditionContent(toks[i+2]) &&
+				shared(toks[i+3]) {
+				if ok, w := lacks([]string{toks[i+2]}, false); ok {
+					return refuse("requirement", w)
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func actorTerm(t string, lexicon ActorLexicon) bool {
+	for _, terms := range lexicon.Actors {
+		for _, x := range terms {
+			if x == t {
+				return true
+			}
+		}
+	}
+	return false
+}

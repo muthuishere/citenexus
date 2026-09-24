@@ -25,6 +25,7 @@ type verifyVector struct {
 	LeadInFrames  []string                        `json:"lead_in_frames"`
 	// Actors EXTENDS DefaultActorLexicon: actor id -> extra terms.
 	Actors   map[string][]string `json:"actors"`
+	Glossary [][2]string         `json:"glossary"`
 	Evidence []struct {
 		ID         string `json:"id"`
 		DocumentID string `json:"document_id"`
@@ -70,8 +71,8 @@ func TestVerifyAnswerConformance(t *testing.T) {
 	if err := json.Unmarshal(raw, &file); err != nil {
 		t.Fatal(err)
 	}
-	if len(file.Cases) != 133 {
-		t.Fatalf("verify_answer.json: got %d cases, want 133", len(file.Cases))
+	if len(file.Cases) != 141 {
+		t.Fatalf("verify_answer.json: got %d cases, want 141", len(file.Cases))
 	}
 	refuseControls := 0
 	for _, c := range file.Cases {
@@ -101,6 +102,7 @@ func TestVerifyAnswerConformance(t *testing.T) {
 				}
 			}
 			opts := VerifyOptions{AnswerLanguage: c.AnswerLanguage, AdmitParaphrase: c.AdmitParaphrase, NameAliases: c.NameAliases, LeadInFrames: c.LeadInFrames}
+			opts.Glossary = c.Glossary
 			if len(c.Actors) > 0 {
 				lexicon := DefaultActorLexicon
 				for id, terms := range c.Actors {

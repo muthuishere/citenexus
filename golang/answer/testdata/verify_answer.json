@@ -167,7 +167,7 @@
       }
     },
     {
-      "name": "negation/claim-already-carries-the-negation (R-123)",
+      "name": "negation/claim-already-carries-the-negation (R-123), and still drops the zolang-condition",
       "answer": "De bonus wordt niet uitgekeerd [eu:b].",
       "answer_language": "nl",
       "evidence": [
@@ -179,14 +179,15 @@
         }
       ],
       "expect": {
-        "decision": "answered",
+        "decision": "refused",
         "claims": [
           {
-            "supported": true,
-            "reason": ""
+            "supported": false,
+            "reason": "condition guard"
           }
         ]
-      }
+      },
+      "must_refuse": true
     },
     {
       "name": "value/unrelated-claim-survives-a-differing-phone-number (R-114)",
@@ -3809,6 +3810,284 @@
         "S1": [
           0.999,
           0.0
+        ]
+      }
+    },
+    {
+      "name": "condition/dc-03 the 'Kom je … niet uit, dan' condition dropped (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "Bij ongewenst gedrag kun je terecht bij de vertrouwenspersoon [eu:S1]. Kom je er met de betrokkene niet uit, dan kun je terecht bij de vertrouwenspersoon [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "gedragscode",
+          "language": "nl",
+          "text": "Ongewenst gedrag. Bespreek ongewenst gedrag eerst met de betrokkene. Kom je er met de betrokkene niet uit, dan kun je terecht bij de vertrouwenspersoon."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "condition guard"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "condition/dc-08 onbetaald verlof widened to verlof (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "Tijdens verlof worden toeslagen niet doorbetaald [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "regeling onbetaald verlof",
+          "language": "nl",
+          "text": "Artikel 4. Gevolgen. Tijdens het onbetaald verlof worden vaste en variabele toeslagen en vergoedingen niet doorbetaald. De werkgever blijft het werkgeversdeel van de pensioenpremie betalen."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "condition guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "condition/gw-v2-01 all employees over permanent staff with twelve months (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "Alle werknemers ontvangen in december een eindejaarsuitkering van 8,33% van het jaarsalaris [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "arbeidsvoorwaardenregeling De Vaart Logistiek",
+          "language": "nl",
+          "text": "Eindejaarsuitkering. Werknemers met een vast dienstverband die op 1 december ten minste twaalf maanden in dienst zijn, ontvangen in december een eindejaarsuitkering van 8,33% van het jaarsalaris. Uitzendkrachten en oproepkrachten hebben geen recht op de eindejaarsuitkering."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "condition guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "condition/gw-v2-02 the twelve-month service condition dropped (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "Werknemers met een vast dienstverband ontvangen in december een eindejaarsuitkering van 8,33% van het jaarsalaris [eu:S1]. Werknemers met een vast dienstverband die op 1 december ten minste twaalf maanden in dienst zijn, ontvangen een eindejaarsuitkering van 8,33% [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "arbeidsvoorwaardenregeling De Vaart Logistiek",
+          "language": "nl",
+          "text": "Eindejaarsuitkering. Werknemers met een vast dienstverband die op 1 december ten minste twaalf maanden in dienst zijn, ontvangen in december een eindejaarsuitkering van 8,33% van het jaarsalaris. Uitzendkrachten en oproepkrachten hebben geen recht op de eindejaarsuitkering."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "condition guard"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "condition/gw-v2-04 all over at-least-24-hours staff (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "Alle medewerkers kunnen eens per vier jaar een fiets aanschaffen via de fietsregeling [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "fietsregeling Gemeente Kraaijenburg",
+          "language": "nl",
+          "text": "Fietsregeling. Medewerkers met een aanstelling van ten minste 24 uur per week kunnen eens per vier jaar een fiets aanschaffen via de fietsregeling. De waarde van de fiets bedraagt ten hoogste € 1.750. Stagiairs en medewerkers in de proeftijd zijn uitgesloten."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "condition guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "condition/gw-v2-12 all trainees over first-year trainees (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "Alle advocaat-stagiaires volgen de Beroepsopleiding Advocatuur op kosten van het kantoor [eu:S1]. Advocaat-stagiaires in het eerste jaar van hun stage volgen de Beroepsopleiding Advocatuur op kosten van het kantoor [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "opleidingsregeling Maasoever Advocaten",
+          "language": "nl",
+          "text": "Beroepsopleiding Advocatuur. Advocaat-stagiaires die in het eerste jaar van hun stage zitten, volgen de Beroepsopleiding Advocatuur op kosten van het kantoor. De opleiding wordt in werktijd gevolgd. Ondersteunend personeel komt voor deze regeling niet in aanmerking."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "condition guard"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "condition/dc-06 en permission dropped, through the caller's glossary (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "Employees may work from home [eu:S1]. Employees may work from home with their manager's permission [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "thuiswerkregeling",
+          "language": "nl",
+          "text": "Thuiswerken. Werknemers mogen thuiswerken met toestemming van hun leidinggevende. De werkgever vergoedt een bureaustoel voor werknemers met een vast contract."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "condition guard"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      },
+      "glossary": [
+        [
+          "toestemming",
+          "permission"
+        ],
+        [
+          "leidinggevende",
+          "manager"
+        ],
+        [
+          "thuiswerken",
+          "work from home"
+        ],
+        [
+          "werknemers",
+          "employees"
+        ]
+      ]
+    },
+    {
+      "name": "condition/dc-06 en without a glossary is no verdict across languages (rag_go adv, fictional)",
+      "must_refuse": false,
+      "answer": "Employees may work from home [eu:S1]. Employees may work from home with their manager's permission [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "thuiswerkregeling",
+          "language": "nl",
+          "text": "Thuiswerken. Werknemers mogen thuiswerken met toestemming van hun leidinggevende. De werkgever vergoedt een bureaustoel voor werknemers met een vast contract."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
         ]
       }
     }
