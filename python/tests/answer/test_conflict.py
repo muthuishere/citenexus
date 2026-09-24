@@ -87,6 +87,36 @@ TRUE_CONFLICTS: list[Pair] = [
      "The aluminium sample contracts when heated."),
     ("physics", "negation-morphology", "The reaction conserves momentum in this frame.",
      "The reaction does not conserve momentum in this frame."),
+    # ── Dutch (nl): the golden fixture that lets conformance/conflict.json claim
+    #    "nl". HR/policy register, because that is the consuming corpus. ──
+    ("hr-nl", "negation (niet)", "De werkgever vergoedt de reiskosten voor woon-werkverkeer.",
+     "De werkgever vergoedt de reiskosten voor woon-werkverkeer niet."),
+    ("hr-nl", "negation (geen)", "Een uitzendkracht heeft recht op de eindejaarsuitkering.",
+     "Een uitzendkracht heeft geen recht op de eindejaarsuitkering."),
+    ("hr-nl", "negation (geen replaces een)",
+     "De medewerker ontvangt een vergoeding voor thuiswerken.",
+     "De medewerker ontvangt geen vergoeding voor thuiswerken."),
+    ("hr-nl", "negation (nooit)", "Overuren worden uitbetaald in de volgende salarisperiode.",
+     "Overuren worden nooit uitbetaald in de volgende salarisperiode."),
+    ("hr-nl", "negation (verboden)",
+     "Het gebruik van privelaptops is toegestaan voor zakelijk werk.",
+     "Het gebruik van privelaptops is verboden voor zakelijk werk."),
+    ("hr-nl", "negation (niet toegestaan)", "Thuiswerken is toegestaan tijdens de proeftijd.",
+     "Thuiswerken is niet toegestaan tijdens de proeftijd."),
+    ("hr-nl", "comparator (verplicht/optioneel)",
+     "Deelname aan de jaarlijkse beoordeling is verplicht voor alle medewerkers.",
+     "Deelname aan de jaarlijkse beoordeling is optioneel voor alle medewerkers."),
+    ("hr-nl", "comparator (goedgekeurd/afgewezen)",
+     "Het verzoek om ouderschapsverlof is goedgekeurd door de afdeling HR.",
+     "Het verzoek om ouderschapsverlof is afgewezen door de afdeling HR."),
+    ("hr-nl", "value", "De opzegtermijn bedraagt 30 dagen.", "De opzegtermijn bedraagt 60 dagen."),
+    ("finance-nl", "value (euro)", "De thuiswerkvergoeding is € 2 per dag.",
+     "De thuiswerkvergoeding is € 3 per dag."),
+    ("legal-nl", "negation in a long policy sentence",
+     "Een medewerker die langer dan twee jaar in dienst is, heeft bij ontslag op initiatief "
+     "van de werkgever recht op een transitievergoeding.",
+     "Een medewerker die langer dan twee jaar in dienst is, heeft bij ontslag op initiatief "
+     "van de werkgever geen recht op een transitievergoeding."),
 ]
 
 #: Pairs that LOOK like contradictions and are not. Each differs by one further
@@ -153,6 +183,51 @@ HARD_NEGATIVES: list[Pair] = [
     ("physics", "unit variant", "The half life is 2 hours.", "The half life is 120 minutes."),
     ("physics", "different medium", "Sound travels at 343 metres per second in air.",
      "Sound travels at 1480 metres per second in water."),
+    # ── Dutch (nl) ──
+    # Scope restrictors, the Dutch "except"/"unless": in POLARITY_MARKERS, never
+    # in the conflict negations.
+    ("hr-nl", "restrictor not negation (behalve)",
+     "Alle medewerkers behalve stagiairs ontvangen een laptop.",
+     "Alle medewerkers ontvangen een laptop."),
+    ("hr-nl", "restrictor not negation (uitgezonderd)",
+     "Alle functies uitgezonderd de directie vallen onder de cao.",
+     "Alle functies vallen onder de cao."),
+    ("hr-nl", "restrictor not negation (tenzij)",
+     "Vakantiedagen vervallen na vijf jaar tenzij anders is afgesproken.",
+     "Vakantiedagen vervallen na vijf jaar."),
+    # "zonder" scopes a POPULATION here, exactly like a restrictor. As a
+    # negation it turns this pair — both true — into a false conflict, which is
+    # why zonder is a polarity marker but not a conflict negation.
+    ("hr-nl", "zonder scopes a population",
+     "Medewerkers zonder vast contract krijgen de eindejaarsuitkering.",
+     "Medewerkers met vast contract krijgen de eindejaarsuitkering."),
+    ("hr-nl", "negation different population",
+     "Stagiairs hebben geen recht op een leaseauto.",
+     "Managers hebben recht op een leaseauto."),
+    # Threshold comparatives partition a population: both sides are true. This
+    # pair is why meer/minder is NOT a Dutch antonym.
+    ("hr-nl", "threshold comparative (meer/minder)",
+     "Medewerkers met meer dan 10 dienstjaren krijgen 25 vakantiedagen.",
+     "Medewerkers met minder dan 10 dienstjaren krijgen 20 vakantiedagen."),
+    # ...and why hoger/lager is not one either.
+    ("finance-nl", "threshold comparative (hoger/lager)",
+     "Bij een jaarsalaris hoger dan 50000 euro geldt een bijdrage van 6 procent.",
+     "Bij een jaarsalaris lager dan 50000 euro geldt een bijdrage van 4 procent."),
+    # The same amount quoted both ways is the NORMAL case in Dutch price and
+    # allowance text. This pair is why inclusief/exclusief is not an antonym.
+    ("finance-nl", "same price quoted excl and incl btw",
+     "De vergoeding bedraagt € 100 exclusief btw.",
+     "De vergoeding bedraagt € 121 inclusief btw."),
+    ("finance-nl", "same price quoted excl. and incl. btw (abbreviated)",
+     "De cursus kost € 500 excl. btw.", "De cursus kost € 605 incl. btw."),
+    ("hr-nl", "different subject same verb", "De reiskosten worden maandelijks vergoed.",
+     "De studiekosten worden maandelijks vergoed."),
+    # No Dutch reported-speech bigram exists; the residual guard declines this
+    # on its own (three divergent tokens after the negation).
+    ("legal-nl", "quoted negation", "De bewering dat de medewerker niet verzekerd is, is onjuist.",
+     "De medewerker is verzekerd."),
+    ("legal-nl", "double negation restatement", "Het beding is niet ongeldig.",
+     "Het beding is geldig."),
 ]
 
 #: Pairs sharing one polysemous word and nothing else.
@@ -201,6 +276,19 @@ UNRELATED: list[Pair] = [
      "The term is defined in the physics glossary."),
     ("finance", "shared 'exposure'", "Net exposure fell to 4.2 million.",
      "Radiation exposure is limited to 20 millisieverts."),
+    # ── Dutch (nl): Dutch articles and prepositions are NOT stopwords, so these
+    #    also probe whether shared function words alone manufacture a subject. ──
+    ("legal-nl", "shared 'termijn'", "De termijn voor betaling is 30 dagen.",
+     "De termijn van de huurovereenkomst is 5 jaar."),
+    ("hr-nl", "shared 'recht'", "De medewerker heeft recht op ouderschapsverlof.",
+     "Het Nederlands recht is van toepassing op deze overeenkomst."),
+    ("finance-nl", "shared 'vergoeding'", "De vergoeding voor thuiswerken is 2 euro per dag.",
+     "De rechter kende de eiser een vergoeding van 5000 euro toe."),
+    ("hr-nl", "shared 'contract'", "Het contract wordt niet stilzwijgend verlengd.",
+     "Het contract met de leverancier loopt tot 2027."),
+    ("hr-nl", "shared function words only",
+     "De werkgever betaalt de premie van de verzekering.",
+     "De medewerker leest de tekst van de regeling niet."),
 ]
 
 #: Written after the spike's thresholds were frozen and never tuned against.
@@ -283,9 +371,9 @@ DUPLICATE_CASES: list[tuple[str, str, str, bool]] = [
 #   * the VALUE rule is script-independent once tokenization works — it compares
 #     digits and units, not words — so it fires in all four scripts here,
 #     Japanese subject to the digit-adjacency caveat below;
-#   * the NEGATION and ANTONYM rules are backed by ENGLISH WORDLISTS
-#     (`conformance/conflict.json` → `languages: ["en"]`), so they do NOT fire
-#     outside Latin script and no tokenizer change can make them. The
+#   * the NEGATION and ANTONYM rules are backed by WORDLISTS for the claimed
+#     languages only (`conformance/conflict.json` → `languages: ["en", "nl"]`),
+#     so they do NOT fire in these scripts and no tokenizer change can make them. The
 #     `english-table` vectors below pin that gap as a KNOWN MISS rather than
 #     leaving it undocumented; closing it means adding per-language polarity
 #     tables, which is a specification decision, not a port fix.
@@ -474,9 +562,10 @@ def test_non_latin_set_discriminates() -> None:
 
 
 def test_non_latin_polarity_rules_are_english_only() -> None:
-    """Negation and antonym are ENGLISH wordlists, and no tokenizer fixes that.
+    """Negation and antonym are per-language wordlists, and no tokenizer fixes that.
 
-    ``conformance/conflict.json`` declares ``languages: ["en"]``. The vectors
+    ``conformance/conflict.json`` declares ``languages: ["en", "nl"]`` — neither
+    covers Tamil, Telugu or Arabic. The vectors
     labelled ``english-table`` are true contradictions that the detector cannot
     see, recorded as a known miss rather than papered over with invented table
     entries. Closing it means per-language polarity tables — a specification
@@ -633,3 +722,47 @@ def test_describe_names_both_documents_and_never_a_winner() -> None:
     assert "policy-2019" in described
     assert "policy-2026" in described
     assert "30" in described and "60" in described
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Dutch (nl) — what the claim covers, and the gaps it does NOT close
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_dutch_fixtures_cover_every_rule_and_both_verdicts() -> None:
+    """The "nl" claim in conformance/conflict.json rests on these fixtures."""
+    nl_true = [p for p in TRUE_CONFLICTS if p[0].endswith("-nl")]
+    nl_hard = [p for p in HARD_NEGATIVES if p[0].endswith("-nl")]
+    nl_unrel = [p for p in UNRELATED if p[0].endswith("-nl")]
+    assert (len(nl_true), len(nl_hard), len(nl_unrel)) == (11, 12, 5)
+    rules = {f.rule for p in nl_true if (f := detect_conflict(p[2], p[3])) is not None}
+    assert rules == {"negation", "antonym", "value"}
+
+
+#: Measured gaps the Dutch tables do NOT close, pinned so that closing one is a
+#: conscious fixture change. (label, a, b, what the detector returns today)
+DUTCH_KNOWN_GAPS: list[tuple[str, str, str, str | None]] = [
+    # A true conflict the tables cannot catch. inclusief/exclusief is NOT an
+    # antonym pair: the antonym rule ignores numbers, so the both-true pair
+    # "€ 100 exclusief btw" / "€ 121 inclusief btw" (a hard negative above)
+    # would become a false conflict. Admitting the pair needs a detector change,
+    # not a table change.
+    ("KNOWN MISS: incl/excl, same amount",
+     "De vergoeding is € 25 inclusief btw.", "De vergoeding is € 25 exclusief btw.", None),
+    ("KNOWN MISS: incl./excl., same amount",
+     "De vergoeding is € 25 incl. btw.", "De vergoeding is € 25 excl. btw.", None),
+    # Dutch number formatting is not normalised: "1.500" parses as 1.5 and
+    # "25,00" as 2500, so the SAME amount written two ways is a value conflict.
+    # Pre-existing, table-independent, and in the unsafe direction.
+    ("KNOWN FALSE CONFLICT: Dutch thousands separator",
+     "Het opleidingsbudget is € 1.500 per jaar.", "Het opleidingsbudget is € 1500 per jaar.",
+     "value"),
+    ("KNOWN FALSE CONFLICT: Dutch decimal comma",
+     "De vergoeding is € 25,00 per maand.", "De vergoeding is € 25 per maand.", "value"),
+]
+
+
+@pytest.mark.parametrize(("label", "left", "right", "rule"), DUTCH_KNOWN_GAPS)
+def test_dutch_known_gaps_are_pinned(label: str, left: str, right: str, rule: str | None) -> None:
+    finding = detect_conflict(left, right)
+    assert (finding.rule if finding else None) == rule, f"{label}: got {finding}"

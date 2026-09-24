@@ -6,7 +6,8 @@
 // (package.json `files` is ["dist"]; conformance/ is not published).
 
 export const CONFLICT_LANGUAGES_TABLE: readonly string[] = [
-  "en"
+  "en",
+  "nl"
 ];
 
 export const CONFLICT_NEGATIONS_TABLE: readonly string[] = [
@@ -18,18 +19,25 @@ export const CONFLICT_NEGATIONS_TABLE: readonly string[] = [
   "failed",
   "fails",
   "forbidden",
+  "geen",
   "lack",
   "lacks",
   "neither",
   "never",
+  "niemand",
+  "niet",
+  "niets",
   "no",
   "nobody",
+  "noch",
   "none",
+  "nooit",
   "nor",
   "not",
   "nothing",
   "prohibited",
   "unable",
+  "verboden",
   "without"
 ];
 
@@ -42,6 +50,10 @@ export const CONFLICT_ANTONYMS_TABLE: readonly (readonly [string, string])[] = [
   [
     "accelerates",
     "decelerates"
+  ],
+  [
+    "afgewezen",
+    "goedgekeurd"
   ],
   [
     "after",
@@ -146,6 +158,10 @@ export const CONFLICT_ANTONYMS_TABLE: readonly (readonly [string, string])[] = [
   [
     "optional",
     "required"
+  ],
+  [
+    "optioneel",
+    "verplicht"
   ],
   [
     "overturned",

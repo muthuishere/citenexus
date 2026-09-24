@@ -40,9 +40,9 @@ var conflictPairBuckets = []string{
 // expectedConflictCounts pins the bucket sizes. A vector silently dropped from a
 // bucket is a weakened contract that no per-case assertion can see.
 var expectedConflictCounts = map[string]int{
-	"true_conflicts":          27,
-	"hard_negatives":          27,
-	"unrelated":               22,
+	"true_conflicts":          38, // 27 en + 11 nl
+	"hard_negatives":          39, // 27 en + 12 nl
+	"unrelated":               27, // 22 en + 5 nl
 	"heldout_conflicts":       5,
 	"heldout_negatives":       10,
 	"non_latin":               30,
@@ -73,8 +73,8 @@ func TestConflictVectorBucketNamesAndSizes(t *testing.T) {
 		}
 		total += want
 	}
-	if total != 132 {
-		t.Fatalf("pinned bucket sizes sum to %d, want 132", total)
+	if total != 160 {
+		t.Fatalf("pinned bucket sizes sum to %d, want 160", total)
 	}
 }
 

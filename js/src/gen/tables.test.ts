@@ -56,6 +56,6 @@ describe("generated tables match conformance/", () => {
   });
 
   it("claims only languages that have a golden fixture", () => {
-    expect(POLARITY_TABLE.languages).toEqual(["en"]);
+    expect(POLARITY_TABLE.languages).toEqual(["en", "nl"]);
   });
 });

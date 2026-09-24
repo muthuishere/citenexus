@@ -136,6 +136,131 @@
     "known_miss": "Named in the module docstring as one of the two residual failures the ADR-0009 spike could not fix; UAX #29 calls it a required tailoring."
   },
   {
+    "label": "abbrev-nl/incl-and-o.a.",
+    "text": "De vergoeding is € 25 incl. btw en geldt o.a. voor reizen.",
+    "claims": [
+      "De vergoeding is € 25 incl. btw en geldt o.a. voor reizen."
+    ]
+  },
+  {
+    "label": "abbrev-nl/excl",
+    "text": "De cursus kost € 500 excl. btw per deelnemer.",
+    "claims": [
+      "De cursus kost € 500 excl. btw per deelnemer."
+    ]
+  },
+  {
+    "label": "abbrev-nl/bijv",
+    "text": "Declareer kosten, bijv. parkeerkosten, via het portaal.",
+    "claims": [
+      "Declareer kosten, bijv. parkeerkosten, via het portaal."
+    ]
+  },
+  {
+    "label": "abbrev-nl/i.v.m.",
+    "text": "Het verlof vervalt i.v.m. de reorganisatie.",
+    "claims": [
+      "Het verlof vervalt i.v.m. de reorganisatie."
+    ]
+  },
+  {
+    "label": "abbrev-nl/m.b.t.",
+    "text": "Vragen m.b.t. het pensioen gaan naar HR.",
+    "claims": [
+      "Vragen m.b.t. het pensioen gaan naar HR."
+    ]
+  },
+  {
+    "label": "abbrev-nl/t.o.v.",
+    "text": "Het budget stijgt t.o.v. vorig jaar.",
+    "claims": [
+      "Het budget stijgt t.o.v. vorig jaar."
+    ]
+  },
+  {
+    "label": "abbrev-nl/ca",
+    "text": "De reistijd is ca. 40 minuten.",
+    "claims": [
+      "De reistijd is ca. 40 minuten."
+    ]
+  },
+  {
+    "label": "abbrev-nl/evt",
+    "text": "Neem evt. vragen mee naar het gesprek.",
+    "claims": [
+      "Neem evt. vragen mee naar het gesprek."
+    ]
+  },
+  {
+    "label": "abbrev-nl/d.w.z.",
+    "text": "De proeftijd is kort, d.w.z. een maand.",
+    "claims": [
+      "De proeftijd is kort, d.w.z. een maand."
+    ]
+  },
+  {
+    "label": "abbrev-nl/m.u.v.",
+    "text": "Alle medewerkers m.u.v. stagiairs krijgen een laptop.",
+    "claims": [
+      "Alle medewerkers m.u.v. stagiairs krijgen een laptop."
+    ]
+  },
+  {
+    "label": "abbrev-nl/blz",
+    "text": "Zie blz. 12 van de regeling.",
+    "claims": [
+      "Zie blz. 12 van de regeling."
+    ]
+  },
+  {
+    "label": "abbrev-nl/mr",
+    "text": "Mr. De Vries adviseert de ondernemingsraad.",
+    "claims": [
+      "Mr. De Vries adviseert de ondernemingsraad."
+    ]
+  },
+  {
+    "label": "abbrev-nl/boundary-after-incl-btw",
+    "text": "De vergoeding is € 25 incl. btw. De regeling geldt vanaf maart.",
+    "claims": [
+      "De vergoeding is € 25 incl. btw.",
+      "De regeling geldt vanaf maart."
+    ]
+  },
+  {
+    "label": "abbrev-nl/enz-not-in-table",
+    "text": "Declareer reis- en parkeerkosten enz. Bonnen zijn verplicht.",
+    "claims": [
+      "Declareer reis- en parkeerkosten enz.",
+      "Bonnen zijn verplicht."
+    ]
+  },
+  {
+    "label": "abbrev-nl/jl-not-in-table",
+    "text": "De regeling geldt sinds 1 maart jl. Eerdere afspraken vervallen.",
+    "claims": [
+      "De regeling geldt sinds 1 maart jl.",
+      "Eerdere afspraken vervallen."
+    ]
+  },
+  {
+    "label": "abbrev-nl/z.s.m.-not-in-table",
+    "text": "Meld een ziekte z.s.m. De manager neemt contact op.",
+    "claims": [
+      "Meld een ziekte z.s.m.",
+      "De manager neemt contact op."
+    ]
+  },
+  {
+    "label": "abbrev-nl/z.s.m.-mid-sentence",
+    "text": "Neem z.s.m. contact op met HR.",
+    "claims": [
+      "Neem z.s.m.",
+      "contact op met HR."
+    ],
+    "known_miss": "\"z.s.m.\" is left out of ABBREVIATIONS because it is clause-final as often as not; mid-sentence it therefore breaks and yields a fragment claim. A fragment fails the gate and is dropped (safe); a false merge would pass or fail two sentences together (unsafe)."
+  },
+  {
     "label": "digit/decimal",
     "text": "The dose is 500.00 milligrams daily.",
     "claims": [

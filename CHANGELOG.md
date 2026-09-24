@@ -10,6 +10,45 @@ Dist name on PyPI is **`citenexus`** (the import package is `citenexus`; see
 
 ## [Unreleased]
 
+### Added
+
+- **Dutch (`nl`) is a claimed language for the ADR-0009 polarity table and the
+  ADR-0007 conflict tables**, each backed by golden fixtures that all three ports
+  run from `conformance/cases/`.
+  - Polarity markers (`python/src/citenexus/answer/tables.py:65`): `niet`,
+    `geen`, `nooit`, `zonder`, `niemand`, `niets`, `noch`, `verboden`, plus the
+    scope restrictors `behalve`, `uitgezonderd`, `tenzij`.
+    `POLARITY_LANGUAGES` is `("en", "nl")` (`tables.py:52`). Fixtures:
+    11 attacks and 8 controls (`python/tests/answer/test_verify_v2.py:87,150`).
+  - Conflict negations: `niet`, `geen`, `nooit`, `niemand`, `niets`, `noch`,
+    `verboden`. `behalve` / `uitgezonderd` / `tenzij` / `zonder` are scope
+    restrictors, not negations (`tables.py:213`). Antonyms: `verplicht/optioneel`,
+    `goedgekeurd/afgewezen`. `conformance/conflict.json:2-5` declares
+    `["en", "nl"]`. Fixtures: 11 true conflicts, 12 hard negatives, 5 unrelated
+    pairs (`python/tests/answer/test_conflict.py:90,186,279`).
+  - Measured with `spikes/nl-tables/measure.py`: Dutch attacks rejected 0/11 →
+    11/11 at 0/8 false rejection; Dutch conflict recall 2/11 → 11/11 at 0/12
+    false conflicts on hard negatives. Every English number is unchanged.
+  - **Not** added, on measured false conflicts: `inclusief/exclusief`,
+    `incl/excl`, `meer/minder`, `hoger/lager` — the antonym rule ignores numbers,
+    so the same price quoted both ways, or a threshold that partitions a
+    population, conflicts. So "€ 25 inclusief btw" vs "€ 25 exclusief btw" is
+    still **not detected**, pinned at `test_conflict.py:744`.
+- **Dutch abbreviations for claim segmentation**
+  (`python/src/citenexus/answer/tables.py:122`): `incl`, `excl`, `bijv`, `o.a`,
+  `i.v.m`, `m.b.t`, `t.o.v`, `ca`, `evt`, `d.w.z`, `m.u.v`, `blz`. Multi-dot forms
+  are stored with their interior dots, the form rule 3 actually sees. `enz`,
+  `jl` and `z.s.m` are left out because they routinely end a sentence; 17 vectors
+  in `conformance/cases/segmentation.json` pin both decisions.
+
+### Known gaps (measured, not closed)
+
+- A clause-final Dutch `niet` ("De werkgever vergoedt de parkeerkosten niet.")
+  sits outside the span the gate inspects, so dropping it is **accepted**
+  (`python/tests/answer/test_verify_v2.py:362`).
+- Dutch number formatting is not normalised: `€ 1.500` vs `€ 1500` and
+  `€ 25,00` vs `€ 25` are **false value conflicts** (`test_conflict.py:744`).
+
 ## [0.12.0] - 2026-08-17
 
 **The parity release.** Six capabilities that existed only in Python now ship

@@ -21,11 +21,11 @@ type v2Fixture struct {
 }
 
 // expectedFaithfulV2Counts pins the bucket sizes of
-// conformance/cases/faithful_v2.json: nine adversarial attacks and thirty
-// controls. A dropped attack is a silently weakened ADR-0009 contract.
+// conformance/cases/faithful_v2.json: twenty adversarial attacks (9 English,
+// 11 Dutch) and thirty-eight controls (30 English, 8 Dutch). A dropped attack is a silently weakened ADR-0009 contract.
 var expectedFaithfulV2Counts = map[string]int{
-	"attacks":  9,
-	"controls": 30,
+	"attacks":  20,
+	"controls": 38,
 }
 
 func loadFaithfulV2(t *testing.T) v2Fixture {
@@ -53,7 +53,8 @@ func TestFaithfulV2VectorBucketSizes(t *testing.T) {
 
 // TestIsSupportedV2Conformance is the ADR-0009 contract: every verdict in
 // conformance/cases/faithful_v2.json must be reproduced exactly. The attacks are
-// nine false answers that the frozen v1 predicate accepts 9/9; the controls are
+// twenty false answers (9 English, 11 Dutch) that the frozen v1 predicate
+// accepts 20/20; the controls are
 // legitimately-supported answers in four shapes (verbatim, subspan,
 // punctuation/case noise, interior-word compression) that must stay accepted —
 // the measured false-rejection rate is 0.0%.
@@ -92,7 +93,7 @@ func TestV2IsNarrowerThanV1(t *testing.T) {
 }
 
 // TestAttacksStillPassV1 documents WHY v2 exists: the frozen predicate accepts
-// all nine adversarial answers. It also guards the requirement that IsSupported
+// all twenty adversarial answers. It also guards the requirement that IsSupported
 // stays byte-identical.
 func TestAttacksStillPassV1(t *testing.T) {
 	fixture := loadFaithfulV2(t)

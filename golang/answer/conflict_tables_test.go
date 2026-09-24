@@ -31,8 +31,8 @@ func TestConflictTableSizes(t *testing.T) {
 		got  int
 		want int
 	}{
-		{"negations", len(tables.Negations), 21},
-		{"antonyms", len(tables.Antonyms), 30},
+		{"negations", len(tables.Negations), 28}, // 21 en + 7 nl
+		{"antonyms", len(tables.Antonyms), 32},   // 30 en + 2 nl
 		{"report_bigrams", len(tables.ReportBigrams), 11},
 		{"scope_markers", len(tables.ScopeMarkers), 27},
 		{"measurement_units", len(tables.MeasurementUnits), 73},
@@ -70,8 +70,8 @@ func TestConflictThresholdsArePinned(t *testing.T) {
 // go undetected depending on candidate order.
 func TestAntonymSetIsSymmetrised(t *testing.T) {
 	set := ConflictAntonymSet()
-	if len(set) != 60 {
-		t.Fatalf("symmetrised antonyms = %d, want 60", len(set))
+	if len(set) != 64 {
+		t.Fatalf("symmetrised antonyms = %d, want 64", len(set))
 	}
 	for pair := range set {
 		if _, ok := set[[2]string{pair[1], pair[0]}]; !ok {

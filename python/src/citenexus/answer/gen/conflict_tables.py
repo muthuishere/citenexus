@@ -19,7 +19,7 @@ __all__ = [
     "MEASUREMENT_UNITS",
 ]
 
-CONFLICT_LANGUAGES: tuple[str, ...] = ("en",)
+CONFLICT_LANGUAGES: tuple[str, ...] = ("en", "nl")
 
 CONFLICT_NEGATIONS: frozenset[str] = frozenset(
     {
@@ -31,18 +31,25 @@ CONFLICT_NEGATIONS: frozenset[str] = frozenset(
         "failed",
         "fails",
         "forbidden",
+        "geen",
         "lack",
         "lacks",
         "neither",
         "never",
+        "niemand",
+        "niet",
+        "niets",
         "no",
         "nobody",
+        "noch",
         "none",
+        "nooit",
         "nor",
         "not",
         "nothing",
         "prohibited",
         "unable",
+        "verboden",
         "without",
     }
 )
@@ -51,6 +58,7 @@ CONFLICT_ANTONYMS: frozenset[tuple[str, str]] = frozenset(
     {
         ("above", "below"),
         ("accelerates", "decelerates"),
+        ("afgewezen", "goedgekeurd"),
         ("after", "before"),
         ("allowed", "forbidden"),
         ("approved", "rejected"),
@@ -77,6 +85,7 @@ CONFLICT_ANTONYMS: frozenset[tuple[str, str]] = frozenset(
         ("loss", "profit"),
         ("mandatory", "optional"),
         ("optional", "required"),
+        ("optioneel", "verplicht"),
         ("overturned", "upheld"),
         ("permitted", "prohibited"),
     }

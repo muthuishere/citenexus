@@ -1,6 +1,6 @@
 """conformance/cases/faithful_v2.json asserted as a BINDING contract (ADR-0009).
 
-These 39 vectors are the ordered-containment + polarity gate — the check the
+These 58 vectors (39 English, 19 Dutch) are the ordered-containment + polarity gate — the check the
 whole project exists to make trustworthy. Go asserts them
 (``golang/gate/verify_v2_test.go:31,57,72``) and JS asserts them
 (``js/src/gate/verify-v2.test.ts:25``); until this module, the reference port
@@ -22,7 +22,8 @@ from .fixtures import load_case
 
 VECTORS: dict[str, list[dict[str, Any]]] = load_case("faithful_v2.json")
 
-EXPECTED_COUNTS: dict[str, int] = {"attacks": 9, "controls": 30}
+#: 9 English + 11 Dutch attacks; 30 English + 8 Dutch controls.
+EXPECTED_COUNTS: dict[str, int] = {"attacks": 20, "controls": 38}
 
 
 def test_bucket_names_and_sizes() -> None:
@@ -50,23 +51,25 @@ def test_control_vector(case: dict[str, Any]) -> None:
 
 
 def test_every_attack_is_rejected_by_v2() -> None:
-    """The headline guarantee, stated as one assertion rather than 9 verdicts."""
+    """The headline guarantee, stated as one assertion rather than 20 verdicts."""
     accepted = [c["name"] for c in VECTORS["attacks"] if c["supported"]]
     assert accepted == [], f"conformance file claims v2 ACCEPTS an attack: {accepted}"
 
 
-def test_frozen_v1_gate_still_accepts_all_nine_attacks() -> None:
+def test_frozen_v1_gate_still_accepts_every_attack() -> None:
     """Why v2 exists, pinned rather than remembered.
 
-    ``is_supported`` (frozen, SPEC-PORTS-v1 §4) accepted 9/9 of these false
-    answers in all three ports while every suite was green. If this ever stops
+    ``is_supported`` (frozen, SPEC-PORTS-v1 §4) accepted 9/9 of the English
+    false answers in all three ports while every suite was green, and accepts
+    every Dutch one too. If this ever stops
     being true the v1 predicate has been quietly modified, which would break the
     frozen-forever contract the shipped conformance vectors rest on. Go pins the
     same fact at ``golang/gate/verify_v2_test.go:57``.
     """
     accepted = [c["name"] for c in VECTORS["attacks"] if is_supported(c["answer"], c["passage"])]
     assert len(accepted) == EXPECTED_COUNTS["attacks"], (
-        f"v1 no longer accepts all attacks (accepted {len(accepted)}/9): {accepted}"
+        f"v1 no longer accepts all attacks (accepted {len(accepted)}/"
+        f"{EXPECTED_COUNTS['attacks']}): {accepted}"
     )
 
 

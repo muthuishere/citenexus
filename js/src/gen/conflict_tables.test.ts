@@ -35,17 +35,17 @@ describe("generated conflict tables match conformance/conflict.json", () => {
   it("languages", () => {
     expect(CONFLICT_LANGUAGES_TABLE).toEqual(canonical.languages);
     // English only until a language has hard-negative fixtures of its own.
-    expect(CONFLICT_LANGUAGES_TABLE).toEqual(["en"]);
+    expect(CONFLICT_LANGUAGES_TABLE).toEqual(["en", "nl"]);
   });
 
   it("negations", () => {
     expect(CONFLICT_NEGATIONS_TABLE).toEqual(canonical.negations);
-    expect(CONFLICT_NEGATIONS_TABLE).toHaveLength(21);
+    expect(CONFLICT_NEGATIONS_TABLE).toHaveLength(28); // 21 en + 7 nl
   });
 
   it("antonyms", () => {
     expect(CONFLICT_ANTONYMS_TABLE).toEqual(canonical.antonyms);
-    expect(CONFLICT_ANTONYMS_TABLE).toHaveLength(30);
+    expect(CONFLICT_ANTONYMS_TABLE).toHaveLength(32); // 30 en + 2 nl
   });
 
   it("report bigrams", () => {

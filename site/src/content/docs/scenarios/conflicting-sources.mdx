@@ -14,7 +14,7 @@ That is not hypothetical. Before conflict detection existed, the corpus below
 returned a confident, correctly-cited answer with `conflicts_detected = 0`. It
 now refuses in **all three** implementations, over the same corpus and the same
 question, from one predicate pinned by
-[132 committed vectors](https://github.com/muthuishere/citenexus/blob/main/conformance/cases/conflict.json).
+[160 committed vectors](https://github.com/muthuishere/citenexus/blob/main/conformance/cases/conflict.json).
 
 ## Example 1 — the filing and its restatement
 
@@ -403,7 +403,7 @@ Two of those `None`s are **capability**, and two are **known misses**:
   (`in the first year, the notice period is 60 days`), are both declined — the
   subject-overlap and residual guards are set arithmetic and are script-neutral.
 - ❌ **KNOWN MISS — negation and antonym cannot fire outside Latin script.**
-  Both rules are driven by **English wordlists** (`CONFLICT_NEGATIONS`,
+  Both rules are driven by **English and Dutch wordlists** (`CONFLICT_NEGATIONS`,
   `CONFLICT_ANTONYMS`). No Tamil, Telugu, Arabic, Japanese or Chinese negation or
   antonym is in them, so a permitted/prohibited contradiction in those scripts is
   **not detected**. This is pinned as expected behaviour in the vectors, labelled
