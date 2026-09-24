@@ -124,6 +124,26 @@ by hand, with no AGPL/GPL tool involved. `conformance/fixtures/pdf/*.pdf` is
 regenerated with `CITENEXUS_WRITE_PDF_FIXTURES=1 cargo test --test pdf_fixtures_test`.
 Third-party attributions: [`NOTICE`](NOTICE).
 
+**Table acceptance scoring** (`examples/pdf_tables.rs`, counts/shapes/scores
+only; the GT map is parsed at run time so client file names never enter the
+repo; disputed vision text is excluded):
+
+```bash
+# deterministic, no model: runs pdf_units over the originals
+PDFIUM_DYNAMIC_LIB_PATH=... cargo run --profile measure --features pdf --example pdf_tables -- \
+  --originals <spike185>/data/originals --manifest <spike185>/data/originals_manifest.json \
+  --gt-map <spike185>/measure_tables.py --gt ~/answer-engine-local/lex-markdown --lang nl
+
+# ALREADY-ASSEMBLED output from a host harness (PdfPrepare -> models -> PdfAssemble):
+# one PdfUnitsOutput JSON per file at <dir>/<file_id>.json, file ids as in the GT map
+cargo run --profile measure --features pdf --example pdf_tables -- \
+  --assembled <dir> --gt-map <spike185>/measure_tables.py --gt ~/answer-engine-local/lex-markdown \
+  [--originals <dir> --manifest <json>]   # adds positional integrity (needs libpdfium)
+```
+
+`--gt-map` also accepts a JSON object `{"<gt file>.md": "<file_id>"}`. The host
+contract itself is [`docs/pdf-model-contract.md`](../docs/pdf-model-contract.md).
+
 `examples/pdf_measure.rs` measures `pdf_units` over a directory of PDFs and
 prints **counts only**: routes, heading agreement, hyphen markers left,
 furniture. Optionally it also runs spike 185's quote-support measure in memory.

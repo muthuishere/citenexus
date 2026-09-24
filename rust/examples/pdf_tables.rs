@@ -2,9 +2,17 @@
 //! SHAPES and SCORES ONLY: no cell values, no file names (tables are T1..Tn).
 //!
 //! ```text
+//! # deterministic (runs pdf_units, no model):
 //! PDFIUM_DYNAMIC_LIB_PATH=... cargo run --profile measure --features pdf --example pdf_tables -- \
-//!     <originals-dir> <manifest.json> <measure_tables.py> <gt-md-dir> [--lang nl]
+//!     --originals <dir> --manifest <originals_manifest.json> \
+//!     --gt-map <measure_tables.py | map.json> --gt <gt-md-dir> [--lang nl] [--no-corpus]
+//! # scoring ALREADY-ASSEMBLED output (the host ran PdfPrepare -> models ->
+//! # PdfAssemble and wrote <file_id>.json per file, the PdfUnitsOutput JSON):
+//!     --assembled <dir> --gt-map <...> --gt <dir> [--originals <dir> --manifest <json>]
 //! ```
+//! (`--originals`/`--manifest` add positional integrity; the old positional
+//! form `<originals> <manifest> <measure_tables.py> <gt-dir>` still works.)
+//! Disputed vision text is excluded from scoring (`vision::citable_text`).
 //!
 //! The ground-truth map (hand-written GT markdown file -> file_id) is PARSED
 //! from spike 185's `measure_tables.py` at run time so client file names never
@@ -24,6 +32,7 @@ use std::path::{Path, PathBuf};
 use citenexus_core::checks::pipe_grid;
 use citenexus_core::extract::pdf::{diag, pdf_prepare, pdf_units};
 use citenexus_core::units::*;
+use citenexus_core::vision;
 use unicode_normalization::UnicodeNormalization;
 
 fn norm(c: &str) -> String {
@@ -191,9 +200,21 @@ fn score(gt_md: &str, cand_md: &str) -> Score {
     }
 }
 
-/// Parse `GT = { "x.md": "file-id", ... }` out of the spike script.
-fn gt_map(script: &Path) -> Vec<(String, String)> {
-    let src = std::fs::read_to_string(script).expect("measure_tables.py");
+/// The GT map: `measure_tables.py` (its `GT = {...}` dict is parsed) or a
+/// JSON object `{"<gt file>.md": "<file_id>", ...}`.
+fn gt_map(path: &Path) -> Vec<(String, String)> {
+    let src = std::fs::read_to_string(path).expect("GT map");
+    if path.extension().is_some_and(|e| e == "json") {
+        let v: serde_json::Value = serde_json::from_str(&src).expect("GT map JSON");
+        let mut out: Vec<(String, String)> = v
+            .as_object()
+            .expect("GT map: a JSON object")
+            .iter()
+            .map(|(k, v)| (k.clone(), v.as_str().unwrap_or_default().to_string()))
+            .collect();
+        out.sort();
+        return out;
+    }
     let start = src.find("GT = {").expect("GT map");
     let end = start + src[start..].find('}').expect("GT map end");
     src[start..end]
@@ -205,16 +226,24 @@ fn gt_map(script: &Path) -> Vec<(String, String)> {
         .collect()
 }
 
-/// Share of emitted table cells made of text-layer words inside the table box.
+/// Cells of emitted TEXT-LAYER tables (struct/ruled/tracks/model grid; not
+/// vision) made of text-layer words inside the table box: (ok, total).
 fn integrity(bytes: &[u8], opts: &PdfOptions, out: &PdfUnitsOutput) -> (usize, usize) {
     let words = diag::page_words(bytes, opts).unwrap_or_default();
     let (mut ok, mut total) = (0, 0);
-    for u in out.units.iter().filter(|u| u.kind == UnitKind::Table) {
+    for u in out
+        .units
+        .iter()
+        .filter(|u| u.kind == UnitKind::Table && !u.provenance.vision_transcribed)
+    {
         let (Some(p), Some(b)) = (u.page, u.bbox) else {
             continue;
         };
+        let Some(page_words) = words.get((p - 1) as usize) else {
+            continue;
+        };
         let mut pool: BTreeMap<String, usize> = BTreeMap::new();
-        for w in &words[(p - 1) as usize] {
+        for w in page_words {
             let (cx, cy) = ((w.bbox[0] + w.bbox[2]) / 2.0, (w.bbox[1] + w.bbox[3]) / 2.0);
             if cx >= b[0] - 1.0 && cx <= b[2] + 1.0 && cy >= b[1] - 1.0 && cy <= b[3] + 1.0 {
                 *pool.entry(w.text.clone()).or_default() += 1;
@@ -238,228 +267,126 @@ fn integrity(bytes: &[u8], opts: &PdfOptions, out: &PdfUnitsOutput) -> (usize, u
     (ok, total)
 }
 
-fn main() {
-    let a: Vec<String> = std::env::args().skip(1).collect();
-    let (dir, manifest, script, gt_dir) = (
-        PathBuf::from(&a[0]),
-        PathBuf::from(&a[1]),
-        PathBuf::from(&a[2]),
-        PathBuf::from(&a[3]),
-    );
-    let lang = a
+/// Citable markdown of a whole output (disputed vision text excluded).
+fn citable_markdown(out: &PdfUnitsOutput) -> String {
+    out.units
         .iter()
-        .position(|x| x == "--lang")
-        .map(|i| a[i + 1].clone())
-        .or(Some("nl".into()));
+        .map(|u| vision::citable_text(&u.markdown))
+        .collect::<Vec<_>>()
+        .join("\n\n")
+}
+
+struct Args {
+    originals: Option<PathBuf>,
+    manifest: Option<PathBuf>,
+    gt_map: PathBuf,
+    gt: PathBuf,
+    assembled: Option<PathBuf>,
+    lang: Option<String>,
+    corpus: bool,
+}
+
+fn args() -> Args {
+    let a: Vec<String> = std::env::args().skip(1).collect();
+    let flag = |name: &str| a.iter().position(|x| x == name).map(|i| a[i + 1].clone());
+    // legacy positional form: <originals> <manifest> <measure_tables.py> <gt-dir>
+    if a.len() >= 4 && !a[0].starts_with("--") {
+        return Args {
+            originals: Some(PathBuf::from(&a[0])),
+            manifest: Some(PathBuf::from(&a[1])),
+            gt_map: PathBuf::from(&a[2]),
+            gt: PathBuf::from(&a[3]),
+            assembled: flag("--assembled").map(PathBuf::from),
+            lang: flag("--lang").or(Some("nl".into())),
+            corpus: !a.iter().any(|x| x == "--no-corpus"),
+        };
+    }
+    Args {
+        originals: flag("--originals").map(PathBuf::from),
+        manifest: flag("--manifest").map(PathBuf::from),
+        gt_map: PathBuf::from(flag("--gt-map").expect("--gt-map <measure_tables.py | map.json>")),
+        gt: PathBuf::from(flag("--gt").expect("--gt <dir of hand-written GT .md>")),
+        assembled: flag("--assembled").map(PathBuf::from),
+        lang: flag("--lang").or(Some("nl".into())),
+        corpus: !a.iter().any(|x| x == "--no-corpus") && flag("--assembled").is_none(),
+    }
+}
+
+fn main() {
+    let args = args();
     let opts = PdfOptions {
-        language: lang,
+        language: args.lang.clone(),
         ..Default::default()
     };
-    let man: serde_json::Value =
-        serde_json::from_str(&std::fs::read_to_string(&manifest).unwrap()).unwrap();
-    let path_of = |fid: &str| -> Option<PathBuf> {
-        man.as_array()?
-            .iter()
-            .find(|e| e["file_id"] == fid)
-            .and_then(|e| {
-                let p = e["path"].as_str()?;
-                Some(dir.join(Path::new(p).file_name()?))
-            })
+    let man: serde_json::Value = args
+        .manifest
+        .as_ref()
+        .map(|m| serde_json::from_str(&std::fs::read_to_string(m).unwrap()).unwrap())
+        .unwrap_or(serde_json::Value::Null);
+    let original_of = |fid: &str| -> Option<Vec<u8>> {
+        let dir = args.originals.as_ref()?;
+        let e = man.as_array()?.iter().find(|e| e["file_id"] == fid)?;
+        let p = e["path"].as_str().or(e["filename"].as_str())?;
+        std::fs::read(dir.join(Path::new(p).file_name()?)).ok()
+    };
+    let output_of = |fid: &str| -> Result<PdfUnitsOutput, String> {
+        match &args.assembled {
+            Some(dir) => {
+                let raw = std::fs::read_to_string(dir.join(format!("{fid}.json")))
+                    .map_err(|_| "assembled file missing".to_string())?;
+                serde_json::from_str(&raw).map_err(|e| format!("assembled JSON: {e}"))
+            }
+            None => pdf_units(&original_of(fid).ok_or("original missing")?, &opts),
+        }
     };
 
-    // --- acceptance: the GT tables
-    let gt = gt_map(&script);
+    let mode = if args.assembled.is_some() {
+        "assembled (host model output)"
+    } else {
+        "deterministic (no model)"
+    };
+    let gt = gt_map(&args.gt_map);
     let (mut cells, mut cell_tot, mut rows, mut row_tot) = (0, 0, 0, 0);
-    println!("GT tables: {}", gt.len());
+    let (mut integ_ok, mut integ_tot, mut vision_tables) = (0, 0, 0);
+    println!("mode: {mode}; GT tables: {}", gt.len());
     for (k, (gtf, fid)) in gt.iter().enumerate() {
-        let gt_md = std::fs::read_to_string(gt_dir.join(gtf)).unwrap_or_default();
-        let (md, note) = match path_of(fid).and_then(|p| std::fs::read(p).ok()) {
-            Some(bytes) => match pdf_units(&bytes, &opts) {
-                Ok(out) => {
-                    let srcs: Vec<String> = out
-                        .units
-                        .iter()
-                        .filter(|u| u.kind == UnitKind::Table)
-                        .map(|u| format!("{:?}", u.provenance.table_source.unwrap()).to_lowercase())
-                        .collect();
-                    let routes: Vec<String> = out
-                        .pages
-                        .iter()
-                        .map(|p| format!("{:?}", p.route).to_lowercase())
-                        .collect();
-                    let md = out
-                        .units
-                        .iter()
-                        .map(|u| u.markdown.as_str())
-                        .collect::<Vec<_>>()
-                        .join("\n\n");
-                    (md, format!("tables {srcs:?} routes {routes:?}"))
+        let gt_md = std::fs::read_to_string(args.gt.join(gtf)).unwrap_or_default();
+        let (md, note) = match output_of(fid) {
+            Ok(out) => {
+                let srcs: Vec<String> = out
+                    .units
+                    .iter()
+                    .filter(|u| {
+                        u.kind == UnitKind::Table
+                            || (u.provenance.vision_transcribed && u.markdown.contains('|'))
+                    })
+                    .map(
+                        |u| match (u.provenance.table_source, u.provenance.vision_transcribed) {
+                            (_, true) => "vision".to_string(),
+                            (Some(s), _) => format!("{s:?}").to_lowercase(),
+                            (None, _) => "?".into(),
+                        },
+                    )
+                    .collect();
+                vision_tables += srcs.iter().filter(|s| *s == "vision").count();
+                if let Some(bytes) = original_of(fid) {
+                    let (o, t) = integrity(&bytes, &opts, &out);
+                    integ_ok += o;
+                    integ_tot += t;
                 }
-                Err(_) => (String::new(), "pdf error".into()),
-            },
-            None => (String::new(), "original missing".into()),
+                let routes: Vec<String> = out
+                    .pages
+                    .iter()
+                    .map(|p| format!("{:?}", p.route).to_lowercase())
+                    .collect();
+                (
+                    citable_markdown(&out),
+                    format!("tables {srcs:?} routes {routes:?}"),
+                )
+            }
+            Err(e) => (String::new(), e),
         };
         let s = score(&gt_md, &md);
-        if std::env::var_os("TABLES_DEBUG").is_some() {
-            // mismatch kinds for each GT row against its best candidate row
-            let cands = tables(&md);
-            let mut kinds: BTreeMap<&str, usize> = BTreeMap::new();
-            for gt in tables(&gt_md) {
-                for grow in &gt {
-                    let g: Vec<String> = grow.iter().map(|x| norm(x)).collect();
-                    let best = cands.iter().flatten().max_by_key(|c| {
-                        g.iter()
-                            .enumerate()
-                            .filter(|(j, x)| *j < c.len() && norm(&c[*j]) == **x)
-                            .count()
-                    });
-                    let Some(c) = best else { continue };
-                    for (j, x) in g.iter().enumerate() {
-                        let y = c.get(j).map(|v| norm(v)).unwrap_or_default();
-                        if *x == y {
-                            continue;
-                        }
-                        let digits =
-                            |t: &str| t.chars().filter(|c| c.is_ascii_digit()).collect::<String>();
-                        let k = if y.is_empty() {
-                            "candidate empty"
-                        } else if x.is_empty() {
-                            "gt empty"
-                        } else if y.contains(x.as_str()) {
-                            "candidate contains gt (extra text)"
-                        } else if x.contains(y.as_str()) {
-                            "gt contains candidate (text missing)"
-                        } else if digits(x) == digits(&y) && !digits(x).is_empty() {
-                            "same digits, other chars differ"
-                        } else {
-                            let tx: std::collections::BTreeSet<&str> =
-                                x.split_whitespace().collect();
-                            let ty: std::collections::BTreeSet<&str> =
-                                y.split_whitespace().collect();
-                            let inter = tx.intersection(&ty).count();
-                            let dx: String = x.chars().filter(|c| c.is_ascii_digit()).collect();
-                            let dy: String = y.chars().filter(|c| c.is_ascii_digit()).collect();
-                            println!(
-                                "      digits: gt {} cand {} equal {}",
-                                dx.len(),
-                                dy.len(),
-                                dx == dy
-                            );
-                            println!(
-                                "      different: row {} col {} gt {} tokens / cand {} tokens, shared {inter}, gt row idx in table {}",
-                                gt.iter().position(|r| r == grow).unwrap_or(0),
-                                j,
-                                tx.len(),
-                                ty.len(),
-                                cands.iter().flatten().position(|r| std::ptr::eq(r, c)).unwrap_or(0)
-                            );
-                            "different"
-                        };
-                        *kinds.entry(k).or_default() += 1;
-                    }
-                }
-            }
-            println!("    mismatch kinds {kinds:?}");
-            if let Some(bytes) = path_of(fid).and_then(|p| std::fs::read(p).ok()) {
-                if let Ok(d) = diag::tables(&bytes, &opts) {
-                    for p in d {
-                        println!(
-                            "    page {} accepted {:?} uncertain {} rejected {:?}",
-                            p.page, p.accepted, p.uncertain, p.rejected
-                        );
-                    }
-                }
-            }
-            if let Some(bytes) = path_of(fid).and_then(|p| std::fs::read(p).ok()) {
-                let r = citenexus_core::extract::pdf::raw::read(&bytes).unwrap();
-                for (pi, pg) in r.pages.iter().enumerate() {
-                    let mut per_tr: Vec<usize> = Vec::new();
-                    let mut spans: BTreeMap<(u32, u32), usize> = BTreeMap::new();
-                    for n in &pg.struct_nodes {
-                        if n.kind == "TR" {
-                            per_tr.push(0);
-                        } else if n.kind == "TD" || n.kind == "TH" {
-                            if let Some(l) = per_tr.last_mut() {
-                                *l += 1;
-                            }
-                            *spans.entry((n.rowspan, n.colspan)).or_default() += 1;
-                        }
-                    }
-                    if !per_tr.is_empty() {
-                        println!("    struct p{pi}: cells per TR {per_tr:?}; (rowspan,colspan) counts {spans:?}");
-                    }
-                }
-            }
-            // per candidate column: non-empty share (no values)
-            for t in tables(&md) {
-                let cols = t.iter().map(|r| r.len()).max().unwrap_or(0);
-                let fill: Vec<String> = (0..cols)
-                    .map(|c| {
-                        format!(
-                            "{:.2}",
-                            t.iter()
-                                .filter(|r| r.get(c).is_some_and(|x| !x.is_empty()))
-                                .count() as f64
-                                / t.len() as f64
-                        )
-                    })
-                    .collect();
-                println!("    candidate {}x{} column fill {:?}", t.len(), cols, fill);
-                let pat: Vec<String> = t
-                    .iter()
-                    .map(|r| {
-                        r.iter()
-                            .map(|c| if c.is_empty() { '.' } else { '#' })
-                            .collect()
-                    })
-                    .collect();
-                println!("      rows {}", pat.join(" "));
-                let tok: Vec<String> = t
-                    .iter()
-                    .map(|r| {
-                        r.iter()
-                            .map(|c| c.split_whitespace().count().to_string())
-                            .collect::<Vec<_>>()
-                            .join("")
-                    })
-                    .collect();
-                println!("      tokens {}", tok.join(" "));
-            }
-            for t in tables(&gt_md) {
-                let cols = t.iter().map(|r| r.len()).max().unwrap_or(0);
-                let fill: Vec<String> = (0..cols)
-                    .map(|c| {
-                        format!(
-                            "{:.2}",
-                            t.iter()
-                                .filter(|r| r.get(c).is_some_and(|x| !x.is_empty()))
-                                .count() as f64
-                                / t.len() as f64
-                        )
-                    })
-                    .collect();
-                println!("    GT        {}x{} column fill {:?}", t.len(), cols, fill);
-                let pat: Vec<String> = t
-                    .iter()
-                    .map(|r| {
-                        r.iter()
-                            .map(|c| if c.is_empty() { '.' } else { '#' })
-                            .collect()
-                    })
-                    .collect();
-                println!("      rows {}", pat.join(" "));
-                let tok: Vec<String> = t
-                    .iter()
-                    .map(|r| {
-                        r.iter()
-                            .map(|c| c.split_whitespace().count().to_string())
-                            .collect::<Vec<_>>()
-                            .join("")
-                    })
-                    .collect();
-                println!("      tokens {}", tok.join(" "));
-            }
-        }
         cells += s.matched;
         cell_tot += s.gt_cells;
         rows += s.row_hits;
@@ -476,10 +403,20 @@ fn main() {
             s.n_tables
         );
     }
-    println!("TOTAL deterministic: cells {cells}/{cell_tot}, rows {rows}/{row_tot}");
+    println!("TOTAL {mode}: cells {cells}/{cell_tot}, rows {rows}/{row_tot}");
+    if args.originals.is_some() {
+        println!("positional integrity (GT files, text-layer tables): {integ_ok}/{integ_tot} cells made of text-layer words inside the table box; vision tables (not text-layer, not counted): {vision_tables}");
+    } else {
+        println!("positional integrity: not computed (pass --originals and --manifest)");
+    }
 
-    // --- corpus: every PDF
-    let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)
+    if !args.corpus {
+        return;
+    }
+    let Some(dir) = args.originals.as_ref() else {
+        return;
+    };
+    let mut files: Vec<PathBuf> = std::fs::read_dir(dir)
         .unwrap()
         .filter_map(|e| e.ok().map(|e| e.path()))
         .filter(|p| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("pdf")))
@@ -490,7 +427,6 @@ fn main() {
     let mut rejected: BTreeMap<String, usize> = BTreeMap::new();
     let (mut uncertain, mut uncertain_units) = (0, 0);
     let (mut treq, mut twords, mut tmax) = (0usize, 0usize, 0usize);
-    let mut size_hist: BTreeMap<&str, (usize, usize)> = BTreeMap::new();
     for f in &files {
         let Ok(bytes) = std::fs::read(f) else {
             continue;
@@ -526,16 +462,6 @@ fn main() {
                 .iter()
                 .filter(|r| r.kind == PdfRequestKind::TableStructure)
             {
-                let pg = &prep.pages[(r.page - 1) as usize];
-                let share = (r.bbox[3] - r.bbox[1]) / pg.height.max(1.0);
-                let k = if share >= 0.6 {
-                    "region >= 60% of page height"
-                } else {
-                    "region < 60% of page height"
-                };
-                let e = size_hist.entry(k).or_default();
-                e.0 += 1;
-                e.1 += r.words.len();
                 treq += 1;
                 twords += r.words.len();
                 tmax = tmax.max(r.words.len());
@@ -554,6 +480,5 @@ fn main() {
             0.0
         }
     );
-    println!("  by region size (requests, words): {size_hist:?}");
-    println!("positional integrity: {ok}/{tot} emitted cells made of text-layer words inside the table box");
+    println!("positional integrity (corpus): {ok}/{tot} emitted cells made of text-layer words inside the table box");
 }
