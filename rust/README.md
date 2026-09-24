@@ -15,6 +15,8 @@ real C ABI.
 | **extract** — pdf (pdfium, runtime-bound): `extract` keeps the one-paragraph-per-page `ExtractedDoc` | behind the `pdf` feature |
 | **pdf units** — `pdf_units` / `citenexus_pdf_units`: the no-model base extractor (ADR-0017 step 2). Layout lines/columns from pdfium char boxes, U+0002 hyphen join with document witnesses, running header/footer kept once as `furniture`, reading order (struct tree → rule-based → XY-cut), headings: on a tagged document only where the struct tree tags one AND the print supports it (per heading; the per-document agreement rate is still reported), on an untagged one by the strict font rule (font-only headings need ≥1.15× body size or a bold section number, never bold alone; an "Artikel N" label merges with its title), lists, per-page route (`plain`/`formatted`/`table`/`image`/`scan`) with its signals | behind the `pdf` feature; tested on synthetic PDFs (`tests/pdf_units_test.rs`); **tables are not built yet** (a table page is routed `table`, its text is still emitted as paragraphs) |
 | **emit** — any supported format → markdown (`citenexus_to_markdown`), deterministic, byte-identical with the Python reference | ✅ implemented, parity-tested |
+| **pdf contract** — `pdf_prepare` / `pdf_assemble` (ADR-0017 step 3): the model returns table STRUCTURE as word IDs, Rust fills the cells from pdfium's characters; a geometry gate (rows/columns in disjoint ordered bands, IDs known and used once, no dropped cell, no split unit) rejects swapped, moved or duplicated values; vision text is checked against any OCR layer (digit bag, ADR-0015 values as a multiset, coverage 0.90 / novelty 0.08) and labelled `vision_transcribed`; any failure keeps the base text with `failed_check` | behind the `pdf` feature; vectors in `tests/data/pdf/pdf_assemble.json` (15 must-reject, 3 must-accept, 1 documented gap: a word MOVED inside vision text is invisible to every bag); byte-identical Go golden (`tests/data/pdf/assemble-mixed.*`, Rust-generated, so kept out of the Python-generated `conformance/`); default prompts as data in `data/pdf_prompts.json`; deterministic tables (step 4) not built yet |
+| **checks / numbers** — `checks` (geometry gate, output guards, digit bag, value/token multisets) and `numbers` (ADR-0015 locale reader) | pure, no feature; `numbers` pinned to the Python reference's 30 `number_readings` vectors (`tests/data/number_readings.json`, from `6f7cee0`) |
 | **store** — Lance (`upsert/search/scan/drop`, merge-insert by `eu_id`) | ✅ implemented; `tests/core/test_rust_store_parity.py` proves Rust-written tables are read (scan + search) by Python's `LanceVectorStore` and vice versa — same URI, same bytes |
 | **detect** — fastText lid.176 (pure-Rust `fasttext` crate) | ✅ implemented — **dense `lid.176.bin` only**: the crate's quantized (`.ftz`) inference diverges from upstream in 0.8.0, so quantized models are refused with an error (see `src/detect.rs`) |
 | **rrf** — reciprocal-rank fusion (`citenexus_rrf`) — pure rank arithmetic over `eu_id`s, k passed in, no tokenization/Unicode/key | ✅ implemented, byte-parity-tested (`tests/rrf_test.rs` + `tests/core/test_rust_rrf_parity.py`) against the Python reference `citenexus.retrieve.fusion` (ADR-0006). Every SDK's fusion is a thin binding to this; the old per-language helpers are **deprecated, not removed** |
@@ -46,6 +48,14 @@ char* citenexus_to_markdown(const uint8_t* bytes, size_t len,
 // or NULL. -> {"units":[DocUnit...],"pages":[...],"document":{...}} or
 // {"error": ...} (also when built without `pdf` or libpdfium is missing).
 char* citenexus_pdf_units(const uint8_t* bytes, size_t len, const char* opts_json);
+// The model contract (ADR-0017): the core never calls a model. prepare returns
+// the base output + requests (table_structure over text-layer word IDs,
+// vision_page, vision_region); the host fulfils them; assemble re-parses the
+// PDF and applies each response that passes the checks. pdf_units ==
+// pdf_assemble with no responses, byte for byte.
+char* citenexus_pdf_prepare(const uint8_t* bytes, size_t len, const char* opts_json);
+char* citenexus_pdf_assemble(const uint8_t* bytes, size_t len, const char* opts_json,
+                             const char* responses_json); // JSON array of PdfResponse, or NULL
 
 // rrf — reciprocal-rank fusion. lists_json = JSON array of arrays of eu_id
 // strings; k = the RRF constant (60 is standard). -> JSON array of fused

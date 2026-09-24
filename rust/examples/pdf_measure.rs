@@ -20,7 +20,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use citenexus_core::extract::pdf::pdf_units;
+use citenexus_core::extract::pdf::{pdf_prepare, pdf_units};
 use citenexus_core::units::*;
 use unicode_normalization::UnicodeNormalization;
 
@@ -102,6 +102,8 @@ fn main() {
     let mut rates: Vec<f64> = Vec::new();
     let (mut unsup, mut strong, mut weak) = (0u32, 0u32, 0u32);
     let mut order: BTreeMap<String, usize> = BTreeMap::new();
+    let mut requests: BTreeMap<String, usize> = BTreeMap::new();
+    let mut table_words = 0usize;
     let t0 = std::time::Instant::now();
     for f in &files {
         let name = f.file_name().unwrap().to_string_lossy().to_string();
@@ -126,6 +128,14 @@ fn main() {
                 continue;
             }
         };
+        if let Ok(prep) = pdf_prepare(&bytes, &opts) {
+            for r in &prep.requests {
+                *requests
+                    .entry(format!("{:?}", r.kind).to_lowercase())
+                    .or_default() += 1;
+                table_words += r.words.len();
+            }
+        }
         let md: String = out
             .units
             .iter()
@@ -190,6 +200,9 @@ fn main() {
     println!("route per page: {routes:?}");
     println!("reading order per page: {order:?}");
     println!("units by kind: {kinds:?}");
+    println!(
+        "pdf_prepare requests by kind: {requests:?}; words listed in table requests: {table_words}"
+    );
 
     if let Some(bdir) = &baseline {
         // baseline <file_id>.md, keyed by file_id
