@@ -203,3 +203,24 @@ fn json_shape_matches_python_field_names() {
     assert!(json["blocks"][0]["page"].is_null());
     assert_eq!(json["blocks"][0]["order"], 0);
 }
+
+// XML entities and character references are text. quick-xml 0.41 delivers them
+// as a separate GeneralRef event; ignoring it turned "A &amp; B" into "A  B".
+#[test]
+fn docx_and_pptx_keep_xml_entities_and_char_refs() {
+    let document_xml = r#"<?xml version="1.0"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>Loon &amp; premie &lt;5%&gt; &quot;bruto&quot; &apos;x&apos; &#8364; 10 &#x20AC; 20</w:t></w:r></w:p>
+  </w:body>
+</w:document>"#;
+    let doc = run(&zip_of(&[("word/document.xml", document_xml)]), SourceType::Docx);
+    assert_eq!(doc.blocks[0].text, "Loon & premie <5%> \"bruto\" 'x' € 10 € 20");
+
+    let slide_xml = r#"<?xml version="1.0"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>In- &amp; verkoop</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld>
+</p:sld>"#;
+    let doc = run(&zip_of(&[("ppt/slides/slide1.xml", slide_xml)]), SourceType::Pptx);
+    assert!(doc.blocks.iter().any(|b| b.text.contains("In- & verkoop")), "{:?}", doc.blocks);
+}

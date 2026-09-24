@@ -86,6 +86,13 @@ fn docx_paragraphs(xml: &str) -> Vec<DocxParagraph> {
                     }
                 }
             }
+            Ok(Event::GeneralRef(r)) => {
+                if in_text {
+                    if let (Some(p), Some(ch)) = (current.as_mut(), general_ref(&r)) {
+                        p.text.push(ch);
+                    }
+                }
+            }
             Ok(Event::End(e)) => match local_name(e.name().as_ref()) {
                 b"t" => in_text = false,
                 b"p" => {
@@ -277,6 +284,13 @@ fn pptx_slide(xml: &str, page: u32) -> (Vec<String>, Vec<ImageRef>) {
                     }
                 }
             }
+            Ok(Event::GeneralRef(r)) => {
+                if in_a_t {
+                    if let Some(ch) = general_ref(&r) {
+                        paragraph.push(ch);
+                    }
+                }
+            }
             Ok(Event::End(e)) => match local_name(e.name().as_ref()) {
                 b"t" => in_a_t = false,
                 b"p" if in_tx_body => frame_paragraphs.push(std::mem::take(&mut paragraph)),
@@ -350,4 +364,22 @@ pub fn extract_pptx(
         blocks,
         images,
     })
+}
+
+/// An entity or character reference inside text. quick-xml 0.41 delivers
+/// `&amp;`, `&#8364;` and the like as their own event, not inside `Text`;
+/// ignoring it dropped them ("A &amp; B" read "A  B"). OOXML defines no DTD
+/// entities, so only the five predefined names exist.
+fn general_ref(r: &quick_xml::events::BytesRef<'_>) -> Option<char> {
+    if let Ok(Some(ch)) = r.resolve_char_ref() {
+        return Some(ch);
+    }
+    match r.decode().ok()?.as_ref() {
+        "amp" => Some('&'),
+        "lt" => Some('<'),
+        "gt" => Some('>'),
+        "quot" => Some('"'),
+        "apos" => Some('\''),
+        _ => None,
+    }
 }
