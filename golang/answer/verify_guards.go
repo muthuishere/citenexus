@@ -458,8 +458,9 @@ func clauseNegationGuard(claim, passage string) string {
 				inSpan[tok]++
 			}
 		}
-		for tok, n := range inSpan {
-			if inClaim[tok] < n {
+		// In span order, so the reason names the same marker on every run.
+		for _, tok := range clauseTokens[span.Start : span.End+1] {
+			if n, ok := inSpan[tok]; ok && inClaim[tok] < n {
 				return fmt.Sprintf("negation guard: the claim drops %q from the matched words", tok)
 			}
 		}

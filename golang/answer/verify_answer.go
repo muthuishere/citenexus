@@ -459,7 +459,14 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 	}
 	unsupported := sortedUnique(scriptLists...)
 	answerLanguage := lang.ResolveAnswerLanguage(nil, opts.AnswerLanguage, "", languages, defaultAnswerLanguage)
-	claimLanguage := primaryLanguage(opts.AnswerLanguage)
+	// "auto" is the detect-it sentinel, not a language: it must not count as
+	// declared, or every unit with a declared language reads as cross-language
+	// and the model admits same-language paraphrases without AdmitParaphrase.
+	declared := opts.AnswerLanguage
+	if strings.EqualFold(strings.TrimSpace(declared), lang.AutoAnswerLanguage) {
+		declared = ""
+	}
+	claimLanguage := primaryLanguage(declared)
 
 	// Authority: after grounding in spirit — it only ever narrows what may be cited.
 	selection := authority.Select(evidence, func(eu EvidenceUnit) map[string]string { return eu.Authority }, opts.Authority)
@@ -570,7 +577,7 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 		if !v.supported && v.reason != ReasonContradicted && opts.Checker != nil && len(pc.cited) > 0 {
 			guardReason := ""
 			admit := func(eu EvidenceUnit) (bool, error) {
-				if reason := guards(pc.text, opts.AnswerLanguage, eu, opts.NameAliases); reason != "" {
+				if reason := guards(pc.text, declared, eu, opts.NameAliases); reason != "" {
 					if guardReason == "" {
 						guardReason = reason // the FIRST cited unit refused, not the last
 					}

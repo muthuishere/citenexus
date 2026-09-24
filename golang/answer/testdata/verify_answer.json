@@ -1692,6 +1692,35 @@
           }
         ]
       }
+    },
+    {
+      "name": "language/auto-is-undeclared-and-does-not-open-the-model-path",
+      "must_refuse": true,
+      "answer": "Het loon wordt maandelijks overgemaakt [eu:a].",
+      "answer_language": "auto",
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werkgever betaalt het salaris elke maand uit."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "not supported"
+          }
+        ]
+      }
     }
   ]
 }

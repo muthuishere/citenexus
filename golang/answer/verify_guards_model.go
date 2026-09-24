@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math/big"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/muthuishere/citenexus/golang/gate"
@@ -289,7 +290,18 @@ func ratKey(r *big.Rat) string {
 // its unit, and the number guard already requires the digits to be present.
 func unitGuard(claim, claimLanguage, passage, passageLanguage string) string {
 	have := quantities(passage, passageLanguage)
+	claimed := make([][2]string, 0)
 	for q := range quantities(claim, claimLanguage) {
+		claimed = append(claimed, q)
+	}
+	// Sorted by (value, unit), so the reason names the same quantity on every run.
+	sort.Slice(claimed, func(i, j int) bool {
+		if claimed[i][0] != claimed[j][0] {
+			return claimed[i][0] < claimed[j][0]
+		}
+		return claimed[i][1] < claimed[j][1]
+	})
+	for _, q := range claimed {
 		if _, ok := have[q]; ok {
 			continue
 		}
