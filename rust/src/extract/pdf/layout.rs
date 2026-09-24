@@ -234,8 +234,12 @@ pub fn starts_list_item(text: &str) -> bool {
         return false;
     }
     let core = head.trim_start_matches('(');
-    let (body, tail) = core.split_at(core.len() - 1);
-    if !matches!(tail, ")" | ".") || body.is_empty() {
+    // Split off the last CHAR (not byte): heads like "€" are multi-byte.
+    let Some((cut, last)) = core.char_indices().last() else {
+        return false;
+    };
+    let (body, tail) = (&core[..cut], last);
+    if !matches!(tail, ')' | '.') || body.is_empty() {
         return false;
     }
     let numeric = body.chars().all(|c| c.is_ascii_digit());
@@ -243,7 +247,7 @@ pub fn starts_list_item(text: &str) -> bool {
     let roman = body.chars().all(|c| matches!(c, 'i' | 'v' | 'x')) && body.len() <= 4;
     // "1." alone is ambiguous with section numbering; only ")" forms and
     // lower-case letters/romans are list markers here.
-    (numeric && tail == ")") || alpha || (roman && tail == ")")
+    (numeric && tail == ')') || alpha || (roman && tail == ')')
 }
 
 /// The modal baseline pitch between vertically adjacent same-column segments.
@@ -376,4 +380,26 @@ pub fn layout_text(page: &RawPage, pl: &PageLayout) -> String {
         out.push('\n');
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn list_markers() {
+        assert!(starts_list_item("\u{2022} annual leave"));
+        assert!(starts_list_item("a) first"));
+        assert!(starts_list_item("(1) first"));
+        assert!(starts_list_item("iv) fourth"));
+        assert!(!starts_list_item("1. Scope"));
+        assert!(!starts_list_item("Leave policy"));
+    }
+
+    #[test]
+    fn multibyte_heads_do_not_panic() {
+        assert!(!starts_list_item("€ 7.000,00 per jaar"));
+        assert!(!starts_list_item("€€ x"));
+        let _ = starts_list_item("ë) x");
+    }
 }
