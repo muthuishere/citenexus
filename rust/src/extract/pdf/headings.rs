@@ -7,7 +7,12 @@
 //! **Decided per document, never page by page (consumer rule).** When the
 //! structure tree carries headings, it is compared with the font evidence on
 //! every page where either names a heading. A page agrees when both name
-//! exactly the same heading blocks. If more than `MAX_DISAGREEMENT` (20 %) of
+//! the same headings, weighted by evidence: a page DISAGREES when a tagged
+//! heading is printed exactly like body text (not larger, not bold), or when a
+//! clearly larger short line (≥1.15 × body size) is tagged as body text. A
+//! bold body-size line tagged as body text is weak evidence (Word labels,
+//! lead-ins) and is only counted (`font_untagged_weak`), never a
+//! disagreement. If more than `MAX_DISAGREEMENT` (20 %) of
 //! those pages disagree, the tags are treated as systematically unreliable and
 //! the WHOLE document uses font evidence; otherwise the WHOLE document uses the
 //! tags. Why 20 %: one odd page in five is the kind of local quirk a real
@@ -97,7 +102,10 @@ fn font_candidate(b: &HBlock, body: f64) -> bool {
     if t.ends_with(',') || t.ends_with(';') || t.ends_with(':') {
         return false;
     }
-    let bigger = b.size >= body * 1.15;
+    // A larger line that ends a sentence is lead/intro text, not a heading,
+    // unless it is a few words ("Art. 5.").
+    let sentence = t.ends_with('.') && t.split_whitespace().count() > 3;
+    let bigger = b.size >= body * 1.15 && b.lines <= 2 && !sentence;
     let bold_line = b.bold && b.size >= body * 0.95 && b.lines <= 2 && !t.ends_with('.');
     bigger || bold_line
 }
@@ -135,19 +143,31 @@ pub fn plan(blocks: &[HBlock], body: f64, outline: &[OutlineEntry], pages: usize
     let mut trust_struct = false;
     if has_struct {
         let (mut compared, mut agree) = (0u32, 0u32);
+        let (mut unsupported, mut strong, mut weak) = (0u32, 0u32, 0u32);
         for p in 0..pages {
             let on: Vec<usize> = (0..blocks.len()).filter(|&i| blocks[i].page == p).collect();
-            let s: Vec<usize> = on
-                .iter()
-                .copied()
-                .filter(|&i| blocks[i].struct_tag.is_some())
-                .collect();
-            let f: Vec<usize> = on.iter().copied().filter(|&i| cand[i]).collect();
-            if s.is_empty() && f.is_empty() {
+            let tagged = |i: usize| blocks[i].struct_tag.is_some();
+            let strong_font = |i: usize| cand[i] && blocks[i].size >= body * 1.15;
+            if !on.iter().any(|&i| tagged(i) || cand[i]) {
                 continue;
             }
             compared += 1;
-            if s == f {
+            // A tagged heading printed exactly like body text (not larger, not bold).
+            let u = on
+                .iter()
+                .filter(|&&i| tagged(i) && blocks[i].size < body * 1.15 && !blocks[i].bold)
+                .count() as u32;
+            // A clearly larger short line the tags call body text.
+            let st = on.iter().filter(|&&i| strong_font(i) && !tagged(i)).count() as u32;
+            // A bold body-size line the tags call body text: weak, counted only.
+            let wk = on
+                .iter()
+                .filter(|&&i| cand[i] && !strong_font(i) && !tagged(i))
+                .count() as u32;
+            unsupported += u;
+            strong += st;
+            weak += wk;
+            if u == 0 && st == 0 {
                 agree += 1;
             }
         }
@@ -162,6 +182,9 @@ pub fn plan(blocks: &[HBlock], body: f64, outline: &[OutlineEntry], pages: usize
             agreeing_pages: agree,
             rate: r4(rate),
             struct_tree_trusted: trust_struct,
+            struct_unsupported: unsupported,
+            font_untagged_strong: strong,
+            font_untagged_weak: weak,
         });
     }
 

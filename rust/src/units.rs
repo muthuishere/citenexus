@@ -219,12 +219,23 @@ pub struct PdfPageInfo {
 pub struct HeadingAgreement {
     /// Pages with a struct-tree heading or a font-evidence heading.
     pub compared_pages: u32,
-    /// Of those, pages where both sources name the same heading blocks.
+    /// Of those, pages with no tagged heading printed as body text and no
+    /// clearly larger line tagged as body text.
     pub agreeing_pages: u32,
     /// agreeing / compared, rounded to 4 decimals (1.0 when nothing compared).
     pub rate: f64,
     /// The struct tree was trusted for the WHOLE document.
     pub struct_tree_trusted: bool,
+    /// Tagged heading blocks printed like body text (not larger, not bold).
+    #[serde(default)]
+    pub struct_unsupported: u32,
+    /// Clearly larger short blocks (≥1.15 × body) tagged as body text.
+    #[serde(default)]
+    pub font_untagged_strong: u32,
+    /// Bold body-size short blocks tagged as body text (weak; not counted
+    /// against the tags).
+    #[serde(default)]
+    pub font_untagged_weak: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
