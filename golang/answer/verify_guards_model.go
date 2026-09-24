@@ -167,7 +167,8 @@ func numberValue(token, language string) (string, bool) {
 // "halfjaar" / "half (a) year" as 6 months, and an ordinal before a year
 // compound ("eerste levensjaar") as 1 year.
 func quantities(text, language string) map[[2]string]struct{} {
-	_, text = clockTimes(text) // "7.30 uur" is a time of day, not 7.3 hours
+	_, text = clockTimes(text)           // "7.30 uur" is a time of day, not 7.3 hours
+	_, text = moneyRates(text, language) // "€ 150 per maand" is a price, not 150 months
 	tokens := unitScan.FindAllString(strings.ToLower(text), -1)
 	out := map[[2]string]struct{}{}
 	for i := 0; i < len(tokens); i++ {
@@ -294,6 +295,20 @@ func ratKey(r *big.Rat) string {
 func unitGuard(claim, claimLanguage, passage, passageLanguage string) string {
 	_, claim = clockTimes(claim) // a clock time is never a duration
 	_, passage = clockTimes(passage)
+	// A rate conflicts only with the SAME amount at another period: "€ 150 per
+	// jaar" over "€ 150 per maand". Another amount's period decides nothing.
+	claimRates, _ := moneyRates(claim, claimLanguage)
+	passageRates, _ := moneyRates(passage, passageLanguage)
+	for _, r := range sortedPairs(claimRates) {
+		if _, ok := passageRates[r]; ok {
+			continue
+		}
+		for _, p := range sortedPairs(passageRates) {
+			if p[0] == r[0] && p[1] != r[1] && !samePeriodFamily(p[1], r[1]) {
+				return fmt.Sprintf("unit guard: %s per %s where the passage says %s per %s", r[0], r[1], p[0], p[1])
+			}
+		}
+	}
 	have := quantities(passage, passageLanguage)
 	claimed := make([][2]string, 0)
 	for q := range quantities(claim, claimLanguage) {
@@ -310,10 +325,8 @@ func unitGuard(claim, claimLanguage, passage, passageLanguage string) string {
 		if _, ok := have[q]; ok {
 			continue
 		}
-		if eq, ok := equivalentQuantity(q); ok {
-			if _, found := have[eq]; found {
-				continue
-			}
+		if sameQuantityIn(q, have) {
+			continue
 		}
 		var sameValue, sameUnit []string
 		for p := range have {
@@ -632,4 +645,51 @@ func scopeGuard(claim, passage string) string {
 		return "scope guard: the claim widens a specific period in the passage to every period"
 	}
 	return ""
+}
+
+func sortedPairs(set map[[2]string]struct{}) [][2]string {
+	out := make([][2]string, 0, len(set))
+	for p := range set {
+		out = append(out, p)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i][0] != out[j][0] {
+			return out[i][0] < out[j][0]
+		}
+		return out[i][1] < out[j][1]
+	})
+	return out
+}
+
+// sameQuantityIn: q, or the same period in another unit, is in have — years
+// as months, and a whole number of years as 52-week years ("het eerste
+// ziektejaar" = "de eerste 52 weken"), both directions.
+func sameQuantityIn(q [2]string, have map[[2]string]struct{}) bool {
+	if _, ok := have[q]; ok {
+		return true
+	}
+	if eq, ok := equivalentQuantity(q); ok {
+		if _, found := have[eq]; found {
+			return true
+		}
+	}
+	v, ok := new(big.Rat).SetString(q[0])
+	if !ok {
+		return false
+	}
+	switch q[1] {
+	case "year":
+		_, found := have[[2]string{ratKey(new(big.Rat).Mul(v, big.NewRat(52, 1))), "week"}]
+		return found
+	case "week":
+		_, found := have[[2]string{ratKey(new(big.Rat).Quo(v, big.NewRat(52, 1))), "year"}]
+		return found && new(big.Rat).Quo(v, big.NewRat(52, 1)).IsInt()
+	}
+	return false
+}
+
+// samePeriodFamily: day and workday are not told apart for a rate — "per
+// thuiswerkdag" ends in "werkdag" but is a (home-working) day.
+func samePeriodFamily(a, b string) bool {
+	return (a == "day" || a == "workday") && (b == "day" || b == "workday")
 }

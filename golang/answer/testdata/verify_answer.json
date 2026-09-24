@@ -5233,6 +5233,211 @@
           }
         ]
       }
+    },
+    {
+      "name": "rate/per-year-over-per-month-refuses",
+      "answer": "De eigen bijdrage is € 150 per jaar [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De eigen bijdrage is € 150 per maand."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "unit guard"
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "rate/per-week-over-per-day-refuses",
+      "answer": "The allowance is €12 per week [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De vergoeding bedraagt € 12 per dag."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "unit guard"
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "rate/a-rate-is-not-a-duration",
+      "answer": "De eigen bijdrage is € 150 per maand [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De eigen bijdrage is € 150 per maand, 12 maanden lang."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "rate/a-rate-is-not-compared-with-an-unrelated-duration",
+      "answer": "The contribution is €150 net per month [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De eigen bijdrage bedraagt € 150 netto per maand. Het contract heeft een looptijd van 48 maanden."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "rate/a-rate-per-compound-day",
+      "answer": "The home-working allowance is €2.35 per day [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De thuiswerkvergoeding bedraagt € 2,35 per thuiswerkdag."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "rate/a-rate-is-not-refused-for-another-amounts-period (R-34 shape)",
+      "answer": "De eigen bijdrage is € 150 per maand [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De eigen bijdrage bedraagt € 150. De parkeervergoeding is € 30 per maand."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "unit/one-year-is-52-weeks (R-24 shape)",
+      "answer": "Tijdens het eerste ziektejaar wordt 70% doorbetaald [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Gedurende de eerste 52 weken wordt 70% van het loon doorbetaald."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
     }
   ]
 }

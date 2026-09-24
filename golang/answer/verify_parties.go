@@ -268,13 +268,8 @@ func valueRowGuard(claim, claimLanguage string, eu EvidenceUnit) string {
 				}
 				matched = true
 				for q := range mine {
-					if _, ok := theirs[q]; ok {
+					if sameQuantityIn(q, theirs) {
 						agrees = true
-					}
-					if eq, ok := equivalentQuantity(q); ok {
-						if _, ok := theirs[eq]; ok {
-							agrees = true
-						}
 					}
 				}
 				if other == ([2]string{}) {

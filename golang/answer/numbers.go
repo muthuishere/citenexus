@@ -241,3 +241,38 @@ func clockTimes(text string) (map[string]struct{}, string) {
 	}
 	return keys, string(blank)
 }
+
+// Money is never a duration: "€ 150 per maand" is a price with a period, not
+// 150 months. moneyRates returns the rates in text — (amount key, period
+// class) for an amount followed by per/a/each/"/" and a time unit ("€ 2,35
+// per thuiswerkdag" = (2.35, day)) — and the text with every money amount
+// blanked, so quantities() never reads one as a duration.
+var (
+	moneyBefore = regexp.MustCompile(`(?:€|\beur\b|\$|£)\s*([0-9][0-9.,]*)(?:,-)?`)
+	moneyAfter  = regexp.MustCompile(`\b([0-9][0-9.,]*)\s*(?:euro|eur)\b`)
+	ratePeriod  = regexp.MustCompile(`^(?:\s+\p{L}+)?\s*(?:per|a|an|each|/)\s*(\p{L}+)`)
+)
+
+func moneyRates(text, language string) (map[[2]string]struct{}, string) {
+	rates := map[[2]string]struct{}{}
+	lowered := strings.ToLower(text)
+	blank := []byte(lowered)
+	for _, re := range []*regexp.Regexp{moneyBefore, moneyAfter} {
+		for _, m := range re.FindAllStringSubmatchIndex(lowered, -1) {
+			raw := strings.TrimRight(lowered[m[2]:m[3]], ".,")
+			if raw == "" {
+				continue
+			}
+			key := ReadNumber(raw, false, language).Key
+			if p := ratePeriod.FindStringSubmatch(lowered[m[1]:]); p != nil {
+				if class, _, ok := unitOf(p[1]); ok {
+					rates[[2]string{key, class}] = struct{}{}
+				}
+			}
+			for i := m[2]; i < m[3]; i++ {
+				blank[i] = ' '
+			}
+		}
+	}
+	return rates, string(blank)
+}
