@@ -441,3 +441,20 @@ func TestQualifierPairsAreHostExtensible(t *testing.T) {
 		t.Fatalf("a host pair must refuse peak over daluren: %+v", res.Claims)
 	}
 }
+
+// The exclusion guard gives NO VERDICT across languages without a glossary
+// (rag_go adv gw-v2-15, fictional text): it must not guess that "teachers" is
+// "leraren". End to end the checker is then the only barrier; with a glossary
+// the guard refuses it (the conformance vector).
+func TestExclusionGuardHasNoVerdictAcrossLanguagesWithoutAGlossary(t *testing.T) {
+	claim := "Teachers who work from home at least one day a week receive €2.35 per day worked from home."
+	unit := EvidenceUnit{ID: "S1", DocumentID: "thuiswerkregeling Stichting Openbaar Onderwijs Duinrand", Language: "nl",
+		Text: "Thuiswerkvergoeding. Medewerkers van het bestuursbureau die op grond van een thuiswerkafspraak ten minste één dag per week thuiswerken, ontvangen een vergoeding van € 2,35 per thuiswerkdag. Voor leraren en onderwijsondersteunend personeel geldt deze vergoeding niet."}
+	if reason := exclusionGuard(claim, "en", unit, guardConfig{actors: DefaultActorLexicon}); reason != "" {
+		t.Fatalf("no glossary: want no verdict, got %q", reason)
+	}
+	cfg := guardConfig{actors: DefaultActorLexicon, glossary: [][2]string{{"leraren", "teachers"}, {"leraar", "teacher"}}}
+	if reason := exclusionGuard(claim, "en", unit, cfg); !strings.HasPrefix(reason, "exclusion guard") {
+		t.Fatalf("with a glossary: want the exclusion refused, got %q", reason)
+	}
+}

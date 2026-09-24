@@ -6231,35 +6231,6 @@
       }
     },
     {
-      "name": "exclusion/adv-gw-v2-15 without a glossary is the checker's (no verdict)",
-      "answer": "Teachers who work from home at least one day a week receive €2.35 per day worked from home [eu:S1].",
-      "answer_language": "en",
-      "admit_paraphrase": true,
-      "checker": {
-        "S1": [
-          0.999,
-          0.0
-        ]
-      },
-      "evidence": [
-        {
-          "id": "S1",
-          "document_id": "thuiswerkregeling Stichting Openbaar Onderwijs Duinrand",
-          "language": "nl",
-          "text": "Thuiswerkvergoeding. Medewerkers van het bestuursbureau die op grond van een thuiswerkafspraak ten minste één dag per week thuiswerken, ontvangen een vergoeding van € 2,35 per thuiswerkdag. Voor leraren en onderwijsondersteunend personeel geldt deze vergoeding niet."
-        }
-      ],
-      "expect": {
-        "decision": "answered",
-        "claims": [
-          {
-            "supported": true,
-            "reason": ""
-          }
-        ]
-      }
-    },
-    {
       "name": "exclusion/nl-an-excluded-group-refuses",
       "answer": "Stagiairs kunnen eens per vier jaar een fiets aanschaffen via de fietsregeling [eu:a].",
       "answer_language": "nl",

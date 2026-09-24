@@ -20,8 +20,10 @@
 // "every"), unless it restates the exclusion itself (it carries an exclusion
 // marker or a negation). Same language directly; across languages only
 // through VerifyOptions.Glossary, and a group word the glossary does not cover
-// gives no verdict. With no glossary no cross-language claim is judged — then
-// it is the checker's to catch. Can only refuse.
+// gives no verdict. With no glossary no cross-language claim is judged: the
+// guard returns no verdict, and END TO END THE CHECKER IS THEN THE ONLY
+// BARRIER for such a claim (gw-v2-15 is admitted by a checker that admits
+// it). Pass the host's glossary to close it deterministically. Can only refuse.
 
 package answer
 
