@@ -975,3 +975,158 @@ fn fake_bold_offset_by_a_full_point_still_comes_out_once() {
         vec!["Belangrijk"]
     );
 }
+
+// ------------------- furniture: mastheads, sparse pages (peer round 2) ----
+
+fn furniture_of(out: &PdfUnitsOutput) -> Vec<&str> {
+    out.units
+        .iter()
+        .filter(|u| u.kind == UnitKind::Furniture)
+        .map(|u| u.markdown.as_str())
+        .collect()
+}
+
+#[test]
+fn a_mixed_size_masthead_is_one_block_and_the_body_below_it_stays_body() {
+    if !have_pdfium() {
+        return;
+    }
+    // (a) 10 pt bold name over an 8 pt strapline; the first body line (10 pt
+    // regular, the document's body type) sits close below it.
+    let pages: Vec<Page> = (1..=4)
+        .map(|n| {
+            body_page(&format!("Eerste regel van pagina {n}."), "Slotregel.")
+                .bold(72.0, 30.0, 10.0, "Advocatenkantoor Voorbeeld")
+                .text(72.0, 42.0, 8.0, "Arbeidsrecht en ondernemingsrecht")
+                .text(
+                    72.0,
+                    56.0,
+                    10.0,
+                    &format!("Dossier {n} is geopend op maandag."),
+                )
+        })
+        .collect();
+    let out = run(&Doc::new(pages), Some("nl"));
+    assert_eq!(
+        furniture_of(&out),
+        vec![
+            "Advocatenkantoor Voorbeeld",
+            "Arbeidsrecht en ondernemingsrecht"
+        ]
+    );
+    for n in 1..=4u32 {
+        assert!(
+            body_texts(&out, n).contains(&format!("Dossier {n} is geopend op maandag.")),
+            "page {n}"
+        );
+    }
+}
+
+#[test]
+fn a_detached_footer_at_ten_percent_is_still_caught() {
+    if !have_pdfium() {
+        return;
+    }
+    // (c) body ends at ~690 pt; the footer sits ~10 % from the bottom (760 pt),
+    // detached by whitespace.
+    let pages: Vec<Page> = (1..=4)
+        .map(|n| {
+            Page::a4()
+                .para(
+                    72.0,
+                    100.0,
+                    10.0,
+                    &[&format!("Tekst van pagina {n}."), "Nog een regel."],
+                )
+                .para(
+                    72.0,
+                    660.0,
+                    10.0,
+                    &["Laatste alinea van de tekst.", "Einde."],
+                )
+                .text(72.0, 760.0, 8.0, "Vertrouwelijk - interne regeling")
+        })
+        .collect();
+    let out = run(&Doc::new(pages), Some("nl"));
+    assert_eq!(furniture_of(&out), vec!["Vertrouwelijk - interne regeling"]);
+    for n in 1..=4u32 {
+        assert!(body_texts(&out, n).contains("Einde."), "page {n}");
+    }
+}
+
+#[test]
+fn a_sparse_page_keeps_its_detached_header_as_furniture_and_its_body_as_body() {
+    if !have_pdfium() {
+        return;
+    }
+    // (d) header + two body lines + footer only (cover sheets, short forms):
+    // every gap on the page is one of the gaps being judged.
+    let pages: Vec<Page> = (1..=4)
+        .map(|n| {
+            Page::a4()
+                .text(72.0, 30.0, 8.0, "Formulier verlofaanvraag")
+                .para(
+                    72.0,
+                    62.0,
+                    10.0,
+                    &[
+                        &format!("Aanvraag {n} van de werknemer."),
+                        "Handtekening volgt.",
+                    ],
+                )
+                .text(72.0, 810.0, 8.0, "Versie 2024-03")
+        })
+        .collect();
+    let out = run(&Doc::new(pages), Some("nl"));
+    assert_eq!(
+        furniture_of(&out),
+        vec!["Formulier verlofaanvraag", "Versie 2024-03"]
+    );
+    for n in 1..=4u32 {
+        let b = body_texts(&out, n);
+        assert!(
+            b.contains(&format!("Aanvraag {n} van de werknemer."))
+                && b.contains("Handtekening volgt."),
+            "page {n}: {b}"
+        );
+    }
+}
+
+#[test]
+fn a_masthead_heavier_than_the_body_on_every_page() {
+    if !have_pdfium() {
+        return;
+    }
+    // (e) The rule's FLOOR: on EVERY page a 2-line masthead (9 pt bold name,
+    // 8 pt address, more characters than the body) over ONE 10 pt body line.
+    // The document-level body style then comes out as the address style, not
+    // the body line's. Observed and pinned: the name is furniture, the
+    // address stays body text (repeated on each page, never deleted), and
+    // every page keeps its own body line. Nothing is lost; the masthead is
+    // only partly suppressed. A degenerate forms-only document: a documented
+    // limit (furniture.rs `edge_block`), not tuned for.
+    let pages: Vec<Page> = (1..=4)
+        .map(|n| {
+            Page::a4()
+                .bold(72.0, 20.0, 9.0, "Voorbeeld Groep B.V. Juridische Zaken")
+                .text(
+                    72.0,
+                    31.0,
+                    8.0,
+                    "Postbus 1234, 1000 AB Amsterdam, telefoon 020 123 45 67",
+                )
+                .text(72.0, 44.0, 10.0, &format!("Brief {n} over de regeling."))
+        })
+        .collect();
+    let out = run(&Doc::new(pages), Some("nl"));
+    for n in 1..=4u32 {
+        assert!(
+            body_texts(&out, n).contains(&format!("Brief {n} over de regeling.")),
+            "page {n} lost its body line"
+        );
+    }
+    assert_eq!(
+        furniture_of(&out),
+        vec!["Voorbeeld Groep B.V. Juridische Zaken"]
+    );
+}

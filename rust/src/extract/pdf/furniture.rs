@@ -58,25 +58,79 @@ pub fn is_page_number(key: &str) -> bool {
             .all(|w| w.chars().all(|c| c == '#') || PAGE_WORDS.contains(&w))
 }
 
+/// A text style: font size in 0.5 pt bins, and boldness.
+type Style = (i64, bool);
+
+fn style(s: &Segment) -> Style {
+    ((s.size * 2.0).round() as i64, s.bold)
+}
+
+/// The DOCUMENT'S body style: the character-weighted mode over every page
+/// (never per page, so a cover sheet or form where furniture outweighs body
+/// on that page cannot flip it), excluding tabular lines (3+ segments on one
+/// baseline: table rows are often set smaller and hold many characters).
+/// Furniture runs before table detection, so this is the proxy for "not a
+/// table". Ties go to the larger size.
+fn body_style(pages: &[(f64, &[Segment])]) -> Option<Style> {
+    let mut weight: BTreeMap<Style, usize> = BTreeMap::new();
+    for (_, segs) in pages {
+        let mut per_line: BTreeMap<i64, usize> = BTreeMap::new();
+        for s in segs.iter() {
+            *per_line
+                .entry((s.baseline * 2.0).round() as i64)
+                .or_default() += 1;
+        }
+        for s in segs.iter() {
+            if per_line[&((s.baseline * 2.0).round() as i64)] >= 3 || s.text.trim().is_empty() {
+                continue;
+            }
+            *weight.entry(style(s)).or_default() += s.chars.len();
+        }
+    }
+    weight
+        .into_iter()
+        .max_by(|a, b| a.1.cmp(&b.1).then(a.0.cmp(&b.0)))
+        .map(|(k, _)| k)
+}
+
 /// Only the EDGE-MOST BLOCK of a band may be furniture: the chain of lines
-/// from the page edge whose baselines follow each other within 1.6 × the font
-/// size, walked over ALL of the page's lines (`all`, sorted from that edge).
-/// If the chain runs past the band (`in_band` false for a chained line), the
-/// band holds body text that reaches into it — the last lines of a page with
-/// no footer, the first lines with no header — and NOTHING there is
-/// furniture. A body block separated from a real header/footer by whitespace
-/// is never part of the chain either. Keeping furniture once would otherwise
-/// DELETE such body text from every other page (digit masking makes "zie
-/// pagina 3 van 12" repeat). Segments on one baseline stay together.
-fn edge_block(segs: &[Segment], all: &[usize], in_band: &dyn Fn(usize) -> bool) -> Vec<usize> {
+/// from the page edge whose baselines follow each other within 1.6 × the
+/// font size (a SIZE-based threshold: it does not estimate a pitch from the
+/// page's own gaps, so a sparse page cannot bend it), walked over ALL of the
+/// page's lines (`all`, sorted from that edge).
+///
+/// - If the edge-most line is NOT in the document's body style, it starts a
+///   masthead: the chain continues through non-body lines (a 10 pt name over
+///   an 8 pt strapline stays one block) and stops dead at the first line in
+///   the body style, which stays body.
+/// - If the edge-most line IS in the body style, a chain that runs past the
+///   band (`in_band` false for a chained line) is body text reaching into it
+///   (the last lines of a page with no footer, the first with no header):
+///   NOTHING there is furniture.
+///
+/// Keeping furniture once would otherwise DELETE body text from every other
+/// page (digit masking makes "zie pagina 3 van 12" repeat). Known limit: a
+/// degenerate forms-only document whose "body" is itself the repeated
+/// masthead style has no body style to stop at; see the vector
+/// `a_masthead_heavier_than_the_body_on_every_page`.
+fn edge_block(
+    segs: &[Segment],
+    all: &[usize],
+    in_band: &dyn Fn(usize) -> bool,
+    body: Option<Style>,
+) -> Vec<usize> {
     let mut out: Vec<usize> = Vec::new();
     let mut last: Option<usize> = None;
+    let masthead = all.first().is_some_and(|&i| Some(style(&segs[i])) != body);
     for &i in all {
         if let Some(l) = last {
             let size = segs[i].size.max(segs[l].size).max(1.0);
             let gap = (segs[i].baseline - segs[l].baseline).abs();
             if gap > 1.6 * size {
                 break;
+            }
+            if masthead && Some(style(&segs[i])) == body {
+                break; // the document's body type: the masthead ends here
             }
         }
         if !in_band(i) {
@@ -97,6 +151,7 @@ pub fn detect(pages: &[(f64, &[Segment])]) -> Vec<(usize, usize)> {
 /// measurement; the pipeline uses `detect`).
 pub fn detect_with(pages: &[(f64, &[Segment])], band: f64, edge_rule: bool) -> Vec<(usize, usize)> {
     let n = pages.len();
+    let body = body_style(pages);
     // (band, key) -> sorted pages
     let mut occ: BTreeMap<(Band, String), Vec<usize>> = BTreeMap::new();
     let mut cands: Vec<(usize, usize, Band, String)> = Vec::new();
@@ -131,9 +186,9 @@ pub fn detect_with(pages: &[(f64, &[Segment])], band: f64, edge_rule: bool) -> V
             let chosen = if !edge_rule {
                 list
             } else if band == Band::Top {
-                edge_block(segs, &from_top, &|i| top_set.contains(&i))
+                edge_block(segs, &from_top, &|i| top_set.contains(&i), body)
             } else {
-                edge_block(segs, &from_bottom, &|i| bottom_set.contains(&i))
+                edge_block(segs, &from_bottom, &|i| bottom_set.contains(&i), body)
             };
             for i in chosen.into_iter().take(CAP_PER_BAND) {
                 let k = key(&segs[i].text);

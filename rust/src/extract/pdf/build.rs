@@ -326,12 +326,18 @@ pub(crate) fn stage(raw: &RawDoc, opts: &PdfOptions) -> Staged {
     }
 
     // 5. headings (per document)
+    // Document-level body size, character-weighted, EXCLUDING table blocks:
+    // tables are often set smaller and hold many characters, and counting them
+    // would make every real paragraph look "larger than body" (headings).
     let body_size = layout::mode_half(work.iter().flat_map(|w| {
-        w.pl.blocks.iter().flat_map(|b| {
-            b.segs
-                .iter()
-                .map(|&s| (w.pl.segments[s].size, w.pl.segments[s].chars.len()))
-        })
+        w.pl.blocks
+            .iter()
+            .filter(|b| b.table.is_none())
+            .flat_map(|b| {
+                b.segs
+                    .iter()
+                    .map(|&s| (w.pl.segments[s].size, w.pl.segments[s].chars.len()))
+            })
     }))
     .unwrap_or(10.0);
     let hblocks: Vec<HBlock> = doc_blocks

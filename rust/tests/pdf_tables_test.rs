@@ -600,3 +600,70 @@ fn decimal_aligned_and_centred_columns_are_one_track_each() {
         "| Code | Bedrag | Status |\n| --- | --- | --- |\n| A1 | 7,50 | ok |\n| B22 | 1.250,00 | open |\n| C3 | 12,75 | betaald |"
     );
 }
+
+#[test]
+fn a_long_small_type_table_does_not_become_the_body_size() {
+    if !have_pdfium() {
+        return;
+    }
+    // Three pages of an 8 pt table (far more characters than the prose) and
+    // short, distinct 10 pt prose lines mid-page. If table rows counted
+    // toward the body size, the body would be 8 pt and every short prose
+    // line (1.25 x) would turn into a heading.
+    let prose = [
+        (
+            "Deze regeling beschrijft de vergoedingen",
+            "voor reiskosten en verblijf",
+        ),
+        (
+            "Bedragen worden maandelijks uitbetaald",
+            "na goedkeuring door de manager",
+        ),
+        (
+            "Vragen gaan naar de afdeling personeelszaken",
+            "die binnen een week antwoordt",
+        ),
+    ];
+    let pages: Vec<Page> = (0..3)
+        .map(|pg| {
+            let mut p = Page::a4();
+            for r in 0..25 {
+                let y = 100.0 + r as f64 * 16.0;
+                let n = pg * 25 + r;
+                p = p
+                    .text(72.0, y, 8.0, &format!("Medewerker nummer {n}"))
+                    .text(250.0, y, 8.0, &format!("{},{:02}", 1000 + n * 7, n % 100))
+                    .text(380.0, y, 8.0, &format!("{},{:02}", 200 + n * 3, n % 97));
+            }
+            let (a, b) = prose[pg];
+            p.para(72.0, 560.0, 10.0, &[a, b])
+        })
+        .collect();
+    let out = pdf_units(
+        &Doc::new(pages).build(),
+        &PdfOptions {
+            language: Some("nl".into()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        tables(&out).len(),
+        3,
+        "the table must still be found on each page"
+    );
+    let heads: Vec<&str> = out
+        .units
+        .iter()
+        .filter(|u| u.kind == UnitKind::Heading)
+        .map(|u| u.markdown.as_str())
+        .collect();
+    assert!(heads.is_empty(), "prose promoted to headings: {heads:?}");
+    assert_eq!(
+        out.units
+            .iter()
+            .filter(|u| u.kind == UnitKind::Paragraph)
+            .count(),
+        3
+    );
+}
