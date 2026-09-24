@@ -18,6 +18,7 @@ pub mod ffi;
 
 pub use detect::{Detection, Detector};
 pub use emit::markdown::to_markdown;
+pub use extract::ooxml_units::ooxml_units;
 pub use extract::{extract, source_type_for_extension};
 pub use rrf::rrf;
 pub use store::LanceStore;

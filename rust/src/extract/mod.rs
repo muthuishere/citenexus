@@ -11,6 +11,7 @@ pub mod html;
 pub mod image;
 pub mod md;
 pub mod ooxml;
+pub mod ooxml_units;
 #[cfg(feature = "pdf")]
 pub mod pdf;
 pub mod schema_openapi;

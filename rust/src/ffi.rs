@@ -99,6 +99,38 @@ pub unsafe extern "C" fn citenexus_to_markdown(
     to_c_string(payload)
 }
 
+/// Structured units of a DOCX/PPTX from its own OOXML structure (ADR-0017
+/// decision 8): headings, lists, pipe tables, furniture — no model.
+/// `source_type` is `"docx"` or `"pptx"`. Returns malloc'd JSON: an array of
+/// `DocUnit` (`units.rs`), or `{"error": ...}`. Byte-deterministic.
+///
+/// # Safety
+/// `bytes` must point to `len` readable bytes; `source_type` must be a valid
+/// NUL-terminated UTF-8 C string.
+#[no_mangle]
+pub unsafe extern "C" fn citenexus_ooxml_units(
+    bytes: *const u8,
+    len: usize,
+    source_type: *const c_char,
+) -> *mut c_char {
+    if bytes.is_null() || source_type.is_null() {
+        return to_c_string(error_json("null argument"));
+    }
+    let data = std::slice::from_raw_parts(bytes, len);
+    let source_type = match CStr::from_ptr(source_type).to_str() {
+        Ok(s) => s,
+        Err(_) => return to_c_string(error_json("source_type is not UTF-8")),
+    };
+    let Some(kind) = parse_source_type(source_type) else {
+        return to_c_string(error_json(&format!("unknown source_type: {source_type}")));
+    };
+    let payload = match crate::extract::ooxml_units::ooxml_units(data, kind) {
+        Ok(units) => serde_json::to_string(&units).unwrap_or_else(|e| error_json(&e.to_string())),
+        Err(message) => error_json(&message),
+    };
+    to_c_string(payload)
+}
+
 /// Reciprocal-rank-fuse the ranked `eu_id` lists in `lists_json` (a JSON array
 /// of arrays of strings) with constant `k`. Returns malloc'd JSON: a JSON array
 /// of fused `eu_id`s (descending fused score, ascending `eu_id` tie-break), or
