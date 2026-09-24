@@ -7261,6 +7261,325 @@
           }
         ]
       }
+    },
+    {
+      "name": "exclusion/adv-ex-01 (rag_go adv_v3_exclusion, fictional)",
+      "must_refuse": true,
+      "answer": "Oproepkrachten ontvangen in december een eindejaarsuitkering van 8,33% van het jaarsalaris [eu:S1]. Medewerkers die geen oproepkracht zijn, ontvangen in december een eindejaarsuitkering van 8,33% [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "cao",
+          "language": "nl",
+          "text": "Eindejaarsuitkering. Alle medewerkers ontvangen in december een eindejaarsuitkering van 8,33% van het jaarsalaris, behalve oproepkrachten."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "exclusion guard: the"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "exclusion/adv-ex-02 (rag_go adv_v3_exclusion, fictional)",
+      "must_refuse": true,
+      "answer": "The annual bonus applies to all employees, including interns [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "bonusregeling",
+          "language": "nl",
+          "text": "Bonus. De jaarlijkse bonus geldt voor alle medewerkers, met uitzondering van stagiairs en uitzendkrachten."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "exclusion guard: the"
+          }
+        ]
+      }
+    },
+    {
+      "name": "exclusion/adv-ex-03 (rag_go adv_v3_exclusion, fictional)",
+      "must_refuse": true,
+      "answer": "Iedereen die thuiswerkt, krijgt € 2,35 per dag, ook medewerkers met een lease-auto [eu:S1]. Iedereen die thuiswerkt en geen lease-auto heeft, krijgt € 2,35 per dag [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "thuiswerkregeling",
+          "language": "nl",
+          "text": "Thuiswerkvergoeding. De thuiswerkvergoeding van € 2,35 per dag geldt voor iedereen die thuiswerkt, uitgezonderd medewerkers met een lease-auto."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "exclusion guard: the"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "exclusion/adv-ex-04 (rag_go adv_v3_exclusion, fictional)",
+      "must_refuse": true,
+      "answer": "Managers from scale 10 receive a 25% overtime supplement [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "arbeidstijden",
+          "language": "nl",
+          "text": "Overwerk. Overwerk wordt vergoed met een toeslag van 25%. Deze regeling is niet van toepassing op leidinggevenden vanaf schaal 10."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "exclusion guard: the"
+          }
+        ]
+      }
+    },
+    {
+      "name": "exclusion/adv-ex-05 (rag_go adv_v3_exclusion, fictional)",
+      "must_refuse": true,
+      "answer": "Alle medewerkers krijgen een reiskostenvergoeding [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "reiskostenregeling",
+          "language": "nl",
+          "text": "Reiskosten. De reiskostenvergoeding geldt niet voor medewerkers die binnen vijf kilometer van het kantoor wonen."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "exclusion guard: the"
+          }
+        ]
+      }
+    },
+    {
+      "name": "exclusion/adv-ex-06 (rag_go adv_v3_exclusion, fictional)",
+      "must_refuse": true,
+      "answer": "Every employee receives a laptop allowance of €500 every three years [eu:S1]. Employees without a company laptop receive €500 every three years [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "IT policy",
+          "language": "en",
+          "text": "Laptop allowance. Every employee receives a laptop allowance of €500 every three years, except employees who received a company laptop."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "exclusion guard: the"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "exclusion/adv-ex-07 (rag_go adv_v3_exclusion, fictional)",
+      "must_refuse": true,
+      "answer": "Uitzendkrachten mogen deelnemen aan het fietsplan [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "fietsplan",
+          "language": "en",
+          "text": "Bike plan. All staff may join the bike plan, excluding temporary agency workers."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "exclusion guard: the"
+          }
+        ]
+      }
+    },
+    {
+      "name": "exclusion/adv-ex-08 (rag_go adv_v3_exclusion, fictional)",
+      "answer": "At a 25-year service anniversary the employee receives half a monthly salary net [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "jubileumregeling",
+          "language": "nl",
+          "text": "Jubileum. Bij een dienstjubileum van 25 jaar ontvangt de medewerker een netto uitkering van een half maandsalaris. Dit geldt niet voor medewerkers in de proeftijd van een nieuw contract."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "exclusion/adv-ex-09 (rag_go adv_v3_exclusion, fictional)",
+      "must_refuse": true,
+      "answer": "Medewerkers kunnen elke dag gratis parkeren in de garage [eu:S1]. Behalve op zaterdag kunnen medewerkers gratis parkeren in de garage [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "parkeerregeling",
+          "language": "nl",
+          "text": "Parkeren. Medewerkers kunnen gratis parkeren in de garage, behalve op zaterdag."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "condition guard: the"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "exclusion/adv-ex-10 (rag_go adv_v3_exclusion, fictional)",
+      "must_refuse": true,
+      "answer": "External contractors get a 20% discount in the canteen [eu:S1]. Employees get a 20% discount in the canteen [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "kantineregeling",
+          "language": "nl",
+          "text": "Kantine. Alle medewerkers krijgen 20% korting in de kantine, met uitzondering van externe inhuur."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "role guard: contract"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
     }
   ]
 }

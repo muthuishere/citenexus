@@ -277,6 +277,11 @@ func conditionGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfi
 				negated := i > 0 && (toks[i-1] == "niet" || toks[i-1] == "not") // "niet alleen … maar ook"
 				if _, ok := conditionOpeners[toks[i]]; ok && !negated {
 					start = i + 1
+					// An exclusion the claim restates itself ("… en geen
+					// lease-auto heeft") is the exclusion guard's to judge.
+					if _, excl := exclusionOpeners[toks[i]]; excl && boundOrNegation(claimTokens) {
+						start = -1
+					}
 				}
 				for _, ph := range conditionPhrases {
 					if i+1 < len(toks) && toks[i] == ph[0] && toks[i+1] == ph[1] {
@@ -428,3 +433,5 @@ func canonicalDates(text, language string) string {
 	b.WriteString(lowered[last:])
 	return b.String()
 }
+
+var exclusionOpeners = map[string]struct{}{"behalve": {}, "uitgezonderd": {}, "except": {}}

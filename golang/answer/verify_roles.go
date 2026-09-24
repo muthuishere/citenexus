@@ -97,9 +97,12 @@ type ActorLexicon struct {
 // must / may words. It names no organisation: hosts add theirs.
 var DefaultActorLexicon = ActorLexicon{
 	Actors: map[string][]string{
-		"employee": {"werknemer", "werknemers", "medewerker", "medewerkers", "employee", "employees"},
-		"employer": {"werkgever", "werkgevers", "employer", "employers"},
-		"intern":   {"stagiair", "stagiairs", "stagiaire", "stagiaires", "intern", "interns"},
+		"employee":   {"werknemer", "werknemers", "medewerker", "medewerkers", "employee", "employees"},
+		"employer":   {"werkgever", "werkgevers", "employer", "employers"},
+		"intern":     {"stagiair", "stagiairs", "stagiaire", "stagiaires", "intern", "interns"},
+		"agency":     {"uitzendkracht", "uitzendkrachten", "agency"},
+		"contractor": {"inhuur", "freelancer", "freelancers", "zzp'er", "zzp'ers", "contractor", "contractors"},
+		"manager":    {"leidinggevende", "leidinggevenden", "manager", "managers"},
 	},
 	SecondPerson:      "employee",
 	SecondPersonTerms: []string{"je", "jij", "jou", "jouw", "u", "uw", "you", "your", "yours"},

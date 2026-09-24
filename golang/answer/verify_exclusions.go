@@ -18,12 +18,13 @@
 // The claim is refused when it names an excluded group — every content word
 // of one group — or speaks about everyone ("alle", "iedereen", "all",
 // "every"), unless it restates the exclusion itself (it carries an exclusion
-// marker or a negation). Same language directly; across languages only
-// through VerifyOptions.Glossary, and a group word the glossary does not cover
-// gives no verdict. With no glossary no cross-language claim is judged: the
-// guard returns no verdict, and END TO END THE CHECKER IS THEN THE ONLY
-// BARRIER for such a claim (gw-v2-15 is admitted by a checker that admits
-// it). Pass the host's glossary to close it deterministically. Can only refuse.
+// marker, a negation, "without"/"zonder"). A group word is read through the
+// actor lexicon's language-free ids (stagiair = intern), in the unit's
+// language, or through VerifyOptions.Glossary; a word none of them reads is
+// skipped, and a group with no readable word gives NO VERDICT — end to end the
+// checker is then the only barrier (gw-v2-15 without a glossary, "leraren"
+// being no lexicon role). A claim about everyone over any exclusion is refused
+// in any language. Can only refuse.
 
 package answer
 
@@ -74,6 +75,15 @@ func splitGroups(tokens []string) [][]string {
 		case "en", "and", "or", "of":
 			flush()
 			continue
+		case "die", "dat", "who", "that", "which", "waarvan":
+			// A relative clause describes the group; it is not another one
+			// ("opleidingen die de werkgever verplicht stelt").
+			flush()
+			return out
+		}
+		if _, prep := groupPrepositions[t]; prep && len(cur) > 0 && !hasTerm(cur, qualifierMark) {
+			cur = append(cur, qualifierMark) // "medewerkers | proeftijd …"
+			continue
 		}
 		if conditionContent(t) {
 			cur = append(cur, t)
@@ -81,6 +91,14 @@ func splitGroups(tokens []string) [][]string {
 	}
 	flush()
 	return out
+}
+
+// qualifierMark separates a group's head ("medewerkers") from its
+// prepositional qualifier ("in de proeftijd van een nieuw contract").
+const qualifierMark = "|"
+
+var groupPrepositions = map[string]struct{}{
+	"in": {}, "met": {}, "van": {}, "vanaf": {}, "op": {}, "bij": {}, "with": {}, "from": {}, "of": {}, "on": {}, "at": {},
 }
 
 // excludedGroups reads the groups a unit sentence excludes.
@@ -135,15 +153,13 @@ func excludedGroups(tokens []string) [][]string {
 // exclusionGuard: see the file comment.
 func exclusionGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfig) string {
 	cross := claimLanguage != "" && eu.Language != "" && primaryLanguage(claimLanguage) != primaryLanguage(eu.Language)
-	if cross && len(cfg.glossary) == 0 {
-		return ""
-	}
 	claimTokens := tokenize.TokenizeV2(claim)
 	c := carrier{claim: map[string]bool{}, crossLang: cross, translations: glossaryIndex(cfg.glossary)}
 	for _, t := range claimTokens {
 		c.claim[t] = true
 	}
-	// A claim that restates an exclusion or is negated states no inclusion.
+	// A claim that restates an exclusion ("except …", "zonder …", "geen …")
+	// or is negated states no inclusion.
 	if len(excludedGroups(claimTokens)) > 0 || boundOrNegation(claimTokens) {
 		return ""
 	}
@@ -164,24 +180,77 @@ func exclusionGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfi
 		}
 		universal = true
 	}
+	// A group word is matched through the actor lexicon (language-free ids),
+	// else in the unit's language or through the glossary; a word neither can
+	// read is skipped, and a group with no readable word decides nothing.
+	carried := func(w string) (has, known bool) {
+		for _, terms := range cfg.actors.Actors {
+			if hasTerm(terms, w) {
+				for _, x := range terms {
+					if c.claim[x] {
+						return true, true
+					}
+				}
+				return false, true
+			}
+		}
+		return c.carried(w)
+	}
 	for _, s := range sentenceBreak.Split(softJoin(eu.Text), -1) {
 		for _, g := range excludedGroups(tokenize.TokenizeV2(s)) {
-			all, known := true, true
+			if universal {
+				return fmt.Sprintf("exclusion guard: the claim speaks about everyone; the passage excludes %q", strings.Join(withoutMark(g), " "))
+			}
+			// The head may skip words no reader covers ("temporary agency
+			// workers"); a qualifier decides WHICH members are excluded, so it
+			// must be readable, and every readable word must be carried.
+			all, known, qualifier, qualifierKnown := true, 0, false, 0
+			qualifierWords, qualifierNumber := 0, false
+			// A head naming a lexicon role is that role: its other words are
+			// the role's name ("temporary agency workers" = uitzendkrachten).
+			headRole := false
 			for _, w := range g {
-				has, ok := c.carried(w)
-				if !ok {
-					known = false
+				if w == qualifierMark {
 					break
+				}
+				if actorTerm(w, cfg.actors) {
+					headRole = true
+				}
+			}
+			for _, w := range g {
+				if w != qualifierMark && !qualifier && headRole && !actorTerm(w, cfg.actors) {
+					continue
+				}
+				if w == qualifierMark {
+					qualifier = true
+					continue
+				}
+				if qualifier {
+					qualifierWords++
+					if strings.ContainsAny(w, "0123456789") {
+						qualifierNumber = true
+					}
+				}
+				has, ok := carried(w)
+				if !ok {
+					continue
+				}
+				known++
+				if qualifier {
+					qualifierKnown++
 				}
 				if !has {
 					all = false
 				}
 			}
-			if !known {
+			// Every qualifier word must be readable ("binnenlands vervoer" with
+			// only "vervoer" in the glossary would match "international
+			// transport"), unless a number pins it ("vanaf schaal 10").
+			if qualifier && (qualifierKnown == 0 || (qualifierKnown < qualifierWords && !qualifierNumber)) {
 				continue
 			}
-			if all || universal {
-				return fmt.Sprintf("exclusion guard: the passage excludes %q", strings.Join(g, " "))
+			if known > 0 && all {
+				return fmt.Sprintf("exclusion guard: the passage excludes %q", strings.Join(withoutMark(g), " "))
 			}
 		}
 	}
@@ -191,9 +260,19 @@ func exclusionGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfi
 func boundOrNegation(tokens []string) bool {
 	for _, t := range tokens {
 		switch t {
-		case "niet", "not", "geen", "no", "never", "nooit":
+		case "niet", "not", "geen", "no", "never", "nooit", "without", "zonder", "behalve", "except", "excluding":
 			return true
 		}
 	}
 	return false
+}
+
+func withoutMark(g []string) []string {
+	out := make([]string, 0, len(g))
+	for _, w := range g {
+		if w != qualifierMark {
+			out = append(out, w)
+		}
+	}
+	return out
 }
