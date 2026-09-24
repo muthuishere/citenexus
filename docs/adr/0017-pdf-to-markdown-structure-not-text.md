@@ -1,0 +1,149 @@
+# 0017 — PDF→markdown in the Rust core: models propose structure, the PDF supplies the text
+
+Status: proposed · 2026-09-24 · research: [`docs/research/2026-09-24-pdf-to-markdown.md`](../research/2026-09-24-pdf-to-markdown.md) (`f3d9458`)
+
+## Context
+
+`rust/src/extract/pdf.rs` emits one paragraph per page from `page.text().all()`. It
+has no headings, no tables, no hyphen joining and no header/footer handling, and
+pdfium's U+0002 soft-hyphen marker survives into the text. A consumer (rag_go,
+Lex5 corpus) measured these gaps. Their spike 185 then showed that routing each
+page, and using an injected text LLM or vision model gated by deterministic
+checks, recovers tables: 127/149 cells and 32/36 rows, against 91 and 21 for flat
+text.
+
+The research found two facts that change the design:
+
+1. **The spike's gate checks vocabulary, not placement.** At its strictest
+   thresholds it accepts amounts swapped between rows, `7.000,00` → `70.000,0`,
+   `5.100,00` → `100`, and a "geen" moved to another sentence (research §0, §5
+   W1). Every one of those is a confidently-wrong table, which is the error
+   class this library exists to prevent.
+2. **The spike's score rests on AGPL and GPL code.** It uses PyMuPDF (spike
+   `build_final.py:183`, `build_corpus.py:32`) and poppler `pdftotext -layout`
+   (`build_final.py:79`). Neither may enter the Apache-2.0 core (ADR-0005), so
+   the score has to be re-earned on pdfium.
+
+The leading text-layer systems avoid (1) by construction: the model decides
+*structure*, and the cell text is the PDF's own characters (research §8 #1).
+
+## Decision
+
+**One implementation, in the Rust core.** Python, JS and Go all call it through
+the existing C ABI. Go uses `golang/core` behind `citenexus_ffi`, the same place
+as `Extract` and `ToMarkdown` (`golang/core/core.go:78,96`). This is tier-3 work
+under ADR-0010: real parsing over pdfium character boxes.
+
+1. **Base extraction, deterministic, no model.** From pdfium character boxes
+   (x/y, font size and weight):
+   - **Layout text layer** per page, the equivalent of `pdftotext -layout`.
+   - **Hyphen joining** at the U+0002 marker. Join only when the document
+     itself shows the joined form elsewhere. Without that evidence, a
+     per-language keep-list decides. Coordinated compounds ("in- en verkoop")
+     and real compounds ("e-mail", "long-term") are never merged.
+   - **Headings**, in this order of sources: the tagged-PDF structure tree
+     (`FPDF_StructTree_*`), then the outline, then numbering, then font
+     clustering. A heading is emitted only when the available sources agree.
+   - **Reading order:** the structure tree when the PDF is tagged. Otherwise a
+     rule-based ordering, with XY-Cut++ as the fallback.
+   - **Running headers and footers:** a line in a top or bottom band, repeated
+     across pages. Each such line is kept **once** per document as tagged
+     furniture, not deleted, so "laatst bijgewerkt <date>" stays citable.
+   - **Per-page output** with bboxes.
+2. **Per-page routing with its signals exposed.** Every page is classified as
+   plain, formatted, table, image region, or scan with no text layer. The
+   classification returns the evidence behind it: ruling lines, column tracks,
+   text-layer soundness, image coverage.
+3. **Deterministic tables first.** For a ruled grid (lines and rects) or
+   inferred column tracks, a scored grid search runs, with fake-table
+   validators. The tagged structure tree, when present, wins outright. A model
+   is asked only when the grid score is low.
+4. **Model hooks: STRUCTURE, not text.** The core never makes a network call.
+   It uses the ADR-0005 two-phase pattern:
+   - `prepare(pdf, opts)` returns the pages, routes and signals, plus **requests**.
+   - The host fulfils the requests with its own injected text LLM or vision
+     model. The prompts are host **config**; a default `prompts.json` ships as
+     data, not code.
+   - `assemble(pdf, responses)` returns the markdown plus provenance.
+     `assemble` re-parses the PDF, so the core keeps no state between calls.
+   - On a page **with a text layer**, the model returns a grid, or region
+     boundaries, over the text-layer **word IDs** the request lists. Rust fills
+     every cell from those pdfium characters. Model-written text is never used
+     on such a page.
+   - On a page or region **with no text layer**, vision-written markdown is
+     used and flagged `vision_transcribed`.
+5. **Deterministic checks before anything replaces base text.** All of these
+   are library functions:
+   - **Geometry:** every cell's characters sit in one row band and one column
+     band.
+   - **Digit bag and value parse:** locale-aware under ADR-0015, ignoring
+     model-added list markers, but catching "I.3" → "1.3".
+   - **Coverage and novelty.** For vision-only content, the thresholds
+     0.90/0.08 carry over from the spike, and furniture is exempt.
+   - **Choosing between grids:** GriTS plus the position check replaces "more
+     rows wins".
+   - **Model-output guards:** finish reason, repetition and length.
+   - **Fallback:** any failure falls back to the base text.
+6. **Provenance on every unit:** `route`, `table_source`
+   (struct_tree | ruled | tracks | model_grid), `vision_transcribed`,
+   `table_uncertain`, and which check failed when a fallback happened.
+7. **What we borrow, and what we don't.** We borrow parts, not tools, and we
+   take **no dependency** on Xberg. Code is ported from permissive sources at
+   pinned commits, with attribution in `rust/NOTICE`: LiteParse router and
+   repetition, Marker `table_recon`, Xberg `table_core` and hyphen witnesses,
+   Docling reading order and text quality, GriTS, olmOCR guards. Nothing
+   AGPL, GPL or non-commercial anywhere in the stack.
+
+## Runtime (Linux amd64, Scaleway container)
+
+- `pdfium-render` keeps binding **libpdfium dynamically** (`rust/Cargo.toml`,
+  feature `pdf`).
+- Ship a **pinned** `libpdfium.so` from bblanchon/pdfium-binaries
+  (`pdfium-linux-x64.tgz`, glibc, about 3.7 MB; pdfium itself is BSD-3), next to
+  the `citenexus-core` cdylib. Point `PDFIUM_DYNAMIC_LIB_PATH` at it, or put it
+  on the loader path.
+- No GPU, no ONNX Runtime and no model weights in the core. An optional small
+  table model (TATR or SLANet_plus via `ort`) is deferred until measurement
+  shows grid search misses too often. Even then it can stay host-side.
+- A Dockerfile snippet and a smoke test that loads the `.so` ship with step 1.
+  The exact binary size and glibc floor get re-checked when the binary is
+  pinned.
+
+## Verification and acceptance
+
+- **Conformance vectors from synthetic PDFs only.** They are the spike's 11
+  check tests, olmOCR-bench-style present / absent / order / cell-neighbour
+  tests, and a **must-reject** adversarial set: swapped row amounts, a dropped
+  digit, `7.000,00` → `70.000,0`, a moved "geen". The dehyphenation vectors
+  include "e-mail", "long-term" and "in- en verkoop".
+- **Lex5, 82 originals, read in place and never copied:**
+  - cells ≥127/149 and rows ≥32/36;
+  - quote support ≥282/468;
+  - **positional integrity: 100% of emitted table-cell values traceable to
+    their pdfium character boxes.**
+  - The table sample is 7 tables and 149 cells, so a ±1-cell difference is
+    noise. Report the count and the table-level result, not a rate.
+- All Go, Python and JS suites stay green. Nothing merges or tags before the
+  owner's port condition is met.
+
+## Build order
+
+1. Probe what share of Lex5 is tagged (an evening).
+2. Hyphen join, text-layer soundness, router, header/footer, reading order and
+   headings. None of these needs a model.
+3. The geometry gate and the structure-not-text request/response contract,
+   with the adversarial vectors.
+4. Deterministic tables.
+5. Model hooks across Python, JS and Go.
+6. The optional table model, only if measured necessary.
+
+## Consequences
+
+- The model can no longer invent a value on a text-layer page. Its worst case
+  is a wrong **structure**, and the geometry gate and GriTS catch or downgrade
+  that. The price is a request schema more complex than "page → markdown".
+- Scans and image regions remain as trustworthy as their vision model. They
+  are **labelled** `vision_transcribed`, never passed off as backed by the text
+  layer.
+- The spike's numbers are a target, not a baseline: they have to be re-earned
+  without PyMuPDF or poppler.
