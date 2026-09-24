@@ -239,8 +239,10 @@ func valueRowGuard(claim, claimLanguage string, eu EvidenceUnit) string {
 	}
 	// Sentences, not clauses: a period is often a fronted adverbial set off by
 	// a comma ("During the first year of illness, you receive 100%").
-	unitClauses := sentenceBreak.Split(softJoin(eu.Text), -1)
-	for _, c := range sentenceBreak.Split(softJoin(claim), -1) {
+	_, unitText := clockTimes(eu.Text) // clock times are compared by the number guard
+	_, claimText := clockTimes(claim)
+	unitClauses := sentenceBreak.Split(softJoin(unitText), -1)
+	for _, c := range sentenceBreak.Split(softJoin(claimText), -1) {
 		for _, m := range numbersIn(c, claimLanguage) {
 			key := m.reading.Key
 			mine := periods(c, claimLanguage, key)

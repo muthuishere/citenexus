@@ -31,6 +31,14 @@ import (
 // "first") satisfy only an ORDINAL in the claim ("1st", "1e"), never a bare
 // "1": "1 dag" and "de eerste dag" are different facts.
 func numberGuard(claim, claimLanguage, passage, passageLanguage string) string {
+	// Clock times first, compared as times; then blanked for the rest.
+	claimClocks, claim := clockTimes(claim)
+	passageClocks, passage := clockTimes(passage)
+	for _, k := range sortedKeys(claimClocks) {
+		if _, ok := passageClocks[k]; !ok {
+			return fmt.Sprintf("number guard: %s is not in the passage", strings.TrimPrefix(k, "clock:"))
+		}
+	}
 	have := map[string]struct{}{}
 	for _, m := range numbersIn(passage, passageLanguage) {
 		have[m.reading.Key] = struct{}{}
@@ -254,7 +262,7 @@ var ordinalToken = regexp.MustCompile(`^[0-9]+(st|nd|rd|th|e|de|ste)$`)
 // numberWithUnit is a number joined to its unit or a fraction: "25-jarig",
 // "40-urige", "40-hour", "3-year", "1/12th", "1/12e". The number and unit
 // guards read them; they are not names.
-var numberWithUnit = regexp.MustCompile(`^[0-9]+([.,][0-9]+)?-?(jarig|jarige|urig|urige|daags|daagse|weeks|weekse|maands|maandse|hour|hours|day|days|week|weeks|month|months|year|years)$|^[0-9]+/[0-9]+(st|nd|rd|th|e|de|ste)?$`)
+var numberWithUnit = regexp.MustCompile(`^[0-9]+([.,][0-9]+)?-?(jarig|jarige|urig|urige|daags|daagse|weeks|weekse|maands|maandse|hour|hours|day|days|week|weeks|month|months|year|years)$|^[0-9]+/[0-9]+(st|nd|rd|th|e|de|ste)?$|^[0-9]{1,2}([:.][0-5][0-9])?(am|pm)$`)
 
 var listMarker = regexp.MustCompile(`^([-*•·–—]|#{1,6}|[0-9]{1,3}[.)]|[a-z][.)])$`)
 

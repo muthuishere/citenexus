@@ -14,6 +14,7 @@ package answer
 import (
 	"math/big"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -186,4 +187,57 @@ func numbersIn(text, language string) []numberMatch {
 		out = append(out, match)
 	}
 	return out
+}
+
+// Clock times are times of day, never durations or amounts: "09:00" =
+// "9:00" = "9.00 uur" = "9am". clockTimes returns their keys ("clock:9:00",
+// 24-hour) and the text with them blanked out, so the number and unit guards
+// never read "9.00 uur" as nine hours or "09:00" as the numbers 9 and 0.
+var (
+	clockColon = regexp.MustCompile(`\b([01]?[0-9]|2[0-3]):([0-5][0-9])\b`)
+	clockDot   = regexp.MustCompile(`\b([01]?[0-9]|2[0-3])\.([0-5][0-9])(\s*(?:uur|u)\b)`)
+	clockAmPm  = regexp.MustCompile(`\b(1[0-2]|0?[1-9])(?:[:.]([0-5][0-9]))?\s*(am|pm|a\.m\.|p\.m\.)`)
+)
+
+func clockTimes(text string) (map[string]struct{}, string) {
+	keys := map[string]struct{}{}
+	lowered := strings.ToLower(text)
+	blank := []byte(lowered)
+	mark := func(start, end int, hour, minute string) {
+		h := strings.TrimLeft(hour, "0")
+		if h == "" {
+			h = "0"
+		}
+		if minute == "" {
+			minute = "00"
+		}
+		keys["clock:"+h+":"+minute] = struct{}{}
+		for i := start; i < end; i++ {
+			blank[i] = ' '
+		}
+	}
+	for _, m := range clockAmPm.FindAllStringSubmatchIndex(lowered, -1) {
+		hour, minute := lowered[m[2]:m[3]], ""
+		if m[4] >= 0 {
+			minute = lowered[m[4]:m[5]]
+		}
+		h := 0
+		for _, r := range hour {
+			h = h*10 + int(r-'0')
+		}
+		pm := strings.HasPrefix(lowered[m[6]:m[7]], "p")
+		switch {
+		case pm && h < 12:
+			h += 12
+		case !pm && h == 12:
+			h = 0
+		}
+		mark(m[0], m[1], strconv.Itoa(h), minute)
+	}
+	for _, re := range []*regexp.Regexp{clockColon, clockDot} {
+		for _, m := range re.FindAllStringSubmatchIndex(string(blank), -1) {
+			mark(m[0], m[5], string(blank[m[2]:m[3]]), string(blank[m[4]:m[5]]))
+		}
+	}
+	return keys, string(blank)
 }

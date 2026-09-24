@@ -167,6 +167,7 @@ func numberValue(token, language string) (string, bool) {
 // "halfjaar" / "half (a) year" as 6 months, and an ordinal before a year
 // compound ("eerste levensjaar") as 1 year.
 func quantities(text, language string) map[[2]string]struct{} {
+	_, text = clockTimes(text) // "7.30 uur" is a time of day, not 7.3 hours
 	tokens := unitScan.FindAllString(strings.ToLower(text), -1)
 	out := map[[2]string]struct{}{}
 	for i := 0; i < len(tokens); i++ {
@@ -291,6 +292,8 @@ func ratKey(r *big.Rat) string {
 // cell ("12,5 ✓" under a "Jaren in dienst" header) carries the number without
 // its unit, and the number guard already requires the digits to be present.
 func unitGuard(claim, claimLanguage, passage, passageLanguage string) string {
+	_, claim = clockTimes(claim) // a clock time is never a duration
+	_, passage = clockTimes(passage)
 	have := quantities(passage, passageLanguage)
 	claimed := make([][2]string, 0)
 	for q := range quantities(claim, claimLanguage) {

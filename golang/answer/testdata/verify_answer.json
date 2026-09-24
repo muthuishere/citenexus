@@ -4651,6 +4651,374 @@
         ]
       },
       "must_refuse": true
+    },
+    {
+      "name": "clock/09-00-over-9-00-uur-is-the-same-time",
+      "answer": "Your working day starts at 09:00 [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Je werkdag begint om 9.00 uur."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "clock/10-00-over-9-00-refuses",
+      "must_refuse": true,
+      "answer": "Your working day starts at 10:00 [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Je werkdag begint om 9.00 uur."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "clock/08-30-over-8-00-refuses",
+      "must_refuse": true,
+      "answer": "Je werkdag begint om 08:30 [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Je werkdag begint om 8.00 uur."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "clock/17-30-over-17-00-refuses",
+      "must_refuse": true,
+      "answer": "The office closes at 17:30 [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Het kantoor sluit om 17.00 uur."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "clock/a-clock-time-is-never-a-duration",
+      "must_refuse": true,
+      "answer": "You work 9 hours a day [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Je werkt vanaf 9.00 uur."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "clock/adv-nf-11 (rag_go adv, fictional)",
+      "answer": "Bij ziekte meld je je vóór 09:00 uur telefonisch bij je leidinggevende [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "verzuimprotocol",
+          "language": "nl",
+          "text": "Verzuimprotocol. Bij ziekte meldt de werknemer zich vóór 9.00 uur telefonisch bij de leidinggevende. De werkgever betaalt gedurende de eerste twee ziektejaren 70% van het loon; in het eerste ziektejaar wordt dit aangevuld tot 100%. De bedrijfsarts beoordeelt of de werknemer arbeidsongeschikt is."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "clock/adv-nf-v2-03 (rag_go adv, fictional)",
+      "answer": "The normal working week is 36 hours [eu:S1]. The day shift starts at 07:30 and ends at 16:00, with an unpaid break of half an hour [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "arbeidstijdenregeling De Vaart Logistiek",
+          "language": "nl",
+          "text": "Werktijden. De normale arbeidsduur bedraagt 36 uur per week. De dagdienst begint om 7.30 uur en eindigt om 16.00 uur, met een onbetaalde pauze van ½ uur. Werken op zaterdag gebeurt alleen op vrijwillige basis."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "clock/adv-nf-v2-04 (rag_go adv, fictional)",
+      "answer": "De dagdienst loopt van 07:30 tot 16:00 uur, met een onbetaalde pauze van een half uur [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "arbeidstijdenregeling De Vaart Logistiek",
+          "language": "nl",
+          "text": "Werktijden. De normale arbeidsduur bedraagt 36 uur per week. De dagdienst begint om 7.30 uur en eindigt om 16.00 uur, met een onbetaalde pauze van ½ uur. Werken op zaterdag gebeurt alleen op vrijwillige basis."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "clock/adv-nf-v2-05 (rag_go adv, fictional)",
+      "answer": "Werk je in de dagdienst, dan meld je je vóór 09:00 ziek bij je teamleider [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "verzuimprotocol Ziekenhuis Oosterlanden",
+          "language": "nl",
+          "text": "Ziekmelding. Medewerkers in de dagdienst melden zich vóór 9.00 uur ziek bij de teamleider. Medewerkers in de avonddienst melden zich uiterlijk twee uur voor aanvang van hun dienst. Herstel wordt dezelfde dag doorgegeven."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "clock/adv-nf-v2-19 (rag_go adv, fictional)",
+      "answer": "For night shifts, the following applies [eu:S1]:\n- A night shift runs from 23:00 to 07:30 [eu:S1].\n- After a series of three or more night shifts, you get a rest period of at least 46 hours [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "roosterreglement Ziekenhuis Oosterlanden",
+          "language": "nl",
+          "text": "Nachtdiensten. Een nachtdienst duurt van 23.00 uur tot 7.30 uur. Na een reeks van drie of meer nachtdiensten heeft de medewerker een rustperiode van ten minste 46 uur. Per jaar worden maximaal 120 nachtdiensten ingeroosterd."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "clock/adv-nf-v2-20 (rag_go adv, fictional)",
+      "answer": "Een nachtdienst duurt van 23:00 uur tot 07:30 uur [eu:S1]. Na 3 of meer nachtdiensten achter elkaar heb je ten minste 46 uur rust [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "roosterreglement Ziekenhuis Oosterlanden",
+          "language": "nl",
+          "text": "Nachtdiensten. Een nachtdienst duurt van 23.00 uur tot 7.30 uur. Na een reeks van drie of meer nachtdiensten heeft de medewerker een rustperiode van ten minste 46 uur. Per jaar worden maximaal 120 nachtdiensten ingeroosterd."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "clock/adv-nf-v2-06 (rag_go adv, fictional)",
+      "answer": "Day-shift staff must report sick to the team leader before 9am [eu:S1]. Evening-shift staff report sick no later than 2 hours before their shift starts [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "verzuimprotocol Ziekenhuis Oosterlanden",
+          "language": "nl",
+          "text": "Ziekmelding. Medewerkers in de dagdienst melden zich vóór 9.00 uur ziek bij de teamleider. Medewerkers in de avonddienst melden zich uiterlijk twee uur voor aanvang van hun dienst. Herstel wordt dezelfde dag doorgegeven."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
     }
   ]
 }
