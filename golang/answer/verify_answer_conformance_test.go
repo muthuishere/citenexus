@@ -18,6 +18,7 @@ type verifyVector struct {
 	AdmitParaphrase bool                 `json:"admit_paraphrase"`
 	NameAliases     map[string][]string  `json:"name_aliases"`
 	Checker         map[string][]float64 `json:"checker"`
+	LeadInFrames    []string             `json:"lead_in_frames"`
 	Evidence        []struct {
 		ID         string `json:"id"`
 		DocumentID string `json:"document_id"`
@@ -56,8 +57,8 @@ func TestVerifyAnswerConformance(t *testing.T) {
 	if err := json.Unmarshal(raw, &file); err != nil {
 		t.Fatal(err)
 	}
-	if len(file.Cases) != 61 {
-		t.Fatalf("verify_answer.json: got %d cases, want 61", len(file.Cases))
+	if len(file.Cases) != 69 {
+		t.Fatalf("verify_answer.json: got %d cases, want 69", len(file.Cases))
 	}
 	refuseControls := 0
 	for _, c := range file.Cases {
@@ -73,7 +74,7 @@ func TestVerifyAnswerConformance(t *testing.T) {
 					checker[e.Text] = [2]float64{s[0], s[1]}
 				}
 			}
-			opts := VerifyOptions{AnswerLanguage: c.AnswerLanguage, AdmitParaphrase: c.AdmitParaphrase, NameAliases: c.NameAliases}
+			opts := VerifyOptions{AnswerLanguage: c.AnswerLanguage, AdmitParaphrase: c.AdmitParaphrase, NameAliases: c.NameAliases, LeadInFrames: c.LeadInFrames}
 			if len(c.Checker) > 0 {
 				opts.Checker, opts.CheckerName = checker, "fake"
 			}

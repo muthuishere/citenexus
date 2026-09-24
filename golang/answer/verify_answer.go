@@ -105,6 +105,13 @@ type VerifyOptions struct {
 	// all tokens of any one alias are in the passage. Nothing is guessed: without
 	// an entry a name must appear as written.
 	NameAliases map[string][]string
+	// LeadInFrames are the content-free list lead-ins ("Zo zit het:", "Here's
+	// how:") that are NOT joined to their items: an item under such a lead-in is
+	// verified alone and the lead-in is exempt. nil means DefaultLeadInFrames; a
+	// non-nil empty slice means none (every ":" lead-in is joined). A lead-in is
+	// content-free only when every token is inside a frame or is a stopword — any
+	// other word, number, polarity marker, exclusivity word or count means JOIN.
+	LeadInFrames []string
 	// AdmitParaphrase lets the checker admit SAME-language claims the gate
 	// rejected (a paraphrase), still behind the deterministic guards. Off by
 	// default: it trades the gate's guarantee for coverage, and the caller should
@@ -165,6 +172,10 @@ type citedClaim struct {
 // claim it follows. Markers (with the whitespace before them) are removed first,
 // so an id containing "." cannot split a sentence.
 func parseCitations(answer string) []citedClaim {
+	return parseCitationsWith(answer, DefaultLeadInFrames)
+}
+
+func parseCitationsWith(answer string, frames []string) []citedClaim {
 	type mark struct {
 		at    int // byte offset in the cleaned text
 		facet bool
@@ -217,7 +228,7 @@ func parseCitations(answer string) []citedClaim {
 			claims[owner].cited = appendUnique(claims[owner].cited, m.ids...)
 		}
 	}
-	return joinListItems(claims)
+	return joinListItems(claims, frames)
 }
 
 var (
@@ -247,7 +258,7 @@ var (
 // is refused, and each item is joined to the lead-in with the exclusivity word
 // and the count removed ("De werkgever mag de volgende gegevens vragen naam").
 // The answer may list a subset; each item must still be in the source.
-func joinListItems(claims []citedClaim) []citedClaim {
+func joinListItems(claims []citedClaim, frames []string) []citedClaim {
 	merged := make([]citedClaim, 0, len(claims))
 	for i := 0; i < len(claims); i++ {
 		c := claims[i]
@@ -275,8 +286,16 @@ func joinListItems(claims []citedClaim) []citedClaim {
 				listItemPrefix.MatchString(merged[i+1].text) {
 				lead := c
 				leadIn = &lead
-				stripped, marked := stripListQualifiers(strings.TrimSuffix(strings.TrimSpace(c.text), ":"))
+				bare := strings.TrimSuffix(strings.TrimSpace(c.text), ":")
+				stripped, marked := stripListQualifiers(bare)
 				joinText = stripped
+				if !marked && contentFreeLeadIn(bare, frames) {
+					// "Zo zit het:" says nothing: joined, its words would only make
+					// a true item fail. Items are verified alone, as without a lead-in.
+					leadIn = &citedClaim{text: "", cited: c.cited, facets: c.facets}
+					joinText = ""
+					continue
+				}
 				if marked {
 					ownClaim = len(out)
 					out = append(out, c)
@@ -292,7 +311,11 @@ func joinListItems(claims []citedClaim) []citedClaim {
 			out = append(out, c)
 			continue
 		}
-		c.text = joinText + " " + lowerFirst(item)
+		if joinText == "" {
+			c.text = item
+		} else {
+			c.text = joinText + " " + lowerFirst(item)
+		}
 		c.cited = appendUnique(append([]string{}, c.cited...), leadIn.cited...)
 		c.facets = appendUnique(append([]string{}, c.facets...), leadIn.facets...)
 		if ownClaim >= 0 {
@@ -302,6 +325,61 @@ func joinListItems(claims []citedClaim) []citedClaim {
 		out = append(out, c)
 	}
 	return out
+}
+
+// DefaultLeadInFrames is a small, generic nl/en table of content-free list
+// lead-ins. Hosts supply their own through VerifyOptions.LeadInFrames.
+var DefaultLeadInFrames = []string{
+	"zo zit het", "zo werkt het", "het volgende", "als volgt", "hieronder",
+	"samengevat", "kort samengevat", "in het kort", "een overzicht",
+	"here's how", "here is how", "here's what", "here is what", "as follows",
+	"the following", "below", "in short", "in summary", "an overview",
+}
+
+// contentFreeLeadIn: every token of the lead-in is covered by a frame or is a
+// stopword that is not a polarity marker, and there is at least one frame.
+// Numbers never count as free.
+func contentFreeLeadIn(lead string, frames []string) bool {
+	toks := tokenize.TokenizeV2(lead)
+	if len(toks) == 0 {
+		return false
+	}
+	covered := make([]bool, len(toks))
+	matched := false
+	for _, f := range frames {
+		ft := tokenize.TokenizeV2(f)
+		if len(ft) == 0 {
+			continue
+		}
+		for i := 0; i+len(ft) <= len(toks); i++ {
+			same := true
+			for k := range ft {
+				if toks[i+k] != ft[k] {
+					same = false
+					break
+				}
+			}
+			if same {
+				matched = true
+				for k := range ft {
+					covered[i+k] = true
+				}
+			}
+		}
+	}
+	if !matched {
+		return false
+	}
+	polarity := gate.PolarityMarkers()
+	for i, t := range toks {
+		if covered[i] {
+			continue
+		}
+		if _, neg := polarity[t]; neg || !gate.IsStopword(t) {
+			return false
+		}
+	}
+	return true
 }
 
 // listExclusives make a lead-in exclusive: "mag alleen de volgende …".
@@ -495,7 +573,11 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 		return cache[k], nil
 	}
 
-	parsed := parseCitations(answer)
+	frames := opts.LeadInFrames
+	if frames == nil {
+		frames = DefaultLeadInFrames
+	}
+	parsed := parseCitationsWith(answer, frames)
 	verdicts := make([]verdict, 0, len(parsed))
 	for _, pc := range parsed {
 		v := verdict{text: pc.text, facets: pc.facets}

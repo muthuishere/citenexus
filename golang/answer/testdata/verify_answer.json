@@ -1721,6 +1721,197 @@
           }
         ]
       }
+    },
+    {
+      "name": "lead-in/content-free-nl-frame-is-not-joined",
+      "answer": "Zo zit het:\n- De werknemer heeft recht op 25 vakantiedagen per kalenderjaar [eu:a]",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werknemer heeft recht op 25 vakantiedagen per kalenderjaar."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "lead-in/content-free-en-frame-is-not-joined",
+      "answer": "Here's how:\n- Employees get 25 days of leave per year [eu:a]",
+      "answer_language": "en",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "en",
+          "text": "Employees get 25 days of leave per year."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "lead-in/content-free-frame-still-refuses-an-altered-item",
+      "must_refuse": true,
+      "answer": "Zo zit het:\n- De werknemer heeft recht op 30 vakantiedagen per kalenderjaar [eu:a]",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werknemer heeft recht op 25 vakantiedagen per kalenderjaar."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "not supported"
+          }
+        ]
+      }
+    },
+    {
+      "name": "lead-in/exclusive-scope-is-content-and-refuses",
+      "must_refuse": true,
+      "answer": "Alleen voor stagiairs:\n- Er is recht op een reiskostenvergoeding [eu:a]",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Voor werknemers geldt: er is recht op een reiskostenvergoeding."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "not supported"
+          },
+          {
+            "supported": false,
+            "reason": "not supported"
+          }
+        ]
+      }
+    },
+    {
+      "name": "lead-in/scope-without-exclusivity-is-content-and-joins",
+      "must_refuse": true,
+      "answer": "Voor stagiairs:\n- Er is recht op een reiskostenvergoeding [eu:a]",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Voor werknemers geldt: er is recht op een reiskostenvergoeding."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "not supported"
+          }
+        ]
+      }
+    },
+    {
+      "name": "lead-in/counted-frame-still-runs-the-count-check",
+      "must_refuse": true,
+      "answer": "Op twee manieren:\n- via HR [eu:a]",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Je kunt op drie manieren melden: via de leidinggevende, via HR of via de vertrouwenspersoon."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "not supported"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "lead-in/an-unknown-word-means-join",
+      "answer": "Zo zit het ongeveer:\n- De werknemer heeft recht op 25 vakantiedagen per kalenderjaar [eu:a]",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werknemer heeft recht op 25 vakantiedagen per kalenderjaar."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "not supported"
+          }
+        ]
+      }
+    },
+    {
+      "name": "lead-in/host-supplied-frames-replace-the-default",
+      "answer": "Kortom:\n- De werknemer heeft recht op 25 vakantiedagen per kalenderjaar [eu:a]",
+      "answer_language": "nl",
+      "lead_in_frames": [
+        "kortom"
+      ],
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werknemer heeft recht op 25 vakantiedagen per kalenderjaar."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
     }
   ]
 }

@@ -398,3 +398,17 @@ func TestR119R120InclExclBtw(t *testing.T) {
 		t.Fatalf("tiered: %s %v", res.Evidence.Decision, res.Conflicts)
 	}
 }
+
+// A non-nil empty LeadInFrames disables the content-free rule: every ":" lead-in
+// is joined again, so "Zo zit het" lands in the claim and the gate refuses it.
+func TestLeadInFramesEmptyDisablesTheRule(t *testing.T) {
+	ev := []EvidenceUnit{{ID: "a", DocumentID: "a", Language: "nl", Text: "De werknemer heeft recht op 25 vakantiedagen per kalenderjaar."}}
+	answer := "Zo zit het:\n- De werknemer heeft recht op 25 vakantiedagen per kalenderjaar [eu:a]"
+	res, err := VerifyAnswer(context.Background(), answer, ev, VerifyOptions{AnswerLanguage: "nl", LeadInFrames: []string{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Claims) != 1 || res.Claims[0].Supported || !strings.HasPrefix(res.Claims[0].Claim, "Zo zit het") {
+		t.Fatalf("empty frames must join the lead-in: %+v", res.Claims)
+	}
+}
