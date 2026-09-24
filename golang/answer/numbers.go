@@ -169,7 +169,7 @@ type numberMatch struct {
 // numbersIn finds every measured number in text, skipping identifiers such as
 // "p50" / "ipv4" (a digit run flush against an ASCII letter).
 func numbersIn(text, language string) []numberMatch {
-	lowered := strings.ToLower(text)
+	lowered := joinSpacedThousands(strings.ToLower(text))
 	out := []numberMatch{}
 	for _, m := range numberRE.FindAllStringSubmatchIndex(lowered, -1) {
 		start := m[2]
@@ -275,4 +275,21 @@ func moneyRates(text, language string) (map[[2]string]struct{}, string) {
 		}
 	}
 	return rates, string(blank)
+}
+
+// spacedThousands is a money amount grouped by spaces — a plain, no-break or
+// narrow no-break space — "€ 4 000" = "€ 4.000" = 4000. Only after a currency
+// sign or code, and only with exact three-digit groups: elsewhere "4 000" may
+// be two numbers.
+var spacedThousands = regexp.MustCompile(`((?:€|\beur\b|\$|£)\s*)([1-9][0-9]*)[ \x{00A0}\x{202F}]([0-9]{3})\b`)
+
+func joinSpacedThousands(text string) string {
+	for i := 0; i < 4; i++ { // "€ 1 250 000": one group per pass
+		next := spacedThousands.ReplaceAllString(text, "$1$2$3")
+		if next == text {
+			break
+		}
+		text = next
+	}
+	return text
 }
