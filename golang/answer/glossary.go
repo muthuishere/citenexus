@@ -74,10 +74,13 @@ func ParseGlossaryTSV(r io.Reader) ([]GlossaryEntry, error) {
 func expandGlossary(entries []GlossaryEntry) (pairs [][2]string, sep, class map[string]string) {
 	sep, class = map[string]string{}, map[string]string{}
 	nlForms, enForms := map[string][]string{}, map[string][]string{}
+	plain := map[string]bool{} // forms that are also a verb on their own
 	for _, e := range entries {
 		pairs = append(pairs, [2]string{e.NL, e.EN})
 		if e.Sep != "" {
 			sep[e.NL] = e.Sep
+		} else {
+			plain[e.NL] = true
 		}
 		if e.Class != "" {
 			class[e.NL] = e.Class
@@ -93,6 +96,11 @@ func expandGlossary(entries []GlossaryEntry) (pairs [][2]string, sep, class map[
 		if e.Class != "" {
 			class[e.LemmaNL] = e.Class
 		}
+	}
+	// "stuurt" is sturen as well as the split form of opsturen: a form that
+	// is also a plain verb needs no particle.
+	for form := range plain {
+		delete(sep, form)
 	}
 	for lemma, nls := range nlForms {
 		for _, n := range nls {

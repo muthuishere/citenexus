@@ -494,12 +494,6 @@ func inSubjectOfRole(toks []string, i int, lexicon ActorLexicon) bool {
 	if start >= len(toks) || !actorTerm(toks[start], lexicon) {
 		return false
 	}
-	// Within the subject: before any verb, and close to the role — a "met"
-	// six words on belongs to the predicate ("… de melder niet in verband met
-	// het … melden").
-	if i-start > 6 {
-		return false
-	}
 	for k := start + 1; k < i; k++ {
 		if _, verb := groupVerbs[toks[k]]; verb {
 			return false

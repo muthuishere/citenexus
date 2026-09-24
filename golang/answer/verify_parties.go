@@ -375,8 +375,9 @@ func subjectSwapGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardCon
 	}
 	var parties [][]string
 	for p := range subjects {
-		// With classes known (GlossaryEntries), only a party or a group is one.
-		if len(cfg.classOf) > 0 && !isParty(p, cfg) && !actorTerm(p, cfg.actors) {
+		// A noun the glossary classes as something else ("de uitkering": other)
+		// is no party; an unclassed noun keeps its place.
+		if c, known := cfg.classOf[p]; known && c != "party" && c != "group" && !actorTerm(p, cfg.actors) {
 			continue
 		}
 		parties = append(parties, []string{p})
