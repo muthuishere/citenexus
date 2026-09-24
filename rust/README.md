@@ -49,11 +49,15 @@ char* citenexus_to_markdown(const uint8_t* bytes, size_t len,
 // or NULL. -> {"units":[DocUnit...],"pages":[...],"document":{...}} or
 // {"error": ...} (also when built without `pdf` or libpdfium is missing).
 char* citenexus_pdf_units(const uint8_t* bytes, size_t len, const char* opts_json);
-// The model contract (ADR-0017): the core never calls a model. prepare returns
-// the base output + requests (table_structure over text-layer word IDs,
-// vision_page, vision_region); the host fulfils them; assemble re-parses the
-// PDF and applies each response that passes the checks. pdf_units ==
-// pdf_assemble with no responses, byte for byte.
+// The model contract (ADR-0017; docs/pdf-model-contract.md): the core never
+// calls a model. prepare returns the base output + requests: table_structure
+// over text-layer word IDs (one per uncertain table region), and vision_page /
+// vision_region TWICE each (ids ...:v1 / ...:v2, `variant` 1|2, a `hint` to use
+// a different model or seed). The host fulfils them; assemble re-parses the
+// PDF and applies each response that passes the checks; vision text is kept
+// only where both variants agree, the rest is wrapped in
+// <!-- vision_disputed ... --> (not citable). pdf_units == pdf_assemble with no
+// responses, byte for byte.
 char* citenexus_pdf_prepare(const uint8_t* bytes, size_t len, const char* opts_json);
 char* citenexus_pdf_assemble(const uint8_t* bytes, size_t len, const char* opts_json,
                              const char* responses_json); // JSON array of PdfResponse, or NULL

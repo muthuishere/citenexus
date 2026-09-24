@@ -71,7 +71,30 @@ under ADR-0010: real parsing over pdfium character boxes.
      every cell from those pdfium characters. Model-written text is never used
      on such a page.
    - On a page or region **with no text layer**, vision-written markdown is
-     used and flagged `vision_transcribed`.
+     used and flagged `vision_transcribed`, and only under **dual
+     transcription** (amended 2026-09-25, consumer requirement):
+     - every `vision_page` / `vision_region` request is issued **twice**,
+       with distinct ids (`…:v1`, `…:v2`), a `variant` field (1/2) and a
+       `hint` telling the host to use a different model or sampling seed.
+       Prompts stay host config.
+     - Each transcription still passes the step-5 guards and checks on its
+       own (digit bag, values, coverage/novelty against any OCR layer); a
+       variant that fails is dropped.
+     - Assemble aligns the two by sentence after normalisation (NFKC,
+       case-fold, whitespace, and every number replaced by its ADR-0015
+       reading). Only sentences **identical in both** become content.
+     - A sentence that differs or appears in one only stays in the unit,
+       inside a `<!-- vision_disputed\nv1: …\nv2: …\n-->` block, and the unit
+       carries `provenance.vision_disputed = true`. Disputed text is **not
+       citable**: hosts cite `citable_text(markdown)` (Rust
+       `vision::citable_text`, Go `core.CitableText`), which strips those
+       blocks.
+     - One response back (the other missing, timed out or failed its
+       checks): the whole unit is one disputed block, single-source, never
+       silently trusted. No response: base output.
+     - This closes the "moved word" gap that no bag of words can see: a
+       "geen" moved between sentences, or two amounts swapped between
+       lines, makes both sentences disputed.
 5. **Deterministic checks before anything replaces base text.** All of these
    are library functions:
    - **Geometry:** every cell's characters sit in one row band and one column
@@ -146,6 +169,10 @@ under ADR-0010: real parsing over pdfium character boxes.
 
 ## Verification and acceptance
 
+- **The host-facing contract** (request/response shapes, ids, variants,
+  disputed markup, failure semantics, a worked example) is
+  [`docs/pdf-model-contract.md`](../pdf-model-contract.md) with a JSON Schema
+  in `docs/schema/`.
 - **Conformance vectors from synthetic PDFs only.** They are the spike's 11
   check tests, olmOCR-bench-style present / absent / order / cell-neighbour
   tests, and a **must-reject** adversarial set: swapped row amounts, a dropped
@@ -179,8 +206,10 @@ under ADR-0010: real parsing over pdfium character boxes.
 - The model can no longer invent a value on a text-layer page. Its worst case
   is a wrong **structure**, and the geometry gate and GriTS catch or downgrade
   that. The price is a request schema more complex than "page → markdown".
-- Scans and image regions remain as trustworthy as their vision model. They
-  are **labelled** `vision_transcribed`, never passed off as backed by the text
-  layer.
+- Scans and image regions remain as trustworthy as the AGREEMENT of two
+  independent vision transcriptions. They are **labelled**
+  `vision_transcribed`, never passed off as backed by the text layer, and any
+  sentence the two do not agree on is `vision_disputed` and not citable. The
+  price is two vision calls per region instead of one.
 - The spike's numbers are a target, not a baseline: they have to be re-earned
   without PyMuPDF or poppler.
