@@ -488,3 +488,24 @@ func TestDisableDefinitions(t *testing.T) {
 		t.Fatalf("disabled: the checker decides: %+v", res.Claims)
 	}
 }
+
+func TestParseGlossaryTSV(t *testing.T) {
+	tsv := "nl\ten\tpos\tclass\tlemma_nl\tlemma_en\tsep\n" +
+		"sluit\tclose\tverb\tverb\tafsluiten\tclose\taf\n" +
+		"Controller\tController\tnoun\tparty\tcontroller\tcontroller\t\n" +
+		"\tempty\tnoun\tparty\t\t\t\n"
+	entries, err := ParseGlossaryTSV(strings.NewReader(tsv))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []GlossaryEntry{
+		{NL: "sluit", EN: "close", LemmaNL: "afsluiten", LemmaEN: "close", Sep: "af", Class: "verb"},
+		{NL: "controller", EN: "controller", LemmaNL: "controller", LemmaEN: "controller", Class: "party"},
+	}
+	if !reflect.DeepEqual(entries, want) {
+		t.Fatalf("got %+v", entries)
+	}
+	if _, err := ParseGlossaryTSV(strings.NewReader("a\tb\nx\ty\n")); err == nil {
+		t.Fatal("a header without nl/en must be an error")
+	}
+}

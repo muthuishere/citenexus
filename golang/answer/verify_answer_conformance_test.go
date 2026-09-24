@@ -26,6 +26,15 @@ type verifyVector struct {
 	// Actors EXTENDS DefaultActorLexicon: actor id -> extra terms.
 	Actors   map[string][]string `json:"actors"`
 	Glossary [][2]string         `json:"glossary"`
+	// GlossaryEntries: rows with lemmas, particle and class (glossary.go).
+	GlossaryEntries []struct {
+		NL      string `json:"nl"`
+		EN      string `json:"en"`
+		LemmaNL string `json:"lemma_nl"`
+		LemmaEN string `json:"lemma_en"`
+		Sep     string `json:"sep"`
+		Class   string `json:"class"`
+	} `json:"glossary_entries"`
 	Evidence []struct {
 		ID         string `json:"id"`
 		DocumentID string `json:"document_id"`
@@ -71,8 +80,8 @@ func TestVerifyAnswerConformance(t *testing.T) {
 	if err := json.Unmarshal(raw, &file); err != nil {
 		t.Fatal(err)
 	}
-	if len(file.Cases) != 267 {
-		t.Fatalf("verify_answer.json: got %d cases, want 267", len(file.Cases))
+	if len(file.Cases) != 268 {
+		t.Fatalf("verify_answer.json: got %d cases, want 268", len(file.Cases))
 	}
 	refuseControls := 0
 	for _, c := range file.Cases {
@@ -103,6 +112,9 @@ func TestVerifyAnswerConformance(t *testing.T) {
 			}
 			opts := VerifyOptions{AnswerLanguage: c.AnswerLanguage, AdmitParaphrase: c.AdmitParaphrase, NameAliases: c.NameAliases, LeadInFrames: c.LeadInFrames}
 			opts.Glossary = c.Glossary
+			for _, e := range c.GlossaryEntries {
+				opts.GlossaryEntries = append(opts.GlossaryEntries, GlossaryEntry{NL: e.NL, EN: e.EN, LemmaNL: e.LemmaNL, LemmaEN: e.LemmaEN, Sep: e.Sep, Class: e.Class})
+			}
 			if len(c.Actors) > 0 {
 				lexicon := DefaultActorLexicon
 				for id, terms := range c.Actors {

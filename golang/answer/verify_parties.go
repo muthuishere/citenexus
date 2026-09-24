@@ -375,6 +375,10 @@ func subjectSwapGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardCon
 	}
 	var parties [][]string
 	for p := range subjects {
+		// With classes known (GlossaryEntries), only a party or a group is one.
+		if len(cfg.classOf) > 0 && !isParty(p, cfg) && !actorTerm(p, cfg.actors) {
+			continue
+		}
 		parties = append(parties, []string{p})
 	}
 	sort.Slice(parties, func(i, j int) bool { return parties[i][0] < parties[j][0] })
@@ -385,6 +389,19 @@ func subjectSwapGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardCon
 		t := toks[j]
 		if gate.IsStopword(t) || !partyWord(t) {
 			return false
+		}
+		// A split separable form ("sluit", "keert") is that verb only with its
+		// particle later in the sentence.
+		if p := cfg.sepOf[t]; p != "" {
+			found := false
+			for k := j + 1; k < len(toks); k++ {
+				if toks[k] == p {
+					found = true
+				}
+			}
+			if !found {
+				return false
+			}
 		}
 		for _, vf := range forms(t) {
 			if len(vf) == 1 && vf[0] == claimVerb {
@@ -438,6 +455,9 @@ func subjectSwapGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardCon
 				case reader && actorTerm(subj[0], cfg.actors):
 					// The reader may be that employee or that employer: no verdict.
 					agrees = true
+				case reader && !isParty(subj[0], cfg):
+					// Not known to be a party at all ("de uitkering"): no verdict.
+					agrees = true
 				case !reader && (subj[0] == party || sameActorClass(subj[0], party, cfg.actors)):
 					agrees = true
 				case other == "":
@@ -462,8 +482,9 @@ func subjectSwapGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardCon
 		}
 	}
 	// The reader as the claim's subject ("You close …") against a THIRD party
-	// — one the lexicon does not name: who "you" is (employee or employer)
-	// depends on who asked, so only a party that is neither decides.
+	// — one the lexicon does not name, and that VerifyOptions.GlossaryEntries
+	// class as a party or group: who "you" is (employee or employer) depends
+	// on who asked, and "de uitkering" is no party at all.
 	for i, t := range claimTokens {
 		// Subject forms only: "your salary" is a possessive, not the actor.
 		if _, subject := readerSubjects[t]; !subject {
@@ -496,3 +517,10 @@ func sameActorClass(a, b string, lexicon ActorLexicon) bool {
 
 // readerSubjects are the reader's pronouns in subject form.
 var readerSubjects = map[string]struct{}{"you": {}, "je": {}, "jij": {}, "u": {}}
+
+// isParty: the glossary classes the noun as a party or a group. Without
+// classes nothing is known to be a third party.
+func isParty(noun string, cfg guardConfig) bool {
+	c := cfg.classOf[noun]
+	return c == "party" || c == "group"
+}

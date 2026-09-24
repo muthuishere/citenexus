@@ -141,6 +141,12 @@ type VerifyOptions struct {
 	// condition guard, to tell whether a claim in another language carries a
 	// unit's condition word. nil: that guard gives no verdict across languages.
 	Glossary [][2]string
+	// GlossaryEntries are glossary rows with lemmas, a separable particle and
+	// a class (glossary.go; ParseGlossaryTSV reads them from a file). They add
+	// to Glossary: inflections match through their lemma, a split separable
+	// verb only with its particle, and the reader is compared with a third
+	// party only when a party's class says it is one.
+	GlossaryEntries []GlossaryEntry
 	// AdmitParaphrase lets the checker admit SAME-language claims the gate
 	// rejected (a paraphrase), still behind the deterministic guards. Off by
 	// default: it trades the gate's guarantee for coverage, and the caller should
@@ -659,8 +665,10 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 	if opts.VerbPairs != nil {
 		verbs = opts.VerbPairs
 	}
+	entryPairs, sepOf, classOf := expandGlossary(opts.GlossaryEntries)
 	cfg := guardConfig{aliases: opts.NameAliases, actors: actors, pairs: pairs, verbs: verbs,
-		glossary: opts.Glossary, noDefinitions: opts.DisableDefinitions}
+		glossary: append(append([][2]string{}, opts.Glossary...), entryPairs...),
+		sepOf:    sepOf, classOf: classOf, noDefinitions: opts.DisableDefinitions}
 	frames := opts.LeadInFrames
 	if frames == nil {
 		frames = DefaultLeadInFrames

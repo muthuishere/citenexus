@@ -432,6 +432,8 @@ type guardConfig struct {
 	pairs    []QualifierPair
 	verbs    []VerbPair
 	glossary [][2]string
+	// sepOf / classOf: from VerifyOptions.GlossaryEntries (glossary.go).
+	sepOf, classOf map[string]string
 	// noDefinitions: VerifyOptions.DisableDefinitions.
 	noDefinitions bool
 	// fragment: the text is a list lead-in checked on its own (union rule):
