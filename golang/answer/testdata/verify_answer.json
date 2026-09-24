@@ -5019,6 +5019,220 @@
           }
         ]
       }
+    },
+    {
+      "name": "condition/adv-nf-14 a bound or an eligibility the claim does not speak about is no dropped condition (rag_go adv, fictional)",
+      "answer": "De thuiswerkvergoeding is €2,40 per thuiswerkdag [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "thuiswerkregeling",
+          "language": "nl",
+          "text": "Thuiswerkvergoeding. Werknemers die structureel ten minste twee dagen per week thuiswerken, ontvangen een thuiswerkvergoeding van € 2,40 per thuiswerkdag. Stagiairs zijn uitgesloten van deze regeling."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "condition/adv-nf-v2-09 a bound or an eligibility the claim does not speak about is no dropped condition (rag_go adv, fictional)",
+      "answer": "Bij een voltijds dienstverband bedraagt de vakantietoeslag minimaal 1900 euro bruto [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "cao-tekst ziekenhuiszorg",
+          "language": "nl",
+          "text": "Artikel 3.2 Vakantietoeslag. De werknemer ontvangt jaarlijks in mei een vakantietoeslag van 8% van het in de periode van 1 juni tot en met 31 mei verdiende salaris. De vakantietoeslag bedraagt ten minste € 1.900,00 bruto bij een voltijds dienstverband."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "condition/adv-nf-v2-28 a bound or an eligibility the claim does not speak about is no dropped condition (rag_go adv, fictional)",
+      "answer": "Voor medewerkers in schaal 1 t/m 8 is de eindejaarsuitkering minimaal 800 euro [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "vergoedingsregeling Stichting Openbaar Onderwijs Duinrand",
+          "language": "nl",
+          "text": "Eindejaarsuitkering. De eindejaarsuitkering bedraagt 6,3% van het jaarsalaris en wordt in december uitbetaald. Voor medewerkers in schaal 1 tot en met 8 bedraagt de uitkering ten minste € 800. Bij deeltijd wordt de uitkering naar rato berekend."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "condition/adv-ri-v2-22 a pronoun claim still carries the subject group condition (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "Je meldt je sollicitatie vooraf bij de benoemingsadviescommissie [eu:S1]. Als je wilt solliciteren, meld je dit vooraf aan je eigen schoolleider [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "mobiliteitsregeling Stichting Openbaar Onderwijs Duinrand",
+          "language": "nl",
+          "text": "Interne vacatures. De afdeling HRM publiceert interne vacatures gedurende tien werkdagen op het intranet. Een medewerker die wil solliciteren, meldt dit vooraf aan de eigen schoolleider. De benoemingsadviescommissie voert de gesprekken en het college van bestuur benoemt."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "condition guard: the"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "condition/adv-ri-v2-12 a plural carries the singular restrictor (rag_go adv, fictional; its must-admit twin only)",
+      "answer": "Voor bereikbaarheidsdiensten geldt [eu:S1]:\n- Bij een oproep ben je binnen dertig minuten op de afdeling aanwezig [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "cao-tekst ziekenhuiszorg",
+          "language": "nl",
+          "text": "Artikel 6.4 Bereikbaarheidsdienst. De werkgever stelt het rooster voor bereikbaarheidsdiensten vast na overleg met de betrokken medewerkers. De medewerker die bereikbaarheidsdienst heeft, is binnen dertig minuten na oproep op de afdeling aanwezig. De werkgever vergoedt de reistijd bij oproep als werktijd."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "condition/adv-dc-05 a beneficiary restriction stays in scope on the model path (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "De werkgever vergoedt een bureaustoel [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "thuiswerkregeling",
+          "language": "nl",
+          "text": "Thuiswerken. Werknemers mogen thuiswerken met toestemming van hun leidinggevende. De werkgever vergoedt een bureaustoel voor werknemers met een vast contract."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "truncation guard: th"
+          }
+        ]
+      }
+    },
+    {
+      "name": "condition/adv-dh-v2-21 mits dropped under a lead-in (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "Voor thuiswerken geldt [eu:S1]:\n- Je mag altijd thuiswerken [eu:S1].\n- Je mag thuiswerken, mits je thuiswerkplek voldoet aan de eisen van de arbochecklist [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "thuiswerkregeling Woonstichting Beekdal",
+          "language": "nl",
+          "text": "Thuiswerken. Een medewerker mag thuiswerken, mits de thuiswerkplek voldoet aan de eisen van de arbochecklist. De leidinggevende kan het thuiswerken tijdelijk beperken als de bezetting op kantoor dat vereist. De medewerker vult de arbochecklist jaarlijks in."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "condition guard: the"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
     }
   ]
 }

@@ -81,7 +81,9 @@ func conditionContent(t string) bool {
 	if _, stop := contextStop[t]; stop {
 		return false
 	}
-	return len([]rune(t)) >= 2
+	// Short words ("wil", "zijn") are verbs and particles more than they are
+	// conditions; digits always count.
+	return len([]rune(t)) >= 4 || strings.ContainsAny(t, "0123456789")
 }
 
 // carried reports whether the claim carries unit word w: directly, or (other
@@ -96,6 +98,16 @@ type carrier struct {
 func (c carrier) carried(w string) (has, known bool) {
 	if c.claim[w] {
 		return true, true
+	}
+	// An inflection or a plural ("bereikbaarheidsdienst" / "…diensten"): one
+	// word is the other plus a short ending.
+	if r := []rune(w); len(r) >= 6 {
+		for t := range c.claim {
+			if tr := []rune(t); len(tr) >= 6 && (strings.HasPrefix(t, w) || strings.HasPrefix(w, t)) &&
+				abs(len(tr)-len(r)) <= 3 {
+				return true, true
+			}
+		}
 	}
 	if !c.crossLang {
 		return false, true
@@ -142,28 +154,37 @@ func conditionGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfi
 		return ""
 	}
 	c := carrier{claim: map[string]bool{}, crossLang: cross, translations: glossaryIndex(cfg.glossary)}
-	for _, t := range tokenize.TokenizeV2(claim) {
+	claimTokens := tokenize.TokenizeV2(claim)
+	for _, t := range claimTokens {
 		c.claim[t] = true
 	}
+	claimBounds := boundDirections(claimTokens)
 	shared := func(t string) bool {
 		has, _ := c.carried(t)
 		return conditionContent(t) && has
 	}
-	// The unit sentence the claim follows.
-	var best []string
-	var bestText string
+	// The unit sentence(s) the claim follows: the most shared content words,
+	// every sentence tied for it (a heading "Ongewenst gedrag." ties with the
+	// sentence that restricts it; both are read).
+	var ties []string
 	bestN := 0
 	for _, s := range sentenceBreak.Split(softJoin(eu.Text), -1) {
 		n := 0
 		seen := map[string]bool{}
 		for _, t := range tokenize.TokenizeV2(s) {
-			if !seen[t] && shared(t) {
+			// Any non-stopword counts for finding the sentence ("mag" too); only
+			// the restrictor test needs content words of 4+ letters.
+			has, _ := c.carried(t)
+			if !seen[t] && has && !gate.IsStopword(t) && !isContextStop(t) {
 				seen[t] = true
 				n++
 			}
 		}
-		if n > bestN {
-			best, bestText, bestN = tokenize.TokenizeV2(s), s, n
+		switch {
+		case n > bestN:
+			ties, bestN = []string{s}, n
+		case n == bestN && n > 0:
+			ties = append(ties, s)
 		}
 	}
 	if bestN < 2 {
@@ -209,72 +230,104 @@ func conditionGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfi
 		return fmt.Sprintf("condition guard: the passage restricts it (%s %q) and the claim drops it", kind, word)
 	}
 
-	// A conditional sentence opened by its verb: "Kom je … niet uit, dan …".
-	if len(best) > 2 {
-		if _, subj := conditionalVerbSubjects[best[1]]; subj && conditionContent(best[0]) {
-			for i, t := range best {
-				if t == "dan" && i > 2 && strings.Contains(bestText, ", dan") {
-					if ok, w := lacks(best[:i], false); ok {
-						return refuse("condition", w)
+	for _, bestText := range ties {
+		best := tokenize.TokenizeV2(bestText)
+		// A conditional sentence opened by its verb: "Kom je … niet uit, dan …".
+		if len(best) > 2 {
+			if _, subj := conditionalVerbSubjects[best[1]]; subj && !gate.IsStopword(best[0]) && !isContextStop(best[0]) {
+				for i, t := range best {
+					if t == "dan" && i > 2 && strings.Contains(bestText, ", dan") {
+						if ok, w := lacks(best[:i], false); ok {
+							return refuse("condition", w)
+						}
+						break
+					}
+				}
+			}
+		}
+		for _, clause := range clauseBreak.Split(softJoin(bestText), -1) {
+			toks := tokenize.TokenizeV2(clause)
+			// A restriction of a group the claim does not speak about ("Werknemers
+			// die structureel ten minste twee dagen … thuiswerken, ontvangen …"
+			// under "De thuiswerkvergoeding is € 2,40") is out of the claim's
+			// scope, and so is every opener inside it.
+			// Only a group in SUBJECT position (the clause's first noun) is out of
+			// scope: "… vergoedt een bureaustoel voor werknemers met een vast
+			// contract" restricts the predicate the claim states, so it stays.
+			outOfScope := make([]bool, len(toks))
+			for i := 1; i < len(toks); i++ {
+				subject := i-1 == 0 || (i-1 == 1 && isArticle(toks[0]))
+				if _, ok := partyRestrictors[toks[i]]; ok && subject && actorTerm(toks[i-1], cfg.actors) &&
+					!claimNamesActor(c.claim, toks[i-1], cfg.actors) {
+					for k := i; k < len(toks); k++ {
+						outOfScope[k] = true
 					}
 					break
 				}
 			}
-		}
-	}
-	for _, clause := range clauseBreak.Split(softJoin(bestText), -1) {
-		toks := tokenize.TokenizeV2(clause)
-		for i := 0; i < len(toks); i++ {
-			start := -1
-			negated := i > 0 && (toks[i-1] == "niet" || toks[i-1] == "not") // "niet alleen … maar ook"
-			if _, ok := conditionOpeners[toks[i]]; ok && !negated {
-				start = i + 1
-			}
-			for _, ph := range conditionPhrases {
-				if i+1 < len(toks) && toks[i] == ph[0] && toks[i+1] == ph[1] {
-					start = i + 1 // "toestemming", "minste" belong to the condition
+			for i := 0; i < len(toks); i++ {
+				if outOfScope[i] {
+					continue
+				}
+				start := -1
+				negated := i > 0 && (toks[i-1] == "niet" || toks[i-1] == "not") // "niet alleen … maar ook"
+				if _, ok := conditionOpeners[toks[i]]; ok && !negated {
+					start = i + 1
+				}
+				for _, ph := range conditionPhrases {
+					if i+1 < len(toks) && toks[i] == ph[0] && toks[i+1] == ph[1] {
+						start = i + 1 // "toestemming", "minste" belong to the condition
+						// A bound the claim states its own way ("minimaal" for
+						// "ten minste") is carried: the bound check is the negation
+						// guard's and the number guard's.
+						if claimBounds[boundLower] && (ph[1] == "minste" || ph[1] == "least") {
+							start = -1
+						}
+					}
+				}
+				// "Werknemers met …" / "… die …": a restricted group (a subject
+				// group the claim does not speak about was scoped out above).
+				if _, ok := partyRestrictors[toks[i]]; ok && i > 0 && actorTerm(toks[i-1], cfg.actors) {
+					start = i + 1
+				}
+				if start < 0 || start >= len(toks) {
+					continue
+				}
+				end := start
+				for end < len(toks) && !shared(toks[end]) {
+					end++
+				}
+				if _, alreadyOpener := conditionOpeners[toks[i]]; !alreadyOpener && end == start {
+					continue
+				}
+				if ok, w := lacks(toks[start:end], true); ok {
+					return refuse("condition", toks[i]+" … "+w)
 				}
 			}
-			if _, ok := partyRestrictors[toks[i]]; ok && i > 0 && actorTerm(toks[i-1], cfg.actors) {
-				start = i + 1
-			}
-			if start < 0 || start >= len(toks) {
-				continue
-			}
-			end := start
-			for end < len(toks) && !shared(toks[end]) {
-				end++
-			}
-			if _, alreadyOpener := conditionOpeners[toks[i]]; !alreadyOpener && end == start {
-				continue
-			}
-			if ok, w := lacks(toks[start:end], true); ok {
-				return refuse("condition", toks[i]+" … "+w)
-			}
-		}
-		// Scope qualifiers right before a shared word; "vaste en variabele
-		// toeslagen" qualifies through the coordination.
-		for i := 0; i+1 < len(toks); i++ {
-			if _, q := scopeQualifiers[toks[i]]; !q {
-				continue
-			}
-			j := i + 1
-			for j+1 < len(toks) && (toks[j] == "en" || toks[j] == "and") {
-				j += 2
-			}
-			if j < len(toks) && shared(toks[j]) {
-				if ok, w := lacks([]string{toks[i]}, false); ok {
-					return refuse("qualifier", w)
+			// Scope qualifiers right before a shared word; "vaste en variabele
+			// toeslagen" qualifies through the coordination.
+			for i := 0; i+1 < len(toks); i++ {
+				if _, q := scopeQualifiers[toks[i]]; !q {
+					continue
+				}
+				j := i + 1
+				for j+1 < len(toks) && (toks[j] == "en" || toks[j] == "and") {
+					j += 2
+				}
+				if j < len(toks) && shared(toks[j]) {
+					if ok, w := lacks([]string{toks[i]}, false); ok {
+						return refuse("qualifier", w)
+					}
 				}
 			}
-		}
-		// A coordinated requirement dropped from inside the claim's span:
-		// shared, "en", missing, shared.
-		for i := 0; i+3 < len(toks); i++ {
-			if shared(toks[i]) && (toks[i+1] == "en" || toks[i+1] == "and") && conditionContent(toks[i+2]) &&
-				shared(toks[i+3]) {
-				if ok, w := lacks([]string{toks[i+2]}, false); ok {
-					return refuse("requirement", w)
+			// A coordinated requirement dropped from inside the claim's span:
+			// shared, "en", missing, shared.
+			for i := 0; i+3 < len(toks); i++ {
+				if shared(toks[i]) && (toks[i+1] == "en" || toks[i+1] == "and") && conditionContent(toks[i+2]) &&
+					shared(toks[i+3]) {
+					if ok, w := lacks([]string{toks[i+2]}, false); ok {
+						return refuse("requirement", w)
+					}
 				}
 			}
 		}
@@ -291,4 +344,56 @@ func actorTerm(t string, lexicon ActorLexicon) bool {
 		}
 	}
 	return false
+}
+
+// claimNamesActor: the claim names the same actor as unit term t (any term of
+// its class, in any language).
+func claimNamesActor(claim map[string]bool, t string, lexicon ActorLexicon) bool {
+	for id, terms := range lexicon.Actors {
+		// The reader's pronoun names the SecondPerson actor.
+		if id == lexicon.SecondPerson {
+			for _, x := range lexicon.SecondPersonTerms {
+				if claim[x] && hasTerm(terms, t) {
+					return true
+				}
+			}
+		}
+		in := false
+		for _, x := range terms {
+			if x == t {
+				in = true
+				break
+			}
+		}
+		if !in {
+			continue
+		}
+		for _, x := range terms {
+			if claim[x] {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func hasTerm(terms []string, t string) bool {
+	for _, x := range terms {
+		if x == t {
+			return true
+		}
+	}
+	return false
+}
+
+func abs(n int) int {
+	if n < 0 {
+		return -n
+	}
+	return n
+}
+
+func isContextStop(t string) bool {
+	_, ok := contextStop[t]
+	return ok
 }
