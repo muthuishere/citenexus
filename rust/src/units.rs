@@ -112,6 +112,12 @@ pub struct Provenance {
     /// form differs from `markdown` (a quote may still match the printed form).
     #[serde(default)]
     pub joined_hyphen: bool,
+    /// Vision text here is (partly) disputed: the two transcriptions
+    /// disagreed, or only one came back. The disputed text sits inside
+    /// `<!-- vision_disputed … -->` blocks in `markdown` and is NOT citable
+    /// (`vision::citable_text`).
+    #[serde(default)]
+    pub vision_disputed: bool,
 }
 
 impl Provenance {
@@ -125,6 +131,7 @@ impl Provenance {
             failed_check: None,
             heading_source: None,
             joined_hyphen: false,
+            vision_disputed: false,
         }
     }
 }
@@ -327,6 +334,14 @@ pub struct PdfRequest {
     /// `table_structure` only: the words the grid may reference.
     #[serde(default)]
     pub words: Vec<PdfWord>,
+    /// Vision requests come in two independent variants (1 and 2) of the
+    /// same region; only sentences both transcriptions agree on become
+    /// content. `null` for `table_structure`.
+    #[serde(default)]
+    pub variant: Option<u32>,
+    /// How the host should make the variants independent (vision only).
+    #[serde(default)]
+    pub hint: Option<String>,
 }
 
 /// `pdf_prepare`'s output: the base result plus the requests.

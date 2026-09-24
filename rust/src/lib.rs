@@ -14,6 +14,7 @@ pub mod rrf;
 pub mod store;
 pub mod types;
 pub mod units;
+pub mod vision;
 
 // Public so integration tests can exercise the exact C surface bindings use.
 pub mod ffi;
