@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/muthuishere/citenexus/golang/gate"
@@ -154,8 +155,7 @@ func numberValue(token, language string) (string, bool) {
 	case token[0] >= '0' && token[0] <= '9':
 		return ReadNumber(token, false, language).Key, true
 	default:
-		v, ok := numberWords[token]
-		return v, ok
+		return numberWordValue(token)
 	}
 }
 
@@ -692,4 +692,89 @@ func sameQuantityIn(q [2]string, have map[[2]string]struct{}) bool {
 // thuiswerkdag" ends in "werkdag" but is a (home-working) day.
 func samePeriodFamily(a, b string) bool {
 	return (a == "day" || a == "workday") && (b == "day" || b == "workday")
+}
+
+// Dutch writes numbers as one word: "vijfentwintig" (25), "tweeëntwintig"
+// (22), "honderdvijfentwintig" (125), "tweeduizend" (2000). numberWordValue
+// reads the numberWords table first, then parses such compounds — a grammar,
+// not a table: [units]en[tens] below 100, then honderd and duizend.
+var (
+	dutchUnits = map[string]int{"een": 1, "één": 1, "twee": 2, "drie": 3, "vier": 4, "vijf": 5, "zes": 6, "zeven": 7, "acht": 8, "negen": 9}
+	dutchTeens = map[string]int{"tien": 10, "elf": 11, "twaalf": 12, "dertien": 13, "veertien": 14, "vijftien": 15,
+		"zestien": 16, "zeventien": 17, "achttien": 18, "negentien": 19}
+	dutchTens = map[string]int{"twintig": 20, "dertig": 30, "veertig": 40, "vijftig": 50, "zestig": 60,
+		"zeventig": 70, "tachtig": 80, "negentig": 90}
+)
+
+func numberWordValue(word string) (string, bool) {
+	if v, ok := numberWords[word]; ok {
+		return v, true
+	}
+	if n, ok := parseDutchNumber(word); ok && n > 0 {
+		return strconv.Itoa(n), true
+	}
+	return "", false
+}
+
+func parseDutchNumber(w string) (int, bool) {
+	if w == "" {
+		return 0, false
+	}
+	if head, tail, ok := strings.Cut(w, "duizend"); ok {
+		mult := 1
+		if head != "" {
+			m, ok := parseDutchNumber(head)
+			if !ok {
+				return 0, false
+			}
+			mult = m
+		}
+		rest := 0
+		if tail != "" {
+			r, ok := parseDutchNumber(tail)
+			if !ok {
+				return 0, false
+			}
+			rest = r
+		}
+		return mult*1000 + rest, true
+	}
+	if head, tail, ok := strings.Cut(w, "honderd"); ok {
+		mult := 1
+		if head != "" {
+			m, ok := dutchUnits[head]
+			if !ok {
+				return 0, false
+			}
+			mult = m
+		}
+		rest := 0
+		if tail != "" {
+			r, ok := parseDutchNumber(tail)
+			if !ok || r >= 100 {
+				return 0, false
+			}
+			rest = r
+		}
+		return mult*100 + rest, true
+	}
+	if v, ok := dutchUnits[w]; ok {
+		return v, true
+	}
+	if v, ok := dutchTeens[w]; ok {
+		return v, true
+	}
+	if v, ok := dutchTens[w]; ok {
+		return v, true
+	}
+	for _, link := range []string{"ën", "en"} {
+		for tens, tv := range dutchTens {
+			if unit, ok := strings.CutSuffix(w, link+tens); ok {
+				if uv, ok := dutchUnits[unit]; ok {
+					return uv + tv, true
+				}
+			}
+		}
+	}
+	return 0, false
 }

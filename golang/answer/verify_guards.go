@@ -62,7 +62,7 @@ func numberGuard(claim, claimLanguage, passage, passageLanguage string) string {
 		}
 	}
 	for _, word := range unitScan.FindAllString(strings.ToLower(passage), -1) {
-		if value, ok := numberWords[word]; ok && word != "een" {
+		if value, ok := numberWordValue(word); ok && word != "een" {
 			have[value] = struct{}{}
 		}
 		if value, ok := ordinalWords[word]; ok {
@@ -97,7 +97,7 @@ func countConflict(claim, passage, passageLanguage string) string {
 	words := unitScan.FindAllString(strings.ToLower(claim), -1)
 	ptoks := unitScan.FindAllString(strings.ToLower(passage), -1)
 	for i, word := range words {
-		value, ok := numberWords[word]
+		value, ok := numberWordValue(word)
 		if !ok || word == "een" || word == "one" || i+1 >= len(words) {
 			continue
 		}

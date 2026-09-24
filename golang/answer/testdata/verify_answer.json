@@ -5769,6 +5769,186 @@
           }
         ]
       }
+    },
+    {
+      "name": "numword-nl/26-days-over-vijfentwintig-refuses",
+      "must_refuse": true,
+      "answer": "A full-time employee is entitled to 26 days of holiday per calendar year [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Een medewerker met een voltijds dienstverband heeft recht op vijfentwintig vakantiedagen per kalenderjaar."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "numword-nl/a-compound-hundred",
+      "answer": "De bijdrage is 125 euro per jaar [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De bijdrage bedraagt honderdvijfentwintig euro per jaar."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "numword-nl/a-compound-hundred-other-value-refuses",
+      "must_refuse": true,
+      "answer": "De bijdrage is 135 euro per jaar [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De bijdrage bedraagt honderdvijfentwintig euro per jaar."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "numword-nl/diaeresis-form",
+      "answer": "Je hebt recht op 22 vakantiedagen [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Je hebt recht op tweeëntwintig vakantiedagen."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "numword-nl/adv-nf-v2-14 (rag_go adv, fictional)",
+      "answer": "With a full-time contract you are entitled to 25 days of holiday per calendar year [eu:S1]. Holiday days must be taken by December 31 of the following year at the latest [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "verlofregeling Maasoever Advocaten",
+          "language": "nl",
+          "text": "Vakantiedagen. Een medewerker met een voltijds dienstverband heeft recht op vijfentwintig vakantiedagen per kalenderjaar. Daarnaast ontvangt de medewerker vier ADV-dagen. Vakantiedagen moeten uiterlijk op 31 december van het volgende jaar zijn opgenomen."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "numword-nl/adv-nf-v2-15 (rag_go adv, fictional)",
+      "answer": "Een voltijder heeft recht op 25 vakantiedagen per kalenderjaar en ontvangt daarnaast 4 ADV-dagen [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "verlofregeling Maasoever Advocaten",
+          "language": "nl",
+          "text": "Vakantiedagen. Een medewerker met een voltijds dienstverband heeft recht op vijfentwintig vakantiedagen per kalenderjaar. Daarnaast ontvangt de medewerker vier ADV-dagen. Vakantiedagen moeten uiterlijk op 31 december van het volgende jaar zijn opgenomen."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
     }
   ]
 }
