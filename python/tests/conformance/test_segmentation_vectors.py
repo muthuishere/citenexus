@@ -18,7 +18,7 @@ from .fixtures import load_case
 
 VECTORS: list[dict[str, Any]] = load_case("segmentation.json")
 
-EXPECTED_COUNT = 121  # 95 + 17 Dutch abbreviation vectors + 9 opener vectors
+EXPECTED_COUNT = 125  # 95 + 17 Dutch abbreviation + 9 opener + 4 nl (c.q./t.a.v./a.s./z.o.z.)
 
 
 def test_vector_count() -> None:

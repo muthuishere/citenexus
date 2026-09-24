@@ -2055,6 +2055,33 @@ _SEGMENTATION_CASES: list[tuple[str, str, list[str], str | None]] = [
         ["(J. Smith) signed.", "Done."],
         None,
     ),
+    # ── nl, 2026-09-24 (rag_go: "c.q." split a claim in two) ─────────────────
+    (
+        "abbrev-nl/cq",
+        "De werknemer c.q. de werkgever tekent het formulier. Klaar.",
+        ["De werknemer c.q. de werkgever tekent het formulier.", "Klaar."],
+        None,
+    ),
+    (
+        "abbrev-nl/tav",
+        "Een brief t.a.v. de afdeling HR is nodig. Klaar.",
+        ["Een brief t.a.v. de afdeling HR is nodig.", "Klaar."],
+        None,
+    ),
+    (
+        "abbrev-nl/as-not-tabled",
+        "De vergadering is op maandag a.s. om 10 uur. Klaar.",
+        ["De vergadering is op maandag a.s.", "om 10 uur.", "Klaar."],
+        '"a.s." is NOT tabled: it routinely ends a sentence ("maandag a.s."), and '
+        "a false merge fuses two claims into one verdict. A fragment fails the gate "
+        "and is dropped — the safe side.",
+    ),
+    (
+        "abbrev-nl/zoz-not-tabled",
+        "Zie de achterkant z.o.z. voor details. Klaar.",
+        ["Zie de achterkant z.o.z.", "voor details.", "Klaar."],
+        '"z.o.z." is NOT tabled: it is page- and sentence-final by nature.',
+    ),
     (
         "opener/closing-mark-still-ends-the-sentence",
         "Zie de regeling (nr). Dat is zo.",

@@ -187,6 +187,42 @@
     ]
   },
   {
+    "label": "abbrev-nl/cq",
+    "text": "De werknemer c.q. de werkgever tekent het formulier. Klaar.",
+    "claims": [
+      "De werknemer c.q. de werkgever tekent het formulier.",
+      "Klaar."
+    ]
+  },
+  {
+    "label": "abbrev-nl/tav",
+    "text": "Een brief t.a.v. de afdeling HR is nodig. Klaar.",
+    "claims": [
+      "Een brief t.a.v. de afdeling HR is nodig.",
+      "Klaar."
+    ]
+  },
+  {
+    "label": "abbrev-nl/as-not-tabled",
+    "text": "De vergadering is op maandag a.s. om 10 uur. Klaar.",
+    "claims": [
+      "De vergadering is op maandag a.s.",
+      "om 10 uur.",
+      "Klaar."
+    ],
+    "known_miss": "\"a.s.\" is NOT tabled: it routinely ends a sentence (\"maandag a.s.\"), and a false merge fuses two claims into one verdict. A fragment fails the gate and is dropped — the safe side."
+  },
+  {
+    "label": "abbrev-nl/zoz-not-tabled",
+    "text": "Zie de achterkant z.o.z. voor details. Klaar.",
+    "claims": [
+      "Zie de achterkant z.o.z.",
+      "voor details.",
+      "Klaar."
+    ],
+    "known_miss": "\"z.o.z.\" is NOT tabled: it is page- and sentence-final by nature."
+  },
+  {
     "label": "opener/closing-mark-still-ends-the-sentence",
     "text": "Zie de regeling (nr). Dat is zo.",
     "claims": [

@@ -127,13 +127,15 @@ TERMINATORS: str = ".!?。！？؟۔।॥‼⁇⁈⁉"  # noqa: RUF001 — full
 # Dutch (nl): only abbreviations that practically never END a sentence. Rejected,
 # because they routinely do and a false merge fuses two claims into one verdict:
 # "enz." (list-final), "jl." (follows a date: "per 1 maart jl."), "z.s.m."
-# (clause-final: "meld dit z.s.m."). "mr" was already present. Each decision is
+# (clause-final: "meld dit z.s.m."), "a.s." (follows a date: "maandag a.s."),
+# "z.o.z." (page-final). "mr" was already present. Each decision is
 # pinned in conformance/cases/segmentation.json ("abbrev-nl/...").
 ABBREVIATIONS: frozenset[str] = frozenset(
     {
         # ── nl ──
         "bijv",
         "blz",
+        "c.q",
         "ca",
         "d.w.z",
         "evt",
@@ -143,6 +145,7 @@ ABBREVIATIONS: frozenset[str] = frozenset(
         "m.b.t",
         "m.u.v",
         "o.a",
+        "t.a.v",
         "t.o.v",
         # ── en, dotted forms (the undotted "eg"/"ie" below never matched what
         # English writes: the scanner keeps interior dots) ──
