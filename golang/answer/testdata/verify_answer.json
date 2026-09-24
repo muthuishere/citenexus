@@ -8276,6 +8276,445 @@
           }
         ]
       }
+    },
+    {
+      "name": "hedge/H1 an absolute over the same absolute in other words",
+      "answer": "De werkgever is altijd bereikbaar via de meldlijn [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werkgever is te allen tijde bereikbaar via de meldlijn."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "hedge/H1 an absolute over a softener refuses",
+      "answer": "De werkgever is altijd bereikbaar via de meldlijn [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werkgever is in de regel bereikbaar via de meldlijn."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "hedge guard"
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "hedge/H2 the upper bound in another sentence does not hedge this one",
+      "answer": "Holiday pay accrues on 70% of the last salary [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De WW-uitkering bedraagt maximaal 70% van het maximumdagloon. De werknemer bouwt vakantiegeld op over 70% van het laatste salaris."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      },
+      "glossary": [
+        [
+          "vakantiegeld",
+          "holiday pay"
+        ],
+        [
+          "laatste",
+          "last"
+        ],
+        [
+          "salaris",
+          "salary"
+        ],
+        [
+          "bouwt",
+          "accrues"
+        ]
+      ]
+    },
+    {
+      "name": "hedge/H3 a modal in a purpose clause does not hedge the main fact",
+      "answer": "Dezelfde dag registreert de werkgever de ziekmelding [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werkgever registreert de ziekmelding dezelfde dag, zodat de bedrijfsarts contact kan opnemen."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "hedge/H4 a negated modal is a prohibition, not a hedge",
+      "answer": "The employer cannot rely on the clause if the contract ends at its initiative [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Aan het beding kan de werkgever geen rechten ontlenen als de arbeidsovereenkomst op zijn initiatief eindigt."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      },
+      "glossary": [
+        [
+          "beding",
+          "clause"
+        ],
+        [
+          "werkgever",
+          "employer"
+        ],
+        [
+          "rechten",
+          "rights"
+        ],
+        [
+          "arbeidsovereenkomst",
+          "contract"
+        ],
+        [
+          "initiatief",
+          "initiative"
+        ],
+        [
+          "eindigt",
+          "ends"
+        ]
+      ]
+    },
+    {
+      "name": "hedge/H5 a range with both bounds is carried by a range",
+      "answer": "Het verlof duurt 1 tot 3 maanden [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Het verlof duurt minimaal één en maximaal drie maanden."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "hedge/H5 one value of a range refuses",
+      "answer": "Het verlof duurt 3 maanden [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Het verlof duurt minimaal één en maximaal drie maanden."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "hedge guard"
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "hedge/A6 you can discuss the next steps is admitted",
+      "answer": "In this phase you can discuss the next steps with the case manager [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Vervolg. In deze fase kun je de vervolgstappen bespreken met de casemanager."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      },
+      "glossary": [
+        [
+          "vervolgstappen",
+          "next steps"
+        ],
+        [
+          "fase",
+          "phase"
+        ],
+        [
+          "bespreken",
+          "discuss"
+        ],
+        [
+          "casemanager",
+          "case manager"
+        ]
+      ]
+    },
+    {
+      "name": "hedge/A6 next steps may be discussed is admitted",
+      "answer": "In this phase the next steps may be discussed with the case manager [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Vervolg. In deze fase kun je de vervolgstappen bespreken met de casemanager."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      },
+      "glossary": [
+        [
+          "vervolgstappen",
+          "next steps"
+        ],
+        [
+          "fase",
+          "phase"
+        ],
+        [
+          "bespreken",
+          "discuss"
+        ],
+        [
+          "casemanager",
+          "case manager"
+        ]
+      ]
+    },
+    {
+      "name": "hedge/A6 possible next steps are discussed refuses (an adjective on the object is no hedge on the predicate)",
+      "answer": "In this phase possible next steps are discussed with the case manager [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Vervolg. In deze fase kun je de vervolgstappen bespreken met de casemanager."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "hedge guard"
+          }
+        ]
+      },
+      "must_refuse": true,
+      "glossary": [
+        [
+          "vervolgstappen",
+          "next steps"
+        ],
+        [
+          "fase",
+          "phase"
+        ],
+        [
+          "bespreken",
+          "discuss"
+        ],
+        [
+          "casemanager",
+          "case manager"
+        ]
+      ]
+    },
+    {
+      "name": "hedge/A6 the next steps are discussed refuses (an option stated as a fact)",
+      "answer": "In this phase the next steps are discussed with the case manager [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Vervolg. In deze fase kun je de vervolgstappen bespreken met de casemanager."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "hedge guard"
+          }
+        ]
+      },
+      "must_refuse": true,
+      "glossary": [
+        [
+          "vervolgstappen",
+          "next steps"
+        ],
+        [
+          "fase",
+          "phase"
+        ],
+        [
+          "bespreken",
+          "discuss"
+        ],
+        [
+          "casemanager",
+          "case manager"
+        ]
+      ]
     }
   ]
 }

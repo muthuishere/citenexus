@@ -211,11 +211,17 @@ func quantities(text, language string) map[[2]string]struct{} {
 			if _, link := quantityLinks[tokens[j]]; !link {
 				break
 			}
-			if _, n := numberValue(tokens[j+1], language); !n {
+			// "minimaal één en maximaal drie maanden": a bound word may sit
+			// between the link and the next number.
+			skip := 0
+			if _, bound := rangeBoundWords[tokens[j+1]]; bound && j+2 < len(tokens) {
+				skip = 1
+			}
+			if _, n := numberValue(tokens[j+1+skip], language); !n {
 				break
 			}
-			linked, _ := numberValue(tokens[j+1], language)
-			j += 2
+			linked, _ := numberValue(tokens[j+1+skip], language)
+			j += 2 + skip
 			if j < len(tokens) {
 				if v, n := numberValue(tokens[j], language); n && v == linked {
 					j++ // "drie (3)" after the link
@@ -778,3 +784,6 @@ func parseDutchNumber(w string) (int, bool) {
 	}
 	return 0, false
 }
+
+// rangeBoundWords may precede the second number of a range.
+var rangeBoundWords = map[string]struct{}{"maximaal": {}, "minimaal": {}, "hooguit": {}, "maximum": {}, "minimum": {}, "most": {}, "least": {}}

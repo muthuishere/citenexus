@@ -36,7 +36,8 @@ import (
 )
 
 var absolutizers = [][]string{
-	{"altijd"}, {"always"}, {"steeds"}, {"at", "any", "time"}, {"op", "elk", "moment"}, {"whenever"},
+	{"altijd"}, {"always"}, {"steeds"}, {"te", "allen", "tijde"}, {"at", "all", "times"}, {"voortdurend"},
+	{"at", "any", "time"}, {"op", "elk", "moment"}, {"whenever"},
 	{"wanneer", "ze", "maar", "willen"}, {"without", "restriction"}, {"zonder", "beperking"},
 	{"for", "any", "reason"}, {"om", "welke", "reden", "dan", "ook"}, {"ongeacht"}, {"regardless"},
 	{"in", "alle", "gevallen"}, {"in", "all", "cases"}, {"for", "as", "long", "as", "needed"},
@@ -71,12 +72,23 @@ var hedgePhrases = []struct {
 func hedgesIn(tokens []string, text string) map[string]string {
 	out := map[string]string{}
 	markers := gate.PolarityMarkers()
+	// A purpose or result clause ("zodat de bedrijfsarts contact kan
+	// opnemen", "so that …", "in order to …") does not hedge the main fact.
+	for i, t := range tokens {
+		if t == "zodat" || t == "opdat" || (t == "so" && i+1 < len(tokens) && tokens[i+1] == "that") ||
+			(t == "in" && i+2 < len(tokens) && tokens[i+1] == "order" && tokens[i+2] == "to") {
+			tokens = tokens[:i]
+			break
+		}
+	}
 	for _, h := range hedgePhrases {
 		for _, sp := range findSpans(tokens, h.words) {
-			// "mogen geen", "may not", "kan niet": a prohibition, not a hedge.
+			// A negated modal is a PROHIBITION, like "mogen geen", not a hedge:
+			// "kan de werkgever geen rechten ontlenen", "may not". The negation
+			// may come a few words on in the same clause.
 			if h.class == hedgePermission {
 				negated := false
-				for k := sp.end; k < len(tokens) && k <= sp.end+1; k++ {
+				for k := sp.end; k < len(tokens) && k <= sp.end+4; k++ {
 					if _, neg := markers[tokens[k]]; neg {
 						negated = true
 					}
@@ -97,6 +109,8 @@ func hedgesIn(tokens []string, text string) map[string]string {
 	}
 	return out
 }
+
+var claimRange = regexp.MustCompile(`\b[0-9][0-9.,]*\s*(?:tot|to|t/m|-|–)\s*[0-9]|\b(?:tussen|between)\s+[0-9][0-9.,]*\s+(?:en|and)\s+[0-9]`)
 
 var toSameAmount = regexp.MustCompile(`\b(?:to|tot)\s*(?:€|eur\b)?\s*[0-9]`)
 
@@ -167,6 +181,11 @@ func hedgeGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfig) s
 			continue
 		}
 		if _, kept := claimHedges[class]; kept {
+			continue
+		}
+		// A range in the claim ("1 tot 3 maanden", "between 1 and 3") states
+		// its own bounds.
+		if class == hedgeUpper && claimRange.MatchString(strings.ToLower(claim)) {
 			continue
 		}
 		// "aanvullen tot 70%" / "top up to 70%": the claim's "to"/"tot" + the

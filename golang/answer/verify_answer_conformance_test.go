@@ -80,8 +80,8 @@ func TestVerifyAnswerConformance(t *testing.T) {
 	if err := json.Unmarshal(raw, &file); err != nil {
 		t.Fatal(err)
 	}
-	if len(file.Cases) != 268 {
-		t.Fatalf("verify_answer.json: got %d cases, want 268", len(file.Cases))
+	if len(file.Cases) != 279 {
+		t.Fatalf("verify_answer.json: got %d cases, want 279", len(file.Cases))
 	}
 	refuseControls := 0
 	for _, c := range file.Cases {
