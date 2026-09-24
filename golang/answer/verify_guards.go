@@ -157,9 +157,14 @@ var ordinalWords = map[string]string{
 // to the checker's contradiction score and the veto.
 func negationGuard(claim, passage string) string {
 	markers := gate.PolarityMarkers()
+	claimTokens := tokenize.TokenizeV2(claim)
+	// "no later than" / "niet meer dan" state a BOUND, not a negation — but only
+	// when the passage bounds the same way ("uiterlijk", "maximaal"). Over an
+	// opposite bound or no bound at all their "no"/"niet" still counts.
+	bounded := boundMarkerPositions(claimTokens, boundDirections(tokenize.TokenizeV2(passage)))
 	claimNegated := false
-	for _, tok := range tokenize.TokenizeV2(claim) {
-		if _, ok := markers[tok]; ok {
+	for i, tok := range claimTokens {
+		if _, ok := markers[tok]; ok && !bounded[i] {
 			claimNegated = true
 			break
 		}
@@ -582,4 +587,58 @@ func truncationGuard(claim, passage string) string {
 		return ""
 	}
 	return fmt.Sprintf("truncation guard: the passage continues with %q after the matched words", restricted)
+}
+
+// Bounds: phrases that set an upper or a lower limit, NL + EN. A phrase that
+// starts with a polarity marker ("no later than", "niet meer dan") reads as
+// a negation to the negation guard unless the passage bounds the same way.
+const (
+	boundUpper = "upper"
+	boundLower = "lower"
+)
+
+var boundPhrases = []struct {
+	words     []string
+	direction string
+}{
+	{[]string{"no", "later", "than"}, boundUpper}, {[]string{"not", "later", "than"}, boundUpper},
+	{[]string{"no", "more", "than"}, boundUpper}, {[]string{"not", "more", "than"}, boundUpper},
+	{[]string{"at", "most"}, boundUpper}, {[]string{"up", "to"}, boundUpper},
+	{[]string{"niet", "later", "dan"}, boundUpper}, {[]string{"niet", "meer", "dan"}, boundUpper},
+	{[]string{"uiterlijk"}, boundUpper}, {[]string{"maximaal"}, boundUpper}, {[]string{"hooguit"}, boundUpper},
+	{[]string{"ten", "hoogste"}, boundUpper}, {[]string{"maximum"}, boundUpper},
+	{[]string{"no", "earlier", "than"}, boundLower}, {[]string{"not", "earlier", "than"}, boundLower},
+	{[]string{"no", "less", "than"}, boundLower}, {[]string{"not", "less", "than"}, boundLower},
+	{[]string{"no", "fewer", "than"}, boundLower}, {[]string{"at", "least"}, boundLower},
+	{[]string{"niet", "eerder", "dan"}, boundLower}, {[]string{"niet", "minder", "dan"}, boundLower},
+	{[]string{"minimaal"}, boundLower}, {[]string{"ten", "minste"}, boundLower},
+	{[]string{"tenminste"}, boundLower}, {[]string{"minimum"}, boundLower},
+}
+
+// boundDirections are the bound directions present in tokens.
+func boundDirections(tokens []string) map[string]bool {
+	out := map[string]bool{}
+	for _, b := range boundPhrases {
+		if len(findSpans(tokens, b.words)) > 0 {
+			out[b.direction] = true
+		}
+	}
+	return out
+}
+
+// boundMarkerPositions: the token positions of bound phrases in the claim
+// whose direction the passage also has — their markers are not negations.
+func boundMarkerPositions(tokens []string, passage map[string]bool) map[int]bool {
+	out := map[int]bool{}
+	for _, b := range boundPhrases {
+		if !passage[b.direction] {
+			continue
+		}
+		for _, sp := range findSpans(tokens, b.words) {
+			for i := sp.start; i < sp.end; i++ {
+				out[i] = true
+			}
+		}
+	}
+	return out
 }

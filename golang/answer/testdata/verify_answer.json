@@ -4300,6 +4300,179 @@
           }
         ]
       }
+    },
+    {
+      "name": "bound/no-later-than-over-uiterlijk-is-the-same-bound",
+      "answer": "The employee submits the request no later than three months before the start date [eu:a].",
+      "answer_language": "en",
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werknemer dient het verzoek uiterlijk drie maanden voor de ingangsdatum in."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "bound/no-earlier-than-over-uiterlijk-refuses",
+      "answer": "The employee submits the request no earlier than three months before the start date [eu:a].",
+      "answer_language": "en",
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werknemer dient het verzoek uiterlijk drie maanden voor de ingangsdatum in."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "negation guard"
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "bound/the-same-bound-with-another-number-refuses",
+      "answer": "The employee submits the request no later than four months before the start date [eu:a].",
+      "answer_language": "en",
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werknemer dient het verzoek uiterlijk drie maanden voor de ingangsdatum in."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": ""
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "bound/a-bound-over-a-unit-without-one-refuses",
+      "answer": "The employee submits the request no later than three months before the start date [eu:a].",
+      "answer_language": "en",
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werknemer dient het verzoek drie maanden voor de ingangsdatum in."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "negation guard"
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "bound/no-more-than-over-minimaal-refuses",
+      "answer": "You get no more than five days of special leave [eu:a].",
+      "answer_language": "en",
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Je krijgt minimaal vijf dagen bijzonder verlof."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "negation guard"
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "bound/no-other-allowance-is-still-a-negation",
+      "answer": "No other allowance applies [eu:a].",
+      "answer_language": "en",
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Naast de reiskostenvergoeding geldt ook een thuiswerkvergoeding."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "negation guard"
+          }
+        ]
+      },
+      "must_refuse": true
     }
   ]
 }
