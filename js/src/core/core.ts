@@ -60,6 +60,10 @@ interface Symbols {
   storeDeleteDocument: Sym;
   storeDrop: Sym;
   storeClose: Sym;
+  pdfUnits: Sym;
+  pdfPrepare: Sym;
+  pdfAssemble: Sym;
+  ooxmlUnits: Sym;
 }
 
 let cached: Symbols | undefined;
@@ -108,6 +112,23 @@ function symbols(): Symbols {
     ]),
     storeDrop: lib.func("citenexus_store_drop", "void*", [LanceStorePtr]),
     storeClose: lib.func("citenexus_store_close", "void", [LanceStorePtr]),
+    pdfUnits: lib.func("citenexus_pdf_units", "void*", ["const uint8_t*", "size_t", "const char*"]),
+    pdfPrepare: lib.func("citenexus_pdf_prepare", "void*", [
+      "const uint8_t*",
+      "size_t",
+      "const char*",
+    ]),
+    pdfAssemble: lib.func("citenexus_pdf_assemble", "void*", [
+      "const uint8_t*",
+      "size_t",
+      "const char*",
+      "const char*",
+    ]),
+    ooxmlUnits: lib.func("citenexus_ooxml_units", "void*", [
+      "const uint8_t*",
+      "size_t",
+      "const char*",
+    ]),
   };
   return cached;
 }
@@ -334,4 +355,197 @@ export class Store {
       this.handle = null;
     }
   }
+}
+
+// ---- structured units + the PDF model contract (ADR-0017) -------------------
+//
+// docs/pdf-model-contract.md is the host contract. pdfPrepare returns requests;
+// the HOST fulfils them with its own models (this module never calls a model);
+// pdfAssemble applies every response that passes the core's checks. PDF calls
+// need the core built with `--features pdf` and libpdfium loadable
+// (PDFIUM_DYNAMIC_LIB_PATH). Same C ABI as Go and Python: same bytes out.
+
+export interface PdfOptions {
+  language?: string;
+  layout_text?: boolean;
+  /** Also ask the model about tables the deterministic path accepted. */
+  model_tables?: boolean;
+}
+
+export interface Provenance {
+  route: string;
+  table_source: string | null;
+  vision_transcribed: boolean;
+  table_uncertain: boolean;
+  failed_check: string | null;
+  heading_source: string | null;
+  joined_hyphen: boolean;
+  vision_disputed: boolean;
+  header_flattened: boolean;
+  model_verdict: string | null;
+}
+
+/** kind: heading|paragraph|list|table|furniture|image|image_description;
+ *  bbox: [x0, y0, x1, y1] in points, top-left origin. */
+export interface DocUnit {
+  page: number | null;
+  bbox: [number, number, number, number] | null;
+  kind: string;
+  level: number | null;
+  markdown: string;
+  provenance: Provenance;
+}
+
+export interface PdfPageInfo {
+  page: number;
+  width: number;
+  height: number;
+  route: string;
+  signals: Record<string, unknown>;
+  layout_text?: string | null;
+}
+
+export interface PdfDocumentSignals {
+  pages: number;
+  responses_applied: number;
+  responses_rejected: number;
+  [signal: string]: unknown;
+}
+
+export interface PdfUnitsOutput {
+  units: DocUnit[];
+  pages: PdfPageInfo[];
+  document: PdfDocumentSignals;
+}
+
+export interface PdfWord {
+  id: string;
+  text: string;
+  bbox: [number, number, number, number];
+  /** A list-marker glyph; a grid may leave it out. */
+  marker: boolean;
+}
+
+export interface PdfRequest {
+  id: string;
+  page: number;
+  kind: "table_structure" | "vision_page" | "vision_region";
+  prompt: string;
+  bbox: [number, number, number, number];
+  words: PdfWord[];
+  /** 1 or 2 for vision (every region is asked twice); null for tables. */
+  variant: number | null;
+  hint: string | null;
+}
+
+export interface PdfPrepared extends PdfUnitsOutput {
+  requests: PdfRequest[];
+}
+
+export type PdfCell = string[] | { words: string[]; colspan?: number; rowspan?: number };
+
+export interface PdfGrid {
+  rows: PdfCell[][];
+}
+
+export interface PdfResponse {
+  request_id: string;
+  finish_reason?: string | null;
+  /** table_structure: grids of word IDs; `[]` means "no table here". */
+  tables?: PdfGrid[] | null;
+  /** vision_page / vision_region. */
+  markdown?: string | null;
+  /** vision_region: "description" when the region has no text and is described. */
+  mode?: "transcription" | "description" | null;
+}
+
+function pdfBuffer(pdf: Uint8Array): Uint8Array {
+  return pdf.length > 0 ? pdf : new Uint8Array(0);
+}
+
+/** The base output (no model) as the core's JSON, untouched. */
+export function pdfUnitsJson(pdf: Uint8Array, options: PdfOptions = {}): string {
+  const sym = symbols();
+  const buf = pdfBuffer(pdf);
+  const raw = takeString(sym.pdfUnits(buf, buf.length, JSON.stringify(options)), sym);
+  parseJson<unknown>(raw);
+  return raw;
+}
+
+export function pdfPrepareJson(pdf: Uint8Array, options: PdfOptions = {}): string {
+  const sym = symbols();
+  const buf = pdfBuffer(pdf);
+  const raw = takeString(sym.pdfPrepare(buf, buf.length, JSON.stringify(options)), sym);
+  parseJson<unknown>(raw);
+  return raw;
+}
+
+/** Apply responses (typed, or a JSON array string) and return the core's JSON
+ *  untouched: byte-identical across JS, Go and Python. */
+export function pdfAssembleJson(
+  pdf: Uint8Array,
+  responses: PdfResponse[] | string,
+  options: PdfOptions = {},
+): string {
+  const sym = symbols();
+  const buf = pdfBuffer(pdf);
+  const body = typeof responses === "string" ? responses : JSON.stringify(responses);
+  const raw = takeString(sym.pdfAssemble(buf, buf.length, JSON.stringify(options), body), sym);
+  parseJson<unknown>(raw);
+  return raw;
+}
+
+/** The base output: pdfAssemble with no responses. */
+export function pdfUnits(pdf: Uint8Array, options: PdfOptions = {}): PdfUnitsOutput {
+  return JSON.parse(pdfUnitsJson(pdf, options)) as PdfUnitsOutput;
+}
+
+/** Phase one: the base output plus the requests the host may fulfil. */
+export function pdfPrepare(pdf: Uint8Array, options: PdfOptions = {}): PdfPrepared {
+  return JSON.parse(pdfPrepareJson(pdf, options)) as PdfPrepared;
+}
+
+/** Phase two: re-parse and apply every response that passes the checks. A
+ *  missing or failed response is base output (the latter with failed_check). */
+export function pdfAssemble(
+  pdf: Uint8Array,
+  responses: PdfResponse[] | string,
+  options: PdfOptions = {},
+): PdfUnitsOutput {
+  return JSON.parse(pdfAssembleJson(pdf, responses, options)) as PdfUnitsOutput;
+}
+
+/** DOCX/PPTX units from their own OOXML structure (no model). */
+export function ooxmlUnits(bytes: Uint8Array, sourceType: "docx" | "pptx"): DocUnit[] {
+  const sym = symbols();
+  const buf = pdfBuffer(bytes);
+  const raw = takeString(sym.ooxmlUnits(buf, buf.length, sourceType), sym);
+  return parseJson<DocUnit[]>(raw);
+}
+
+const NON_CITABLE = ["<!-- vision_disputed", "<!-- image_description"];
+
+/** `markdown` with every <!-- vision_disputed … --> and <!-- image_description
+ *  … --> block removed: the only text a host may cite or quote-match. Mirrors
+ *  the core's vision::citable_text. */
+export function citableText(markdown: string): string {
+  let out = "";
+  let rest = markdown;
+  for (;;) {
+    const starts = NON_CITABLE.map((b) => rest.indexOf(b)).filter((i) => i >= 0);
+    if (starts.length === 0) {
+      out += rest;
+      break;
+    }
+    const start = Math.min(...starts);
+    out += rest.slice(0, start);
+    const end = rest.indexOf("-->", start);
+    if (end < 0) break;
+    rest = rest.slice(end + 3);
+  }
+  return out
+    .split("\n")
+    .map((l) => l.replace(/\s+$/, ""))
+    .filter((l) => l.trim().length > 0)
+    .join("\n");
 }
