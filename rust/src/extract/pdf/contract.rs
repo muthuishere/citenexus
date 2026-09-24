@@ -334,7 +334,10 @@ fn table_markdown(
     rows: &[Vec<GridCell>],
     placement: &checks::Placement,
     text: &BTreeMap<&str, (usize, &str)>,
+    boxes: &BTreeMap<String, WordBox>,
+    runs: &[super::tables::RotRun],
 ) -> String {
+    use super::tables::Slot;
     let n_rows = placement.len();
     let n_cols = rows
         .iter()
@@ -343,9 +346,28 @@ fn table_markdown(
         .max()
         .unwrap_or(0);
     let mut m = vec![vec![String::new(); n_cols]; n_rows];
+    let mut slots = vec![vec![Slot::Covered; n_cols]; n_rows];
     for (r, row) in rows.iter().enumerate() {
         for (k, cell) in row.iter().enumerate() {
             let (pr, pc) = placement[r][k];
+            let bb = cell.words.iter().filter_map(|w| boxes.get(w)).fold(
+                [f64::MAX, f64::MAX, f64::MIN, f64::MIN],
+                |a, b| {
+                    [
+                        a[0].min(b[0]),
+                        a[1].min(b[1]),
+                        a[2].max(b[2]),
+                        a[3].max(b[3]),
+                    ]
+                },
+            );
+            let single = cell.colspan.max(1) == 1 && cell.rowspan.max(1) == 1;
+            slots[pr][pc] = match (cell.words.is_empty(), single) {
+                (true, true) => Slot::Empty,
+                (true, false) => Slot::Covered,
+                (false, true) => Slot::Text(bb),
+                (false, false) => Slot::Spanned(bb),
+            };
             let mut ws: Vec<(usize, String)> = cell
                 .words
                 .iter()
@@ -360,6 +382,15 @@ fn table_markdown(
                     .collect::<Vec<_>>()
                     .join(" "),
             );
+        }
+    }
+    let mut rot = vec![vec![String::new(); n_cols]; n_rows];
+    super::tables::fill_rotated(runs, &slots, &mut rot);
+    for (r, row) in rot.into_iter().enumerate() {
+        for (c, t) in row.into_iter().enumerate() {
+            if !t.is_empty() && m[r][c].is_empty() {
+                m[r][c] = escape_cell(&t);
+            }
         }
     }
     let line = |cells: &[String]| format!("| {} |", cells.join(" | "));
@@ -511,6 +542,7 @@ fn apply_table(
         .filter(|w| checks::is_leader(&w.text))
         .map(|w| w.id.as_str())
         .collect();
+    let runs = super::tables::rotated_runs(&b.raw.pages[p]);
     let mut all: BTreeSet<String> = BTreeSet::new();
     let mut grids = Vec::new();
     for g in tables {
@@ -604,7 +636,7 @@ fn apply_table(
     let mut remove = BTreeSet::new();
     let mut marks = Vec::new();
     for (g, (cells, placement, ids)) in grids.into_iter().enumerate() {
-        let md = table_markdown(&cells, &placement, &order);
+        let md = table_markdown(&cells, &placement, &order, &boxes, &runs);
         // A deterministic table under this grid: the two compete (GriTS +
         // the position check both already passed), never "more rows wins".
         let rivals: Vec<usize> = touched[g]

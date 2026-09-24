@@ -1479,6 +1479,65 @@
         "table_uncertain": false,
         "table": "| Niveau | Bedrag | Score |\n| --- | --- | --- |\n| Junior | € 1.500 | 12 punten |\n| Medior | € 2.250 | 18 punten |\n| Senior | € 3.100 | 24 punten |"
       }
+    },
+    {
+      "name": "table (T5 shape): a rotated corner label is not a word, so no grid can place it; the core fills the grid's EMPTY corner cell from the label's own characters (here a disagreeing model grid wins over tracks)",
+      "fixture": "rotcorner",
+      "category": "must_accept",
+      "responses": [
+        {
+          "request": "p1:table0",
+          "finish_reason": "stop",
+          "tables": [
+            {
+              "rows": [
+                [
+                  [],
+                  [
+                    "~Minimum",
+                    "~Maximum"
+                  ]
+                ],
+                [
+                  [
+                    "~A"
+                  ],
+                  [
+                    "~2.500,00",
+                    "~3.100,00"
+                  ]
+                ],
+                [
+                  [
+                    "~B"
+                  ],
+                  [
+                    "~3.100,00#2",
+                    "~3.900,00"
+                  ]
+                ],
+                [
+                  [
+                    "~C"
+                  ],
+                  [
+                    "~3.900,00#2",
+                    "~4.800,00"
+                  ]
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "applied": 1,
+        "rejected": 0,
+        "failed_check": null,
+        "table_source": "model_grid",
+        "table_uncertain": true,
+        "table": "| Schaal | Minimum Maximum |\n| --- | --- |\n| A | 2.500,00 3.100,00 |\n| B | 3.100,00 3.900,00 |\n| C | 3.900,00 4.800,00 |"
+      }
     }
   ]
 }

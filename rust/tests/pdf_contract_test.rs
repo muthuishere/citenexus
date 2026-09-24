@@ -159,8 +159,30 @@ pub fn t7shape_fixture() -> Doc {
     Doc::new(vec![p])
 }
 
+/// A borderless table whose empty top-left corner holds a VERTICAL label (T5).
+pub fn rotcorner_fixture() -> Doc {
+    let mut p = Page::a4()
+        .para(72.0, 60.0, 10.0, &["Salarisschalen voor het jaar."])
+        .vertical(72.0, 110.0, 8.0, "Schaal");
+    let rows = [
+        ("", "Minimum", "Maximum"),
+        ("A", "2.500,00", "3.100,00"),
+        ("B", "3.100,00", "3.900,00"),
+        ("C", "3.900,00", "4.800,00"),
+    ];
+    for (k, (a, b, c)) in rows.iter().enumerate() {
+        let y = 100.0 + k as f64 * 16.0;
+        if !a.is_empty() {
+            p = p.text(72.0, y, 10.0, a);
+        }
+        p = p.text(200.0, y, 10.0, b).text(330.0, y, 10.0, c);
+    }
+    Doc::new(vec![p])
+}
+
 fn fixture(name: &str) -> Vec<u8> {
     match name {
+        "rotcorner" => rotcorner_fixture(),
         "listtable" => listtable_fixture(),
         "cliptable" => cliptable_fixture(),
         "t7shape" => t7shape_fixture(),
@@ -184,11 +206,19 @@ fn resolve(prep: &PdfPrepared, request: &str, cell: &[serde_json::Value]) -> Vec
             }
             if let Some(t) = s.strip_prefix('~') {
                 let req = req.unwrap_or_else(|| panic!("no request {request}"));
+                // `~text#n`: the n-th chunk with that text (1-based)
+                let (t, nth) = match t.rsplit_once('#') {
+                    Some((a, n)) if !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()) => {
+                        (a, n.parse::<usize>().unwrap())
+                    }
+                    _ => (t, 1),
+                };
                 return req
                     .chunks
                     .iter()
-                    .find(|c| c.text == t)
-                    .unwrap_or_else(|| panic!("no chunk {t:?}"))
+                    .filter(|c| c.text == t)
+                    .nth(nth - 1)
+                    .unwrap_or_else(|| panic!("no chunk {t:?} #{nth}"))
                     .id
                     .clone();
             }

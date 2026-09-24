@@ -272,7 +272,10 @@ pub(crate) fn stage(raw: &RawDoc, opts: &PdfOptions) -> Staged {
         let blk = &work[p].pl.blocks[b];
         if let Some(k) = blk.table {
             let t = &work[p].tables.accepted[k];
-            let grid = tables::text_grid(&work[p].pl.segments, &raw.pages[p], &t.rows);
+            let segs = &work[p].pl.segments;
+            let mut grid = tables::text_grid(segs, &raw.pages[p], &t.rows);
+            let slots = tables::slots(segs, &raw.pages[p], &t.rows);
+            tables::fill_rotated(&tables::rotated_runs(&raw.pages[p]), &slots, &mut grid);
             texts.push(tables::markdown(&grid));
             joined.push(false);
             continue;

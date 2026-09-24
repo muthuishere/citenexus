@@ -667,3 +667,137 @@ fn a_long_small_type_table_does_not_become_the_body_size() {
         3
     );
 }
+
+/// A ruled grid whose top-left corner holds only a VERTICAL label (T5): the
+/// header row is tall, the label reads bottom to top.
+fn rotated_corner_page(label: bool) -> Page {
+    let mut p = Page::a4().para(72.0, 60.0, 11.0, &["Salarisschalen per niveau."]);
+    for y in [100.0, 140.0, 160.0, 180.0] {
+        p = p.line(72.0, y, 452.0, y);
+    }
+    for x in [72.0, 150.0, 300.0, 452.0] {
+        p = p.line(x, 100.0, x, 180.0);
+    }
+    if label {
+        p = p.vertical(100.0, 136.0, 8.0, "Schaal");
+    }
+    p.text(160.0, 115.0, 10.0, "Minimum")
+        .text(310.0, 115.0, 10.0, "Maximum")
+        .text(80.0, 145.0, 10.0, "A")
+        .text(160.0, 145.0, 10.0, "2.500,00")
+        .text(310.0, 145.0, 10.0, "3.100,00")
+        .text(80.0, 165.0, 10.0, "B")
+        .text(160.0, 165.0, 10.0, "3.100,00")
+        .text(310.0, 165.0, 10.0, "3.900,00")
+}
+
+#[test]
+fn a_rotated_corner_label_fills_its_own_empty_cell() {
+    if !have_pdfium() {
+        return;
+    }
+    let out = run(rotated_corner_page(true));
+    let t = tables(&out);
+    assert_eq!(t.len(), 1, "{:?}", out.units);
+    assert_eq!(t[0].provenance.table_source, Some(TableSource::Ruled));
+    assert_eq!(
+        t[0].markdown,
+        "| Schaal | Minimum | Maximum |\n| --- | --- | --- |\n| A | 2.500,00 | 3.100,00 |\n| B | 3.100,00 | 3.900,00 |"
+    );
+    // without the label the corner stays empty: nothing is invented
+    let out = run(rotated_corner_page(false));
+    assert!(
+        tables(&out)[0]
+            .markdown
+            .starts_with("|  | Minimum | Maximum |"),
+        "{}",
+        tables(&out)[0].markdown
+    );
+}
+
+#[test]
+fn a_rotated_corner_label_fills_a_borderless_corner_too() {
+    if !have_pdfium() {
+        return;
+    }
+    let mut p = Page::a4().para(72.0, 60.0, 11.0, &["Salarisschalen voor het jaar."]);
+    p = p.vertical(72.0, 110.0, 8.0, "Schaal");
+    let rows = [
+        ("", "Minimum", "Maximum"),
+        ("A", "2.500,00", "3.100,00"),
+        ("B", "3.100,00", "3.900,00"),
+        ("C", "3.900,00", "4.800,00"),
+    ];
+    for (k, (a, b, c)) in rows.iter().enumerate() {
+        let y = 100.0 + k as f64 * 16.0;
+        if !a.is_empty() {
+            p = p.text(72.0, y, 10.0, a);
+        }
+        p = p.text(200.0, y, 10.0, b).text(330.0, y, 10.0, c);
+    }
+    let out = run(p);
+    let t = tables(&out);
+    assert_eq!(t.len(), 1, "{:?}", out.units);
+    assert!(
+        t[0].markdown.starts_with("| Schaal | Minimum | Maximum |"),
+        "{}",
+        t[0].markdown
+    );
+}
+
+#[test]
+fn rotated_text_that_is_not_a_label_is_not_a_cell() {
+    if !have_pdfium() {
+        return;
+    }
+    // (a) a diagonal stamp inside the empty corner: a label is vertical
+    // (taller than wide), a stamp is not
+    let p = rotated_corner_page(false).rotated(76.0, 136.0, 9.0, 30.0, "CONCEPT");
+    let out = run(p);
+    assert!(
+        tables(&out)[0].markdown.starts_with("|  | Minimum"),
+        "{}",
+        tables(&out)[0].markdown
+    );
+    // (b) a vertical run crossing filled cells: it overlaps words
+    let p = rotated_corner_page(false).vertical(82.0, 176.0, 12.0, "CONCEPT CONCEPT");
+    let out = run(p);
+    assert!(
+        tables(&out)[0].markdown.starts_with("|  | Minimum"),
+        "{}",
+        tables(&out)[0].markdown
+    );
+    assert!(!all_text(&out).contains("CONCEPT"));
+}
+
+#[test]
+fn a_vertical_label_beside_the_row_labels_heads_that_column() {
+    if !have_pdfium() {
+        return;
+    }
+    // Lex5 T5 shape: the label runs up the left of the row labels, BELOW
+    // the header row; the header cell of that column is empty. It becomes
+    // that header cell (the column's only empty cell).
+    let mut p = Page::a4().para(72.0, 60.0, 11.0, &["Salarisschalen voor het jaar."]);
+    p = p.vertical(72.0, 164.0, 8.0, "Schaal");
+    let rows = [
+        ("", "Minimum", "Maximum"),
+        ("A", "2.500,00", "3.100,00"),
+        ("B", "3.100,00", "3.900,00"),
+        ("C", "3.900,00", "4.800,00"),
+    ];
+    for (k, (a, b, c)) in rows.iter().enumerate() {
+        let y = 100.0 + k as f64 * 16.0;
+        if !a.is_empty() {
+            p = p.text(92.0, y, 10.0, a);
+        }
+        p = p.text(200.0, y, 10.0, b).text(330.0, y, 10.0, c);
+    }
+    let out = run(p);
+    let t = tables(&out);
+    assert_eq!(t.len(), 1, "{:?}", out.units);
+    assert_eq!(
+        t[0].markdown,
+        "| Schaal | Minimum | Maximum |\n| --- | --- | --- |\n| A | 2.500,00 | 3.100,00 |\n| B | 3.100,00 | 3.900,00 |\n| C | 3.900,00 | 4.800,00 |"
+    );
+}

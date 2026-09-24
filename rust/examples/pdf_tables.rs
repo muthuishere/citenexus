@@ -32,7 +32,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use citenexus_core::checks::pipe_grid;
-use citenexus_core::extract::pdf::{diag, pdf_prepare, pdf_units};
+use citenexus_core::extract::pdf::{diag, pdf_prepare, pdf_units, raw, tables};
 use citenexus_core::units::*;
 use citenexus_core::vision;
 use unicode_normalization::UnicodeNormalization;
@@ -264,6 +264,11 @@ fn gt_map(path: &Path) -> Vec<(String, String)> {
 /// across the sub-header cells it spans; the geometry gate proves placement).
 fn integrity(bytes: &[u8], opts: &PdfOptions, out: &PdfUnitsOutput) -> (usize, usize) {
     let words = diag::page_words(bytes, opts).unwrap_or_default();
+    // rotated labels (`tables::fill_rotated`): a cell may be exactly one run
+    // of the page's own rotated characters, within LABEL_REACH of the table
+    let runs: Vec<Vec<tables::RotRun>> = raw::read(bytes)
+        .map(|r| r.pages.iter().map(tables::rotated_runs).collect())
+        .unwrap_or_default();
     let (mut ok, mut total) = (0, 0);
     for u in out
         .units
@@ -288,6 +293,21 @@ fn integrity(bytes: &[u8], opts: &PdfOptions, out: &PdfUnitsOutput) -> (usize, u
                 continue;
             }
             total += 1;
+            let reach = tables::LABEL_REACH;
+            let label = runs.get((p - 1) as usize).is_some_and(|rs| {
+                rs.iter().any(|r| {
+                    let (cx, cy) = ((r.bbox[0] + r.bbox[2]) / 2.0, (r.bbox[1] + r.bbox[3]) / 2.0);
+                    r.text.trim() == cell
+                        && cx >= b[0] - reach
+                        && cx <= b[2] + reach
+                        && cy >= b[1] - reach
+                        && cy <= b[3] + reach
+                })
+            });
+            if label {
+                ok += 1;
+                continue;
+            }
             let mut local = pool.clone();
             let good = cell.split_whitespace().all(|tok| match local.get_mut(tok) {
                 Some(n) if *n > 0 => {
@@ -462,7 +482,7 @@ fn main() {
     };
     println!("TOTAL {mode}: cells {cells}/{cell_tot}, rows {rows}/{row_tot}{with}");
     if args.originals.is_some() {
-        println!("positional integrity (GT files, text-layer tables): {integ_ok}/{integ_tot} cells made of text-layer words inside the table box; vision tables (not text-layer, not counted): {vision_tables}");
+        println!("positional integrity (GT files, text-layer tables): {integ_ok}/{integ_tot} cells made of text-layer words inside the table box (or one rotated label run); vision tables (not text-layer, not counted): {vision_tables}");
     } else {
         println!("positional integrity: not computed (pass --originals and --manifest)");
     }
@@ -579,5 +599,5 @@ fn main() {
         }
     );
     println!("  requests containing leader-like words (5+ dots): {leader_reqs} ({leader_words} words); shapes {leader_shapes:?}");
-    println!("positional integrity (corpus): {ok}/{tot} emitted cells made of text-layer words inside the table box");
+    println!("positional integrity (corpus): {ok}/{tot} emitted cells made of text-layer words inside the table box (or one rotated label run)");
 }

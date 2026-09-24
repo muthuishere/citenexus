@@ -257,6 +257,202 @@ pub fn text_grid(segs: &[Segment], page: &RawPage, rows: &[Vec<TCell>]) -> Vec<V
     m
 }
 
+/// A run of rotated characters (a vertical row or corner label). Layout text
+/// excludes rotated glyphs, so such a label is in no cell until
+/// `fill_rotated` places it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RotRun {
+    pub text: String,
+    pub bbox: [f64; 4],
+}
+
+/// Rotated, non-generated characters grouped in stream order: a char joins
+/// the current run when its box lies within 1.5 x its size of the run's box.
+pub fn rotated_runs(page: &RawPage) -> Vec<RotRun> {
+    let mut out: Vec<RotRun> = Vec::new();
+    let mut open = false;
+    let mut space = false;
+    for c in page.chars.iter().filter(|c| c.rotated && !c.generated) {
+        if c.ch.is_whitespace() {
+            space = true;
+            continue;
+        }
+        let b = [c.x0, c.y0, c.x1, c.y1];
+        let near = |r: &RotRun| {
+            let d = 1.5 * c.size.max(1.0);
+            b[0] <= r.bbox[2] + d
+                && b[2] >= r.bbox[0] - d
+                && b[1] <= r.bbox[3] + d
+                && b[3] >= r.bbox[1] - d
+        };
+        match out.last_mut() {
+            Some(r) if open && near(r) => {
+                if space {
+                    r.text.push(' ');
+                }
+                r.text.push(c.ch);
+                r.bbox = union(r.bbox, b);
+            }
+            _ => {
+                out.push(RotRun {
+                    text: c.ch.to_string(),
+                    bbox: b,
+                });
+                open = true;
+            }
+        }
+        space = false;
+    }
+    out
+}
+
+/// One slot of a table's text matrix, for `fill_rotated`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Slot {
+    /// A 1x1 cell with no words.
+    Empty,
+    /// A 1x1 cell with words: their box (defines the row and column bands).
+    Text([f64; 4]),
+    /// A spanning cell with words: its box (an obstacle, not a band).
+    Spanned([f64; 4]),
+    /// Covered by a span, or no cell at all.
+    Covered,
+}
+
+/// The slot grid of a deterministic table (see `Slot`).
+pub fn slots(segs: &[Segment], page: &RawPage, rows: &[Vec<TCell>]) -> Vec<Vec<Slot>> {
+    let pl = layout(rows);
+    let cols = n_cols(rows);
+    let mut m = vec![vec![Slot::Covered; cols]; rows.len()];
+    for (r, row) in rows.iter().enumerate() {
+        for (k, cell) in row.iter().enumerate() {
+            let (_, c, _) = pl[r][k];
+            let bb = cell
+                .words
+                .iter()
+                .map(|&(s, w)| word_box(page, &segs[s], w))
+                .fold(EMPTY_BOX, union);
+            let single = cell.colspan.max(1) == 1 && cell.rowspan.max(1) == 1;
+            m[r][c] = match (cell.words.is_empty(), single) {
+                (true, true) => Slot::Empty,
+                (true, false) => Slot::Covered,
+                (false, true) => Slot::Text(bb),
+                (false, false) => Slot::Spanned(bb),
+            };
+        }
+    }
+    m
+}
+
+/// Put a rotated label into an EMPTY cell (T5: a vertical corner label).
+///
+/// A slot's box runs between the midpoints to its neighbouring row and column
+/// bands; the outer edges reach one band further (columns: at least
+/// `LABEL_REACH` points). A run is a label only when it is vertical (taller
+/// than wide: a diagonal stamp is not) and overlaps no word of the table (a
+/// stamp or watermark crosses text; a label has its own room). It fills:
+/// 1. the empty slot its centre lies in; else
+/// 2. the empty HEADER cell (row 0) of the column its centre lies in, when
+///    that is the column's only empty cell and the centre is within the
+///    table's rows — a vertical label running up beside the row labels,
+///    below the header, heads that column.
+///
+/// Only when exactly one run qualifies. The text is the PDF's own characters.
+pub const LABEL_REACH: f64 = 36.0;
+
+pub fn fill_rotated(runs: &[RotRun], slots: &[Vec<Slot>], m: &mut [Vec<String>]) {
+    if runs.is_empty() || slots.is_empty() {
+        return;
+    }
+    let cols = slots.iter().map(|r| r.len()).max().unwrap_or(0);
+    let mut rb: Vec<Option<(f64, f64)>> = vec![None; slots.len()];
+    let mut cb: Vec<Option<(f64, f64)>> = vec![None; cols];
+    let mut obstacles = Vec::new();
+    for (r, row) in slots.iter().enumerate() {
+        for (c, s) in row.iter().enumerate() {
+            match *s {
+                Slot::Text(b) => {
+                    let ext = |o: Option<(f64, f64)>, lo: f64, hi: f64| {
+                        Some(o.map_or((lo, hi), |(a, z)| (a.min(lo), z.max(hi))))
+                    };
+                    rb[r] = ext(rb[r], b[1], b[3]);
+                    cb[c] = ext(cb[c], b[0], b[2]);
+                    obstacles.push(b);
+                }
+                Slot::Spanned(b) => obstacles.push(b),
+                _ => {}
+            }
+        }
+    }
+    // the slot box along one axis: midpoints to the nearest banded neighbours
+    let bounds = |bands: &[Option<(f64, f64)>], i: usize, reach: f64| -> Option<(f64, f64)> {
+        let (lo, hi) = bands[i]?;
+        let prev = bands[..i].iter().rev().flatten().next();
+        let next = bands[i + 1..].iter().flatten().next();
+        let out = (hi - lo).max(reach);
+        let a = prev.map_or(lo - out, |p| (p.1 + lo) / 2.0);
+        let z = next.map_or(hi + out, |n| (hi + n.0) / 2.0);
+        Some((a, z))
+    };
+    let label: Vec<bool> = runs
+        .iter()
+        .map(|r| {
+            let b = &r.bbox;
+            b[3] - b[1] > b[2] - b[0] && obstacles.iter().all(|o| overlap_area(o, b) <= 0.0)
+        })
+        .collect();
+    // the table's rows, top to bottom (for rule 2)
+    let rows_span = match (rb.iter().flatten().next(), rb.iter().flatten().last()) {
+        (Some(f), Some(l)) => Some((f.0, l.1)),
+        _ => None,
+    };
+    let mut used = vec![false; runs.len()];
+    let mut place = |r: usize, c: usize, m: &mut [Vec<String>], hit: &dyn Fn(f64, f64) -> bool| {
+        let hits: Vec<usize> = (0..runs.len())
+            .filter(|&k| {
+                let (cx, cy) = center(&runs[k].bbox);
+                !used[k] && label[k] && hit(cx, cy)
+            })
+            .collect();
+        if let [k] = hits[..] {
+            used[k] = true;
+            m[r][c] = runs[k].text.trim().to_string();
+        }
+    };
+    let empty =
+        |r: usize, c: usize, m: &[Vec<String>]| slots[r][c] == Slot::Empty && m[r][c].is_empty();
+    // 1. a label inside an empty slot
+    for r in 0..slots.len() {
+        for c in 0..slots[r].len() {
+            if !empty(r, c, m) {
+                continue;
+            }
+            let (Some((y0, y1)), Some((x0, x1))) =
+                (bounds(&rb, r, 0.0), bounds(&cb, c, LABEL_REACH))
+            else {
+                continue;
+            };
+            place(r, c, m, &|cx, cy| cx > x0 && cx < x1 && cy > y0 && cy < y1);
+        }
+    }
+    // 2. a label beside a column's rows heads that column's empty header
+    let Some((t0, t1)) = rows_span else {
+        return;
+    };
+    for c in 0..cols {
+        let empties = (0..slots.len())
+            .filter(|&r| c < slots[r].len() && slots[r][c] == Slot::Empty)
+            .count();
+        if empties != 1 || c >= slots[0].len() || !empty(0, c, m) {
+            continue;
+        }
+        let Some((x0, x1)) = bounds(&cb, c, LABEL_REACH) else {
+            continue;
+        };
+        place(0, c, m, &|cx, cy| cx > x0 && cx < x1 && cy > t0 && cy < t1);
+    }
+}
+
 /// GitHub pipe table; spanned slots are empty; `|` escaped.
 pub fn markdown(grid: &[Vec<String>]) -> String {
     if grid.is_empty() {

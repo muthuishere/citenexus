@@ -28,6 +28,16 @@ pub enum Item {
         size: f64,
         text: String,
     },
+    /// Text rotated `deg` degrees counter-clockwise about its start point
+    /// (x, y) = where the baseline starts, top-left page coordinates. 90 =
+    /// a vertical label reading bottom to top.
+    Rotated {
+        x: f64,
+        y: f64,
+        size: f64,
+        deg: f64,
+        text: String,
+    },
     Line {
         x0: f64,
         y0: f64,
@@ -105,6 +115,28 @@ impl Page {
             x,
             y,
             size,
+            text: text.into(),
+        });
+        self
+    }
+    /// A vertical label reading bottom to top, occupying x..x+size, with its
+    /// baseline starting at (x + size, y_bottom).
+    pub fn vertical(mut self, x: f64, y_bottom: f64, size: f64, text: &str) -> Self {
+        self.items.push(Item::Rotated {
+            x: x + size * 0.8,
+            y: y_bottom,
+            size,
+            deg: 90.0,
+            text: text.into(),
+        });
+        self
+    }
+    pub fn rotated(mut self, x: f64, y: f64, size: f64, deg: f64, text: &str) -> Self {
+        self.items.push(Item::Rotated {
+            x,
+            y,
+            size,
+            deg,
             text: text.into(),
         });
         self
@@ -331,6 +363,30 @@ impl Doc {
                         let py = page.height - y - size;
                         c.extend(
                             format!("BT 3 Tr /F1 {} Tf {} {} Td (", f(*size), f(*x), f(py)).bytes(),
+                        );
+                        c.extend(esc(text));
+                        c.extend(b") Tj ET\n");
+                    }
+                    Item::Rotated {
+                        x,
+                        y,
+                        size,
+                        deg,
+                        text,
+                    } => {
+                        let (s, co) = deg.to_radians().sin_cos();
+                        c.extend(
+                            format!(
+                                "BT /F1 {} Tf {} {} {} {} {} {} Tm (",
+                                f(*size),
+                                f(co),
+                                f(s),
+                                f(-s),
+                                f(co),
+                                f(*x),
+                                f(page.height - y)
+                            )
+                            .bytes(),
                         );
                         c.extend(esc(text));
                         c.extend(b") Tj ET\n");
