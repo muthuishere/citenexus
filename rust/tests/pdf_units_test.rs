@@ -774,3 +774,204 @@ fn fake_bold_drawn_twice_still_counts_once() {
         vec!["Offerte effect"]
     );
 }
+
+// ---------------------------------- furniture band origin (peer check) ----
+
+fn body_texts(out: &PdfUnitsOutput, page: u32) -> String {
+    out.units
+        .iter()
+        .filter(|u| u.page == Some(page) && u.kind != UnitKind::Furniture)
+        .map(|u| u.markdown.as_str())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Continuous body text from `top` to `bottom` (1-inch margins), 12.5 pt
+/// pitch; `first`/`last` replace the first/last line.
+fn body_page(first: &str, last: &str) -> Page {
+    let mut lines: Vec<String> = Vec::new();
+    let mut y = 72.0;
+    while y <= 757.0 {
+        lines.push(format!(
+            "Regel op hoogte {} van de doorlopende tekst.",
+            y as i64
+        ));
+        y += 12.5;
+    }
+    let n = lines.len();
+    lines[0] = first.to_string();
+    lines[n - 1] = last.to_string();
+    let refs: Vec<&str> = lines.iter().map(String::as_str).collect();
+    Page::a4().para(72.0, 72.0, 10.0, &refs)
+}
+
+#[test]
+fn with_no_footer_the_last_body_line_is_never_furniture() {
+    if !have_pdfium() {
+        return;
+    }
+    // Body text runs to a 1-inch bottom margin, deep inside a 12 % band. The
+    // last line is identical on some pages and digit-differing on others.
+    let pages: Vec<Page> = (1..=4)
+        .map(|n| {
+            let last = if n % 2 == 0 {
+                "Einde van deze pagina.".to_string()
+            } else {
+                format!("Stap {n} van de procedure is klaar.")
+            };
+            body_page(&format!("Begin van pagina {n}."), &last)
+        })
+        .collect();
+    let out = run(&Doc::new(pages), Some("nl"));
+    let furn: Vec<&str> = out
+        .units
+        .iter()
+        .filter(|u| u.kind == UnitKind::Furniture)
+        .map(|u| u.markdown.as_str())
+        .collect();
+    assert!(furn.is_empty(), "{furn:?}");
+    for n in 1..=4u32 {
+        let b = body_texts(&out, n);
+        let want = if n % 2 == 0 {
+            "Einde van deze pagina.".to_string()
+        } else {
+            format!("Stap {n} van de procedure is klaar.")
+        };
+        assert!(b.contains(&want), "page {n} lost its last line");
+    }
+}
+
+#[test]
+fn with_no_header_the_first_body_line_is_never_furniture() {
+    if !have_pdfium() {
+        return;
+    }
+    let pages: Vec<Page> = (1..=4)
+        .map(|n| {
+            body_page(
+                &format!("Artikel {n} van de regeling is van toepassing."),
+                "Slotregel.",
+            )
+        })
+        .collect();
+    let out = run(&Doc::new(pages), Some("nl"));
+    assert!(out.units.iter().all(|u| u.kind != UnitKind::Furniture));
+    for n in 1..=4u32 {
+        assert!(body_texts(&out, n).contains(&format!("Artikel {n} van de regeling")));
+    }
+}
+
+#[test]
+fn a_real_footer_detached_from_the_body_is_still_furniture() {
+    if !have_pdfium() {
+        return;
+    }
+    // The control: the same continuous body, plus a footer separated from it
+    // by whitespace, stays furniture (kept once).
+    let pages: Vec<Page> = (1..=4)
+        .map(|n| {
+            body_page(&format!("Begin van pagina {n}."), "Slotregel.").text(
+                250.0,
+                800.0,
+                8.0,
+                "laatst bijgewerkt 12-03-2024",
+            )
+        })
+        .collect();
+    let out = run(&Doc::new(pages), Some("nl"));
+    let furn: Vec<&str> = out
+        .units
+        .iter()
+        .filter(|u| u.kind == UnitKind::Furniture)
+        .map(|u| u.markdown.as_str())
+        .collect();
+    assert_eq!(furn, vec!["laatst bijgewerkt 12-03-2024"]);
+}
+
+#[test]
+fn a_page_box_with_a_non_zero_origin_gives_the_same_geometry() {
+    if !have_pdfium() {
+        return;
+    }
+    let make = |origin: (f64, f64)| {
+        let pages: Vec<Page> = (1..=3)
+            .map(|n| {
+                let mut p = Page::a4()
+                    .text(72.0, 30.0, 9.0, "Personeelshandboek")
+                    .para(72.0, 150.0, 10.0, &[&format!("Inhoud van pagina {n}.")])
+                    .text(270.0, 810.0, 9.0, &format!("Pagina {n} van 3"));
+                p.origin = origin;
+                p
+            })
+            .collect();
+        run(&Doc::new(pages), Some("nl"))
+    };
+    let (a, b) = (make((0.0, 0.0)), make((30.0, 120.0)));
+    let key = |o: &PdfUnitsOutput| {
+        o.units
+            .iter()
+            .map(|u| (u.kind, u.markdown.clone(), u.bbox))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(key(&a), key(&b));
+    assert_eq!(
+        a.units
+            .iter()
+            .filter(|u| u.kind == UnitKind::Furniture)
+            .count(),
+        2
+    );
+}
+
+// --------------------------------- fake bold vs real double letters ----
+
+#[test]
+fn genuine_double_letters_survive() {
+    if !have_pdfium() {
+        return;
+    }
+    let s = "A bookkeeper committee will assess all offers";
+    let out = run(
+        &Doc::new(vec![Page::a4().text(72.0, 100.0, 11.0, s)]),
+        Some("en"),
+    );
+    assert_eq!(out.units[0].markdown, s);
+}
+
+#[test]
+fn an_overprinted_fake_bold_word_comes_out_once() {
+    if !have_pdfium() {
+        return;
+    }
+    // "Important" drawn twice, the second copy offset 0.4 pt (< 0.2 × 11 pt).
+    let p = Page::a4()
+        .text(72.0, 100.0, 11.0, "Important")
+        .text(72.4, 100.0, 11.0, "Important");
+    let out = run(&Doc::new(vec![p]), Some("en"));
+    assert_eq!(
+        out.units
+            .iter()
+            .map(|u| u.markdown.as_str())
+            .collect::<Vec<_>>(),
+        vec!["Important"]
+    );
+}
+
+#[test]
+fn fake_bold_offset_by_a_full_point_still_comes_out_once() {
+    if !have_pdfium() {
+        return;
+    }
+    // offset 1.0 pt at 11 pt (< 0.2 × size = 2.2 pt), same baseline
+    let p = Page::a4()
+        .text(72.0, 100.0, 11.0, "Belangrijk")
+        .text(73.0, 100.0, 11.0, "Belangrijk");
+    let out = run(&Doc::new(vec![p]), Some("nl"));
+    assert_eq!(
+        out.units
+            .iter()
+            .map(|u| u.markdown.as_str())
+            .collect::<Vec<_>>(),
+        vec!["Belangrijk"]
+    );
+}

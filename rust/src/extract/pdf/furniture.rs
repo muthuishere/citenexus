@@ -19,7 +19,7 @@
 //! After LiteParse `markdown_layout/repetition.rs` and opendataloader
 //! `HeaderFooterProcessor` (both Apache-2.0); see `rust/NOTICE`.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::layout::{Segment, HYPHEN_MARK};
 
@@ -58,24 +58,29 @@ pub fn is_page_number(key: &str) -> bool {
             .all(|w| w.chars().all(|c| c == '#') || PAGE_WORDS.contains(&w))
 }
 
-/// Of a band's segments (sorted from the page edge inward), only the
-/// EDGE-MOST BLOCK may be furniture: the chain of lines from the edge whose
-/// baselines follow each other within 1.6 × the font size. A body block
-/// separated from the header by whitespace can never be taken for furniture,
-/// even when digit masking makes it repeat ("zie pagina 3 van 12" on every
-/// page): keeping furniture once would otherwise DELETE that body text from
-/// every other page. Segments on one baseline (a header split in columns)
-/// stay together.
-fn edge_block(segs: &[Segment], sorted: &[usize]) -> Vec<usize> {
+/// Only the EDGE-MOST BLOCK of a band may be furniture: the chain of lines
+/// from the page edge whose baselines follow each other within 1.6 × the font
+/// size, walked over ALL of the page's lines (`all`, sorted from that edge).
+/// If the chain runs past the band (`in_band` false for a chained line), the
+/// band holds body text that reaches into it — the last lines of a page with
+/// no footer, the first lines with no header — and NOTHING there is
+/// furniture. A body block separated from a real header/footer by whitespace
+/// is never part of the chain either. Keeping furniture once would otherwise
+/// DELETE such body text from every other page (digit masking makes "zie
+/// pagina 3 van 12" repeat). Segments on one baseline stay together.
+fn edge_block(segs: &[Segment], all: &[usize], in_band: &dyn Fn(usize) -> bool) -> Vec<usize> {
     let mut out: Vec<usize> = Vec::new();
     let mut last: Option<usize> = None;
-    for &i in sorted {
+    for &i in all {
         if let Some(l) = last {
             let size = segs[i].size.max(segs[l].size).max(1.0);
             let gap = (segs[i].baseline - segs[l].baseline).abs();
             if gap > 1.6 * size {
                 break;
             }
+        }
+        if !in_band(i) {
+            return Vec::new(); // the chain continues as body: no furniture here
         }
         out.push(i);
         last = Some(i);
@@ -85,6 +90,12 @@ fn edge_block(segs: &[Segment], sorted: &[usize]) -> Vec<usize> {
 
 /// The segments of each page that are running furniture: `(page, seg)`.
 pub fn detect(pages: &[(f64, &[Segment])]) -> Vec<(usize, usize)> {
+    detect_with(pages, BAND, true)
+}
+
+/// `detect` with the band depth and the edge-block rule as parameters (for
+/// measurement; the pipeline uses `detect`).
+pub fn detect_with(pages: &[(f64, &[Segment])], band: f64, edge_rule: bool) -> Vec<(usize, usize)> {
     let n = pages.len();
     // (band, key) -> sorted pages
     let mut occ: BTreeMap<(Band, String), Vec<usize>> = BTreeMap::new();
@@ -97,16 +108,34 @@ pub fn detect(pages: &[(f64, &[Segment])]) -> Vec<(usize, usize)> {
             if s.text.trim().is_empty() {
                 continue;
             }
-            if s.bbox[3] <= BAND * h {
+            if s.bbox[3] <= band * h {
                 top.push(i);
-            } else if s.bbox[1] >= (1.0 - BAND) * h {
+            } else if s.bbox[1] >= (1.0 - band) * h {
                 bottom.push(i);
             }
         }
         top.sort_by(|&a, &b| segs[a].bbox[1].total_cmp(&segs[b].bbox[1]).then(a.cmp(&b)));
         bottom.sort_by(|&a, &b| segs[b].bbox[3].total_cmp(&segs[a].bbox[3]).then(a.cmp(&b)));
+        let live: Vec<usize> = (0..segs.len())
+            .filter(|&i| !segs[i].text.trim().is_empty())
+            .collect();
+        let mut from_top = live.clone();
+        from_top.sort_by(|&a, &b| segs[a].bbox[1].total_cmp(&segs[b].bbox[1]).then(a.cmp(&b)));
+        let mut from_bottom = live;
+        from_bottom.sort_by(|&a, &b| segs[b].bbox[3].total_cmp(&segs[a].bbox[3]).then(a.cmp(&b)));
+        let (top_set, bottom_set): (BTreeSet<usize>, BTreeSet<usize>) = (
+            top.iter().copied().collect(),
+            bottom.iter().copied().collect(),
+        );
         for (band, list) in [(Band::Top, top), (Band::Bottom, bottom)] {
-            for i in edge_block(segs, &list).into_iter().take(CAP_PER_BAND) {
+            let chosen = if !edge_rule {
+                list
+            } else if band == Band::Top {
+                edge_block(segs, &from_top, &|i| top_set.contains(&i))
+            } else {
+                edge_block(segs, &from_bottom, &|i| bottom_set.contains(&i))
+            };
+            for i in chosen.into_iter().take(CAP_PER_BAND) {
                 let k = key(&segs[i].text);
                 let e = occ.entry((band, k.clone())).or_default();
                 if e.last() != Some(&p) {
