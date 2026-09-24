@@ -257,14 +257,14 @@ func AskWith(corpus []Doc, question string, topK int, providers Providers) (resu
 	if k := ConflictTopK(); k < len(window) {
 		window = window[:k]
 	}
-	conflictPairs := FindConflicts(textsOf(window))
+	conflictPairs := FindConflictsWithLanguages(textsOf(window), languagesOf(window), ConflictTopK())
 
 	// Near-duplicate collapse feeds the corroboration signals only. The same
 	// pairwise comparison that finds "same subject, opposite polarity" finds
 	// "same subject, same text" — clones ingested under different document ids —
 	// and those are one piece of evidence, not N.
 	independent := make([]row, 0, len(grounded))
-	for _, i := range CollapseNearDuplicates(textsOf(grounded)) {
+	for _, i := range CollapseNearDuplicatesWithLanguages(textsOf(grounded), languagesOf(grounded)) {
 		independent = append(independent, grounded[i])
 	}
 
@@ -508,6 +508,16 @@ func textsOf(rows []row) []string {
 	out := make([]string, len(rows))
 	for i, r := range rows {
 		out[i] = r.text
+	}
+	return out
+}
+
+// languagesOf is each row's DECLARED language ("" = undeclared), index-aligned
+// with textsOf. It only decides how locale-ambiguous numbers are read (ADR-0015).
+func languagesOf(rows []row) []string {
+	out := make([]string, len(rows))
+	for i, r := range rows {
+		out[i] = r.language
 	}
 	return out
 }

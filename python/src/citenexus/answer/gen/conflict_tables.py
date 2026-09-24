@@ -11,12 +11,17 @@ from __future__ import annotations
 
 __all__ = [
     "CONFLICT_ANTONYMS",
+    "CONFLICT_INCLUSION_PAIRS",
     "CONFLICT_LANGUAGES",
     "CONFLICT_NEGATIONS",
     "CONFLICT_REPORT_BIGRAMS",
     "CONFLICT_SCOPE_MARKERS",
     "CONFLICT_THRESHOLDS",
+    "DECIMAL_COMMA_LANGUAGES",
+    "DECIMAL_POINT_LANGUAGES",
     "MEASUREMENT_UNITS",
+    "VAT_MARKERS",
+    "VAT_RATES",
 ]
 
 CONFLICT_LANGUAGES: tuple[str, ...] = ("en", "nl")
@@ -214,6 +219,36 @@ MEASUREMENT_UNITS: frozenset[str] = frozenset(
         "weeks",
         "year",
         "years",
+    }
+)
+
+#: (inclusive, exclusive) marker pairs, ONE direction — ADR-0015.
+CONFLICT_INCLUSION_PAIRS: tuple[tuple[str, str], ...] = (
+    ("incl", "excl"),
+    ("including", "excluding"),
+    ("inclusief", "exclusief"),
+    ("inclusive", "exclusive"),
+)
+
+VAT_MARKERS: frozenset[str] = frozenset(
+    {
+        "btw",
+        "vat",
+    }
+)
+
+#: Exact decimal strings; read with fractions.Fraction, never float.
+VAT_RATES: tuple[str, ...] = ("1.09", "1.21")
+
+DECIMAL_COMMA_LANGUAGES: frozenset[str] = frozenset(
+    {
+        "nl",
+    }
+)
+
+DECIMAL_POINT_LANGUAGES: frozenset[str] = frozenset(
+    {
+        "en",
     }
 )
 

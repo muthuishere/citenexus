@@ -360,14 +360,26 @@ interface ConflictContext {
   independent: Row[];
 }
 
+/** A row's declared language for number reading, `null` when undeclared. */
+function declaredLanguage(row: Row): string | null {
+  return row.language === "" ? null : row.language;
+}
+
 function conflictContext(grounded: readonly Row[]): ConflictContext {
   const window = grounded.slice(0, CONFLICT_TOP_K);
   return {
     window,
-    pairs: findConflicts(window.map((row) => row.text)),
-    independent: collapseNearDuplicates(grounded.map((row) => row.text)).map(
-      (i) => grounded[i] as Row,
+    // ADR-0015: the DECLARED languages decide how a locale-ambiguous number
+    // ("1.500") is read; `""` is undeclared and reads it as ambiguous.
+    pairs: findConflicts(
+      window.map((row) => row.text),
+      CONFLICT_TOP_K,
+      window.map((row) => declaredLanguage(row)),
     ),
+    independent: collapseNearDuplicates(
+      grounded.map((row) => row.text),
+      grounded.map((row) => declaredLanguage(row)),
+    ).map((i) => grounded[i] as Row),
   };
 }
 

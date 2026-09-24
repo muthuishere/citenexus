@@ -1701,11 +1701,16 @@ def _conflict_table() -> dict[str, Any]:
     from citenexus.answer import conflict as conflict_module
     from citenexus.answer.tables import (
         CONFLICT_ANTONYMS,
+        CONFLICT_INCLUSION_PAIRS,
         CONFLICT_LANGUAGES,
         CONFLICT_NEGATIONS,
         CONFLICT_REPORT_BIGRAMS,
         CONFLICT_SCOPE_MARKERS,
+        DECIMAL_COMMA_LANGUAGES,
+        DECIMAL_POINT_LANGUAGES,
         MEASUREMENT_UNITS,
+        VAT_MARKERS,
+        VAT_RATES,
     )
 
     return {
@@ -1717,6 +1722,12 @@ def _conflict_table() -> dict[str, Any]:
         "report_bigrams": sorted(list(pair) for pair in CONFLICT_REPORT_BIGRAMS),
         "scope_markers": sorted(CONFLICT_SCOPE_MARKERS),
         "measurement_units": sorted(MEASUREMENT_UNITS),
+        # ADR-0015. Ordered pairs: (inclusive, exclusive), not symmetrised.
+        "inclusion_pairs": [list(pair) for pair in CONFLICT_INCLUSION_PAIRS],
+        "vat_markers": sorted(VAT_MARKERS),
+        "vat_rates": list(VAT_RATES),
+        "decimal_comma_languages": sorted(DECIMAL_COMMA_LANGUAGES),
+        "decimal_point_languages": sorted(DECIMAL_POINT_LANGUAGES),
         "thresholds": {
             "subject_overlap": conflict_module.SUBJECT_OVERLAP,
             "max_symdiff": conflict_module.MAX_SYMDIFF,
@@ -1745,7 +1756,10 @@ def _conflict_cases() -> dict[str, Any]:
         HARD_NEGATIVES,
         HELDOUT_CONFLICTS,
         HELDOUT_NEGATIVES,
+        INCLUSION,
         NON_LATIN,
+        NUMBER_FORMATS,
+        NUMBER_READINGS,
         TRUE_CONFLICTS,
         UNRELATED,
     )
@@ -1797,6 +1811,39 @@ def _conflict_cases() -> dict[str, Any]:
                 "rule": rule,
             }
             for domain, label, left, right, rule in NON_LATIN
+        ],
+        # ADR-0015. Each case carries both sides' DECLARED language (null =
+        # undeclared), which decides how a locale-ambiguous number is read. The
+        # expected rule is asserted from INTENT in the source fixture.
+        "inclusion": [
+            {
+                "domain": domain,
+                "label": label,
+                "left": left,
+                "right": right,
+                "left_language": left_language,
+                "right_language": right_language,
+                "conflict": rule is not None,
+                "rule": rule,
+            }
+            for domain, label, left, right, left_language, right_language, rule in INCLUSION
+        ],
+        "number_formats": [
+            {
+                "domain": domain,
+                "label": label,
+                "left": left,
+                "right": right,
+                "left_language": left_language,
+                "right_language": right_language,
+                "conflict": rule is not None,
+                "rule": rule,
+            }
+            for domain, label, left, right, left_language, right_language, rule in NUMBER_FORMATS
+        ],
+        "number_readings": [
+            {"raw": raw, "dash": dash, "language": language, "key": key}
+            for raw, dash, language, key in NUMBER_READINGS
         ],
         "near_duplicates": [
             {

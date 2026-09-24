@@ -23,6 +23,7 @@ from citenexus.answer.conflict import (
     find_conflicts,
     is_near_duplicate,
 )
+from citenexus.answer.numbers import read_number
 
 # (domain, label, passage a, passage b)
 Pair = tuple[str, str, str, str]
@@ -739,30 +740,393 @@ def test_dutch_fixtures_cover_every_rule_and_both_verdicts() -> None:
     assert rules == {"negation", "antonym", "value"}
 
 
-#: Measured gaps the Dutch tables do NOT close, pinned so that closing one is a
-#: conscious fixture change. (label, a, b, what the detector returns today)
-DUTCH_KNOWN_GAPS: list[tuple[str, str, str, str | None]] = [
-    # A true conflict the tables cannot catch. inclusief/exclusief is NOT an
-    # antonym pair: the antonym rule ignores numbers, so the both-true pair
-    # "€ 100 exclusief btw" / "€ 121 inclusief btw" (a hard negative above)
-    # would become a false conflict. Admitting the pair needs a detector change,
-    # not a table change.
-    ("KNOWN MISS: incl/excl, same amount",
-     "De vergoeding is € 25 inclusief btw.", "De vergoeding is € 25 exclusief btw.", None),
-    ("KNOWN MISS: incl./excl., same amount",
-     "De vergoeding is € 25 incl. btw.", "De vergoeding is € 25 excl. btw.", None),
-    # Dutch number formatting is not normalised: "1.500" parses as 1.5 and
-    # "25,00" as 2500, so the SAME amount written two ways is a value conflict.
-    # Pre-existing, table-independent, and in the unsafe direction.
-    ("KNOWN FALSE CONFLICT: Dutch thousands separator",
-     "Het opleidingsbudget is € 1.500 per jaar.", "Het opleidingsbudget is € 1500 per jaar.",
-     "value"),
-    ("KNOWN FALSE CONFLICT: Dutch decimal comma",
-     "De vergoeding is € 25,00 per maand.", "De vergoeding is € 25 per maand.", "value"),
+# ─────────────────────────────────────────────────────────────────────────────
+# ADR-0015 — incl/excl and locale-aware numbers. Expected rules are asserted from
+# INTENT, never echoed from the detector, and each case carries the DECLARED
+# language of both sides (None = undeclared). Closes the two DUTCH_KNOWN_GAPS the
+# Dutch tables left open (incl/excl missed; "1.500"/"25,00" false conflicts).
+
+#: (domain, label, left, right, left_language, right_language, rule)
+LocaleCase = tuple[str, str, str, str, str | None, str | None, str | None]
+
+INCLUSION: list[LocaleCase] = [
+    # Branch 1 — same amount, incl vs excl: the price cannot be both.
+    (
+        "hr-nl",
+        "R-119/R-120: same amount excl vs incl btw",
+        "Voor thuiswerken geldt een vergoeding van € 25 exclusief btw per maand.",
+        "Voor thuiswerken geldt een vergoeding van € 25 inclusief btw per maand.",
+        "nl",
+        "nl",
+        "inclusion",
+    ),
+    (
+        "hr-nl",
+        "same amount, abbreviated incl./excl.",
+        "De vergoeding is € 25 incl. btw.",
+        "De vergoeding is € 25 excl. btw.",
+        None,
+        None,
+        "inclusion",
+    ),
+    (
+        "finance-en",
+        "same amount, including/excluding VAT",
+        "The home office allowance is €25 excluding VAT.",
+        "The home office allowance is €25 including VAT.",
+        "en",
+        "en",
+        "inclusion",
+    ),
+    (
+        "finance-nl",
+        "no amounts at all: prices incl vs excl",
+        "Alle genoemde tarieven zijn inclusief btw.",
+        "Alle genoemde tarieven zijn exclusief btw.",
+        "nl",
+        "nl",
+        "inclusion",
+    ),
+    (
+        "finance-nl",
+        "same amount, written in two formats (€ 25,00 vs € 25)",
+        "De vergoeding is € 25,00 inclusief btw.",
+        "De vergoeding is € 25 exclusief btw.",
+        "nl",
+        "nl",
+        "inclusion",
+    ),
+    # Branch 2 — different amounts, consistent under a tabled VAT rate: one
+    # price quoted both ways, NOT a conflict.
+    (
+        "finance-nl",
+        "21%: € 25 excl / € 30,25 incl",
+        "De vergoeding bedraagt € 25 exclusief btw.",
+        "De vergoeding bedraagt € 30,25 inclusief btw.",
+        "nl",
+        "nl",
+        None,
+    ),
+    (
+        "finance-nl",
+        "9%: € 50 excl / € 54,50 incl",
+        "De maaltijd kost € 50 exclusief btw.",
+        "De maaltijd kost € 54,50 inclusief btw.",
+        "nl",
+        "nl",
+        None,
+    ),
+    (
+        "finance-nl",
+        "21% with a rounded cent: € 19,99 excl / € 24,19 incl",
+        "Het abonnement kost € 19,99 exclusief btw.",
+        "Het abonnement kost € 24,19 inclusief btw.",
+        "nl",
+        "nl",
+        None,
+    ),
+    (
+        "finance-nl",
+        "inclusive side on the LEFT: € 121 incl / € 100 excl",
+        "De vergoeding bedraagt € 121 inclusief btw.",
+        "De vergoeding bedraagt € 100 exclusief btw.",
+        "nl",
+        "nl",
+        None,
+    ),
+    (
+        "finance-nl",
+        "other amounts shared: per maand voor 12 maanden",
+        "De lease kost € 100 exclusief btw per maand voor 12 maanden.",
+        "De lease kost € 121 inclusief btw per maand voor 12 maanden.",
+        "nl",
+        "nl",
+        None,
+    ),
+    (
+        "finance-en",
+        "21%, English abbreviations",
+        "The course costs €500 excl. VAT.",
+        "The course costs €605 incl. VAT.",
+        "en",
+        "en",
+        None,
+    ),
+    (
+        "finance-nl",
+        "declared thousands: € 1.000 excl / € 1.210 incl",
+        "De licentie kost € 1.000 exclusief btw.",
+        "De licentie kost € 1.210 inclusief btw.",
+        "nl",
+        "nl",
+        None,
+    ),
+    # Branch 3 — every other difference stays a conflict. No "numbers differ,
+    # so decline" branch exists: for a legal reader that fails open.
+    (
+        "finance-nl",
+        "not VAT-consistent: € 100 excl / € 150 incl",
+        "De vergoeding bedraagt € 100 exclusief btw.",
+        "De vergoeding bedraagt € 150 inclusief btw.",
+        "nl",
+        "nl",
+        "inclusion",
+    ),
+    (
+        "finance-nl",
+        "two cents off 21%: € 100 excl / € 121,02 incl",
+        "De vergoeding bedraagt € 100 exclusief btw.",
+        "De vergoeding bedraagt € 121,02 inclusief btw.",
+        "nl",
+        "nl",
+        "inclusion",
+    ),
+    (
+        "finance-nl",
+        "rate applied the wrong way: € 121 excl / € 100 incl",
+        "De vergoeding bedraagt € 121 exclusief btw.",
+        "De vergoeding bedraagt € 100 inclusief btw.",
+        "nl",
+        "nl",
+        "inclusion",
+    ),
+    (
+        "hr-nl",
+        "no VAT marker: 21% apart but not a VAT statement",
+        "De reisvergoeding bedraagt € 100 exclusief parkeerkosten.",
+        "De reisvergoeding bedraagt € 121 inclusief parkeerkosten.",
+        "nl",
+        "nl",
+        "inclusion",
+    ),
+    (
+        "finance-en",
+        "VAT-consistent amounts but one side NEGATED (must not decline)",
+        "The monthly fee is €100 excl VAT for members.",
+        "The monthly fee is not €121 incl VAT for members.",
+        "en",
+        "en",
+        "inclusion",
+    ),
+    (
+        "finance-nl",
+        "one side without an amount",
+        "De vergoeding is exclusief btw.",
+        "De vergoeding is € 25 inclusief btw.",
+        "nl",
+        "nl",
+        "inclusion",
+    ),
+    (
+        "finance-nl",
+        "undeclared thousands: € 1.000 / € 1.210 cannot be read",
+        "De licentie kost € 1.000 exclusief btw.",
+        "De licentie kost € 1.210 inclusief btw.",
+        None,
+        None,
+        "inclusion",
+    ),
+]
+
+NUMBER_FORMATS: list[LocaleCase] = [
+    # The same amount written two ways must NOT conflict ...
+    (
+        "finance-nl",
+        "thousands dot, declared nl: € 1.500 = € 1500",
+        "Het opleidingsbudget is € 1.500 per jaar.",
+        "Het opleidingsbudget is € 1500 per jaar.",
+        "nl",
+        "nl",
+        None,
+    ),
+    (
+        "finance-en",
+        "thousands comma, declared en: $1,500 = $1500",
+        "The training budget is $1,500 per year.",
+        "The training budget is $1500 per year.",
+        "en",
+        "en",
+        None,
+    ),
+    (
+        "finance-nl",
+        "decimal comma: € 25,00 = € 25 (any locale)",
+        "De vergoeding is € 25,00 per maand.",
+        "De vergoeding is € 25 per maand.",
+        None,
+        None,
+        None,
+    ),
+    (
+        "finance-nl",
+        "Dutch whole amount: € 25,- = € 25",
+        "De vergoeding is € 25,- per maand.",
+        "De vergoeding is € 25 per maand.",
+        None,
+        None,
+        None,
+    ),
+    (
+        "finance-nl",
+        "euro sign with and without a space",
+        "De vergoeding is €25 per maand.",
+        "De vergoeding is € 25 per maand.",
+        None,
+        None,
+        None,
+    ),
+    (
+        "finance-nl",
+        "both separators: € 1.500,00 = € 1500 (any locale)",
+        "Het budget is € 1.500,00 per jaar.",
+        "Het budget is € 1500 per jaar.",
+        None,
+        None,
+        None,
+    ),
+    (
+        "finance-nl",
+        "repeated thousands: € 1.000.000 = € 1000000 (any locale)",
+        "Het fonds bedraagt € 1.000.000 per jaar.",
+        "Het fonds bedraagt € 1000000 per jaar.",
+        None,
+        None,
+        None,
+    ),
+    (
+        "hr-nl",
+        "decimal mark with one digit: 1,5 dag = 1.5 dag (any locale)",
+        "De bijzonder verlof bedraagt 1,5 dag per jaar.",
+        "De bijzonder verlof bedraagt 1.5 dag per jaar.",
+        None,
+        None,
+        None,
+    ),
+    # ... and genuinely different amounts must never be read equal.
+    (
+        "finance-nl",
+        "undeclared € 1.500 vs € 1500: ambiguous, so NOT equal",
+        "Het opleidingsbudget is € 1.500 per jaar.",
+        "Het opleidingsbudget is € 1500 per jaar.",
+        None,
+        None,
+        "value",
+    ),
+    (
+        "finance-en",
+        "declared en: $1.500 is 1.5, not 1500",
+        "The fee is $1.500 per year.",
+        "The fee is $1500 per year.",
+        "en",
+        "en",
+        "value",
+    ),
+    (
+        "finance-nl",
+        "nl € 1.500 vs en € 1.500: 1500 vs 1.5",
+        "Het budget is € 1.500 per jaar.",
+        "Het budget is € 1.500 per jaar.",
+        "nl",
+        "en",
+        "value",
+    ),
+    (
+        "finance-nl",
+        "€ 25,50 vs € 25,05",
+        "De vergoeding is € 25,50 per maand.",
+        "De vergoeding is € 25,05 per maand.",
+        None,
+        None,
+        "value",
+    ),
+    (
+        "finance-nl",
+        "€ 25,50 vs € 2550 (the old parser read both as 2550)",
+        "De vergoeding is € 25,50 per maand.",
+        "De vergoeding is € 2550 per maand.",
+        None,
+        None,
+        "value",
+    ),
+    (
+        "finance-nl",
+        "declared nl € 1,5 vs € 1.500",
+        "Het budget is € 1,5 miljoen.",
+        "Het budget is € 1.500 miljoen.",
+        "nl",
+        "nl",
+        "value",
+    ),
+]
+
+#: (raw number, ",-" suffix, declared language, expected comparison key)
+NUMBER_READINGS: list[tuple[str, bool, str | None, str]] = [
+    ("1500", False, None, "1500"),
+    ("1.500", False, None, "?1.500"),
+    ("1,500", False, None, "?1,500"),
+    ("1.500", False, "nl", "1500"),
+    ("1.500", False, "nl-NL", "1500"),
+    ("1,500", False, "nl", "1.5"),
+    ("1.500", False, "en", "1.5"),
+    ("1,500", False, "en-GB", "1500"),
+    ("1.500", False, "de", "?1.500"),
+    ("25,00", False, None, "25"),
+    ("25,50", False, None, "25.5"),
+    ("25.50", False, None, "25.5"),
+    ("1,5", False, None, "1.5"),
+    ("1.5", False, None, "1.5"),
+    ("0,05", False, None, "0.05"),
+    ("4.20", False, None, "4.2"),
+    ("25", True, None, "25"),
+    ("1.500", True, None, "1500"),
+    ("25,50", True, None, "?25,50,-"),
+    ("1.500,50", False, None, "1500.5"),
+    ("1,500.50", False, None, "1500.5"),
+    ("1.500.000", False, None, "1500000"),
+    ("1,500,000", False, None, "1500000"),
+    ("1234.567", False, None, "1234.567"),
+    ("0.500", False, None, "0.5"),
+    ("12.500", False, "nl", "12500"),
+    ("1.50.000", False, None, "?1.50.000"),
+    ("0.500.000", False, None, "?0.500.000"),
+    ("01.02.2024", False, None, "?01.02.2024"),
+    ("007", False, None, "7"),
 ]
 
 
-@pytest.mark.parametrize(("label", "left", "right", "rule"), DUTCH_KNOWN_GAPS)
-def test_dutch_known_gaps_are_pinned(label: str, left: str, right: str, rule: str | None) -> None:
-    finding = detect_conflict(left, right)
+@pytest.mark.parametrize(
+    ("domain", "label", "left", "right", "left_language", "right_language", "rule"),
+    INCLUSION + NUMBER_FORMATS,
+)
+def test_adr_0015_cases(
+    domain: str,
+    label: str,
+    left: str,
+    right: str,
+    left_language: str | None,
+    right_language: str | None,
+    rule: str | None,
+) -> None:
+    del domain
+    finding = detect_conflict(
+        left, right, left_language=left_language, right_language=right_language
+    )
     assert (finding.rule if finding else None) == rule, f"{label}: got {finding}"
+    # Symmetric, languages swapped with their passages.
+    mirrored = detect_conflict(
+        right, left, left_language=right_language, right_language=left_language
+    )
+    assert (mirrored.rule if mirrored else None) == rule, f"{label} (mirrored): got {mirrored}"
+
+
+@pytest.mark.parametrize(("raw", "dash", "language", "key"), NUMBER_READINGS)
+def test_number_readings(raw: str, dash: bool, language: str | None, key: str) -> None:
+    assert read_number(raw, dash=dash, language=language).key == key
+
+
+def test_adr_0015_covers_every_branch() -> None:
+    """All three incl/excl branches and both number-format verdicts are fixtured."""
+    labels = " ".join(case[1] for case in INCLUSION)
+    assert "R-119/R-120" in labels
+    assert {case[6] for case in INCLUSION} == {"inclusion", None}
+    assert {case[6] for case in NUMBER_FORMATS} == {"value", None}

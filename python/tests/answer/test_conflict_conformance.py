@@ -24,6 +24,7 @@ from typing import Any
 import pytest
 
 from citenexus.answer.conflict import detect_conflict, is_near_duplicate
+from citenexus.answer.numbers import read_number
 
 _CASES = Path(__file__).resolve().parents[2].parent / "conformance" / "cases" / "conflict.json"
 
@@ -40,6 +41,10 @@ EXPECTED_COUNTS: dict[str, int] = {
     "non_latin": 30,
     "near_duplicates": 9,
     "identifier_tokenization": 2,
+    # ADR-0015
+    "inclusion": 19,
+    "number_formats": 14,
+    "number_readings": 30,
 }
 
 _PAIR_BUCKETS = (
@@ -51,6 +56,10 @@ _PAIR_BUCKETS = (
     # ADR-0011. Every non-Latin vector in this bucket scored "no conflict"
     # while conflict ran on the frozen, ASCII-only v1 tokenizer.
     "non_latin",
+    # ADR-0015. These carry left_language / right_language; the others omit
+    # them, which reads as undeclared.
+    "inclusion",
+    "number_formats",
 )
 
 
@@ -61,7 +70,7 @@ def _pairs(bucket: str) -> list[Any]:
 def test_bucket_names_and_sizes() -> None:
     assert set(VECTORS) == set(EXPECTED_COUNTS)
     assert {k: len(v) for k, v in VECTORS.items()} == EXPECTED_COUNTS
-    assert sum(EXPECTED_COUNTS.values()) == 160
+    assert sum(EXPECTED_COUNTS.values()) == 223
 
 
 @pytest.mark.parametrize(
@@ -70,7 +79,12 @@ def test_bucket_names_and_sizes() -> None:
 )
 def test_pairwise_vector(case: dict[str, Any]) -> None:
     """Verdict AND rule name must match the committed vector exactly."""
-    finding = detect_conflict(case["left"], case["right"])
+    finding = detect_conflict(
+        case["left"],
+        case["right"],
+        left_language=case.get("left_language"),
+        right_language=case.get("right_language"),
+    )
     assert (finding is not None) is case["conflict"], (
         f"{case['domain']}/{case['label']}: expected conflict={case['conflict']}\n"
         f"  left:  {case['left']}\n  right: {case['right']}\n"
@@ -106,8 +120,20 @@ def test_detection_is_symmetric() -> None:
     """
     for bucket in _PAIR_BUCKETS:
         for case in VECTORS[bucket]:
-            swapped = detect_conflict(case["right"], case["left"])
+            swapped = detect_conflict(
+                case["right"],
+                case["left"],
+                left_language=case.get("right_language"),
+                right_language=case.get("left_language"),
+            )
             assert (swapped is not None) is case["conflict"], (
                 f"{bucket}/{case['label']}: asymmetric verdict\n"
                 f"  left:  {case['left']}\n  right: {case['right']}"
             )
+
+
+@pytest.mark.parametrize("case", _pairs("number_readings"))
+def test_number_reading_vector(case: dict[str, Any]) -> None:
+    """ADR-0015: every port reads a number to the same comparison key."""
+    reading = read_number(case["raw"], dash=case["dash"], language=case["language"])
+    assert reading.key == case["key"], f"{case}: got {reading.key}"

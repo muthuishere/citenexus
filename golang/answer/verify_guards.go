@@ -18,26 +18,19 @@ import (
 	"github.com/muthuishere/citenexus/golang/tokenize"
 )
 
-var digitRun = regexp.MustCompile(`[0-9]+`)
-
-// digitRuns splits every number into its digit runs, so "25,50", "25.50" and
-// "€25.50" all read as {25, 50} whatever the locale's separator convention. A
-// claim may carry "25.50" for a passage's "25,50" (EN over NL); "25,5" vs
-// "25,50" is NOT equated — that direction only costs an abstention.
-func digitRuns(text string) map[string]struct{} {
-	out := map[string]struct{}{}
-	for _, run := range digitRun.FindAllString(text, -1) {
-		out[run] = struct{}{}
+// numberGuard: every number in the claim is a number in the passage, compared
+// by ADR-0015 key (ReadNumber) — each side read in ITS OWN declared language, so
+// an English "1,500" over a Dutch "1.500" matches, and "25,00" matches "25".
+// A number neither language can resolve ("1.500" undeclared) matches only the
+// same spelling: ambiguity refuses, it never guesses.
+func numberGuard(claim, claimLanguage, passage, passageLanguage string) string {
+	have := map[string]struct{}{}
+	for _, m := range numbersIn(passage, passageLanguage) {
+		have[m.reading.Key] = struct{}{}
 	}
-	return out
-}
-
-// numberGuard: every digit run in the claim appears in the passage.
-func numberGuard(claim, passage string) string {
-	have := digitRuns(passage)
-	for run := range digitRuns(claim) {
-		if _, ok := have[run]; !ok {
-			return fmt.Sprintf("number guard: %s is not in the passage", run)
+	for _, m := range numbersIn(claim, claimLanguage) {
+		if _, ok := have[m.reading.Key]; !ok {
+			return fmt.Sprintf("number guard: %s is not in the passage", strings.TrimPrefix(m.reading.Key, "?"))
 		}
 	}
 	return ""
@@ -128,9 +121,12 @@ func nameGuard(claim, passage string) string {
 }
 
 // guards runs every deterministic guard and returns the first refusal, or "".
-func guards(claim, passage string) string {
-	for _, g := range []func(string, string) string{numberGuard, negationGuard, clauseNegationGuard, nameGuard} {
-		if reason := g(claim, passage); reason != "" {
+func guards(claim, claimLanguage string, eu EvidenceUnit) string {
+	if reason := numberGuard(claim, claimLanguage, eu.Text, eu.Language); reason != "" {
+		return reason
+	}
+	for _, g := range []func(string, string) string{negationGuard, clauseNegationGuard, nameGuard} {
+		if reason := g(claim, eu.Text); reason != "" {
 			return reason
 		}
 	}

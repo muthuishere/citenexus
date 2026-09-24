@@ -29,11 +29,12 @@
 //
 // Portability notes, all load-bearing:
 //
-//   - Python's `str.replace(",", "")` replaces EVERY comma; JS's replaces only
-//     the first. `stripCommas` below uses a global pattern.
+//   - Numbers are read by `numbers.ts` (ADR-0015) to exact keys and exact
+//     `bigint`-scaled values — never `parseFloat`, whose rounding would make two
+//     different amounts compare equal.
 //   - Python's `\s` on a `str` is the Unicode set `str.isspace()` accepts, which
 //     is neither JS's `\s` (which adds U+FEFF) nor RE2's (ASCII only). It is
-//     spelled out explicitly here, the same way `segment.ts` spells it out.
+//     spelled out explicitly in `numbers.ts`, the same way `segment.ts` does.
 //   - JS `Set` has no portable difference/intersection at this target (ES2022,
 //     Node >= 20), so the set arithmetic is written out.
 //   - Python `sorted()` on these tokens is code-point order; JS's default
@@ -45,14 +46,25 @@
 
 import {
   CONFLICT_ANTONYMS_TABLE,
+  CONFLICT_INCLUSION_PAIRS_TABLE,
   CONFLICT_NEGATIONS_TABLE,
   CONFLICT_REPORT_BIGRAMS_TABLE,
   CONFLICT_SCOPE_MARKERS_TABLE,
   CONFLICT_THRESHOLDS_TABLE,
   MEASUREMENT_UNITS_TABLE,
+  VAT_MARKERS_TABLE,
+  VAT_RATES_TABLE,
 } from "../gen/conflict_tables.js";
 import { STOPWORDS_TABLE } from "../gen/tables.js";
 import { tokenizeV2 } from "../tokenize/tokenize-v2.js";
+import {
+  NUMBER_RE,
+  type DecimalValue,
+  decimalMul,
+  decimalWithin,
+  parseDecimal,
+  readNumber,
+} from "./numbers.js";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Pinned constants. None of these are exposed as caller parameters: a
@@ -132,14 +144,11 @@ function isTokenizerDigitArtifact(token: string): boolean {
   return hasDigit && hasNonAscii;
 }
 
-// Exactly the characters Python's `str.isspace()` accepts — see the header note.
-const PY_SPACE = " \\t\\n\\v\\f\\r\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000";
-
-// RE2-compatible: no lookaround, no backreferences, no backtracking. The
+// The number pattern and its locale-aware reader live in `numbers.ts`
+// (ADR-0015). RE2-compatible: no lookaround, no backreferences. The
 // letter-boundary check that RE2 would need lookbehind for is done in code
-// below, precisely so this pattern ports unchanged. `g` is required for
-// `matchAll`/`exec` iteration in JS; Python's `finditer` needs no such flag.
-const NUMBER_RE = new RegExp(`([0-9][0-9,]*(?:\\.[0-9]+)?)[${PY_SPACE}]*([a-z]+|%)?`, "g");
+// below, precisely so that pattern ports unchanged. Its `\s` is spelled as the
+// exact set Python's `str.isspace()` accepts — see the header note.
 
 // The letter-boundary guard is LATIN-ONLY, deliberately, and this is the one
 // place the two facts have to be held together:
@@ -209,13 +218,36 @@ const FOLDED_ANTONYMS: ReadonlySet<string> = new Set(
 );
 const FOLDED_SCOPE: ReadonlySet<string> = new Set(CONFLICT_SCOPE_MARKERS_TABLE.map(fold));
 
+type Orientation = "left-inclusive" | "right-inclusive";
+
+/** (inclusive, exclusive) marker pairs, folded, in BOTH orientations; the value
+ *  says which side is the inclusive one (ADR-0015). Insertion order matches the
+ *  Python dict, so a later pair overwrites an earlier one identically. */
+const INCLUSION: ReadonlyMap<string, Orientation> = (() => {
+  const map = new Map<string, Orientation>();
+  for (const [incl, excl] of CONFLICT_INCLUSION_PAIRS_TABLE) {
+    map.set(`${fold(incl)}\u0000${fold(excl)}`, "left-inclusive");
+    map.set(`${fold(excl)}\u0000${fold(incl)}`, "right-inclusive");
+  }
+  return map;
+})();
+
+const VAT_MARKERS: ReadonlySet<string> = new Set(VAT_MARKERS_TABLE);
+/** Exact rationals from exact decimal strings — never a float. */
+const VAT_RATES: readonly DecimalValue[] = VAT_RATES_TABLE.map(parseDecimal);
+/** One cent: the rounding a VAT-inclusive price quoted to the cent can carry. */
+const VAT_TOLERANCE: DecimalValue = { units: 1n, scale: 2 };
+
 /** Everything the pairwise rules need from one passage. */
 interface Features {
   tokens: readonly string[];
   /** folded, meaning-bearing, non-numeric, non-polarity */
   content: ReadonlySet<string>;
   negations: number;
+  /** comparison keys (`readNumber`) */
   numbers: ReadonlySet<string>;
+  /** key -> value, `null` when ambiguous */
+  values: ReadonlyMap<string, DecimalValue | null>;
   units: ReadonlySet<string>;
   /** carries a reported-speech bigram */
   reported: boolean;
@@ -223,7 +255,7 @@ interface Features {
 
 /** Why two passages were judged to disagree. Never says which one is right. */
 export interface ConflictFinding {
-  /** "antonym" | "negation" | "value" */
+  /** "inclusion" | "antonym" | "negation" | "value" */
   rule: string;
   detail: string;
 }
@@ -283,32 +315,10 @@ function sorted(values: Iterable<string>): string[] {
   return [...values].sort();
 }
 
-// ── number normalisation ───────────────────────────────────────────────────
-
-/** Python's `str.rstrip(chars)`: strip EVERY trailing character in `chars`. */
-function rstrip(value: string, chars: string): string {
-  let end = value.length;
-  while (end > 0 && chars.includes(value[end - 1] as string)) end--;
-  return value.slice(0, end);
-}
-
-/**
- * String normalisation, never numeric parsing: `parseFloat` would lose
- * precision on long values and reformat exponents, and the result is a set key
- * compared for equality against Python's.
- */
-function normalizeNumber(raw: string): string {
-  let value = raw.replace(/,/g, "");
-  if (value.includes(".")) {
-    value = rstrip(rstrip(value, "0"), ".");
-  }
-  return value || "0";
-}
-
-function features(text: string): Features {
+function features(text: string, language: string | null = null): Features {
   const lowered = text.toLowerCase();
   const tokens = tokenizeV2(lowered);
-  const numbers = new Set<string>();
+  const values = new Map<string, DecimalValue | null>();
   const units = new Set<string>();
 
   NUMBER_RE.lastIndex = 0;
@@ -319,8 +329,12 @@ function features(text: string): Features {
     if (start > 0 && IDENTIFIER_PREFIX.test(prev)) {
       continue; // "p50", "ipv4": an identifier, not a measured value
     }
-    numbers.add(normalizeNumber(match[1] as string));
-    const unit = match[2];
+    const reading = readNumber(match[1] as string, {
+      dash: match[2] !== undefined,
+      language,
+    });
+    values.set(reading.key, reading.value);
+    const unit = match[3];
     if (unit === "%") {
       units.add("%");
     } else if (unit !== undefined && unit !== "" && MEASUREMENT_UNITS.has(unit)) {
@@ -353,7 +367,70 @@ function features(text: string): Features {
     }
   }
 
-  return { tokens, content, negations, numbers, units, reported };
+  return { tokens, content, negations, numbers: new Set(values.keys()), values, units, reported };
+}
+
+/**
+ * True when the two amounts are one price quoted excl. and incl. VAT.
+ *
+ * Exactly one amount differs on each side, both have a single reading, and
+ * `exclusive * rate` is within one cent of `inclusive` for a tabled rate.
+ * Anything else — several differing amounts, an ambiguous one, another rate —
+ * is NOT consistent, and the difference stays a conflict.
+ */
+function vatConsistent(inclusive: Features, exclusive: Features): boolean {
+  const onlyIncl = [...difference(inclusive.numbers, exclusive.numbers)];
+  const onlyExcl = [...difference(exclusive.numbers, inclusive.numbers)];
+  if (onlyIncl.length !== 1 || onlyExcl.length !== 1 || !setsEqual(inclusive.units, exclusive.units)) {
+    return false;
+  }
+  const inclValue = inclusive.values.get(onlyIncl[0] as string) ?? null;
+  const exclValue = exclusive.values.get(onlyExcl[0] as string) ?? null;
+  if (inclValue === null || exclValue === null) return false;
+  return VAT_RATES.some((rate) => decimalWithin(decimalMul(exclValue, rate), inclValue, VAT_TOLERANCE));
+}
+
+/**
+ * ADR-0015: one passage says incl, the other excl, on the same subject.
+ *
+ *   * same amounts (or none) -> conflict: the price cannot be both;
+ *   * different amounts, a VAT marker present, and consistent under a tabled
+ *     VAT rate -> NOT a conflict: the same price quoted both ways;
+ *   * any other difference -> conflict. There is no "numbers differ, so
+ *     decline" branch: for a legal reader that would fail open.
+ */
+function inclusionVerdict(
+  a: Features,
+  b: Features,
+  x: string,
+  y: string,
+  orientation: Orientation,
+): ConflictFinding | null {
+  const [inclusive, exclusive] = orientation === "left-inclusive" ? [a, b] : [b, a];
+  if (setsEqual(a.numbers, b.numbers)) {
+    const amounts = sorted(a.numbers).join(", ");
+    return { rule: "inclusion", detail: `${x} vs ${y}` + (amounts ? ` on ${amounts}` : "") };
+  }
+  const vat = a.tokens.some((t) => VAT_MARKERS.has(t)) || b.tokens.some((t) => VAT_MARKERS.has(t));
+  // The decline also requires equal negation parity: "€ 100 excl" vs "NOT
+  // € 121 incl" is VAT-consistent in its amounts and still a disagreement, and
+  // the negation rule cannot catch it afterwards.
+  const samePolarity = a.negations % 2 === b.negations % 2;
+  if (vat && samePolarity && vatConsistent(inclusive, exclusive)) return null;
+  return { rule: "inclusion", detail: `${inclusionSide(x, a)} vs ${inclusionSide(y, b)}` };
+}
+
+/** `inclusief 121` — the marker plus its amounts, if any. */
+function inclusionSide(word: string, features: Features): string {
+  const amounts = sorted(features.numbers).join(", ");
+  return amounts ? `${word} ${amounts}` : word;
+}
+
+/** The passages' DECLARED languages. They only decide how a locale-ambiguous
+ *  number such as `1.500` is read (ADR-0015); undeclared, it is ambiguous. */
+export interface ConflictLanguages {
+  leftLanguage?: string | null;
+  rightLanguage?: string | null;
 }
 
 /**
@@ -362,9 +439,13 @@ function features(text: string): Features {
  * Pure and total: no model, no network, no I/O, no configuration. The guard
  * ORDER is load-bearing and matches the Python reference line for line.
  */
-export function detectConflict(left: string, right: string): ConflictFinding | null {
-  const a = features(left);
-  const b = features(right);
+export function detectConflict(
+  left: string,
+  right: string,
+  languages: ConflictLanguages = {},
+): ConflictFinding | null {
+  const a = features(left, languages.leftLanguage ?? null);
+  const b = features(right, languages.rightLanguage ?? null);
   const minContent = Math.min(a.content.size, b.content.size);
   if (minContent < MIN_CONTENT) return null; // too short to compare honestly
 
@@ -386,6 +467,22 @@ export function detectConflict(left: string, right: string): ConflictFinding | n
   // the same one Python reports.
   const onlyA = sorted(difference(a.content, b.content));
   const onlyB = sorted(difference(b.content, a.content));
+
+  // Inclusion runs BEFORE the value rule and owns its verdict, including a
+  // decline: a VAT-consistent excl/incl pair must not then be called a value
+  // conflict for carrying two different amounts.
+  for (const x of onlyA) {
+    for (const y of onlyB) {
+      const orientation = INCLUSION.get(`${x}\u0000${y}`);
+      if (orientation === undefined) continue;
+      let residual = 0;
+      for (const token of divergence) {
+        if (token !== x && token !== y) residual++;
+      }
+      if (residual <= MAX_RESIDUAL) return inclusionVerdict(a, b, x, y, orientation);
+    }
+  }
+
   for (const x of onlyA) {
     for (const y of onlyB) {
       if (!FOLDED_ANTONYMS.has(`${x}\u0000${y}`)) continue;
@@ -434,8 +531,12 @@ export function detectConflict(left: string, right: string): ConflictFinding | n
  * Under-collapsing leaves `distinct_documents` as inflated as it is today;
  * over-collapsing would under-report real corroboration, a new wrong signal.
  */
-export function isNearDuplicate(left: string, right: string): string | null {
-  if (detectConflict(left, right) !== null) {
+export function isNearDuplicate(
+  left: string,
+  right: string,
+  languages: ConflictLanguages = {},
+): string | null {
+  if (detectConflict(left, right, languages) !== null) {
     return null; // conflict first, always: a contradiction is never a clone
   }
   const leftTokens = tokenizeV2(left);
@@ -446,8 +547,8 @@ export function isNearDuplicate(left: string, right: string): string | null {
   ) {
     return "exact"; // covers whitespace, punctuation and case variants
   }
-  const a = features(left);
-  const b = features(right);
+  const a = features(left, languages.leftLanguage ?? null);
+  const b = features(right, languages.rightLanguage ?? null);
   if (!setsEqual(a.numbers, b.numbers) || a.negations % 2 !== b.negations % 2) return null;
 
   const leftSet = new Set(leftTokens);
@@ -478,16 +579,33 @@ export function describeConflicts(
   );
 }
 
-/** All conflicting pairs within the first `topK` passages. */
+function languageAt(
+  languages: readonly (string | null | undefined)[] | null | undefined,
+  index: number,
+): string | null {
+  if (languages === null || languages === undefined || index >= languages.length) return null;
+  return languages[index] ?? null;
+}
+
+/**
+ * All conflicting pairs within the first `topK` passages.
+ *
+ * `languages` are the passages' declared languages, index-aligned; they only
+ * decide how locale-ambiguous numbers are read (ADR-0015).
+ */
 export function findConflicts(
   passages: readonly string[],
   topK: number = CONFLICT_TOP_K,
+  languages?: readonly (string | null | undefined)[] | null,
 ): ConflictPair[] {
   const window = passages.slice(0, topK);
   const pairs: ConflictPair[] = [];
   for (let i = 0; i < window.length; i++) {
     for (let j = i + 1; j < window.length; j++) {
-      const finding = detectConflict(window[i] as string, window[j] as string);
+      const finding = detectConflict(window[i] as string, window[j] as string, {
+        leftLanguage: languageAt(languages, i),
+        rightLanguage: languageAt(languages, j),
+      });
       if (finding !== null) pairs.push({ left: i, right: j, finding });
     }
   }
@@ -495,11 +613,20 @@ export function findConflicts(
 }
 
 /** Indices of the passages that survive surface-clone collapse, in order. */
-export function collapseNearDuplicates(passages: readonly string[]): number[] {
+export function collapseNearDuplicates(
+  passages: readonly string[],
+  languages?: readonly (string | null | undefined)[] | null,
+): number[] {
   const kept: number[] = [];
   for (let index = 0; index < passages.length; index++) {
     const text = passages[index] as string;
-    const duplicate = kept.some((k) => isNearDuplicate(text, passages[k] as string) !== null);
+    const duplicate = kept.some(
+      (k) =>
+        isNearDuplicate(text, passages[k] as string, {
+          leftLanguage: languageAt(languages, index),
+          rightLanguage: languageAt(languages, k),
+        }) !== null,
+    );
     if (duplicate) continue;
     kept.push(index);
   }

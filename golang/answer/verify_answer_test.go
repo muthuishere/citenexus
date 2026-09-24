@@ -259,12 +259,23 @@ func TestGuardsCannotBeOverriddenByTheModel(t *testing.T) {
 	}
 }
 
-func TestNumberGuardIsLocaleNeutral(t *testing.T) {
-	if r := numberGuard("The fee is €25.50.", "De vergoeding is € 25,50."); r != "" {
-		t.Fatalf("25.50 vs 25,50 refused: %s", r)
+func TestNumberGuardReadsEachSideInItsLanguage(t *testing.T) {
+	cases := []struct {
+		claim, claimLang, passage, passageLang string
+		pass                                   bool
+	}{
+		{"The fee is €25.50.", "en", "De vergoeding is € 25,50.", "nl", true},
+		{"The budget is €1,500.", "en", "Het budget is € 1.500.", "nl", true},
+		{"De vergoeding is € 25,-.", "nl", "De vergoeding is € 25,00.", "nl", true},
+		{"The fee is €25.05.", "en", "De vergoeding is € 25,50.", "nl", false},
+		{"The budget is €1.500.", "en", "Het budget is € 1.500.", "nl", false}, // 1.5 vs 1500
+		{"Het budget is € 1.500.", "", "Het budget is € 1500.", "nl", false},   // undeclared claim: ambiguous
 	}
-	if r := numberGuard("The fee is €25.5.", "De vergoeding is € 25,50."); r == "" {
-		t.Fatal("25.5 vs 25,50 must not be equated")
+	for _, c := range cases {
+		got := numberGuard(c.claim, c.claimLang, c.passage, c.passageLang) == ""
+		if got != c.pass {
+			t.Errorf("%q (%s) over %q (%s): pass=%v, want %v", c.claim, c.claimLang, c.passage, c.passageLang, got, c.pass)
+		}
 	}
 }
 
@@ -361,5 +372,29 @@ func TestNextClauseNegationDoesNotRefuse(t *testing.T) {
 	res := verify(t, "De werkgever vergoedt de parkeerkosten [eu:c#1].", []EvidenceUnit{ev}, VerifyOptions{})
 	if res.Evidence.Decision != result.DecisionAnswered {
 		t.Fatalf("a negation in the next clause refused a true claim: %+v", res.Claims)
+	}
+}
+
+func TestR119R120InclExclBtw(t *testing.T) {
+	faq := EvidenceUnit{ID: "R-119", DocumentID: "hr-faq", Language: "nl",
+		Text:      "Voor thuiswerken geldt een vergoeding van € 25 exclusief btw per maand.",
+		Authority: map[string]string{"source_layer": "adopted"}}
+	note := EvidenceUnit{ID: "R-120", DocumentID: "voorgesteld-beleid", Language: "nl",
+		Text:      "Voor thuiswerken geldt een vergoeding van € 25 inclusief btw per maand.",
+		Authority: map[string]string{"source_layer": "proposal"}}
+	claim := "Voor thuiswerken geldt een vergoeding van € 25 exclusief btw per maand [eu:R-119]."
+
+	// Untiered: the disagreement is surfaced and the claim abstains, citing both.
+	res := verify(t, claim, []EvidenceUnit{faq, note}, VerifyOptions{AnswerLanguage: "nl"})
+	if res.Answer != result.ConflictRefusalAnswer || len(res.Sources) != 2 ||
+		!strings.HasPrefix(res.Conflicts[0], "inclusion:") {
+		t.Fatalf("untiered: %q %v %v", res.Answer, res.Conflicts, res.Sources)
+	}
+
+	// Tiered at ingest: the adopted FAQ outranks the proposal note.
+	policy := authority.Ordered([]string{"proposal", "adopted"}, "").WithKey("source_layer")
+	res = verify(t, claim, []EvidenceUnit{faq, note}, VerifyOptions{AnswerLanguage: "nl", Authority: policy})
+	if res.Evidence.Decision != result.DecisionAnswered || !strings.Contains(res.Conflicts[0], "resolved by authority") {
+		t.Fatalf("tiered: %s %v", res.Evidence.Decision, res.Conflicts)
 	}
 }

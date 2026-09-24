@@ -23,26 +23,36 @@ from __future__ import annotations
 # site (`citenexus.answer.tables`) regardless of where a table is declared.
 from citenexus.answer.gen.conflict_tables import (
     CONFLICT_ANTONYMS,
+    CONFLICT_INCLUSION_PAIRS,
     CONFLICT_LANGUAGES,
     CONFLICT_NEGATIONS,
     CONFLICT_REPORT_BIGRAMS,
     CONFLICT_SCOPE_MARKERS,
     CONFLICT_THRESHOLDS,
+    DECIMAL_COMMA_LANGUAGES,
+    DECIMAL_POINT_LANGUAGES,
     MEASUREMENT_UNITS,
+    VAT_MARKERS,
+    VAT_RATES,
 )
 
 __all__ = [
     "ABBREVIATIONS",
     "CONFLICT_ANTONYMS",
+    "CONFLICT_INCLUSION_PAIRS",
     "CONFLICT_LANGUAGES",
     "CONFLICT_NEGATIONS",
     "CONFLICT_REPORT_BIGRAMS",
     "CONFLICT_SCOPE_MARKERS",
     "CONFLICT_THRESHOLDS",
+    "DECIMAL_COMMA_LANGUAGES",
+    "DECIMAL_POINT_LANGUAGES",
     "MEASUREMENT_UNITS",
     "POLARITY_LANGUAGES",
     "POLARITY_MARKERS",
     "TERMINATORS",
+    "VAT_MARKERS",
+    "VAT_RATES",
 ]
 
 # Languages whose polarity markers are covered by a golden fixture. Adding a

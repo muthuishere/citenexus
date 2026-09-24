@@ -400,7 +400,7 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 		if !v.supported && v.reason != ReasonContradicted && opts.Checker != nil && len(pc.cited) > 0 {
 			guardReason := ""
 			admit := func(eu EvidenceUnit) (bool, error) {
-				if reason := guards(pc.text, eu.Text); reason != "" {
+				if reason := guards(pc.text, opts.AnswerLanguage, eu); reason != "" {
 					guardReason = reason
 					return false, nil
 				}
@@ -484,7 +484,7 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 					continue
 				}
 				checked[[2]string{s.ID, o.ID}], checked[[2]string{o.ID, s.ID}] = true, true
-				if f, ok := DetectConflict(s.Text, o.Text); ok {
+				if f, ok := DetectConflictWithLanguages(s.Text, s.Language, o.Text, o.Language); ok {
 					conflicts = append(conflicts, conflict{s, o, f})
 				}
 			}
@@ -544,7 +544,7 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 	claims := make([]result.Claim, 0, len(verdicts))
 	sources := []result.SourceRef{}
 	cited := map[string]struct{}{}
-	supportingTexts := []string{}
+	supportingTexts, supportingLanguages := []string{}, []string{}
 	var top *EvidenceUnit
 	modelVerified := 0
 	for _, v := range verdicts {
@@ -562,6 +562,7 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 				cited[id] = struct{}{}
 				eu := evidence[byID[id]]
 				supportingTexts = append(supportingTexts, eu.Text)
+				supportingLanguages = append(supportingLanguages, eu.Language)
 				sources = append(sources, sourceRefOf(eu))
 				if top == nil || tierOf(eu).Outranks(tierOf(*top)) {
 					euCopy := eu
@@ -663,7 +664,7 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 		Mode:           result.TrustModeStrict,
 		Evidence: result.EvidenceSignals{
 			Decision:                 decision,
-			SupportingSources:        len(CollapseNearDuplicates(supportingTexts)),
+			SupportingSources:        len(CollapseNearDuplicatesWithLanguages(supportingTexts, supportingLanguages)),
 			DistinctDocuments:        len(distinct),
 			AllClaimsVerified:        removed == 0,
 			UnsupportedClaimsRemoved: removed,

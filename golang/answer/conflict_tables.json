@@ -313,6 +313,38 @@
     "year",
     "years"
   ],
+  "inclusion_pairs": [
+    [
+      "incl",
+      "excl"
+    ],
+    [
+      "including",
+      "excluding"
+    ],
+    [
+      "inclusief",
+      "exclusief"
+    ],
+    [
+      "inclusive",
+      "exclusive"
+    ]
+  ],
+  "vat_markers": [
+    "btw",
+    "vat"
+  ],
+  "vat_rates": [
+    "1.09",
+    "1.21"
+  ],
+  "decimal_comma_languages": [
+    "nl"
+  ],
+  "decimal_point_languages": [
+    "en"
+  ],
   "thresholds": {
     "subject_overlap": 0.6,
     "max_symdiff": 3,

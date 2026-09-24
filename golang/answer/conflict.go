@@ -40,11 +40,11 @@ package answer
 
 import (
 	"fmt"
+	"math/big"
 	"regexp"
 	"sort"
 	"strings"
 	"sync"
-	"unicode/utf8"
 
 	"github.com/muthuishere/citenexus/golang/gate"
 	"github.com/muthuishere/citenexus/golang/tokenize"
@@ -102,10 +102,9 @@ func isTokenizerDigitArtifact(token string) bool {
 // pattern is otherwise unchanged.
 const pythonSpace = `\x{09}-\x{0d}\x{1c}-\x{20}\x{85}\x{a0}\x{1680}\x{2000}-\x{200a}\x{2028}\x{2029}\x{202f}\x{205f}\x{3000}`
 
-// numberRE mirrors Python's _NUMBER_RE. The letter-boundary check that RE2 would
-// need lookbehind for is done in CODE below, precisely so this pattern stays
+// numberRE lives in numbers.go (ADR-0015). The letter-boundary check that RE2
+// would need lookbehind for is done in CODE, precisely so the pattern stays
 // backtracking-free.
-var numberRE = regexp.MustCompile(`([0-9][0-9,]*(?:\.[0-9]+)?)[` + pythonSpace + `]*([a-z]+|%)?`)
 
 // isIdentifierPrefix mirrors Python's `_IDENTIFIER_PREFIX`. The letter-boundary
 // guard is LATIN-ONLY, deliberately, and this is the one place the two facts
@@ -136,7 +135,7 @@ func isIdentifierPrefix(r rune) bool {
 // ConflictFinding is why two passages were judged to disagree. It never says
 // which one is right.
 type ConflictFinding struct {
-	Rule   string // "antonym" | "negation" | "value"
+	Rule   string // "inclusion" | "antonym" | "negation" | "value"
 	Detail string
 }
 
@@ -167,6 +166,12 @@ var (
 	negationSet    map[string]struct{}
 	reportBigrams  map[[2]string]struct{}
 	unitSet        map[string]struct{}
+	// ADR-0015: (x, y) folded inclusion pairs in both orientations; true when x
+	// is the INCLUSIVE word.
+	inclusionPairs map[[2]string]bool
+	vatMarkers     map[string]struct{}
+	vatRates       []*big.Rat
+	vatTolerance   = big.NewRat(1, 100) // one cent
 )
 
 func loadFolded() {
@@ -182,6 +187,21 @@ func loadFolded() {
 		negationSet = ConflictNegationSet()
 		reportBigrams = ConflictReportBigramSet()
 		unitSet = MeasurementUnitSet()
+		tables := LoadConflictTables()
+		inclusionPairs = map[[2]string]bool{}
+		for _, pair := range tables.InclusionPairs {
+			incl, excl := foldConflictToken(pair[0]), foldConflictToken(pair[1])
+			inclusionPairs[[2]string{incl, excl}] = true
+			inclusionPairs[[2]string{excl, incl}] = false
+		}
+		vatMarkers = stringSet(tables.VATMarkers)
+		for _, rate := range tables.VATRates {
+			r, ok := new(big.Rat).SetString(rate)
+			if !ok {
+				panic("answer: vat rate is not a decimal: " + rate)
+			}
+			vatRates = append(vatRates, r)
+		}
 	})
 }
 
@@ -215,48 +235,28 @@ type conflictFeatures struct {
 	tokens    []string
 	content   map[string]struct{} // folded, meaning-bearing, non-numeric, non-polarity
 	negations int
-	numbers   map[string]struct{}
+	numbers   map[string]struct{} // comparison keys (ReadNumber)
+	values    map[string]*big.Rat // key -> exact value, nil when ambiguous
 	units     map[string]struct{}
 	reported  bool // carries a reported-speech bigram
 }
 
-func normalizeConflictNumber(raw string) string {
-	value := strings.ReplaceAll(raw, ",", "")
-	if strings.Contains(value, ".") {
-		value = strings.TrimRight(value, "0")
-		value = strings.TrimRight(value, ".")
-	}
-	if value == "" {
-		return "0"
-	}
-	return value
-}
-
-func conflictFeaturesOf(text string) conflictFeatures {
+func conflictFeaturesOf(text, language string) conflictFeatures {
 	loadFolded()
 	lowered := strings.ToLower(text)
 	tokens := tokenize.TokenizeV2(lowered)
 
 	numbers := map[string]struct{}{}
+	values := map[string]*big.Rat{}
 	units := map[string]struct{}{}
-	for _, m := range numberRE.FindAllStringSubmatchIndex(lowered, -1) {
-		start := m[2] // group 1 start
-		if start > 0 {
-			prev, _ := utf8.DecodeLastRuneInString(lowered[:start])
-			if isIdentifierPrefix(prev) {
-				continue // "p50", "ipv4": an identifier, not a measured value
-			}
-		}
-		numbers[normalizeConflictNumber(lowered[m[2]:m[3]])] = struct{}{}
-		if m[4] < 0 {
-			continue
-		}
-		unit := lowered[m[4]:m[5]]
-		if unit == "%" {
+	for _, m := range numbersIn(lowered, language) {
+		numbers[m.reading.Key] = struct{}{}
+		values[m.reading.Key] = m.reading.Value
+		if m.unit == "%" {
 			units["%"] = struct{}{}
-		} else if unit != "" {
-			if _, ok := unitSet[unit]; ok {
-				units[unit] = struct{}{}
+		} else if m.unit != "" {
+			if _, ok := unitSet[m.unit]; ok {
+				units[m.unit] = struct{}{}
 			}
 		}
 	}
@@ -298,6 +298,7 @@ func conflictFeaturesOf(text string) conflictFeatures {
 		content:   content,
 		negations: negations,
 		numbers:   numbers,
+		values:    values,
 		units:     units,
 		reported:  reported,
 	}
@@ -309,8 +310,16 @@ func conflictFeaturesOf(text string) conflictFeatures {
 // Pure and total: no model, no network, no I/O, no configuration. The GUARD
 // ORDER is load-bearing and matches the reference exactly.
 func DetectConflict(left, right string) (ConflictFinding, bool) {
+	return DetectConflictWithLanguages(left, "", right, "")
+}
+
+// DetectConflictWithLanguages is DetectConflict with each passage's DECLARED
+// language ("" = undeclared) — Python's left_language / right_language. The
+// languages only decide how a locale-ambiguous number such as "1.500" is read
+// (ADR-0015); undeclared, it is ambiguous and equal to nothing but itself.
+func DetectConflictWithLanguages(left, leftLanguage, right, rightLanguage string) (ConflictFinding, bool) {
 	th := LoadConflictTables().Thresholds
-	a, b := conflictFeaturesOf(left), conflictFeaturesOf(right)
+	a, b := conflictFeaturesOf(left, leftLanguage), conflictFeaturesOf(right, rightLanguage)
 
 	minContent := len(a.content)
 	if len(b.content) < minContent {
@@ -340,6 +349,18 @@ func DetectConflict(left, right string) (ConflictFinding, bool) {
 
 	if a.reported || b.reported {
 		return ConflictFinding{}, false // a quoted negation belongs to a third party
+	}
+
+	// Inclusion runs BEFORE the value rule and owns its verdict, including a
+	// decline: a VAT-consistent excl/incl pair must not then be called a value
+	// conflict for carrying two different amounts.
+	for _, x := range sortedKeys(difference(a.content, b.content)) {
+		for _, y := range sortedKeys(difference(b.content, a.content)) {
+			leftInclusive, ok := inclusionPairs[[2]string{x, y}]
+			if ok && residualExcluding(divergence, x, y) <= th.MaxResidual {
+				return inclusionVerdict(a, b, x, y, leftInclusive)
+			}
+		}
 	}
 
 	// Sorted explicitly: Go map iteration is randomized, and the reference
@@ -383,6 +404,72 @@ func DetectConflict(left, right string) (ConflictFinding, bool) {
 	return ConflictFinding{}, false
 }
 
+// vatConsistent is true when the two amounts are one price quoted excl. and
+// incl. VAT: exactly one amount differs on each side, both have a single
+// reading, and exclusive*rate is within one cent of inclusive for a tabled rate.
+// Anything else is NOT consistent, and the difference stays a conflict.
+func vatConsistent(inclusive, exclusive conflictFeatures) bool {
+	onlyIncl := sortedKeys(difference(inclusive.numbers, exclusive.numbers))
+	onlyExcl := sortedKeys(difference(exclusive.numbers, inclusive.numbers))
+	if len(onlyIncl) != 1 || len(onlyExcl) != 1 || !setsEqual(inclusive.units, exclusive.units) {
+		return false
+	}
+	incl, excl := inclusive.values[onlyIncl[0]], exclusive.values[onlyExcl[0]]
+	if incl == nil || excl == nil {
+		return false
+	}
+	for _, rate := range vatRates {
+		diff := new(big.Rat).Sub(new(big.Rat).Mul(excl, rate), incl)
+		if diff.Abs(diff).Cmp(vatTolerance) <= 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// inclusionVerdict is ADR-0015: one passage says incl, the other excl, on the
+// same subject. Same amounts (or none) conflict; different amounts are declined
+// only when a VAT marker is present and they are consistent under a tabled VAT
+// rate; any other difference conflicts. There is deliberately no "numbers
+// differ, so decline" branch: for a legal reader that would fail open.
+func inclusionVerdict(a, b conflictFeatures, x, y string, leftInclusive bool) (ConflictFinding, bool) {
+	inclusive, exclusive := a, b
+	if !leftInclusive {
+		inclusive, exclusive = b, a
+	}
+	if setsEqual(a.numbers, b.numbers) {
+		detail := fmt.Sprintf("%s vs %s", x, y)
+		if amounts := strings.Join(sortedKeys(a.numbers), ", "); amounts != "" {
+			detail += " on " + amounts
+		}
+		return ConflictFinding{Rule: "inclusion", Detail: detail}, true
+	}
+	vat := false
+	for _, tok := range append(append([]string{}, a.tokens...), b.tokens...) {
+		if _, ok := vatMarkers[tok]; ok {
+			vat = true
+			break
+		}
+	}
+	// The decline also requires equal negation parity: "€ 100 excl" vs "NOT
+	// € 121 incl" is VAT-consistent in its amounts and still a disagreement, and
+	// the negation rule cannot catch it afterwards (the incl/excl words already
+	// use up the residual).
+	samePolarity := a.negations%2 == b.negations%2
+	if vat && samePolarity && vatConsistent(inclusive, exclusive) {
+		return ConflictFinding{}, false
+	}
+	return ConflictFinding{Rule: "inclusion", Detail: inclusionSide(x, a) + " vs " + inclusionSide(y, b)}, true
+}
+
+// inclusionSide is "inclusief 121" — the marker plus its amounts, if any.
+func inclusionSide(word string, f conflictFeatures) string {
+	if amounts := strings.Join(sortedKeys(f.numbers), ", "); amounts != "" {
+		return word + " " + amounts
+	}
+	return word
+}
+
 // IsNearDuplicate returns the collapse reason if the two are SURFACE CLONES; the
 // second return is false otherwise.
 //
@@ -397,8 +484,14 @@ func DetectConflict(left, right string) (ConflictFinding, bool) {
 // Under-collapsing leaves DistinctDocuments as inflated as it is today;
 // over-collapsing would under-report real corroboration, a new wrong signal.
 func IsNearDuplicate(left, right string) (string, bool) {
+	return IsNearDuplicateWithLanguages(left, "", right, "")
+}
+
+// IsNearDuplicateWithLanguages is IsNearDuplicate with declared languages
+// (ADR-0015).
+func IsNearDuplicateWithLanguages(left, leftLanguage, right, rightLanguage string) (string, bool) {
 	th := LoadConflictTables().Thresholds
-	if _, conflicting := DetectConflict(left, right); conflicting {
+	if _, conflicting := DetectConflictWithLanguages(left, leftLanguage, right, rightLanguage); conflicting {
 		// conflict first, always: a contradiction is never a clone
 		return "", false
 	}
@@ -406,7 +499,7 @@ func IsNearDuplicate(left, right string) (string, bool) {
 	if slicesEqual(leftTokens, rightTokens) {
 		return "exact", true // covers whitespace, punctuation and case variants
 	}
-	a, b := conflictFeaturesOf(left), conflictFeaturesOf(right)
+	a, b := conflictFeaturesOf(left, leftLanguage), conflictFeaturesOf(right, rightLanguage)
 	if !setsEqual(a.numbers, b.numbers) || a.negations%2 != b.negations%2 {
 		return "", false
 	}
@@ -445,6 +538,20 @@ func FindConflicts(passages []string) []ConflictPair {
 // FindConflictsTopK is FindConflicts with an explicit window (Python's keyword
 // argument).
 func FindConflictsTopK(passages []string, topK int) []ConflictPair {
+	return FindConflictsWithLanguages(passages, nil, topK)
+}
+
+// languageAt is languages[i], or "" (undeclared) past its end.
+func languageAt(languages []string, i int) string {
+	if i < len(languages) {
+		return languages[i]
+	}
+	return ""
+}
+
+// FindConflictsWithLanguages is FindConflictsTopK with the passages' declared
+// languages, index-aligned (ADR-0015). A nil slice means all undeclared.
+func FindConflictsWithLanguages(passages, languages []string, topK int) []ConflictPair {
 	window := passages
 	if topK < len(window) {
 		window = window[:topK]
@@ -452,7 +559,9 @@ func FindConflictsTopK(passages []string, topK int) []ConflictPair {
 	pairs := []ConflictPair{}
 	for i := range window {
 		for j := i + 1; j < len(window); j++ {
-			if finding, ok := DetectConflict(window[i], window[j]); ok {
+			if finding, ok := DetectConflictWithLanguages(
+				window[i], languageAt(languages, i), window[j], languageAt(languages, j),
+			); ok {
 				pairs = append(pairs, ConflictPair{Left: i, Right: j, Finding: finding})
 			}
 		}
@@ -463,11 +572,19 @@ func FindConflictsTopK(passages []string, topK int) []ConflictPair {
 // CollapseNearDuplicates returns the indices of the passages that survive
 // surface-clone collapse, in order.
 func CollapseNearDuplicates(passages []string) []int {
+	return CollapseNearDuplicatesWithLanguages(passages, nil)
+}
+
+// CollapseNearDuplicatesWithLanguages is CollapseNearDuplicates with the
+// passages' declared languages, index-aligned (ADR-0015).
+func CollapseNearDuplicatesWithLanguages(passages, languages []string) []int {
 	kept := []int{}
 	for index, text := range passages {
 		duplicate := false
 		for _, k := range kept {
-			if _, ok := IsNearDuplicate(text, passages[k]); ok {
+			if _, ok := IsNearDuplicateWithLanguages(
+				text, languageAt(languages, index), passages[k], languageAt(languages, k),
+			); ok {
 				duplicate = true
 				break
 			}

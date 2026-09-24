@@ -268,14 +268,19 @@ class AnswerFlow:
         # caller and to authority (ADR-0004), and rank order deciding which of
         # two contradictory truths the caller sees is the defect this closes.
         window = grounded[:CONFLICT_TOP_K]
-        conflict_pairs = find_conflicts([c.citable_text for c in window])
+        conflict_pairs = find_conflicts(
+            [c.citable_text for c in window], languages=[c.language for c in window]
+        )
 
         # Near-duplicate collapse feeds the corroboration signals only. The same
         # pairwise comparison that finds "same subject, opposite polarity" finds
         # "same subject, same text" -- clones ingested under different document
         # ids -- and those are one piece of evidence, not N.
         independent = [
-            grounded[i] for i in collapse_near_duplicates([c.citable_text for c in grounded])
+            grounded[i]
+            for i in collapse_near_duplicates(
+                [c.citable_text for c in grounded], languages=[c.language for c in grounded]
+            )
         ]
 
         # Try the best passages in rank order and keep the first answer that passes

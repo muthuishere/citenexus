@@ -24,6 +24,21 @@ type conflictVector struct {
 	Conflict  bool    `json:"conflict"`
 	Rule      *string `json:"rule"`
 	Collapses bool    `json:"collapses"`
+	// ADR-0015: declared languages on the pair buckets (null = undeclared), and
+	// the number_readings shape.
+	LeftLanguage  *string `json:"left_language"`
+	RightLanguage *string `json:"right_language"`
+	Raw           string  `json:"raw"`
+	Dash          bool    `json:"dash"`
+	Language      *string `json:"language"`
+	Key           string  `json:"key"`
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 var conflictPairBuckets = []string{
@@ -35,6 +50,9 @@ var conflictPairBuckets = []string{
 	// ADR-0011. Every non-Latin vector in this bucket scored "no conflict"
 	// while conflict ran on the frozen, ASCII-only v1 tokenizer.
 	"non_latin",
+	// ADR-0015. These carry left_language / right_language.
+	"inclusion",
+	"number_formats",
 }
 
 // expectedConflictCounts pins the bucket sizes. A vector silently dropped from a
@@ -48,6 +66,9 @@ var expectedConflictCounts = map[string]int{
 	"non_latin":               30,
 	"near_duplicates":         9,
 	"identifier_tokenization": 2,
+	"inclusion":               19,
+	"number_formats":          14,
+	"number_readings":         30,
 }
 
 func loadConflictVectors(t *testing.T) map[string][]conflictVector {
@@ -73,8 +94,8 @@ func TestConflictVectorBucketNamesAndSizes(t *testing.T) {
 		}
 		total += want
 	}
-	if total != 160 {
-		t.Fatalf("pinned bucket sizes sum to %d, want 160", total)
+	if total != 223 {
+		t.Fatalf("pinned bucket sizes sum to %d, want 223", total)
 	}
 }
 
@@ -85,7 +106,7 @@ func TestConflictPairwiseVectors(t *testing.T) {
 	for _, bucket := range conflictPairBuckets {
 		for i, c := range vectors[bucket] {
 			t.Run(fmt.Sprintf("%s-%d", bucket, i), func(t *testing.T) {
-				finding, ok := DetectConflict(c.Left, c.Right)
+				finding, ok := DetectConflictWithLanguages(c.Left, deref(c.LeftLanguage), c.Right, deref(c.RightLanguage))
 				if ok != c.Conflict {
 					t.Fatalf("%s/%s: expected conflict=%v\n  left:  %s\n  right: %s\n  got:   %+v",
 						c.Domain, c.Label, c.Conflict, c.Left, c.Right, finding)
@@ -143,7 +164,7 @@ func TestConflictDetectionIsSymmetric(t *testing.T) {
 	vectors := loadConflictVectors(t)
 	for _, bucket := range conflictPairBuckets {
 		for _, c := range vectors[bucket] {
-			if _, ok := DetectConflict(c.Right, c.Left); ok != c.Conflict {
+			if _, ok := DetectConflictWithLanguages(c.Right, deref(c.RightLanguage), c.Left, deref(c.LeftLanguage)); ok != c.Conflict {
 				t.Errorf("%s/%s: asymmetric verdict\n  left:  %s\n  right: %s",
 					bucket, c.Label, c.Left, c.Right)
 			}
@@ -198,8 +219,8 @@ func TestConflictUnicodeSpaceBetweenNumberAndUnit(t *testing.T) {
 	}
 }
 
-// TestConflictNumberNormalization pins the comma/trailing-zero rules: EVERY
-// comma is stripped, not just the first.
+// TestConflictNumberNormalization pins the unambiguous forms: every thousands
+// comma is read, trailing zeros drop. ADR-0015 kept these keys unchanged.
 func TestConflictNumberNormalization(t *testing.T) {
 	for _, c := range []struct{ in, want string }{
 		{"1,234,567", "1234567"},
@@ -208,7 +229,7 @@ func TestConflictNumberNormalization(t *testing.T) {
 		{"0.10", "0.1"},
 		{"30", "30"},
 	} {
-		if got := normalizeConflictNumber(c.in); got != c.want {
+		if got := ReadNumber(c.in, false, "").Key; got != c.want {
 			t.Errorf("normalize(%q) = %q, want %q", c.in, got, c.want)
 		}
 	}
@@ -276,5 +297,16 @@ func TestCollapseNearDuplicates(t *testing.T) {
 	got := CollapseNearDuplicates(passages)
 	if len(got) != 2 || got[0] != 0 || got[1] != 2 {
 		t.Fatalf("CollapseNearDuplicates() = %v, want [0 2]", got)
+	}
+}
+
+// TestNumberReadingVectors pins ADR-0015's reader to the Python reference.
+func TestNumberReadingVectors(t *testing.T) {
+	vectors := loadConflictVectors(t)
+	for i, c := range vectors["number_readings"] {
+		if got := ReadNumber(c.Raw, c.Dash, deref(c.Language)).Key; got != c.Key {
+			t.Errorf("number_readings-%d: ReadNumber(%q, %v, %q) = %q, want %q",
+				i, c.Raw, c.Dash, deref(c.Language), got, c.Key)
+		}
 	}
 }

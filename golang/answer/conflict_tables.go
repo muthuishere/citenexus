@@ -35,13 +35,21 @@ type ConflictThresholds struct {
 
 // ConflictTables is the canonical ADR-0007 table set.
 type ConflictTables struct {
-	Languages        []string           `json:"languages"`
-	Negations        []string           `json:"negations"`
-	Antonyms         [][]string         `json:"antonyms"`
-	ReportBigrams    [][]string         `json:"report_bigrams"`
-	ScopeMarkers     []string           `json:"scope_markers"`
-	MeasurementUnits []string           `json:"measurement_units"`
-	Thresholds       ConflictThresholds `json:"thresholds"`
+	Languages        []string   `json:"languages"`
+	Negations        []string   `json:"negations"`
+	Antonyms         [][]string `json:"antonyms"`
+	ReportBigrams    [][]string `json:"report_bigrams"`
+	ScopeMarkers     []string   `json:"scope_markers"`
+	MeasurementUnits []string   `json:"measurement_units"`
+	// ADR-0015: (inclusive, exclusive) marker pairs in ONE direction, the words
+	// that make an incl/excl difference a VAT question, the VAT multipliers as
+	// exact decimal strings, and which languages fix the decimal mark.
+	InclusionPairs        [][]string         `json:"inclusion_pairs"`
+	VATMarkers            []string           `json:"vat_markers"`
+	VATRates              []string           `json:"vat_rates"`
+	DecimalCommaLanguages []string           `json:"decimal_comma_languages"`
+	DecimalPointLanguages []string           `json:"decimal_point_languages"`
+	Thresholds            ConflictThresholds `json:"thresholds"`
 }
 
 var (

@@ -67,10 +67,19 @@ def _py_pairs(name: str, values: list[list[str]]) -> str:
     return f"{name}: frozenset[tuple[str, str]] = frozenset(\n    {{\n{body}    }}\n)\n"
 
 
+def _py_tuple(values: list[str]) -> str:
+    if len(values) == 1:
+        return f"({json.dumps(values[0])},)"
+    return "(" + ", ".join(json.dumps(v) for v in values) + ")"
+
+
+def _py_ordered_pairs(name: str, values: list[list[str]]) -> str:
+    body = "".join(f"    ({json.dumps(a)}, {json.dumps(b)}),\n" for a, b in values)
+    return f"{name}: tuple[tuple[str, str], ...] = (\n{body})\n"
+
+
 def render_python(table: dict[str, Any]) -> str:
-    thresholds = "".join(
-        f"    {json.dumps(k)}: {v!r},\n" for k, v in table["thresholds"].items()
-    )
+    thresholds = "".join(f"    {json.dumps(k)}: {v!r},\n" for k, v in table["thresholds"].items())
     langs = ", ".join(json.dumps(v) for v in table["languages"])
     # A one-tuple needs its comma; a longer one must not carry a trailing comma,
     # which ruff's magic-trailing-comma rule would explode over several lines.
@@ -82,12 +91,17 @@ def render_python(table: dict[str, Any]) -> str:
         "from __future__ import annotations\n\n"
         "__all__ = [\n"
         '    "CONFLICT_ANTONYMS",\n'
+        '    "CONFLICT_INCLUSION_PAIRS",\n'
         '    "CONFLICT_LANGUAGES",\n'
         '    "CONFLICT_NEGATIONS",\n'
         '    "CONFLICT_REPORT_BIGRAMS",\n'
         '    "CONFLICT_SCOPE_MARKERS",\n'
         '    "CONFLICT_THRESHOLDS",\n'
+        '    "DECIMAL_COMMA_LANGUAGES",\n'
+        '    "DECIMAL_POINT_LANGUAGES",\n'
         '    "MEASUREMENT_UNITS",\n'
+        '    "VAT_MARKERS",\n'
+        '    "VAT_RATES",\n'
         "]\n\n"
         f"CONFLICT_LANGUAGES: tuple[str, ...] = {langs_tuple}\n\n"
         + _py_strs("CONFLICT_NEGATIONS", table["negations"])
@@ -100,6 +114,18 @@ def render_python(table: dict[str, Any]) -> str:
         + "\n"
         + _py_strs("MEASUREMENT_UNITS", table["measurement_units"])
         + "\n"
+        + "#: (inclusive, exclusive) marker pairs, ONE direction — ADR-0015.\n"
+        + _py_ordered_pairs("CONFLICT_INCLUSION_PAIRS", table["inclusion_pairs"])
+        + "\n"
+        + _py_strs("VAT_MARKERS", table["vat_markers"])
+        + "\n"
+        + "#: Exact decimal strings; read with fractions.Fraction, never float.\n"
+        + f"VAT_RATES: tuple[str, ...] = {_py_tuple(table['vat_rates'])}\n"
+        + "\n"
+        + _py_strs("DECIMAL_COMMA_LANGUAGES", table["decimal_comma_languages"])
+        + "\n"
+        + _py_strs("DECIMAL_POINT_LANGUAGES", table["decimal_point_languages"])
+        + "\n"
         + "#: The pinned ADR-0007 thresholds, as data. The runtime constants live in\n"
         + "#: ``answer/conflict.py``; a test asserts the two agree, so a port cannot be\n"
         + "#: handed a number the reference does not actually use.\n"
@@ -111,7 +137,7 @@ def render_python(table: dict[str, Any]) -> str:
 # Go — embedded copy, mirroring golang/gate/stopwords.json.
 # --------------------------------------------------------------------------- #
 
-_GO = '''// {banner}
+_GO = """// {banner}
 //
 // {source}
 // {regen}
@@ -148,13 +174,21 @@ type ConflictThresholds struct {{
 
 // ConflictTables is the canonical ADR-0007 table set.
 type ConflictTables struct {{
-\tLanguages        []string           `json:"languages"`
-\tNegations        []string           `json:"negations"`
-\tAntonyms         [][]string         `json:"antonyms"`
-\tReportBigrams    [][]string         `json:"report_bigrams"`
-\tScopeMarkers     []string           `json:"scope_markers"`
-\tMeasurementUnits []string           `json:"measurement_units"`
-\tThresholds       ConflictThresholds `json:"thresholds"`
+\tLanguages        []string   `json:"languages"`
+\tNegations        []string   `json:"negations"`
+\tAntonyms         [][]string `json:"antonyms"`
+\tReportBigrams    [][]string `json:"report_bigrams"`
+\tScopeMarkers     []string   `json:"scope_markers"`
+\tMeasurementUnits []string   `json:"measurement_units"`
+\t// ADR-0015: (inclusive, exclusive) marker pairs in ONE direction, the words
+\t// that make an incl/excl difference a VAT question, the VAT multipliers as
+\t// exact decimal strings, and which languages fix the decimal mark.
+\tInclusionPairs        [][]string         `json:"inclusion_pairs"`
+\tVATMarkers            []string           `json:"vat_markers"`
+\tVATRates              []string           `json:"vat_rates"`
+\tDecimalCommaLanguages []string           `json:"decimal_comma_languages"`
+\tDecimalPointLanguages []string           `json:"decimal_point_languages"`
+\tThresholds            ConflictThresholds `json:"thresholds"`
 }}
 
 var (
@@ -216,7 +250,7 @@ func stringSet(values []string) map[string]struct{{}} {{
 \t}}
 \treturn out
 }}
-'''
+"""
 
 
 def render_go() -> str:
@@ -252,6 +286,21 @@ export const CONFLICT_REPORT_BIGRAMS_TABLE: readonly (readonly [string, string])
 export const CONFLICT_SCOPE_MARKERS_TABLE: readonly string[] = {lit(table["scope_markers"])};
 
 export const MEASUREMENT_UNITS_TABLE: readonly string[] = {lit(table["measurement_units"])};
+
+/** ADR-0015: (inclusive, exclusive) marker pairs, ONE direction. */
+export const CONFLICT_INCLUSION_PAIRS_TABLE: readonly (readonly [string, string])[] = \
+{lit(table["inclusion_pairs"])};
+
+export const VAT_MARKERS_TABLE: readonly string[] = {lit(table["vat_markers"])};
+
+/** Exact decimal strings — parse as rationals, never as floats. */
+export const VAT_RATES_TABLE: readonly string[] = {lit(table["vat_rates"])};
+
+export const DECIMAL_COMMA_LANGUAGES_TABLE: readonly string[] = \
+{lit(table["decimal_comma_languages"])};
+
+export const DECIMAL_POINT_LANGUAGES_TABLE: readonly string[] = \
+{lit(table["decimal_point_languages"])};
 
 /** The pinned ADR-0007 thresholds, as data — a port may not quietly relax one. */
 export const CONFLICT_THRESHOLDS_TABLE: {{

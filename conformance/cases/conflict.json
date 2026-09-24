@@ -1203,6 +1203,522 @@
       "rule": "value"
     }
   ],
+  "inclusion": [
+    {
+      "domain": "hr-nl",
+      "label": "R-119/R-120: same amount excl vs incl btw",
+      "left": "Voor thuiswerken geldt een vergoeding van € 25 exclusief btw per maand.",
+      "right": "Voor thuiswerken geldt een vergoeding van € 25 inclusief btw per maand.",
+      "left_language": "nl",
+      "right_language": "nl",
+      "conflict": true,
+      "rule": "inclusion"
+    },
+    {
+      "domain": "hr-nl",
+      "label": "same amount, abbreviated incl./excl.",
+      "left": "De vergoeding is € 25 incl. btw.",
+      "right": "De vergoeding is € 25 excl. btw.",
+      "left_language": null,
+      "right_language": null,
+      "conflict": true,
+      "rule": "inclusion"
+    },
+    {
+      "domain": "finance-en",
+      "label": "same amount, including/excluding VAT",
+      "left": "The home office allowance is €25 excluding VAT.",
+      "right": "The home office allowance is €25 including VAT.",
+      "left_language": "en",
+      "right_language": "en",
+      "conflict": true,
+      "rule": "inclusion"
+    },
+    {
+      "domain": "finance-nl",
+      "label": "no amounts at all: prices incl vs excl",
+      "left": "Alle genoemde tarieven zijn inclusief btw.",
+      "right": "Alle genoemde tarieven zijn exclusief btw.",
+      "left_language": "nl",
+      "right_language": "nl",
+      "conflict": true,
+      "rule": "inclusion"
+    },
+    {
+      "domain": "finance-nl",
+      "label": "same amount, written in two formats (€ 25,00 vs € 25)",
+      "left": "De vergoeding is € 25,00 inclusief btw.",
+      "right": "De vergoeding is € 25 exclusief btw.",
+      "left_language": "nl",
+      "right_language": "nl",
+      "conflict": true,
+      "rule": "inclusion"
+    },
+    {
+      "domain": "finance-nl",
+      "label": "21%: € 25 excl / € 30,25 incl",
+      "left": "De vergoeding bedraagt € 25 exclusief btw.",
+      "right": "De vergoeding bedraagt € 30,25 inclusief btw.",
+      "left_language": "nl",
+      "right_language": "nl",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance-nl",
+      "label": "9%: € 50 excl / € 54,50 incl",
+      "left": "De maaltijd kost € 50 exclusief btw.",
+      "right": "De maaltijd kost € 54,50 inclusief btw.",
+      "left_language": "nl",
+      "right_language": "nl",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance-nl",
+      "label": "21% with a rounded cent: € 19,99 excl / € 24,19 incl",
+      "left": "Het abonnement kost € 19,99 exclusief btw.",
+      "right": "Het abonnement kost € 24,19 inclusief btw.",
+      "left_language": "nl",
+      "right_language": "nl",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance-nl",
+      "label": "inclusive side on the LEFT: € 121 incl / € 100 excl",
+      "left": "De vergoeding bedraagt € 121 inclusief btw.",
+      "right": "De vergoeding bedraagt € 100 exclusief btw.",
+      "left_language": "nl",
+      "right_language": "nl",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance-nl",
+      "label": "other amounts shared: per maand voor 12 maanden",
+      "left": "De lease kost € 100 exclusief btw per maand voor 12 maanden.",
+      "right": "De lease kost € 121 inclusief btw per maand voor 12 maanden.",
+      "left_language": "nl",
+      "right_language": "nl",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance-en",
+      "label": "21%, English abbreviations",
+      "left": "The course costs €500 excl. VAT.",
+      "right": "The course costs €605 incl. VAT.",
+      "left_language": "en",
+      "right_language": "en",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance-nl",
+      "label": "declared thousands: € 1.000 excl / € 1.210 incl",
+      "left": "De licentie kost € 1.000 exclusief btw.",
+      "right": "De licentie kost € 1.210 inclusief btw.",
+      "left_language": "nl",
+      "right_language": "nl",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance-nl",
+      "label": "not VAT-consistent: € 100 excl / € 150 incl",
+      "left": "De vergoeding bedraagt € 100 exclusief btw.",
+      "right": "De vergoeding bedraagt € 150 inclusief btw.",
+      "left_language": "nl",
+      "right_language": "nl",
+      "conflict": true,
+      "rule": "inclusion"
+    },
+    {
+      "domain": "finance-nl",
+      "label": "two cents off 21%: € 100 excl / € 121,02 incl",
+      "left": "De vergoeding bedraagt € 100 exclusief btw.",
+      "right": "De vergoeding bedraagt € 121,02 inclusief btw.",
+      "left_language": "nl",
+      "right_language": "nl",
+      "conflict": true,
+      "rule": "inclusion"
+    },
+    {
+      "domain": "finance-nl",
+      "label": "rate applied the wrong way: € 121 excl / € 100 incl",
+      "left": "De vergoeding bedraagt € 121 exclusief btw.",
+      "right": "De vergoeding bedraagt € 100 inclusief btw.",
+      "left_language": "nl",
+      "right_language": "nl",
+      "conflict": true,
+      "rule": "inclusion"
+    },
+    {
+      "domain": "hr-nl",
+      "label": "no VAT marker: 21% apart but not a VAT statement",
+      "left": "De reisvergoeding bedraagt € 100 exclusief parkeerkosten.",
+      "right": "De reisvergoeding bedraagt € 121 inclusief parkeerkosten.",
+      "left_language": "nl",
+      "right_language": "nl",
+      "conflict": true,
+      "rule": "inclusion"
+    },
+    {
+      "domain": "finance-en",
+      "label": "VAT-consistent amounts but one side NEGATED (must not decline)",
+      "left": "The monthly fee is €100 excl VAT for members.",
+      "right": "The monthly fee is not €121 incl VAT for members.",
+      "left_language": "en",
+      "right_language": "en",
+      "conflict": true,
+      "rule": "inclusion"
+    },
+    {
+      "domain": "finance-nl",
+      "label": "one side without an amount",
+      "left": "De vergoeding is exclusief btw.",
+      "right": "De vergoeding is € 25 inclusief btw.",
+      "left_language": "nl",
+      "right_language": "nl",
+      "conflict": true,
+      "rule": "inclusion"
+    },
+    {
+      "domain": "finance-nl",
+      "label": "undeclared thousands: € 1.000 / € 1.210 cannot be read",
+      "left": "De licentie kost € 1.000 exclusief btw.",
+      "right": "De licentie kost € 1.210 inclusief btw.",
+      "left_language": null,
+      "right_language": null,
+      "conflict": true,
+      "rule": "inclusion"
+    }
+  ],
+  "number_formats": [
+    {
+      "domain": "finance-nl",
+      "label": "thousands dot, declared nl: € 1.500 = € 1500",
+      "left": "Het opleidingsbudget is € 1.500 per jaar.",
+      "right": "Het opleidingsbudget is € 1500 per jaar.",
+      "left_language": "nl",
+      "right_language": "nl",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance-en",
+      "label": "thousands comma, declared en: $1,500 = $1500",
+      "left": "The training budget is $1,500 per year.",
+      "right": "The training budget is $1500 per year.",
+      "left_language": "en",
+      "right_language": "en",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance-nl",
+      "label": "decimal comma: € 25,00 = € 25 (any locale)",
+      "left": "De vergoeding is € 25,00 per maand.",
+      "right": "De vergoeding is € 25 per maand.",
+      "left_language": null,
+      "right_language": null,
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance-nl",
+      "label": "Dutch whole amount: € 25,- = € 25",
+      "left": "De vergoeding is € 25,- per maand.",
+      "right": "De vergoeding is € 25 per maand.",
+      "left_language": null,
+      "right_language": null,
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance-nl",
+      "label": "euro sign with and without a space",
+      "left": "De vergoeding is €25 per maand.",
+      "right": "De vergoeding is € 25 per maand.",
+      "left_language": null,
+      "right_language": null,
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance-nl",
+      "label": "both separators: € 1.500,00 = € 1500 (any locale)",
+      "left": "Het budget is € 1.500,00 per jaar.",
+      "right": "Het budget is € 1500 per jaar.",
+      "left_language": null,
+      "right_language": null,
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance-nl",
+      "label": "repeated thousands: € 1.000.000 = € 1000000 (any locale)",
+      "left": "Het fonds bedraagt € 1.000.000 per jaar.",
+      "right": "Het fonds bedraagt € 1000000 per jaar.",
+      "left_language": null,
+      "right_language": null,
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "hr-nl",
+      "label": "decimal mark with one digit: 1,5 dag = 1.5 dag (any locale)",
+      "left": "De bijzonder verlof bedraagt 1,5 dag per jaar.",
+      "right": "De bijzonder verlof bedraagt 1.5 dag per jaar.",
+      "left_language": null,
+      "right_language": null,
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance-nl",
+      "label": "undeclared € 1.500 vs € 1500: ambiguous, so NOT equal",
+      "left": "Het opleidingsbudget is € 1.500 per jaar.",
+      "right": "Het opleidingsbudget is € 1500 per jaar.",
+      "left_language": null,
+      "right_language": null,
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "finance-en",
+      "label": "declared en: $1.500 is 1.5, not 1500",
+      "left": "The fee is $1.500 per year.",
+      "right": "The fee is $1500 per year.",
+      "left_language": "en",
+      "right_language": "en",
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "finance-nl",
+      "label": "nl € 1.500 vs en € 1.500: 1500 vs 1.5",
+      "left": "Het budget is € 1.500 per jaar.",
+      "right": "Het budget is € 1.500 per jaar.",
+      "left_language": "nl",
+      "right_language": "en",
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "finance-nl",
+      "label": "€ 25,50 vs € 25,05",
+      "left": "De vergoeding is € 25,50 per maand.",
+      "right": "De vergoeding is € 25,05 per maand.",
+      "left_language": null,
+      "right_language": null,
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "finance-nl",
+      "label": "€ 25,50 vs € 2550 (the old parser read both as 2550)",
+      "left": "De vergoeding is € 25,50 per maand.",
+      "right": "De vergoeding is € 2550 per maand.",
+      "left_language": null,
+      "right_language": null,
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "finance-nl",
+      "label": "declared nl € 1,5 vs € 1.500",
+      "left": "Het budget is € 1,5 miljoen.",
+      "right": "Het budget is € 1.500 miljoen.",
+      "left_language": "nl",
+      "right_language": "nl",
+      "conflict": true,
+      "rule": "value"
+    }
+  ],
+  "number_readings": [
+    {
+      "raw": "1500",
+      "dash": false,
+      "language": null,
+      "key": "1500"
+    },
+    {
+      "raw": "1.500",
+      "dash": false,
+      "language": null,
+      "key": "?1.500"
+    },
+    {
+      "raw": "1,500",
+      "dash": false,
+      "language": null,
+      "key": "?1,500"
+    },
+    {
+      "raw": "1.500",
+      "dash": false,
+      "language": "nl",
+      "key": "1500"
+    },
+    {
+      "raw": "1.500",
+      "dash": false,
+      "language": "nl-NL",
+      "key": "1500"
+    },
+    {
+      "raw": "1,500",
+      "dash": false,
+      "language": "nl",
+      "key": "1.5"
+    },
+    {
+      "raw": "1.500",
+      "dash": false,
+      "language": "en",
+      "key": "1.5"
+    },
+    {
+      "raw": "1,500",
+      "dash": false,
+      "language": "en-GB",
+      "key": "1500"
+    },
+    {
+      "raw": "1.500",
+      "dash": false,
+      "language": "de",
+      "key": "?1.500"
+    },
+    {
+      "raw": "25,00",
+      "dash": false,
+      "language": null,
+      "key": "25"
+    },
+    {
+      "raw": "25,50",
+      "dash": false,
+      "language": null,
+      "key": "25.5"
+    },
+    {
+      "raw": "25.50",
+      "dash": false,
+      "language": null,
+      "key": "25.5"
+    },
+    {
+      "raw": "1,5",
+      "dash": false,
+      "language": null,
+      "key": "1.5"
+    },
+    {
+      "raw": "1.5",
+      "dash": false,
+      "language": null,
+      "key": "1.5"
+    },
+    {
+      "raw": "0,05",
+      "dash": false,
+      "language": null,
+      "key": "0.05"
+    },
+    {
+      "raw": "4.20",
+      "dash": false,
+      "language": null,
+      "key": "4.2"
+    },
+    {
+      "raw": "25",
+      "dash": true,
+      "language": null,
+      "key": "25"
+    },
+    {
+      "raw": "1.500",
+      "dash": true,
+      "language": null,
+      "key": "1500"
+    },
+    {
+      "raw": "25,50",
+      "dash": true,
+      "language": null,
+      "key": "?25,50,-"
+    },
+    {
+      "raw": "1.500,50",
+      "dash": false,
+      "language": null,
+      "key": "1500.5"
+    },
+    {
+      "raw": "1,500.50",
+      "dash": false,
+      "language": null,
+      "key": "1500.5"
+    },
+    {
+      "raw": "1.500.000",
+      "dash": false,
+      "language": null,
+      "key": "1500000"
+    },
+    {
+      "raw": "1,500,000",
+      "dash": false,
+      "language": null,
+      "key": "1500000"
+    },
+    {
+      "raw": "1234.567",
+      "dash": false,
+      "language": null,
+      "key": "1234.567"
+    },
+    {
+      "raw": "0.500",
+      "dash": false,
+      "language": null,
+      "key": "0.5"
+    },
+    {
+      "raw": "12.500",
+      "dash": false,
+      "language": "nl",
+      "key": "12500"
+    },
+    {
+      "raw": "1.50.000",
+      "dash": false,
+      "language": null,
+      "key": "?1.50.000"
+    },
+    {
+      "raw": "0.500.000",
+      "dash": false,
+      "language": null,
+      "key": "?0.500.000"
+    },
+    {
+      "raw": "01.02.2024",
+      "dash": false,
+      "language": null,
+      "key": "?01.02.2024"
+    },
+    {
+      "raw": "007",
+      "dash": false,
+      "language": null,
+      "key": "7"
+    }
+  ],
   "near_duplicates": [
     {
       "label": "exact duplicate",

@@ -20,6 +20,7 @@ import {
   fold,
   isNearDuplicate,
 } from "./conflict.js";
+import { readNumber } from "./numbers.js";
 
 interface PairCase {
   domain?: string;
@@ -28,6 +29,16 @@ interface PairCase {
   right: string;
   conflict: boolean;
   rule: string | null;
+  /** ADR-0015 buckets only; absent or null = undeclared. */
+  left_language?: string | null;
+  right_language?: string | null;
+}
+
+interface NumberReadingCase {
+  raw: string;
+  dash: boolean;
+  language: string | null;
+  key: string;
 }
 
 interface DuplicateCase {
@@ -46,6 +57,9 @@ const VECTORS = loadCase<{
   non_latin: PairCase[];
   near_duplicates: DuplicateCase[];
   identifier_tokenization: PairCase[];
+  inclusion: PairCase[];
+  number_formats: PairCase[];
+  number_readings: NumberReadingCase[];
 }>("conflict.json");
 
 /** Bucket sizes, pinned. A vector silently dropped from a bucket is a weakened
@@ -59,6 +73,10 @@ const EXPECTED_COUNTS: Record<string, number> = {
   non_latin: 30,
   near_duplicates: 9,
   identifier_tokenization: 2,
+  // ADR-0015
+  inclusion: 19,
+  number_formats: 14,
+  number_readings: 30,
 };
 
 const PAIR_BUCKETS = [
@@ -70,6 +88,10 @@ const PAIR_BUCKETS = [
   // ADR-0011. Every non-Latin vector in this bucket scored "no conflict"
   // while conflict ran on the frozen, ASCII-only v1 tokenizer.
   "non_latin",
+  // ADR-0015. These carry left_language / right_language; the others omit
+  // them, which reads as undeclared.
+  "inclusion",
+  "number_formats",
 ] as const;
 
 describe("conflict.json bucket shape", () => {
@@ -78,7 +100,7 @@ describe("conflict.json bucket shape", () => {
       Object.entries(VECTORS).map(([k, v]) => [k, (v as unknown[]).length]),
     );
     expect(sizes).toEqual(EXPECTED_COUNTS);
-    expect(Object.values(EXPECTED_COUNTS).reduce((a, b) => a + b, 0)).toBe(160);
+    expect(Object.values(EXPECTED_COUNTS).reduce((a, b) => a + b, 0)).toBe(223);
   });
 });
 
@@ -86,7 +108,10 @@ for (const bucket of PAIR_BUCKETS) {
   describe(`detectConflict — ${bucket}`, () => {
     VECTORS[bucket].forEach((c, i) => {
       it(`${bucket}-${i} ${c.domain ?? ""}/${c.label ?? ""}`, () => {
-        const finding = detectConflict(c.left, c.right);
+        const finding = detectConflict(c.left, c.right, {
+          leftLanguage: c.left_language ?? null,
+          rightLanguage: c.right_language ?? null,
+        });
         expect(
           finding !== null,
           `expected conflict=${c.conflict}\n  left:  ${c.left}\n  right: ${c.right}\n  got:   ${JSON.stringify(finding)}`,
@@ -123,13 +148,25 @@ describe("detection is symmetric", () => {
   it("every pairwise vector holds with the arguments swapped", () => {
     for (const bucket of PAIR_BUCKETS) {
       for (const c of VECTORS[bucket]) {
-        const swapped = detectConflict(c.right, c.left);
+        const swapped = detectConflict(c.right, c.left, {
+          leftLanguage: c.right_language ?? null,
+          rightLanguage: c.left_language ?? null,
+        });
         expect(
           swapped !== null,
           `${bucket}/${c.label ?? ""}: asymmetric verdict\n  left:  ${c.left}\n  right: ${c.right}`,
         ).toBe(c.conflict);
       }
     }
+  });
+});
+
+describe("readNumber — number_readings", () => {
+  // ADR-0015: every port reads a number to the same comparison key.
+  VECTORS.number_readings.forEach((c, i) => {
+    it(`number_readings-${i} ${c.raw}${c.dash ? ",-" : ""} [${c.language ?? "undeclared"}]`, () => {
+      expect(readNumber(c.raw, { dash: c.dash, language: c.language }).key).toBe(c.key);
+    });
   });
 });
 

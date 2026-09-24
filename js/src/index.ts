@@ -34,6 +34,14 @@ export * from "./answer/segment.js";
 // over the tier-2 tables in gen/conflict_tables.ts). Pure ESM, no native
 // dependency: it runs unchanged in a browser or a Cloudflare Worker.
 export * from "./answer/conflict.js";
+// ADR-0015 locale-aware number reading (the reader conflict compares with).
+export {
+  DECIMAL_COMMA_LANGUAGES,
+  DECIMAL_POINT_LANGUAGES,
+  NUMBER_RE,
+  readNumber,
+} from "./answer/numbers.js";
+export type { DecimalValue, NumberReading } from "./answer/numbers.js";
 export * from "./graph/graph.js";
 export * from "./structure/structure.js";
 export * from "./fakes/fakes.js";

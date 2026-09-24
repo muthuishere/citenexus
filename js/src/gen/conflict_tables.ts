@@ -327,6 +327,45 @@ export const MEASUREMENT_UNITS_TABLE: readonly string[] = [
   "years"
 ];
 
+/** ADR-0015: (inclusive, exclusive) marker pairs, ONE direction. */
+export const CONFLICT_INCLUSION_PAIRS_TABLE: readonly (readonly [string, string])[] = [
+  [
+    "incl",
+    "excl"
+  ],
+  [
+    "including",
+    "excluding"
+  ],
+  [
+    "inclusief",
+    "exclusief"
+  ],
+  [
+    "inclusive",
+    "exclusive"
+  ]
+];
+
+export const VAT_MARKERS_TABLE: readonly string[] = [
+  "btw",
+  "vat"
+];
+
+/** Exact decimal strings — parse as rationals, never as floats. */
+export const VAT_RATES_TABLE: readonly string[] = [
+  "1.09",
+  "1.21"
+];
+
+export const DECIMAL_COMMA_LANGUAGES_TABLE: readonly string[] = [
+  "nl"
+];
+
+export const DECIMAL_POINT_LANGUAGES_TABLE: readonly string[] = [
+  "en"
+];
+
 /** The pinned ADR-0007 thresholds, as data — a port may not quietly relax one. */
 export const CONFLICT_THRESHOLDS_TABLE: {
   readonly subject_overlap: number;

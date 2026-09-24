@@ -431,7 +431,9 @@ class AgenticAnswerFlow:
         # so it is *more* likely than a single-shot retrieval to hold two
         # passages that disagree. Detection reports and never resolves.
         window = units[:CONFLICT_TOP_K]
-        conflict_pairs = find_conflicts([e.citable_text for e in window])
+        conflict_pairs = find_conflicts(
+            [e.citable_text for e in window], languages=[e.language for e in window]
+        )
         touching = tuple(
             pair
             for pair in conflict_pairs
@@ -449,7 +451,12 @@ class AgenticAnswerFlow:
                 loop=loop,
                 authority_floor_applied=floor_applied,
             )
-        independent = [units[i] for i in collapse_near_duplicates([e.citable_text for e in units])]
+        independent = [
+            units[i]
+            for i in collapse_near_duplicates(
+                [e.citable_text for e in units], languages=[e.language for e in units]
+            )
+        ]
         signals = EvidenceSignals(
             decision=decision,
             supporting_sources=len(used),
@@ -528,7 +535,12 @@ class AgenticAnswerFlow:
                         page=unit.page,
                     )
                 )
-        independent = [units[i] for i in collapse_near_duplicates([e.citable_text for e in units])]
+        independent = [
+            units[i]
+            for i in collapse_near_duplicates(
+                [e.citable_text for e in units], languages=[e.language for e in units]
+            )
+        ]
         return Result(
             answer="The available evidence disagrees, so I can't answer that.",
             answer_language=language,
