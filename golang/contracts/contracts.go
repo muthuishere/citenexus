@@ -15,6 +15,9 @@
 //	EmbeddingProvider   Embed(texts)                       -> ([][]float64, error)
 //	GeneratorProvider   Answer(question, passage, langISO)  -> (string, error)
 //
+// plus SupportChecker (support.go), a Go-first seam consumed by
+// answer.VerifyAnswer that the Python reference does not publish yet.
+//
 // Completion, vision and reranking are absent ON PURPOSE. The Go port has no
 // deep-ask decision loop (golang/result/result.go says so outright: "Deep-ask is
 // Python-only today"), no conditional-vision path, and no rerank symbol

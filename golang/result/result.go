@@ -79,6 +79,10 @@ type EvidenceSignals struct {
 	// ports do not have, so Go always emits the empty/false defaults.
 	AuthorityTier         string `json:"authority_tier"`
 	AuthorityFloorApplied bool   `json:"authority_floor_applied"`
+	// ModelVerifiedClaims counts the answered claims admitted by an injected
+	// contracts.SupportChecker rather than the deterministic gate (Go-first,
+	// answer.VerifyAnswer). omitempty keeps every existing Result byte-identical.
+	ModelVerifiedClaims int `json:"model_verified_claims,omitempty"`
 	// Loop is deep-ask (agentic) loop accounting; nil (→ null) on the strict flow.
 	// Deep-ask is Python-only today, so Go always emits null — present for wire
 	// parity with the Python reference. See structural-code-graph / deep-ask.
@@ -111,6 +115,13 @@ type Claim struct {
 	Claim     string   `json:"claim"`
 	Supported bool     `json:"supported"`
 	Sources   []string `json:"sources"`
+	// VerifiedBy names what admitted a supported claim: "gate" for the
+	// deterministic ADR-0009 predicate, "model:<name>" for an injected
+	// SupportChecker. Reason says why an unsupported claim was dropped. Both are
+	// Go-first additions from answer.VerifyAnswer; omitempty keeps every existing
+	// Result byte-identical.
+	VerifiedBy string `json:"verified_by,omitempty"`
+	Reason     string `json:"reason,omitempty"`
 }
 
 // ProvenanceEntry is one link of the reproducible chain: claim -> EU -> document
