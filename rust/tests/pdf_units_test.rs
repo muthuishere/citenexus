@@ -600,3 +600,177 @@ fn a_larger_bold_cell_in_a_ruled_table_is_not_a_heading() {
     let out = run(&Doc::new(vec![page]), Some("nl"));
     assert!(headings_of(&out).is_empty(), "{:?}", headings_of(&out));
 }
+
+// ----------------------------------------- peer findings (standard-14) ----
+
+#[test]
+fn standard14_helvetica_without_widths_has_real_increasing_positions() {
+    if !have_pdfium() {
+        return;
+    }
+    // The generator's fonts are exactly `<< /Type /Font /Subtype /Type1
+    // /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>`: no /Widths, no
+    // /FontDescriptor. pdfium must supply the AFM metrics. Assert POSITIONS:
+    // text comes out in order even on a broken geometry layer.
+    let page =
+        Page::a4()
+            .text(72.0, 100.0, 12.0, "Platform effort")
+            .bold(72.0, 130.0, 12.0, "Migration");
+    let r = raw::read(&Doc::new(vec![page]).build()).unwrap();
+    let chars: Vec<_> = r.pages[0]
+        .chars
+        .iter()
+        .filter(|c| !c.generated && !c.ch.is_whitespace())
+        .collect();
+    assert_eq!(
+        chars.iter().map(|c| c.ch).collect::<String>(),
+        "PlatformeffortMigration"
+    );
+    for word in [&chars[0..8], &chars[8..14], &chars[14..]] {
+        for c in word.iter() {
+            assert!(c.x1 - c.x0 > 0.5, "zero-width glyph {:?}", c.ch);
+        }
+        for pair in word.windows(2) {
+            assert!(
+                pair[1].x0 > pair[0].x0,
+                "x not strictly increasing at {:?}->{:?}",
+                pair[0].ch,
+                pair[1].ch
+            );
+        }
+    }
+    // "Platform" in Helvetica 12 pt is ~46 pt wide (AFM), not a collapsed box
+    let w = chars[7].x1 - chars[0].x0;
+    assert!(w > 40.0 && w < 52.0, "{w}");
+}
+
+// ------------------------------------- peer findings (furniture trap) ----
+
+#[test]
+fn a_repeated_body_sentence_with_a_page_number_stays_body_on_every_page() {
+    if !have_pdfium() {
+        return;
+    }
+    // Digit masking makes "zie pagina 3 van 5" and "zie pagina 4 van 5"
+    // equal. Keeping furniture ONCE must never delete body text:
+    // (1) mid-page; (2) at the top, inside the 12 % band, directly under the
+    // running header and glued to the body below it.
+    let pages: Vec<Page> = (1..=4)
+        .map(|n| {
+            Page::a4()
+                .text(72.0, 30.0, 9.0, "Personeelshandboek")
+                .para(
+                    72.0,
+                    60.0,
+                    10.0,
+                    &[
+                        &format!("Zie pagina {n} van 4 voor de regeling."),
+                        "De regeling geldt voor iedereen.",
+                    ],
+                )
+                .para(
+                    72.0,
+                    400.0,
+                    10.0,
+                    &[
+                        &format!("Deze tekst staat op pagina {n} van 4."),
+                        "Einde van de tekst.",
+                    ],
+                )
+        })
+        .collect();
+    let out = run(&Doc::new(pages), Some("nl"));
+    for n in 1..=4u32 {
+        let body: Vec<&str> = out
+            .units
+            .iter()
+            .filter(|u| u.page == Some(n) && u.kind != UnitKind::Furniture)
+            .map(|u| u.markdown.as_str())
+            .collect();
+        let all = body.join(" ");
+        assert!(
+            all.contains(&format!("Zie pagina {n} van 4")),
+            "page {n}: {body:?}"
+        );
+        assert!(
+            all.contains(&format!("op pagina {n} van 4")),
+            "page {n}: {body:?}"
+        );
+    }
+    let furn: Vec<&str> = out
+        .units
+        .iter()
+        .filter(|u| u.kind == UnitKind::Furniture)
+        .map(|u| u.markdown.as_str())
+        .collect();
+    assert_eq!(furn, vec!["Personeelshandboek"]);
+}
+
+// ----------------------------------------- peer findings (ligatures) ----
+
+#[test]
+fn ligature_glyphs_mapping_one_code_to_several_characters_round_trip() {
+    if !have_pdfium() {
+        return;
+    }
+    // tests/data/pdf/ligatures.pdf: generated once by LibreOffice from
+    // ligatures.gen.py (Carlito). Its ToUnicode CMap maps ONE code to TWO
+    // characters for "tf", "ti" and "ff". Assert the TEXT round-trips exactly
+    // (a count can be right while the order is wrong) and boxes advance.
+    let bytes = std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/pdf/ligatures.pdf"
+    ))
+    .unwrap();
+    let out = pdf_units(
+        &bytes,
+        &PdfOptions {
+            language: Some("en".into()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let text: Vec<&str> = out.units.iter().map(|u| u.markdown.as_str()).collect();
+    assert_eq!(
+        text,
+        vec!["Platform", "Option", "Migration effort", "Trade-offs"],
+        "{text:?}"
+    );
+    let r = raw::read(&bytes).unwrap();
+    let chars: Vec<_> = r.pages[0]
+        .chars
+        .iter()
+        .filter(|c| !c.generated && !c.ch.is_whitespace())
+        .collect();
+    for pair in chars.windows(2) {
+        if (pair[1].baseline - pair[0].baseline).abs() < 1.0 {
+            assert!(
+                pair[1].x0 >= pair[0].x0,
+                "x went backwards at {:?}->{:?}",
+                pair[0].ch,
+                pair[1].ch
+            );
+        }
+    }
+}
+
+#[test]
+fn fake_bold_drawn_twice_still_counts_once() {
+    if !have_pdfium() {
+        return;
+    }
+    let page = Page::a4().text(72.0, 100.0, 11.0, "Offerte effect").text(
+        72.0,
+        100.0,
+        11.0,
+        "Offerte effect",
+    );
+    let out = run(&Doc::new(vec![page]), Some("nl"));
+    assert_eq!(
+        out.units
+            .iter()
+            .map(|u| u.markdown.as_str())
+            .collect::<Vec<_>>(),
+        vec!["Offerte effect"]
+    );
+}

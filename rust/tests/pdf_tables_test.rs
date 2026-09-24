@@ -540,3 +540,63 @@ fn a_toc_with_leaders_glued_to_the_titles_is_not_a_request_either() {
         prep.requests.len()
     );
 }
+
+// ------------------------------- peer findings (alignment, totals rows) ----
+
+use common::fixtures::{invoice_page, width};
+
+#[test]
+fn right_aligned_columns_and_short_totals_rows_stay_one_table() {
+    if !have_pdfium() {
+        return;
+    }
+    // Qty "84", "1", "16" share no left edge, only a right edge; the totals
+    // rows have a label under Description and an amount under Amount only.
+    // One table, 7 rows, every amount in the Amount column.
+    let out = run(invoice_page());
+    let t = tables(&out);
+    assert_eq!(t.len(), 1, "{:?}", out.units);
+    assert_eq!(
+        t[0].markdown,
+        "| # | Description | Qty | Unit price | Amount |\n| --- | --- | --- | --- | --- |\n\
+         | 1 | Consultancy | 84 | 125,00 | 10.500,00 |\n| 2 | Licentie | 1 | 3.000,00 | 3.000,00 |\n\
+         | 3 | Training | 16 | 112,50 | 1.800,00 |\n|  | Subtotal |  |  | 15.300,00 |\n\
+         |  | VAT 21% |  |  | 3.213,00 |\n|  | Total due |  |  | 18.513,00 |"
+    );
+}
+
+#[test]
+fn decimal_aligned_and_centred_columns_are_one_track_each() {
+    if !have_pdfium() {
+        return;
+    }
+    let mut p = Page::a4()
+        .bold(72.0, 100.0, 10.0, "Code")
+        .bold(200.0, 100.0, 10.0, "Bedrag")
+        .bold(340.0, 100.0, 10.0, "Status");
+    for (k, (c, int, dec, st)) in [
+        ("A1", "7", ",50", "ok"),
+        ("B22", "1.250", ",00", "open"),
+        ("C3", "12", ",75", "betaald"),
+    ]
+    .iter()
+    .enumerate()
+    {
+        let y = 116.0 + k as f64 * 16.0;
+        // decimal-aligned at x = 260 (the comma), centred status at x = 360
+        let amount = format!("{int}{dec}");
+        let x_amount = 260.0 - width(int, 10.0);
+        let status_w = st.len() as f64 * 5.3;
+        p = p
+            .text(72.0, y, 10.0, c)
+            .text(x_amount, y, 10.0, &amount)
+            .text(360.0 - status_w / 2.0, y, 10.0, st);
+    }
+    let out = run(p);
+    let t = tables(&out);
+    assert_eq!(t.len(), 1, "{:?}", out.units);
+    assert_eq!(
+        t[0].markdown,
+        "| Code | Bedrag | Status |\n| --- | --- | --- |\n| A1 | 7,50 | ok |\n| B22 | 1.250,00 | open |\n| C3 | 12,75 | betaald |"
+    );
+}
