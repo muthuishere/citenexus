@@ -6067,6 +6067,128 @@
           }
         ]
       }
+    },
+    {
+      "name": "currency/eur-2-50-over-2-40-refuses",
+      "must_refuse": true,
+      "answer": "The home-working allowance is EUR 2.50 per day worked from home [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Werknemers ontvangen een thuiswerkvergoeding van € 2,40 per thuiswerkdag."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "currency/a-negated-claim-over-a-passage-with-a-negative-word-is-still-refused-when-the-amount-differs",
+      "must_refuse": true,
+      "answer": "Niet gebruikt budget tot 600 euro mag worden meegenomen [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "en",
+          "text": "Unused budget of up to €500 may be carried over to the next year."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "currency/adv-nf-13 (rag_go adv, fictional)",
+      "answer": "The home-working allowance is EUR 2.40 per day worked from home [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "thuiswerkregeling",
+          "language": "nl",
+          "text": "Thuiswerkvergoeding. Werknemers die structureel ten minste twee dagen per week thuiswerken, ontvangen een thuiswerkvergoeding van € 2,40 per thuiswerkdag. Stagiairs zijn uitgesloten van deze regeling."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "currency/adv-nf-v2-25 (rag_go adv, fictional)",
+      "answer": "Elke consultant heeft een persoonlijk opleidingsbudget van € 2.000 per kalenderjaar [eu:S1]. Niet gebruikt budget tot 500 euro mag worden meegenomen naar het volgende jaar [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "Benefits Guide Harbourline Consultancy",
+          "language": "en",
+          "text": "Training budget. Each consultant has a personal training budget of €2,000 per calendar year. Unused budget of up to €500 may be carried over to the next year. Applications must be submitted by 30 November."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
     }
   ]
 }

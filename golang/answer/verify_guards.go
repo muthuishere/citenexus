@@ -200,6 +200,9 @@ func negationGuard(claim, passage string) string {
 		if _, ok := markers[tok]; ok {
 			return ""
 		}
+		if _, ok := negativeWords[tok]; ok {
+			return "" // "Unused budget" carries the negation of "Niet gebruikt budget"
+		}
 	}
 	return "negation guard: the claim is negated and the passage is not"
 }
@@ -240,6 +243,10 @@ func names(claim string) []string {
 			continue
 		}
 		runes := []rune(word)
+		if _, code := currencyCodes[strings.ToLower(word)]; code {
+			initial = false
+			continue // "EUR 2.40": a currency, read with its amount, not a name
+		}
 		if ordinalToken.MatchString(strings.ToLower(word)) || numberWithUnit.MatchString(strings.ToLower(word)) {
 			initial = false
 			continue // "1st", "2de", "25-jarig", "40-hour", "1/12th": a number, not a name
@@ -683,4 +690,15 @@ func centsAsEuros(m numberMatch) string {
 		}
 	}
 	return m.reading.Key
+}
+
+// currencyCodes are ISO codes a claim writes for the euro sign ("EUR 2.40").
+var currencyCodes = map[string]struct{}{"eur": {}, "usd": {}, "gbp": {}}
+
+// negativeWords carry a negation in the word itself; a negated claim ("niet
+// gebruikt") over a passage that has one ("unused") is not refused for the
+// missing marker. Passage side only; closed on purpose.
+var negativeWords = map[string]struct{}{
+	"unused": {}, "unpaid": {}, "untaken": {}, "unclaimed": {}, "unspent": {},
+	"ongebruikt": {}, "ongebruikte": {}, "onbetaald": {}, "onbetaalde": {}, "onopgenomen": {},
 }
