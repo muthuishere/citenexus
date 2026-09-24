@@ -337,7 +337,8 @@
         "failed_check",
         "heading_source",
         "joined_hyphen",
-        "vision_disputed"
+        "vision_disputed",
+        "header_flattened"
       ],
       "properties": {
         "route": {
@@ -392,6 +393,10 @@
         "vision_disputed": {
           "type": "boolean",
           "description": "Some or all vision text is disputed (the two transcriptions disagreed, or one only came back). Disputed text is inside <!-- vision_disputed ... --> blocks and is not citable."
+        },
+        "header_flattened": {
+          "type": "boolean",
+          "description": "A header cell spanning several columns was flattened into its sub-headers as \"<label> <sub-header>\" (the PDF's own words; markdown cannot span)."
         }
       },
       "additionalProperties": false

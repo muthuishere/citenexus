@@ -19,7 +19,8 @@
         "failed_check": null,
         "heading_source": null,
         "joined_hyphen": false,
-        "vision_disputed": false
+        "vision_disputed": false,
+        "header_flattened": false
       }
     },
     {
@@ -41,7 +42,8 @@
         "failed_check": null,
         "heading_source": null,
         "joined_hyphen": false,
-        "vision_disputed": false
+        "vision_disputed": false,
+        "header_flattened": false
       }
     },
     {
@@ -63,7 +65,8 @@
         "failed_check": null,
         "heading_source": null,
         "joined_hyphen": false,
-        "vision_disputed": false
+        "vision_disputed": false,
+        "header_flattened": false
       }
     },
     {
@@ -85,7 +88,8 @@
         "failed_check": null,
         "heading_source": null,
         "joined_hyphen": false,
-        "vision_disputed": false
+        "vision_disputed": false,
+        "header_flattened": false
       }
     },
     {
@@ -107,7 +111,8 @@
         "failed_check": null,
         "heading_source": null,
         "joined_hyphen": false,
-        "vision_disputed": false
+        "vision_disputed": false,
+        "header_flattened": false
       }
     },
     {
@@ -129,7 +134,8 @@
         "failed_check": null,
         "heading_source": null,
         "joined_hyphen": false,
-        "vision_disputed": false
+        "vision_disputed": false,
+        "header_flattened": false
       }
     },
     {
@@ -151,7 +157,8 @@
         "failed_check": null,
         "heading_source": null,
         "joined_hyphen": false,
-        "vision_disputed": false
+        "vision_disputed": false,
+        "header_flattened": false
       }
     },
     {
@@ -173,7 +180,8 @@
         "failed_check": null,
         "heading_source": null,
         "joined_hyphen": false,
-        "vision_disputed": false
+        "vision_disputed": false,
+        "header_flattened": false
       }
     }
   ],

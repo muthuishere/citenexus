@@ -45,6 +45,9 @@ type Provenance struct {
 	// the two transcriptions disagreed or only one came back. Disputed text
 	// sits in <!-- vision_disputed … --> blocks; cite only CitableText(Markdown).
 	VisionDisputed bool `json:"vision_disputed"`
+	// HeaderFlattened: a table header cell spanning several columns was
+	// flattened into its sub-headers ("<label> <sub-header>", PDF words).
+	HeaderFlattened bool `json:"header_flattened"`
 }
 
 // OoxmlUnits converts a DOCX or PPTX (sourceType "docx" | "pptx") into

@@ -307,3 +307,117 @@ fn tables_are_deterministic() {
     let b = serde_json::to_string(&run(ruled_page(true))).unwrap();
     assert_eq!(a, b);
 }
+
+// ------------------------------------------- spanning headers, flattened ----
+
+fn salary_rows(mut p: Page, y0: f64) -> Page {
+    for (k, (a, b, c, d)) in [
+        ("Junior", "2.500", "2.700", "2.900"),
+        ("Medior", "3.100", "3.300", "3.500"),
+        ("Senior", "3.900", "4.100", "4.300"),
+    ]
+    .iter()
+    .enumerate()
+    {
+        let y = y0 + k as f64 * 14.0;
+        p = p
+            .text(72.0, y, 10.0, a)
+            .text(200.0, y, 10.0, b)
+            .text(300.0, y, 10.0, c)
+            .text(400.0, y, 10.0, d);
+    }
+    p
+}
+
+#[test]
+fn an_axis_label_over_sub_headers_is_prefixed_to_each_of_them() {
+    if !have_pdfium() {
+        return;
+    }
+    // "Ervaringsjaren" is one label over three range sub-headers; the stub
+    // column of the sub-header row is empty. Markdown cannot span, so each
+    // sub-header becomes "<label> <range>", built from the PDF's own words.
+    let p = Page::a4()
+        .bold(290.0, 100.0, 10.0, "Ervaringsjaren")
+        .bold(200.0, 114.0, 10.0, "0-2")
+        .bold(300.0, 114.0, 10.0, "3-5")
+        .bold(400.0, 114.0, 10.0, "6+");
+    let out = run(salary_rows(p, 128.0));
+    let t = tables(&out);
+    assert_eq!(t.len(), 1, "{:?}", out.units);
+    assert!(t[0].provenance.header_flattened);
+    assert_eq!(
+        t[0].markdown,
+        "|  | Ervaringsjaren 0-2 | Ervaringsjaren 3-5 | Ervaringsjaren 6+ |\n| --- | --- | --- | --- |\n| Junior | 2.500 | 2.700 | 2.900 |\n| Medior | 3.100 | 3.300 | 3.500 |\n| Senior | 3.900 | 4.100 | 4.300 |"
+    );
+    assert!(!out
+        .units
+        .iter()
+        .any(|u| u.kind == UnitKind::Paragraph && u.markdown.contains("Ervaringsjaren")));
+}
+
+#[test]
+fn a_struct_colspan_header_is_flattened_and_the_rowspan_stub_moves_down() {
+    if !have_pdfium() {
+        return;
+    }
+    let p = Page::a4()
+        .tagged(
+            "Table:t/TR:0/TH:a{rs=2}",
+            72.0,
+            100.0,
+            10.0,
+            true,
+            "Functie",
+        )
+        .tagged(
+            "Table:t/TR:0/TH:b{cs=3}",
+            290.0,
+            100.0,
+            10.0,
+            true,
+            "Ervaringsjaren",
+        )
+        .tagged("Table:t/TR:1/TH:c", 200.0, 114.0, 10.0, true, "0-2")
+        .tagged("Table:t/TR:1/TH:d", 300.0, 114.0, 10.0, true, "3-5")
+        .tagged("Table:t/TR:1/TH:e", 400.0, 114.0, 10.0, true, "6+")
+        .tagged("Table:t/TR:2/TD:a", 72.0, 128.0, 10.0, false, "Junior")
+        .tagged("Table:t/TR:2/TD:b", 200.0, 128.0, 10.0, false, "2.500")
+        .tagged("Table:t/TR:2/TD:c", 300.0, 128.0, 10.0, false, "2.700")
+        .tagged("Table:t/TR:2/TD:d", 400.0, 128.0, 10.0, false, "2.900");
+    let out = run(p);
+    let t = tables(&out);
+    assert_eq!(t.len(), 1, "{:?}", out.units);
+    assert_eq!(t[0].provenance.table_source, Some(TableSource::StructTree));
+    assert!(t[0].provenance.header_flattened);
+    assert_eq!(
+        t[0].markdown,
+        "| Functie | Ervaringsjaren 0-2 | Ervaringsjaren 3-5 | Ervaringsjaren 6+ |\n| --- | --- | --- | --- |\n| Junior | 2.500 | 2.700 | 2.900 |"
+    );
+}
+
+#[test]
+fn a_caption_over_a_full_header_row_is_not_a_spanning_header() {
+    if !have_pdfium() {
+        return;
+    }
+    let p = Page::a4()
+        .text(72.0, 100.0, 10.0, "Tabel 1 Salarisschalen per functie")
+        .bold(72.0, 114.0, 10.0, "Functie")
+        .bold(200.0, 114.0, 10.0, "Laag")
+        .bold(300.0, 114.0, 10.0, "Midden")
+        .bold(400.0, 114.0, 10.0, "Hoog");
+    let out = run(salary_rows(p, 128.0));
+    let t = tables(&out);
+    assert_eq!(t.len(), 1);
+    assert!(!t[0].provenance.header_flattened);
+    assert!(
+        t[0].markdown
+            .starts_with("| Functie | Laag | Midden | Hoog |"),
+        "{}",
+        t[0].markdown
+    );
+    assert!(out.units.iter().any(
+        |u| u.kind == UnitKind::Paragraph && u.markdown == "Tabel 1 Salarisschalen per functie"
+    ));
+}

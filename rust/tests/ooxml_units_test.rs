@@ -831,7 +831,7 @@ fn ffi_ooxml_units_returns_a_json_array() {
     };
     assert_eq!(
         out,
-        r##"[{"page":null,"bbox":null,"kind":"heading","level":1,"markdown":"# Hello","provenance":{"route":"ooxml","table_source":null,"vision_transcribed":false,"table_uncertain":false,"failed_check":null,"heading_source":"style","joined_hyphen":false,"vision_disputed":false}}]"##
+        r##"[{"page":null,"bbox":null,"kind":"heading","level":1,"markdown":"# Hello","provenance":{"route":"ooxml","table_source":null,"vision_transcribed":false,"table_uncertain":false,"failed_check":null,"heading_source":"style","joined_hyphen":false,"vision_disputed":false,"header_flattened":false}}]"##
     );
     let bad = CString::new("xlsx").unwrap();
     let err = unsafe {

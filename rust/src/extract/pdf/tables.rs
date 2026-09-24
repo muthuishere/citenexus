@@ -59,6 +59,11 @@ pub type WordRef = (usize, usize);
 #[derive(Debug, Clone, PartialEq)]
 pub struct TCell {
     pub words: Vec<WordRef>,
+    /// Words of a spanning header over this cell, prefixed in its TEXT only
+    /// (a flattened header). Not part of the geometry gate: they sit above.
+    pub prefix: Vec<WordRef>,
+    /// A struct-tree `TH` (a header cell).
+    pub header: bool,
     pub colspan: usize,
     pub rowspan: usize,
 }
@@ -80,6 +85,8 @@ pub struct PageTable {
     /// A struct-tree table that does not account for its region: a row with
     /// no words at all, or a word inside its box that belongs to no cell.
     pub incomplete: bool,
+    /// A spanning header was flattened into its sub-headers.
+    pub header_flattened: bool,
 }
 
 /// Why a candidate was not accepted (diagnostics).
@@ -194,8 +201,9 @@ fn sort_words(segs: &[Segment], page: &RawPage, words: &mut [WordRef]) {
 }
 
 pub fn cell_text(segs: &[Segment], page: &RawPage, cell: &TCell) -> String {
-    cell.words
+    cell.prefix
         .iter()
+        .chain(cell.words.iter())
         .map(|&(s, k)| word_text(page, &segs[s], k))
         .collect::<Vec<_>>()
         .join(" ")
@@ -298,12 +306,24 @@ fn gate(segs: &[Segment], page: &RawPage, rows: &[Vec<TCell>]) -> Result<(), Rej
 }
 
 /// Segments the table fully contains, or Err when a segment is split.
+/// Every distinct word of the table (header prefixes, then cells), in order.
+pub fn table_words(rows: &[Vec<TCell>]) -> Vec<WordRef> {
+    let mut seen = BTreeSet::new();
+    let mut out = Vec::new();
+    for c in rows.iter().flatten() {
+        for &w in c.prefix.iter().chain(c.words.iter()) {
+            if seen.insert(w) {
+                out.push(w);
+            }
+        }
+    }
+    out
+}
+
 fn consumed(segs: &[Segment], rows: &[Vec<TCell>]) -> Result<Vec<usize>, Reject> {
     let mut per: BTreeMap<usize, usize> = BTreeMap::new();
-    for c in rows.iter().flatten() {
-        for &(s, _) in &c.words {
-            *per.entry(s).or_default() += 1;
-        }
+    for (s, _) in table_words(rows) {
+        *per.entry(s).or_default() += 1;
     }
     let mut out = Vec::new();
     for (s, n) in per {
@@ -317,10 +337,8 @@ fn consumed(segs: &[Segment], rows: &[Vec<TCell>]) -> Result<Vec<usize>, Reject>
 
 fn bbox_of(segs: &[Segment], page: &RawPage, rows: &[Vec<TCell>]) -> [f64; 4] {
     let mut b = EMPTY_BOX;
-    for c in rows.iter().flatten() {
-        for &(s, k) in &c.words {
-            b = union(b, word_box(page, &segs[s], k));
-        }
+    for (s, k) in table_words(rows) {
+        b = union(b, word_box(page, &segs[s], k));
     }
     b
 }
@@ -366,6 +384,7 @@ fn finish(
         struct_node: None,
         weak: false,
         incomplete: false,
+        header_flattened: false,
     })
 }
 
@@ -439,6 +458,8 @@ fn struct_tables(page: &RawPage, segs: &[Segment], out: &mut PageTables) {
             .map(|r| {
                 r.iter()
                     .map(|&(node, rs, cs)| TCell {
+                        prefix: vec![],
+                        header: nodes[node].kind == "TH",
                         words: words_of.remove(&node).unwrap_or_default(),
                         colspan: cs as usize,
                         rowspan: rs as usize,
@@ -447,17 +468,14 @@ fn struct_tables(page: &RawPage, segs: &[Segment], out: &mut PageTables) {
             })
             .collect();
         let trows = place_short_rows(segs, page, trows);
+        let (trows, flattened) = flatten_header_spans(trows);
         let region = bbox_of(segs, page, &trows);
         match finish(segs, page, trows, TableSource::StructTree, 1.0, None) {
             Ok(mut t) => {
                 t.struct_node = Some(ti);
+                t.header_flattened = flattened;
                 let empty_row = t.rows.iter().any(|r| r.iter().all(|c| c.words.is_empty()));
-                let mine: BTreeSet<WordRef> = t
-                    .rows
-                    .iter()
-                    .flatten()
-                    .flat_map(|c| c.words.iter().copied())
-                    .collect();
+                let mine: BTreeSet<WordRef> = table_words(&t.rows).into_iter().collect();
                 let orphan = segs.iter().enumerate().any(|(s, seg)| {
                     (0..seg.words.len()).any(|w| {
                         let (cx, cy) = center(&word_box(page, seg, w));
@@ -480,6 +498,66 @@ fn struct_tables(page: &RawPage, segs: &[Segment], out: &mut PageTables) {
             }
         }
     }
+}
+
+/// Flatten struct-tree row-0 header cells that span several columns
+/// (markdown cannot span): when every column a spanning cell covers holds
+/// exactly one non-empty, single-column `TH` sub-header in row 1 (a data row
+/// under a spanning header is left alone), the spanning cell's words
+/// become a PREFIX of each sub-header ("<label> <sub-header>") and leave row 0.
+/// If row 0 then holds nothing but cells that also span row 1 (a `RowSpan`
+/// stub such as "Functie"), row 0 is dropped and those cells move down.
+/// Only the PDF's own words are used; nothing is invented.
+fn flatten_header_spans(mut rows: Vec<Vec<TCell>>) -> (Vec<Vec<TCell>>, bool) {
+    if rows.len() < 2 {
+        return (rows, false);
+    }
+    let pl = layout(&rows);
+    let mut flattened = false;
+    for k in 0..rows[0].len() {
+        let (cs, empty) = (rows[0][k].colspan.max(1), rows[0][k].words.is_empty());
+        if cs < 2 || empty || rows[0][k].rowspan > 1 {
+            continue;
+        }
+        let c0 = pl[0][k].1;
+        let subs: Vec<usize> = (0..rows[1].len())
+            .filter(|&j| pl[1][j].1 >= c0 && pl[1][j].1 < c0 + cs)
+            .collect();
+        // sub-headers, not data: every covered row-1 cell is a TH
+        let ok = subs.len() == cs
+            && subs.iter().all(|&j| {
+                rows[1][j].colspan.max(1) == 1 && !rows[1][j].words.is_empty() && rows[1][j].header
+            });
+        if !ok {
+            continue;
+        }
+        let label = std::mem::take(&mut rows[0][k].words);
+        for &j in &subs {
+            let mut p = label.clone();
+            p.extend(std::mem::take(&mut rows[1][j].prefix));
+            rows[1][j].prefix = p;
+        }
+        flattened = true;
+    }
+    if !flattened {
+        return (rows, false);
+    }
+    let droppable = rows[0].iter().all(|c| c.words.is_empty() || c.rowspan >= 2);
+    if droppable {
+        let pl = layout(&rows);
+        let row0 = rows.remove(0);
+        for (k, mut cell) in row0.into_iter().enumerate() {
+            if cell.words.is_empty() && cell.rowspan < 2 {
+                continue;
+            }
+            let col = pl[0][k].1;
+            cell.rowspan = cell.rowspan.saturating_sub(1).max(1);
+            let at = pl[1].iter().filter(|&&(_, c, _)| c < col).count();
+            let at = at.min(rows[0].len());
+            rows[0].insert(at, cell);
+        }
+    }
+    (rows, true)
 }
 
 /// Rows whose cells fill fewer slots than the table (a merged cell written
@@ -538,12 +616,16 @@ fn place_short_rows(segs: &[Segment], page: &RawPage, rows: Vec<Vec<TCell>>) -> 
                 }
                 for _ in cur..s0 {
                     out.push(TCell {
+                        prefix: vec![],
+                        header: false,
                         words: vec![],
                         colspan: 1,
                         rowspan: 1,
                     });
                 }
                 out.push(TCell {
+                    prefix: vec![],
+                    header: false,
                     words: cell.words,
                     colspan: e0 - s0 + 1,
                     rowspan: 1,
@@ -853,6 +935,8 @@ fn ruled_tables(
         let mut rows: Vec<Vec<TCell>> = vec![Vec::new(); nr];
         for (&g, &(r0, c0, r1, c1)) in &groups {
             rows[r0].push(TCell {
+                prefix: vec![],
+                header: false,
                 words: cell_words.remove(&g).unwrap_or_default(),
                 colspan: c1 - c0 + 1,
                 rowspan: r1 - r0 + 1,
@@ -1041,6 +1125,8 @@ fn track_tables(
             }
             let mut row: Vec<TCell> = (0..ncols)
                 .map(|_| TCell {
+                    prefix: vec![],
+                    header: false,
                     words: vec![],
                     colspan: 1,
                     rowspan: 1,
@@ -1056,6 +1142,61 @@ fn track_tables(
             }
             rows.push(row);
         }
+        // An axis label directly above the sub-header row (tight line pitch),
+        // right of an EMPTY stub column, spanning ≥2 sub-headers: prefix it
+        // to each ("<label> <sub-header>"). A caption over a full header row
+        // (no empty stub) is left alone.
+        let mut flattened = false;
+        if run[0] > 0 && !rows.is_empty() && !seps.is_empty() {
+            let above = &body[run[0] - 1];
+            let head = &body[run[0]];
+            let size = segs[head[0]].size.max(1.0);
+            let gap = segs[head[0]].baseline - segs[above[0]].baseline;
+            let stub_empty = rows[0][0].words.is_empty();
+            let filled: Vec<usize> = (1..rows[0].len())
+                .filter(|&j| !rows[0][j].words.is_empty())
+                .collect();
+            let right_of_stub = above.iter().all(|&s| segs[s].bbox[0] > seps[0]);
+            if gap > 0.0
+                && gap <= 1.6 * size
+                && stub_empty
+                && right_of_stub
+                && filled.len() >= 2
+                && above.len() < filled.len()
+            {
+                let cx = |j: usize| {
+                    let b = rows[0][j].words.iter().fold(EMPTY_BOX, |b, &(s, w)| {
+                        union(b, word_box(page, &segs[s], w))
+                    });
+                    (b[0] + b[2]) / 2.0
+                };
+                let mut owner: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+                for &j in &filled {
+                    let x = cx(j);
+                    let best = (0..above.len())
+                        .min_by(|&a, &b| {
+                            let da =
+                                ((segs[above[a]].bbox[0] + segs[above[a]].bbox[2]) / 2.0 - x).abs();
+                            let db =
+                                ((segs[above[b]].bbox[0] + segs[above[b]].bbox[2]) / 2.0 - x).abs();
+                            da.total_cmp(&db).then(a.cmp(&b))
+                        })
+                        .unwrap();
+                    owner.entry(best).or_default().push(j);
+                }
+                if owner.len() == above.len() && owner.values().all(|v| v.len() >= 2) {
+                    for (a, cols) in owner {
+                        let label: Vec<WordRef> = (0..segs[above[a]].words.len())
+                            .map(|w| (above[a], w))
+                            .collect();
+                        for j in cols {
+                            rows[0][j].prefix = label.clone();
+                        }
+                    }
+                    flattened = true;
+                }
+            }
+        }
         let text = text_grid(segs, page, &rows);
         let score = match score_tracks(&text) {
             Ok(s) => s,
@@ -1065,7 +1206,10 @@ fn track_tables(
             }
         };
         match finish(segs, page, rows, TableSource::Tracks, score, None) {
-            Ok(t) if score >= ACCEPT => out.accepted.push(t),
+            Ok(mut t) if score >= ACCEPT => {
+                t.header_flattened = flattened;
+                out.accepted.push(t)
+            }
             Ok(t) => {
                 out.rejected.push((TableSource::Tracks, Reject::LowScore));
                 if score >= UNCERTAIN {

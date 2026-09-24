@@ -227,21 +227,16 @@ fn gt_map(path: &Path) -> Vec<(String, String)> {
 }
 
 /// Cells of emitted TEXT-LAYER tables (struct/ruled/tracks/model grid; not
-/// vision) made of text-layer words inside the table box: (ok, total).
+/// vision) made of text-layer words inside the table box: (ok, total). Per
+/// cell, every token must be a text-layer word inside the box, each used at
+/// most once within that cell (a flattened header label legitimately repeats
+/// across the sub-header cells it spans; the geometry gate proves placement).
 fn integrity(bytes: &[u8], opts: &PdfOptions, out: &PdfUnitsOutput) -> (usize, usize) {
     let words = diag::page_words(bytes, opts).unwrap_or_default();
     let (mut ok, mut total) = (0, 0);
-    for u in out
-        .units
-        .iter()
-        .filter(|u| u.kind == UnitKind::Table && !u.provenance.vision_transcribed)
-    {
-        let (Some(p), Some(b)) = (u.page, u.bbox) else {
-            continue;
-        };
-        let Some(page_words) = words.get((p - 1) as usize) else {
-            continue;
-        };
+    for u in out.units.iter().filter(|u| u.kind == UnitKind::Table && !u.provenance.vision_transcribed) {
+        let (Some(p), Some(b)) = (u.page, u.bbox) else { continue };
+        let Some(page_words) = words.get((p - 1) as usize) else { continue };
         let mut pool: BTreeMap<String, usize> = BTreeMap::new();
         for w in page_words {
             let (cx, cy) = ((w.bbox[0] + w.bbox[2]) / 2.0, (w.bbox[1] + w.bbox[3]) / 2.0);
@@ -254,13 +249,14 @@ fn integrity(bytes: &[u8], opts: &PdfOptions, out: &PdfUnitsOutput) -> (usize, u
                 continue;
             }
             total += 1;
-            let mut good = true;
-            for tok in cell.split_whitespace() {
-                match pool.get_mut(tok) {
-                    Some(n) if *n > 0 => *n -= 1,
-                    _ => good = false,
+            let mut local = pool.clone();
+            let good = cell.split_whitespace().all(|tok| match local.get_mut(tok) {
+                Some(n) if *n > 0 => {
+                    *n -= 1;
+                    true
                 }
-            }
+                _ => false,
+            });
             ok += good as usize;
         }
     }

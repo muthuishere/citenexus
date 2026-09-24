@@ -552,15 +552,10 @@ pub(crate) fn emit(
                 let mut prov = Provenance::new(Route::Plain);
                 prov.table_source = Some(t.source);
                 prov.table_uncertain = t.uncertain;
-                let ids: Vec<String> = t
-                    .rows
-                    .iter()
-                    .flatten()
-                    .flat_map(|c| {
-                        c.words
-                            .iter()
-                            .map(|&(s, wi)| word_id(p, word_ord[p][s][wi]))
-                    })
+                prov.header_flattened = t.header_flattened;
+                let ids: Vec<String> = tables::table_words(&t.rows)
+                    .into_iter()
+                    .map(|(s, wi)| word_id(p, word_ord[p][s][wi]))
                     .collect();
                 body.push((
                     DocUnit {

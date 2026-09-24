@@ -118,6 +118,11 @@ pub struct Provenance {
     /// (`vision::citable_text`).
     #[serde(default)]
     pub vision_disputed: bool,
+    /// A table header cell that spanned several columns was flattened into
+    /// its sub-headers ("<label> <sub-header>", the PDF's own words):
+    /// markdown cannot span.
+    #[serde(default)]
+    pub header_flattened: bool,
 }
 
 impl Provenance {
@@ -132,6 +137,7 @@ impl Provenance {
             heading_source: None,
             joined_hyphen: false,
             vision_disputed: false,
+            header_flattened: false,
         }
     }
 }
