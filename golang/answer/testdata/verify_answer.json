@@ -7751,6 +7751,65 @@
           }
         ]
       }
+    },
+    {
+      "name": "condition/a-group-qualifier-anywhere-in-the-subject (gw-v2-16 shape)",
+      "must_refuse": true,
+      "answer": "Alle medewerkers van 60 jaar of ouder hebben recht op acht extra verlofdagen per jaar [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Seniorenverlof. Medewerkers van 60 jaar of ouder met een voltijds dienstverband hebben recht op acht extra verlofdagen per jaar."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "condition guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "condition/the-subject-with-its-qualifier-is-admitted",
+      "answer": "Medewerkers van 60 jaar of ouder met een voltijds dienstverband krijgen acht extra verlofdagen per jaar [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Seniorenverlof. Medewerkers van 60 jaar of ouder met een voltijds dienstverband hebben recht op acht extra verlofdagen per jaar."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
     }
   ]
 }

@@ -325,7 +325,8 @@ func conditionGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfi
 				}
 				// "Werknemers met …" / "… die …": a restricted group (a subject
 				// group the claim does not speak about was scoped out above).
-				if _, ok := partyRestrictors[toks[i]]; ok && i > 0 && actorTerm(toks[i-1], cfg.actors) {
+				if _, ok := partyRestrictors[toks[i]]; ok && i > 0 &&
+					(actorTerm(toks[i-1], cfg.actors) || inSubjectOfRole(toks, i, cfg.actors)) {
 					start = i + 1
 				}
 				if start < 0 || start >= len(toks) {
@@ -479,4 +480,24 @@ func claimNamesRole(claim map[string]bool, t string, lexicon ActorLexicon) bool 
 		}
 	}
 	return false
+}
+
+// inSubjectOfRole: position i lies inside the subject of a clause that opens
+// with a role ("Medewerkers van 60 jaar of ouder met een voltijds
+// dienstverband hebben …"): every restriction before the clause's verb
+// narrows that group, not only one right after the role word.
+func inSubjectOfRole(toks []string, i int, lexicon ActorLexicon) bool {
+	start := 0
+	if len(toks) > 1 && isArticle(toks[0]) {
+		start = 1
+	}
+	if start >= len(toks) || !actorTerm(toks[start], lexicon) {
+		return false
+	}
+	for k := start + 1; k < i; k++ {
+		if _, verb := groupVerbs[toks[k]]; verb {
+			return false
+		}
+	}
+	return true
 }
