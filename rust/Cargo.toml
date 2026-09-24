@@ -56,3 +56,10 @@ strip = true
 
 [dev-dependencies]
 tempfile = "3.27.0"
+# examples/pdf_measure.rs only: the spike-185 quote-support token view
+# (NFKC). Already in the lock via lance.
+unicode-normalization = "0.1"
+
+[[example]]
+name = "pdf_measure"
+required-features = ["pdf"]

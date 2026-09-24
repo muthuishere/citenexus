@@ -109,6 +109,13 @@ by hand, with no AGPL/GPL tool involved. `conformance/fixtures/pdf/*.pdf` is
 regenerated with `CITENEXUS_WRITE_PDF_FIXTURES=1 cargo test --test pdf_fixtures_test`.
 Third-party attributions: [`NOTICE`](NOTICE).
 
+`examples/pdf_measure.rs` measures `pdf_units` over a directory of PDFs and
+prints **counts only**: routes, heading agreement, hyphen markers left,
+furniture. Optionally it also runs spike 185's quote-support measure in memory.
+Nothing is written to disk, so it can be pointed at client documents read in
+place:
+`cargo run --release --features pdf --example pdf_measure -- <dir> --lang nl [--quotes <manifest.json> <run.jsonl>...]`.
+
 Build prerequisite: `protoc` (lance's build scripts generate protobuf code) —
 `brew install protobuf` on macOS. The lid.176 real-model tests skip unless
 `assets/models/lid.176.bin` exists (or `CITENEXUS_LID176_PATH` points at it);
