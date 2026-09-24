@@ -980,6 +980,55 @@
           }
         ]
       }
+    },
+    {
+      "name": "list/items-are-verified-as-standalone-sentences",
+      "answer": "De werknemer heeft recht op:\n- vakantiegeld [eu:a]\n- doorbetaald verlof [eu:a]",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werknemer heeft recht op vakantiegeld en doorbetaald verlof."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "list/a-fragment-item-no-longer-passes-on-its-own-words",
+      "must_refuse": true,
+      "answer": "De werknemer heeft recht op:\n- vakantiegeld [eu:a]",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werkgever betaalt het vakantiegeld in mei."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "not supported"
+          }
+        ]
+      }
     }
   ]
 }

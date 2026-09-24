@@ -58,6 +58,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"github.com/muthuishere/citenexus/golang/authority"
 	"github.com/muthuishere/citenexus/golang/contracts"
@@ -210,7 +211,82 @@ func parseCitations(answer string) []citedClaim {
 			claims[owner].cited = appendUnique(claims[owner].cited, m.ids...)
 		}
 	}
-	return claims
+	return joinListItems(claims)
+}
+
+var (
+	bareListMarker = regexp.MustCompile(`^([-*•·]|[0-9]{1,3}[.)]|[a-z][.)])$`)
+	listItemPrefix = regexp.MustCompile(`^([-*•·]|[0-9]{1,3}[.)]|[a-z][.)])\s+`)
+)
+
+// joinListItems makes list items standalone claims.
+//
+// SplitClaims ends a claim at every line break, so a list arrives as a lead-in
+// ("De werknemer heeft recht op:") and items ("- vakantiegeld") — fragments
+// that pass or fail the gate on their own words and mean nothing alone (rag_go
+// measured 596 of 5,836 pieces fragment-shaped). Here:
+//
+//   - a bare marker piece ("1.", "-") is merged into the item it introduces;
+//   - an item following a lead-in that ends in ":" is verified, and reported,
+//     as the joined sentence "De werknemer heeft recht op vakantiegeld";
+//   - such a lead-in is not a claim of its own; its citations and facets pass
+//     to each item;
+//   - an item with no lead-in is verified with its marker removed.
+func joinListItems(claims []citedClaim) []citedClaim {
+	merged := make([]citedClaim, 0, len(claims))
+	for i := 0; i < len(claims); i++ {
+		c := claims[i]
+		if bareListMarker.MatchString(strings.TrimSpace(c.text)) && i+1 < len(claims) {
+			next := claims[i+1]
+			next.text = strings.TrimSpace(c.text) + " " + next.text
+			next.cited = appendUnique(append([]string{}, c.cited...), next.cited...)
+			next.facets = appendUnique(append([]string{}, c.facets...), next.facets...)
+			claims[i+1] = next
+			continue
+		}
+		merged = append(merged, c)
+	}
+
+	out := make([]citedClaim, 0, len(merged))
+	var leadIn *citedClaim
+	for i := range merged {
+		c := merged[i]
+		loc := listItemPrefix.FindStringIndex(c.text)
+		if loc == nil {
+			leadIn = nil
+			if strings.HasSuffix(strings.TrimSpace(c.text), ":") && i+1 < len(merged) &&
+				listItemPrefix.MatchString(merged[i+1].text) {
+				lead := c
+				leadIn = &lead
+				continue // structural: carried into its items, not a claim of its own
+			}
+			out = append(out, c)
+			continue
+		}
+		item := strings.TrimSpace(c.text[loc[1]:])
+		if leadIn == nil {
+			c.text = item
+			out = append(out, c)
+			continue
+		}
+		c.text = strings.TrimSuffix(strings.TrimSpace(leadIn.text), ":") + " " + lowerFirst(item)
+		c.cited = appendUnique(append([]string{}, c.cited...), leadIn.cited...)
+		c.facets = appendUnique(append([]string{}, c.facets...), leadIn.facets...)
+		out = append(out, c)
+	}
+	return out
+}
+
+// lowerFirst lowercases an item's first letter when joined mid-sentence —
+// unless the word is an acronym or code ("CAO", "WW-uitkering"), where the case
+// carries meaning.
+func lowerFirst(item string) string {
+	runes := []rune(item)
+	if len(runes) < 2 || !unicode.IsUpper(runes[0]) || unicode.IsUpper(runes[1]) || !unicode.IsLetter(runes[1]) {
+		return item
+	}
+	runes[0] = unicode.ToLower(runes[0])
+	return string(runes)
 }
 
 func appendUnique(list []string, items ...string) []string {
