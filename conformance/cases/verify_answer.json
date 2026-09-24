@@ -6,24 +6,69 @@
       "must_refuse": true,
       "answer": "De werkgever vergoedt de parkeerkosten [eu:p].",
       "answer_language": "nl",
-      "evidence": [{"id": "p", "document_id": "p", "language": "nl", "text": "De werkgever vergoedt de parkeerkosten niet. Reiskosten worden wel vergoed."}],
-      "expect": {"decision": "refused", "claims": [{"supported": false, "reason": "negation guard"}]}
+      "evidence": [
+        {
+          "id": "p",
+          "document_id": "p",
+          "language": "nl",
+          "text": "De werkgever vergoedt de parkeerkosten niet. Reiskosten worden wel vergoed."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "negation guard"
+          }
+        ]
+      }
     },
     {
       "name": "negation/same-clause-niet-after-adverbs",
       "must_refuse": true,
       "answer": "De werkgever vergoedt de parkeerkosten [eu:p].",
       "answer_language": "nl",
-      "evidence": [{"id": "p", "document_id": "p", "language": "nl", "text": "De werkgever vergoedt de parkeerkosten dan ook niet."}],
-      "expect": {"decision": "refused", "claims": [{"supported": false, "reason": "negation guard"}]}
+      "evidence": [
+        {
+          "id": "p",
+          "document_id": "p",
+          "language": "nl",
+          "text": "De werkgever vergoedt de parkeerkosten dan ook niet."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "negation guard"
+          }
+        ]
+      }
     },
     {
       "name": "negation/niet-before-a-coordinator-still-refuses",
       "must_refuse": true,
       "answer": "De werkgever vergoedt de parkeerkosten [eu:p].",
       "answer_language": "nl",
-      "evidence": [{"id": "p", "document_id": "p", "language": "nl", "text": "De werkgever vergoedt de parkeerkosten niet en de reiskosten wel."}],
-      "expect": {"decision": "refused", "claims": [{"supported": false, "reason": "negation guard"}]}
+      "evidence": [
+        {
+          "id": "p",
+          "document_id": "p",
+          "language": "nl",
+          "text": "De werkgever vergoedt de parkeerkosten niet en de reiskosten wel."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "negation guard"
+          }
+        ]
+      }
     },
     {
       "name": "negation/model-path-cannot-drop-a-clause-final-niet",
@@ -31,47 +76,146 @@
       "answer": "De werkgever vergoedt de parkeerkosten [eu:p].",
       "answer_language": "nl",
       "admit_paraphrase": true,
-      "checker": {"p": [0.99, 0.0]},
-      "evidence": [{"id": "p", "document_id": "p", "language": "nl", "text": "De werkgever vergoedt de parkeerkosten niet."}],
-      "expect": {"decision": "refused", "claims": [{"supported": false, "reason": "negation guard"}]}
+      "checker": {
+        "p": [
+          0.99,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "p",
+          "document_id": "p",
+          "language": "nl",
+          "text": "De werkgever vergoedt de parkeerkosten niet."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "negation guard"
+          }
+        ]
+      }
     },
     {
       "name": "negation/geen-after-a-dash-is-another-clause (R-103)",
       "answer": "Tijdens onbetaald verlof loopt je pensioenopbouw door [eu:s10].",
       "answer_language": "nl",
-      "evidence": [{"id": "s10", "document_id": "pensioen-faq", "language": "nl", "text": "Tijdens onbetaald verlof loopt je pensioenopbouw door — dit gaat automatisch en is geen keuze."}],
-      "expect": {"decision": "answered", "claims": [{"supported": true, "reason": ""}]}
+      "evidence": [
+        {
+          "id": "s10",
+          "document_id": "pensioen-faq",
+          "language": "nl",
+          "text": "Tijdens onbetaald verlof loopt je pensioenopbouw door — dit gaat automatisch en is geen keuze."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
     },
     {
       "name": "negation/niet-after-en-is-another-clause (G-D3)",
       "answer": "De werkgever heeft de werknemer tijdig gewaarschuwd [eu:s19].",
       "answer_language": "nl",
-      "evidence": [{"id": "s19", "document_id": "bw", "language": "nl", "text": "Ontslag is mogelijk mits de werkgever heeft de werknemer tijdig gewaarschuwd en de ongeschiktheid niet het gevolg is van onvoldoende zorg."}],
-      "expect": {"decision": "answered", "claims": [{"supported": true, "reason": ""}]}
+      "evidence": [
+        {
+          "id": "s19",
+          "document_id": "bw",
+          "language": "nl",
+          "text": "Ontslag is mogelijk mits de werkgever heeft de werknemer tijdig gewaarschuwd en de ongeschiktheid niet het gevolg is van onvoldoende zorg."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
     },
     {
       "name": "negation/zonder-beyond-the-tail-window (G-S4)",
       "answer": "Een bestuurder mag zijn besluit alleen uitvoeren als de or daarmee akkoord gaat [eu:s2].",
       "answer_language": "nl",
-      "evidence": [{"id": "s2", "document_id": "ser", "language": "nl", "text": "Een bestuurder mag zijn besluit alleen uitvoeren als de or daarmee akkoord gaat Een besluit dat de werkgever zonder instemming neemt is nietig"}],
-      "expect": {"decision": "answered", "claims": [{"supported": true, "reason": ""}]}
+      "evidence": [
+        {
+          "id": "s2",
+          "document_id": "ser",
+          "language": "nl",
+          "text": "Een bestuurder mag zijn besluit alleen uitvoeren als de or daarmee akkoord gaat Een besluit dat de werkgever zonder instemming neemt is nietig"
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
     },
     {
       "name": "negation/claim-already-carries-the-negation (R-123)",
       "answer": "De bonus wordt niet uitgekeerd [eu:b].",
       "answer_language": "nl",
-      "evidence": [{"id": "b", "document_id": "b", "language": "nl", "text": "De bonus wordt niet uitgekeerd zolang het contract niet is getekend."}],
-      "expect": {"decision": "answered", "claims": [{"supported": true, "reason": ""}]}
+      "evidence": [
+        {
+          "id": "b",
+          "document_id": "b",
+          "language": "nl",
+          "text": "De bonus wordt niet uitgekeerd zolang het contract niet is getekend."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
     },
     {
       "name": "value/unrelated-claim-survives-a-differing-phone-number (R-114)",
       "answer": "In de regeling is opgenomen dat een melder niet benadeeld mag worden [eu:a].",
       "answer_language": "nl",
       "evidence": [
-        {"id": "a", "document_id": "klokkenluider-2023", "language": "nl", "text": "In de regeling is opgenomen dat een melder niet benadeeld mag worden. Vertrouwenspersoon bereikbaar op 06-23220798."},
-        {"id": "b", "document_id": "klokkenluider-2024", "language": "nl", "text": "In de regeling is opgenomen dat een melder niet benadeeld mag worden. Vertrouwenspersoon bereikbaar op 06-23386524."}
+        {
+          "id": "a",
+          "document_id": "klokkenluider-2023",
+          "language": "nl",
+          "text": "In de regeling is opgenomen dat een melder niet benadeeld mag worden. Vertrouwenspersoon bereikbaar op 06-23220798."
+        },
+        {
+          "id": "b",
+          "document_id": "klokkenluider-2024",
+          "language": "nl",
+          "text": "In de regeling is opgenomen dat een melder niet benadeeld mag worden. Vertrouwenspersoon bereikbaar op 06-23386524."
+        }
       ],
-      "expect": {"decision": "answered", "conflicts_reported": true, "claims": [{"supported": true, "reason": ""}]}
+      "expect": {
+        "decision": "answered",
+        "conflicts_reported": true,
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
     },
     {
       "name": "value/claim-carrying-the-disputed-number-is-dropped",
@@ -79,32 +223,497 @@
       "answer": "Vertrouwenspersoon bereikbaar op 06-23220798 [eu:a].",
       "answer_language": "nl",
       "evidence": [
-        {"id": "a", "document_id": "klokkenluider-2023", "language": "nl", "text": "Vertrouwenspersoon bereikbaar op 06-23220798."},
-        {"id": "b", "document_id": "klokkenluider-2024", "language": "nl", "text": "Vertrouwenspersoon bereikbaar op 06-23386524."}
+        {
+          "id": "a",
+          "document_id": "klokkenluider-2023",
+          "language": "nl",
+          "text": "Vertrouwenspersoon bereikbaar op 06-23220798."
+        },
+        {
+          "id": "b",
+          "document_id": "klokkenluider-2024",
+          "language": "nl",
+          "text": "Vertrouwenspersoon bereikbaar op 06-23386524."
+        }
       ],
-      "expect": {"decision": "refused", "conflicts_reported": true, "claims": [{"supported": false, "reason": "cited sources disagree"}]}
+      "expect": {
+        "decision": "refused",
+        "conflicts_reported": true,
+        "claims": [
+          {
+            "supported": false,
+            "reason": "cited sources disagree"
+          }
+        ]
+      }
     },
     {
       "name": "value/shared-number-is-not-the-disputed-one",
       "answer": "De vertrouwenspersoon zit in kamer 13 [eu:a].",
       "answer_language": "nl",
       "evidence": [
-        {"id": "a", "document_id": "klokkenluider-2023", "language": "nl", "text": "De vertrouwenspersoon zit in kamer 13 en is bereikbaar op 23220798."},
-        {"id": "b", "document_id": "klokkenluider-2024", "language": "nl", "text": "De vertrouwenspersoon zit in kamer 13 en is bereikbaar op 23386524."}
+        {
+          "id": "a",
+          "document_id": "klokkenluider-2023",
+          "language": "nl",
+          "text": "De vertrouwenspersoon zit in kamer 13 en is bereikbaar op 23220798."
+        },
+        {
+          "id": "b",
+          "document_id": "klokkenluider-2024",
+          "language": "nl",
+          "text": "De vertrouwenspersoon zit in kamer 13 en is bereikbaar op 23386524."
+        }
       ],
-      "expect": {"decision": "answered", "conflicts_reported": true, "claims": [{"supported": true, "reason": ""}]}
+      "expect": {
+        "decision": "answered",
+        "conflicts_reported": true,
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
     },
     {
       "name": "value/model-paraphrase-is-never-spared",
       "must_refuse": true,
       "answer": "The confidant can be reached by phone [eu:a].",
       "answer_language": "en",
-      "checker": {"a": [0.99, 0.0]},
+      "checker": {
+        "a": [
+          0.99,
+          0.0
+        ]
+      },
       "evidence": [
-        {"id": "a", "document_id": "klokkenluider-2023", "language": "nl", "text": "De vertrouwenspersoon is telefonisch bereikbaar op 23220798."},
-        {"id": "b", "document_id": "klokkenluider-2024", "language": "nl", "text": "De vertrouwenspersoon is telefonisch bereikbaar op 23386524."}
+        {
+          "id": "a",
+          "document_id": "klokkenluider-2023",
+          "language": "nl",
+          "text": "De vertrouwenspersoon is telefonisch bereikbaar op 23220798."
+        },
+        {
+          "id": "b",
+          "document_id": "klokkenluider-2024",
+          "language": "nl",
+          "text": "De vertrouwenspersoon is telefonisch bereikbaar op 23386524."
+        }
       ],
-      "expect": {"decision": "refused", "conflicts_reported": true, "claims": [{"supported": false, "reason": "cited sources disagree"}]}
+      "expect": {
+        "decision": "refused",
+        "conflicts_reported": true,
+        "claims": [
+          {
+            "supported": false,
+            "reason": "cited sources disagree"
+          }
+        ]
+      }
+    },
+    {
+      "name": "unit/weeks-for-months-across-languages",
+      "must_refuse": true,
+      "answer": "The request must be submitted 2 weeks before the start date [eu:u].",
+      "answer_language": "en",
+      "checker": {
+        "u": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "u",
+          "document_id": "u",
+          "language": "nl",
+          "text": "Het verzoek moet uiterlijk twee (2) maanden voor de ingangsdatum worden ingediend."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "unit guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "unit/spelled-out-value-swap",
+      "must_refuse": true,
+      "answer": "De opzegtermijn is vier weken [eu:u].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "u": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "u",
+          "document_id": "u",
+          "language": "nl",
+          "text": "De opzegtermijn is twee weken voor alle medewerkers."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "unit guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "unit/same-quantity-across-languages-is-admitted",
+      "answer": "The request must be submitted 2 months before the start date [eu:u].",
+      "answer_language": "en",
+      "checker": {
+        "u": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "u",
+          "document_id": "u",
+          "language": "nl",
+          "text": "Het verzoek moet uiterlijk twee (2) maanden voor de ingangsdatum worden ingediend."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "unit/number-without-a-unit-in-a-table-is-not-a-swap",
+      "answer": "Na 12,5 jaar dienst volgt een uitkering [eu:t].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "t": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "t",
+          "document_id": "t",
+          "language": "nl",
+          "text": "Jaren in dienst 12,5 ✓ uitkering"
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "qualifier/netto-where-the-matching-place-says-bruto",
+      "must_refuse": true,
+      "answer": "Je ontvangt het nettoloon in geld [eu:q].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "q": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "q",
+          "document_id": "q",
+          "language": "nl",
+          "text": "Je ontvangt het brutoloon in geld. Het nettoloon staat op de loonstrook."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "qualifier guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "qualifier/netto-at-its-own-place-is-admitted",
+      "answer": "Op de loonstrook staat het nettoloon [eu:q].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "q": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "q",
+          "document_id": "q",
+          "language": "nl",
+          "text": "Je ontvangt het brutoloon in geld. Het nettoloon staat op de loonstrook."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "qualifier/role-swap-employee-for-employer",
+      "must_refuse": true,
+      "answer": "De premie wordt door de werknemer betaald [eu:r].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "r": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "r",
+          "document_id": "r",
+          "language": "nl",
+          "text": "De werkgever betaalt de premie. De werknemer ontvangt een loonstrook."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "qualifier guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "scope/during-any-leave-over-a-specific-leave (L-R23)",
+      "must_refuse": true,
+      "answer": "The allowance applies during any leave [eu:s].",
+      "answer_language": "en",
+      "checker": {
+        "s": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "s",
+          "document_id": "s",
+          "language": "nl",
+          "text": "De toelage geldt tijdens aanvullend geboorteverlof."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "scope guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "scope/the-specific-period-is-admitted",
+      "answer": "The allowance applies during additional birth leave [eu:s].",
+      "answer_language": "en",
+      "checker": {
+        "s": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "s",
+          "document_id": "s",
+          "language": "nl",
+          "text": "De toelage geldt tijdens aanvullend geboorteverlof."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "scope/whether-any-is-not-widening",
+      "answer": "Check whether any exception applies during the probation period [eu:s].",
+      "answer_language": "en",
+      "checker": {
+        "s": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "s",
+          "document_id": "s",
+          "language": "nl",
+          "text": "Controleer of er een uitzondering geldt tijdens de proeftijd."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "scope/passage-that-is-universal-itself-is-admitted",
+      "answer": "The allowance applies during all leave [eu:s].",
+      "answer_language": "en",
+      "checker": {
+        "s": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "s",
+          "document_id": "s",
+          "language": "nl",
+          "text": "De toelage geldt tijdens alle vormen van verlof."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "name/list-marker-then-capital-is-not-a-name",
+      "answer": "- The allowance is paid monthly [eu:n].",
+      "answer_language": "en",
+      "checker": {
+        "n": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "n",
+          "document_id": "n",
+          "language": "nl",
+          "text": "De toelage wordt maandelijks betaald."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "name/markdown-label-then-capital-is-not-a-name",
+      "answer": "**Note:** You receive the allowance monthly [eu:n].",
+      "answer_language": "en",
+      "checker": {
+        "n": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "n",
+          "document_id": "n",
+          "language": "nl",
+          "text": "Je ontvangt de toelage maandelijks."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "name/a-real-name-absent-from-the-passage",
+      "must_refuse": true,
+      "answer": "Employees at Acme receive the allowance monthly [eu:n].",
+      "answer_language": "en",
+      "checker": {
+        "n": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "n",
+          "document_id": "n",
+          "language": "nl",
+          "text": "Medewerkers ontvangen de toelage maandelijks."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "name guard"
+          }
+        ]
+      }
     }
   ]
 }

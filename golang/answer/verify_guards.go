@@ -63,16 +63,27 @@ func negationGuard(claim, passage string) string {
 	return "negation guard: the claim is negated and the passage is not"
 }
 
-// names are the claim's capitalised words that are not sentence-initial, plus
-// any word mixing letters and digits or written in capitals ("R-119", "CAO").
+// names are the claim's capitalised words that are not in an INITIAL position,
+// plus any word mixing letters and digits or written in capitals ("R-119",
+// "CAO").
+//
+// Initial positions (capitalised by typography, not because they are names):
+// the start, after a sentence terminator or a colon, after a list marker
+// ("-", "*", "•", "1.", "1)", "#"), and right after an opening quote or bracket.
+// Markdown emphasis is removed first, so "**Label:** You …" reads "Label: You".
+// Treating those as names refused true claims: "- The …", "**Note:** You …"
+// were 39 of 66 English name refusals in rag_go's run.
 func names(claim string) []string {
 	out := []string{}
-	fields := strings.FieldsFunc(claim, func(r rune) bool {
-		return unicode.IsSpace(r) || strings.ContainsRune(`"“”„«»()[]{},;:`, r)
-	})
+	plain := strings.NewReplacer("**", "", "__", "", "`", "").Replace(claim)
 	initial := true
-	for _, f := range fields {
-		word := strings.TrimRight(f, ".!?")
+	for _, f := range strings.Fields(plain) {
+		if isListMarker(f) {
+			initial = true
+			continue
+		}
+		opensQuote := strings.IndexAny(f, `"“„«([{'‘`) == 0
+		word := strings.Trim(f, `"“”„«»()[]{},;:.!?'‘’`)
 		runes := []rune(word)
 		if len(runes) > 1 {
 			hasDigit, hasLetter, allUpper := false, false, true
@@ -90,14 +101,22 @@ func names(claim string) []string {
 			switch {
 			case hasLetter && hasDigit, hasLetter && allUpper:
 				out = append(out, word)
-			case !initial && unicode.IsUpper(runes[0]):
+			case !initial && !opensQuote && unicode.IsUpper(runes[0]):
 				out = append(out, word)
 			}
 		}
-		initial = word != f // a terminator ends a sentence; the next word is initial
+		// A terminator or colon ends a sentence or label; the next word is initial.
+		trimmed := strings.TrimRight(f, `"”»)]}'’`)
+		initial = strings.HasSuffix(trimmed, ".") || strings.HasSuffix(trimmed, "!") ||
+			strings.HasSuffix(trimmed, "?") || strings.HasSuffix(trimmed, ":")
 	}
 	return out
 }
+
+var listMarker = regexp.MustCompile(`^([-*•·–—]|#{1,6}|[0-9]{1,3}[.)]|[a-z][.)])$`)
+
+// isListMarker is a bullet, heading hash or list number standing alone.
+func isListMarker(field string) bool { return listMarker.MatchString(field) }
 
 // nameGuard: every name in the claim is present in the passage.
 //
@@ -125,7 +144,10 @@ func guards(claim, claimLanguage string, eu EvidenceUnit) string {
 	if reason := numberGuard(claim, claimLanguage, eu.Text, eu.Language); reason != "" {
 		return reason
 	}
-	for _, g := range []func(string, string) string{negationGuard, clauseNegationGuard, nameGuard} {
+	if reason := unitGuard(claim, claimLanguage, eu.Text, eu.Language); reason != "" {
+		return reason
+	}
+	for _, g := range []func(string, string) string{negationGuard, clauseNegationGuard, qualifierGuard, scopeGuard, nameGuard} {
 		if reason := g(claim, eu.Text); reason != "" {
 			return reason
 		}
