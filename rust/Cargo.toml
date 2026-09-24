@@ -54,6 +54,12 @@ pdf = ["dep:pdfium-render"]
 lto = true
 strip = true
 
+# Fast optimised builds for the counts-only measurement examples.
+[profile.measure]
+inherits = "release"
+lto = false
+codegen-units = 16
+
 [dev-dependencies]
 tempfile = "3.27.0"
 # examples/pdf_measure.rs only: the spike-185 quote-support token view
@@ -62,4 +68,8 @@ unicode-normalization = "0.1"
 
 [[example]]
 name = "pdf_measure"
+required-features = ["pdf"]
+
+[[example]]
+name = "pdf_headings"
 required-features = ["pdf"]

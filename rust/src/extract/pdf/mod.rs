@@ -11,6 +11,7 @@ use pdfium_render::prelude::*;
 use crate::types::*;
 
 pub mod build;
+pub mod diag;
 pub mod furniture;
 pub mod headings;
 pub mod hyphen;
