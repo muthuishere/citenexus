@@ -329,11 +329,22 @@ func joinListItems(claims []citedClaim, frames []string) []citedClaim {
 
 // DefaultLeadInFrames is a small, generic nl/en table of content-free list
 // lead-ins. Hosts supply their own through VerifyOptions.LeadInFrames.
+//
+// Step introducers ("Volg deze stappen:", "Here are the exact steps:") are
+// whole phrases on purpose: "exact", "volg" and "deze" are not stopwords, so a
+// frame must cover them, and a lead-in with any word outside a frame — "Volg
+// deze stappen bij ziekte:" — is still joined. rag_go measured 12 step items
+// left uncited under exactly these two lead-ins.
 var DefaultLeadInFrames = []string{
 	"zo zit het", "zo werkt het", "het volgende", "als volgt", "hieronder",
 	"samengevat", "kort samengevat", "in het kort", "een overzicht",
 	"here's how", "here is how", "here's what", "here is what", "as follows",
 	"the following", "below", "in short", "in summary", "an overview",
+	"volg deze stappen", "volg de stappen", "volg de volgende stappen",
+	"de volgende stappen", "deze stappen", "de stappen", "stappen",
+	"hier zijn de stappen", "hier zijn de exacte stappen",
+	"here are the steps", "here are the exact steps", "follow these steps",
+	"follow the steps", "these steps", "the steps", "steps",
 }
 
 // contentFreeLeadIn: every token of the lead-in is covered by a frame or is a

@@ -1912,6 +1912,104 @@
           }
         ]
       }
+    },
+    {
+      "name": "lead-in/nl-step-frame-is-not-joined",
+      "answer": "Volg deze stappen:\n1. Log in op het personeelsportaal [eu:a]\n2. Kies het tabblad adresgegevens [eu:a]",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Log in op het personeelsportaal. Kies het tabblad adresgegevens en vul het nieuwe adres in."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "lead-in/en-exact-steps-frame-is-not-joined",
+      "answer": "Here are the exact steps:\n1. Open the employee portal [eu:a]\n2. Select the address tab [eu:a]",
+      "answer_language": "en",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "en",
+          "text": "Open the employee portal. Select the address tab and enter the new address."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "lead-in/nl-step-frame-with-a-content-word-joins",
+      "must_refuse": true,
+      "answer": "Volg deze stappen bij ziekte:\n1. Log in op het personeelsportaal [eu:a]",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Log in op het personeelsportaal. Kies het tabblad adresgegevens en vul het nieuwe adres in."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "not supported"
+          }
+        ]
+      }
+    },
+    {
+      "name": "lead-in/en-step-frame-with-a-content-word-joins",
+      "must_refuse": true,
+      "answer": "Here are the exact steps for sick leave:\n1. Open the employee portal [eu:a]",
+      "answer_language": "en",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "en",
+          "text": "Open the employee portal. Select the address tab and enter the new address."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "not supported"
+          }
+        ]
+      }
     }
   ]
 }
