@@ -83,6 +83,10 @@ type EvidenceSignals struct {
 	// contracts.SupportChecker rather than the deterministic gate (Go-first,
 	// answer.VerifyAnswer). omitempty keeps every existing Result byte-identical.
 	ModelVerifiedClaims int `json:"model_verified_claims,omitempty"`
+	// MissingFacets are the caller-declared parts of the question (see
+	// answer.VerifyOptions.Facets) that no verified claim answers. Go-first,
+	// omitempty.
+	MissingFacets []string `json:"missing_facets,omitempty"`
 	// Loop is deep-ask (agentic) loop accounting; nil (→ null) on the strict flow.
 	// Deep-ask is Python-only today, so Go always emits null — present for wire
 	// parity with the Python reference. See structural-code-graph / deep-ask.

@@ -20,15 +20,28 @@
 // before it is checked, and never appear in Result.Answer: the citations live
 // in Result.Claims[i].Sources.
 //
-// # What admits a claim
+// A writer may also tag the part of the question a claim answers with
+// `[q:<facet-id>]` (see VerifyOptions.Facets): a declared facet no verified
+// claim answers is NAMED in the Result instead of silently missing.
 //
-//  1. The deterministic gate (gate.IsSupportedV2) against a cited unit — or,
-//     for an uncited claim when RequireCitations is false, against any selected
-//     unit, most authoritative first.
-//  2. Otherwise, and only when a SupportChecker is injected: the checker's
-//     entailment, only against a CITED unit whose declared language differs
-//     from the answer language. Such claims are labelled VerifiedBy
-//     "model:<name>" and counted in Evidence.ModelVerifiedClaims.
+// # What admits a claim, in order
+//
+//  1. GATE — the deterministic predicate (gate.IsSupportedV2) against a cited
+//     unit — or, for an uncited claim when RequireCitations is false, against
+//     any selected unit, most authoritative first. VerifiedBy "gate".
+//  2. QUOTE — the claim carries a verbatim quote ("…", “…”, „…”, «…», at least
+//     MinQuoteTokens tokens) that passes the gate against a cited unit, AND the
+//     checker entails the whole claim from that unit. The quote anchors the
+//     content deterministically; the model only vouches for the words around
+//     it (a translation, a framing). VerifiedBy "quote+model:<name>".
+//  3. MODEL — the checker entails the claim from a cited unit whose declared
+//     language differs from the answer language, or from any cited unit when
+//     AdmitParaphrase is set. VerifiedBy "model:<name>".
+//
+// Steps 2 and 3 need an injected SupportChecker, and every admission they make
+// must also pass the deterministic guards (numbers, negation, names —
+// verify_guards.go), which the model cannot override. Model-admitted claims are
+// counted in Evidence.ModelVerifiedClaims.
 //
 // And what removes one again — every rule below can only ADD abstention:
 //
@@ -85,12 +98,29 @@ type VerifyOptions struct {
 	Checker contracts.SupportChecker
 	// CheckerName labels model-admitted claims: VerifiedBy = "model:"+CheckerName.
 	CheckerName string
-	// EntailThreshold is the minimum entailment to admit a cross-language claim.
+	// AdmitParaphrase lets the checker admit SAME-language claims the gate
+	// rejected (a paraphrase), still behind the deterministic guards. Off by
+	// default: it trades the gate's guarantee for coverage, and the caller should
+	// choose that knowingly. Claims it admits are labelled like any model
+	// admission.
+	AdmitParaphrase bool
+	// Facets are the parts of the question the answer must cover, referenced by
+	// the writer as `[q:<ID>]`. A facet with no verified claim is reported in
+	// Evidence.MissingFacets and MissingEvidence, and makes the decision
+	// "partial" (or "refused" when nothing at all was verified).
+	Facets []Facet
+	// EntailThreshold is the minimum entailment for a model or quote admission.
 	// Zero means DefaultEntailThreshold.
 	EntailThreshold float64
 	// ContradictThreshold is the contradiction score at which the checker vetoes,
 	// and above which it may not admit. Zero means DefaultContradictThreshold.
 	ContradictThreshold float64
+}
+
+// Facet is one part of the question an answer must cover.
+type Facet struct {
+	ID    string // what the writer cites in `[q:<ID>]`
+	Label string // what MissingEvidence names; ID when empty
 }
 
 // Default checker thresholds. Deliberately conservative: a wrongly admitted
@@ -114,12 +144,14 @@ const (
 // ErrInvalidEvidence is wrapped by every evidence-validation error.
 var ErrInvalidEvidence = errors.New("answer: invalid evidence")
 
-// citationMarker matches one `[eu:...]` group; the body is a comma list.
-var citationMarker = regexp.MustCompile(`\s*\[\s*eu\s*:([^\]]*)\]`)
+// citationMarker matches one `[eu:...]` or `[q:...]` group; the body is a comma
+// list.
+var citationMarker = regexp.MustCompile(`\s*\[\s*(eu|q)\s*:([^\]]*)\]`)
 
 type citedClaim struct {
-	text  string
-	cited []string
+	text   string
+	cited  []string
+	facets []string
 }
 
 // parseCitations splits the answer into claims and attaches each marker to the
@@ -127,23 +159,25 @@ type citedClaim struct {
 // so an id containing "." cannot split a sentence.
 func parseCitations(answer string) []citedClaim {
 	type mark struct {
-		at  int // byte offset in the cleaned text
-		ids []string
+		at    int // byte offset in the cleaned text
+		facet bool
+		ids   []string
 	}
 	var clean strings.Builder
 	marks := []mark{}
 	last := 0
 	for _, loc := range citationMarker.FindAllStringSubmatchIndex(answer, -1) {
 		clean.WriteString(answer[last:loc[0]])
+		kind := answer[loc[2]:loc[3]]
 		ids := []string{}
-		for _, part := range strings.Split(answer[loc[2]:loc[3]], ",") {
+		for _, part := range strings.Split(answer[loc[4]:loc[5]], ",") {
 			id := strings.TrimSpace(part)
-			id = strings.TrimSpace(strings.TrimPrefix(id, "eu:"))
+			id = strings.TrimSpace(strings.TrimPrefix(id, kind+":"))
 			if id != "" {
 				ids = append(ids, id)
 			}
 		}
-		marks = append(marks, mark{at: clean.Len(), ids: ids})
+		marks = append(marks, mark{at: clean.Len(), facet: kind == "q", ids: ids})
 		last = loc[1]
 	}
 	clean.WriteString(answer[last:])
@@ -168,7 +202,11 @@ func parseCitations(answer string) []citedClaim {
 				owner = i
 			}
 		}
-		if len(claims) > 0 {
+		switch {
+		case len(claims) == 0:
+		case m.facet:
+			claims[owner].facets = appendUnique(claims[owner].facets, m.ids...)
+		default:
 			claims[owner].cited = appendUnique(claims[owner].cited, m.ids...)
 		}
 	}
@@ -201,6 +239,7 @@ func primaryLanguage(code string) string {
 }
 
 type verdict struct {
+	facets     []string
 	text       string
 	supported  bool
 	sources    []string // unit ids that support it
@@ -284,7 +323,7 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 	parsed := parseCitations(answer)
 	verdicts := make([]verdict, 0, len(parsed))
 	for _, pc := range parsed {
-		v := verdict{text: pc.text}
+		v := verdict{text: pc.text, facets: pc.facets}
 
 		// The units this claim may be checked against.
 		candidates := []EvidenceUnit{}
@@ -349,23 +388,70 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 			}
 		}
 
-		// 2. Model admission: cited, cross-language, declared on both sides.
-		if !v.supported && v.reason != ReasonContradicted && opts.Checker != nil && len(pc.cited) > 0 && claimLanguage != "" {
-			for _, eu := range candidates {
-				pl := primaryLanguage(eu.Language)
-				if pl == "" || pl == claimLanguage {
-					continue
+		// 2 + 3. Model-backed admission: cited claims only, checker required,
+		// every admission behind the deterministic guards.
+		if !v.supported && v.reason != ReasonContradicted && opts.Checker != nil && len(pc.cited) > 0 {
+			guardReason := ""
+			admit := func(eu EvidenceUnit) (bool, error) {
+				if reason := guards(pc.text, eu.Text); reason != "" {
+					guardReason = reason
+					return false, nil
 				}
 				s, err := check(pc.text, eu)
 				if err != nil {
-					return result.Result{}, err
+					return false, err
 				}
-				if s.entailed >= entailAt && s.contradicted < contradictAt {
-					v.sources = append(v.sources, eu.ID)
+				return s.entailed >= entailAt && s.contradicted < contradictAt, nil
+			}
+
+			// 2. QUOTE: every quote in the claim passes the gate against the unit.
+			if qs := quotes(pc.text); len(qs) > 0 {
+				for _, eu := range candidates {
+					anchored := true
+					for _, q := range qs {
+						if !gate.IsSupportedV2(q, eu.Text) {
+							anchored = false
+							break
+						}
+					}
+					if !anchored {
+						continue
+					}
+					ok, err := admit(eu)
+					if err != nil {
+						return result.Result{}, err
+					}
+					if ok {
+						v.sources = append(v.sources, eu.ID)
+					}
+				}
+				if len(v.sources) > 0 {
+					v.supported, v.verifiedBy, v.reason = true, "quote+"+modelLabel, ""
 				}
 			}
-			if len(v.sources) > 0 {
-				v.supported, v.verifiedBy, v.reason = true, modelLabel, ""
+
+			// 3. MODEL: cross-language, or any language under AdmitParaphrase.
+			if !v.supported {
+				for _, eu := range candidates {
+					pl := primaryLanguage(eu.Language)
+					crossLanguage := claimLanguage != "" && pl != "" && pl != claimLanguage
+					if !crossLanguage && !opts.AdmitParaphrase {
+						continue
+					}
+					ok, err := admit(eu)
+					if err != nil {
+						return result.Result{}, err
+					}
+					if ok {
+						v.sources = append(v.sources, eu.ID)
+					}
+				}
+				if len(v.sources) > 0 {
+					v.supported, v.verifiedBy, v.reason = true, modelLabel, ""
+				}
+			}
+			if !v.supported && guardReason != "" {
+				v.reason = guardReason
 			}
 		}
 
@@ -486,6 +572,28 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 	}
 	removed := len(verdicts) - len(answered)
 
+	// Facets no verified claim answers are NAMED, never silently missing.
+	covered := map[string]bool{}
+	for _, v := range verdicts {
+		if v.supported {
+			for _, f := range v.facets {
+				covered[f] = true
+			}
+		}
+	}
+	var missingFacets, missingFacetNotes []string
+	for _, f := range opts.Facets {
+		if covered[f.ID] {
+			continue
+		}
+		label := f.Label
+		if label == "" {
+			label = f.ID
+		}
+		missingFacets = append(missingFacets, f.ID)
+		missingFacetNotes = append(missingFacetNotes, "no verified answer for: "+label)
+	}
+
 	if len(answered) == 0 {
 		refused := refusal(answerLanguage, "generated answer failed the faithfulness gate", unsupported, nil)
 		switch {
@@ -511,6 +619,8 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 		refused.Evidence.UnsupportedClaimsRemoved = removed
 		refused.Evidence.LanguagesInEvidence = languages
 		refused.Evidence.AuthorityFloorApplied = selection.FloorApplied()
+		refused.Evidence.MissingFacets = missingFacets
+		refused.MissingEvidence = append(refused.MissingEvidence, missingFacetNotes...)
 		return refused, nil
 	}
 
@@ -518,9 +628,23 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 	for _, s := range sources {
 		distinct[s.Document] = struct{}{}
 	}
+	// Anything dropped or uncovered makes the answer PARTIAL — the verified part
+	// is kept, and what is missing is named rather than lost. (AskWith's strict
+	// flow never emits partial; this verb does, because a caller-generated
+	// multi-claim answer is exactly where incompleteness needs a name.)
 	missing := []string{}
 	if len(unresolvedSides) > 0 {
 		missing = append(missing, ReasonUnresolvedClaims)
+	}
+	for _, v := range verdicts {
+		if !v.supported {
+			missing = append(missing, fmt.Sprintf("dropped: %s (%s)", v.text, v.reason))
+		}
+	}
+	missing = append(missing, missingFacetNotes...)
+	decision := result.DecisionAnswered
+	if removed > 0 || len(missingFacets) > 0 {
+		decision = result.DecisionPartial
 	}
 	tierName := ""
 	if top != nil {
@@ -531,7 +655,7 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 		AnswerLanguage: answerLanguage,
 		Mode:           result.TrustModeStrict,
 		Evidence: result.EvidenceSignals{
-			Decision:                 result.DecisionAnswered,
+			Decision:                 decision,
 			SupportingSources:        len(CollapseNearDuplicates(supportingTexts)),
 			DistinctDocuments:        len(distinct),
 			AllClaimsVerified:        removed == 0,
@@ -542,6 +666,7 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 			AuthorityTier:            tierName,
 			AuthorityFloorApplied:    selection.FloorApplied(),
 			ModelVerifiedClaims:      modelVerified,
+			MissingFacets:            missingFacets,
 		},
 		Claims:          claims,
 		Sources:         sources,

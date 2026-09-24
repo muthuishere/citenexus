@@ -49,14 +49,17 @@ func TestParseCitations(t *testing.T) {
 		want   []citedClaim
 	}{
 		{"marker before period", "One fact [eu:a]. Two fact [eu:b].",
-			[]citedClaim{{"One fact.", []string{"a"}}, {"Two fact.", []string{"b"}}}},
+			[]citedClaim{{text: "One fact.", cited: []string{"a"}}, {text: "Two fact.", cited: []string{"b"}}}},
 		{"marker after period attaches backwards", "One fact. [eu:a] Two fact. [eu:b]",
-			[]citedClaim{{"One fact.", []string{"a"}}, {"Two fact.", []string{"b"}}}},
+			[]citedClaim{{text: "One fact.", cited: []string{"a"}}, {text: "Two fact.", cited: []string{"b"}}}},
 		{"dotted id does not split", "One fact [eu:doc.pdf#3].",
-			[]citedClaim{{"One fact.", []string{"doc.pdf#3"}}}},
+			[]citedClaim{{text: "One fact.", cited: []string{"doc.pdf#3"}}}},
 		{"comma list and repeated groups", "One fact [eu:a, eu:b][eu:c, a].",
-			[]citedClaim{{"One fact.", []string{"a", "b", "c"}}}},
-		{"uncited", "One fact.", []citedClaim{{"One fact.", nil}}},
+			[]citedClaim{{text: "One fact.", cited: []string{"a", "b", "c"}}}},
+		{"uncited", "One fact.", []citedClaim{{text: "One fact.", cited: nil}}},
+		{"facet markers are separate from citations", "One fact [eu:a][q:cost]. Two fact [q:when, q:who][eu:b].",
+			[]citedClaim{{text: "One fact.", cited: []string{"a"}, facets: []string{"cost"}},
+				{text: "Two fact.", cited: []string{"b"}, facets: []string{"when", "who"}}}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -70,7 +73,7 @@ func TestParseCitations(t *testing.T) {
 func TestVerifyAnswerKeepsTheTrueHalf(t *testing.T) {
 	res := verify(t, "The notice period is 30 days [eu:hr-1#0]. The notice period is 90 days [eu:hr-1#0].",
 		[]EvidenceUnit{notice30, leave}, VerifyOptions{})
-	if res.Evidence.Decision != result.DecisionAnswered || res.Answer != "The notice period is 30 days." {
+	if res.Evidence.Decision != result.DecisionPartial || res.Answer != "The notice period is 30 days." {
 		t.Fatalf("got %q / %s", res.Answer, res.Evidence.Decision)
 	}
 	if res.Evidence.AllClaimsVerified || res.Evidence.UnsupportedClaimsRemoved != 1 {
@@ -234,5 +237,98 @@ func TestNewResultFieldsAreOmittedWhenEmpty(t *testing.T) {
 	}
 	if strings.Contains(string(raw), "verified_by") || strings.Contains(string(raw), "reason") {
 		t.Fatalf("existing wire shape changed: %s", raw)
+	}
+}
+
+func TestGuardsCannotBeOverriddenByTheModel(t *testing.T) {
+	// The checker is sure of everything; only the guards stand in the way.
+	sure := &fakeChecker{scores: map[string][2]float64{dutchLeave.Text: {0.99, 0.0}}}
+	opts := VerifyOptions{Checker: sure, AnswerLanguage: "en"}
+	cases := map[string]string{
+		"number":   "Employees get 30 vacation days a year [eu:nl-1#0].",
+		"negation": "Employees do not get 25 vacation days a year [eu:nl-1#0].",
+		"name":     "Employees at Acme get 25 vacation days a year [eu:nl-1#0].",
+	}
+	for guard, claim := range cases {
+		t.Run(guard, func(t *testing.T) {
+			res := verify(t, claim, []EvidenceUnit{dutchLeave}, opts)
+			if res.Evidence.Decision != result.DecisionRefused || !strings.HasPrefix(res.Claims[0].Reason, guard+" guard") {
+				t.Fatalf("%s guard did not hold: %+v", guard, res.Claims)
+			}
+		})
+	}
+}
+
+func TestNumberGuardIsLocaleNeutral(t *testing.T) {
+	if r := numberGuard("The fee is €25.50.", "De vergoeding is € 25,50."); r != "" {
+		t.Fatalf("25.50 vs 25,50 refused: %s", r)
+	}
+	if r := numberGuard("The fee is €25.5.", "De vergoeding is € 25,50."); r == "" {
+		t.Fatal("25.5 vs 25,50 must not be equated")
+	}
+}
+
+func TestNames(t *testing.T) {
+	got := names("Employees at Acme get the CAO bonus per R-119. Then Payroll pays.")
+	want := []string{"Acme", "CAO", "R-119", "Payroll"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v want %v", got, want)
+	}
+}
+
+func TestQuotePathAnchorsTheContent(t *testing.T) {
+	fee := EvidenceUnit{ID: "faq#7", DocumentID: "faq", Language: "nl",
+		Text: "Voor thuiswerken geldt een vergoeding van € 25 exclusief btw per maand."}
+	checker := &fakeChecker{scores: map[string][2]float64{fee.Text: {0.95, 0.01}}}
+	opts := VerifyOptions{Checker: checker, CheckerName: "nli", AnswerLanguage: "nl"}
+
+	// Same language, paraphrased framing, verbatim quote: admitted via the quote.
+	res := verify(t, `Bij thuiswerk geldt "een vergoeding van € 25 exclusief btw" [eu:faq#7].`, []EvidenceUnit{fee}, opts)
+	if res.Claims[0].VerifiedBy != "quote+model:nli" {
+		t.Fatalf("quote path not taken: %+v", res.Claims)
+	}
+	// A quote that is not in the passage anchors nothing — and without
+	// AdmitParaphrase the model cannot rescue a same-language claim.
+	res = verify(t, `Er geldt "een vergoeding van € 25 inclusief btw" [eu:faq#7].`, []EvidenceUnit{fee}, opts)
+	if res.Evidence.Decision != result.DecisionRefused {
+		t.Fatalf("a fabricated quote was admitted: %+v", res.Claims)
+	}
+	// Without a checker the quote alone admits nothing.
+	res = verify(t, `Bij thuiswerk geldt "een vergoeding van € 25 exclusief btw" [eu:faq#7].`, []EvidenceUnit{fee},
+		VerifyOptions{AnswerLanguage: "nl"})
+	if res.Evidence.Decision != result.DecisionRefused {
+		t.Fatalf("quote admitted without a checker: %+v", res.Claims)
+	}
+}
+
+func TestAdmitParaphraseIsOptIn(t *testing.T) {
+	checker := &fakeChecker{scores: map[string][2]float64{leave.Text: {0.97, 0.01}}}
+	claim := "Staff get 25 days of annual leave [eu:hr-3#0]."
+	opts := VerifyOptions{Checker: checker, CheckerName: "nli", AnswerLanguage: "en"}
+	if res := verify(t, claim, []EvidenceUnit{leave}, opts); res.Evidence.Decision != result.DecisionRefused {
+		t.Fatalf("paraphrase admitted without opt-in: %+v", res.Claims)
+	}
+	opts.AdmitParaphrase = true
+	res := verify(t, claim, []EvidenceUnit{leave}, opts)
+	if res.Evidence.Decision != result.DecisionAnswered || res.Claims[0].VerifiedBy != "model:nli" {
+		t.Fatalf("opted-in paraphrase not admitted: %+v", res.Claims)
+	}
+}
+
+func TestMissingFacetsAreNamed(t *testing.T) {
+	opts := VerifyOptions{Facets: []Facet{{ID: "notice", Label: "the notice period"}, {ID: "leave", Label: "annual leave"}}}
+	ev := []EvidenceUnit{notice30, leave}
+
+	res := verify(t, "The notice period is 30 days [eu:hr-1#0][q:notice]. Employees receive 40 days of annual leave [eu:hr-3#0][q:leave].", ev, opts)
+	if res.Evidence.Decision != result.DecisionPartial || !reflect.DeepEqual(res.Evidence.MissingFacets, []string{"leave"}) {
+		t.Fatalf("%s %v", res.Evidence.Decision, res.Evidence.MissingFacets)
+	}
+	if !strings.Contains(strings.Join(res.MissingEvidence, "|"), "no verified answer for: annual leave") {
+		t.Fatalf("facet not named: %v", res.MissingEvidence)
+	}
+
+	res = verify(t, "The notice period is 30 days [eu:hr-1#0][q:notice]. Employees receive 25 days of annual leave [eu:hr-3#0][q:leave].", ev, opts)
+	if res.Evidence.Decision != result.DecisionAnswered || res.Evidence.MissingFacets != nil {
+		t.Fatalf("complete answer marked incomplete: %+v", res.Evidence)
 	}
 }
