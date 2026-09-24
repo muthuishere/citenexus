@@ -95,6 +95,17 @@ under ADR-0010: real parsing over pdfium character boxes.
      - This closes the "moved word" gap that no bag of words can see: a
        "geen" moved between sentences, or two amounts swapped between
        lines, makes both sentences disputed.
+   - Live-harness amendments (2026-09-25, consumer):
+     - a `vision_region` response states its `mode`. A `description` of a
+       region with no meaningful text (a logo) becomes an
+       `image_description` unit. It is never citable and never put through
+       dual agreement, because it is not evidence.
+     - `{"tables": []}` is the model's verdict "no table" (recorded as
+       `model_verdict`), not a failure.
+     - List-marker glyphs and leaders are filler a grid may leave out.
+     - Request regions grow to whole units, and tables of contents are
+       never requested.
+     - The full host contract is [`docs/pdf-model-contract.md`](../pdf-model-contract.md).
 5. **Deterministic checks before anything replaces base text.** All of these
    are library functions:
    - **Geometry:** every cell's characters sit in one row band and one column
