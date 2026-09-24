@@ -414,8 +414,10 @@ fn committed_golden_assemble_vector() {
     let (bytes, rs) = mixed();
     let responses_json = serde_json::to_string_pretty(&rs).unwrap();
     let golden = serde_json::to_string(&pdf_assemble(&bytes, &opts(), &rs).unwrap()).unwrap();
+    let prepared = serde_json::to_string_pretty(&pdf_prepare(&bytes, &opts()).unwrap()).unwrap();
     let files = [
         ("assemble-mixed.pdf", bytes.clone()),
+        ("assemble-mixed.prepared.json", prepared.into_bytes()),
         ("assemble-mixed.responses.json", responses_json.into_bytes()),
         ("assemble-mixed.golden.json", golden.clone().into_bytes()),
     ];

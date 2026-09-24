@@ -65,6 +65,10 @@ codegen-units = 16
 
 [dev-dependencies]
 tempfile = "3.27.0"
+# tests/pdf_contract_schema_test.rs: validates the committed contract fixtures
+# against docs/schema/pdf-model-contract.schema.json (draft 2020-12).
+# MIT OR Apache-2.0; test-only, never in the shipped library.
+boon = "0.6"
 
 [[example]]
 name = "pdf_measure"

@@ -1,0 +1,201 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://citenexus.dev/schema/pdf-model-contract.schema.json",
+  "title": "CiteNexus PDF model contract (ADR-0017)",
+  "description": "Shapes exchanged between the CiteNexus core and a host that fulfils model requests: PdfPrepare output (PdfPrepared), the host's answers (PdfResponse[]), and PdfAssemble / PdfUnits output (PdfUnitsOutput). Human guide: docs/pdf-model-contract.md. Validated against the committed synthetic fixtures by rust/tests/pdf_contract_schema_test.rs.",
+  "$defs": {
+    "BBox": {
+      "description": "[x0, y0, x1, y1] in PDF points, TOP-LEFT origin (y grows down), rounded to 0.01.",
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 4,
+      "maxItems": 4
+    },
+    "PdfOptions": {
+      "type": "object",
+      "properties": {
+        "language": { "type": ["string", "null"], "description": "Declared language (\"nl\", \"en\"): hyphen rules and ADR-0015 number reading." },
+        "layout_text": { "type": "boolean", "description": "Add each page's pdftotext -layout-style text to pages[].layout_text." },
+        "model_tables": { "type": "boolean", "description": "Also request a model grid for tables the deterministic path accepted (review mode). Default false: only uncertain table regions are requested." }
+      },
+      "additionalProperties": false
+    },
+    "PdfWord": {
+      "type": "object",
+      "required": ["id", "text", "bbox"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^p[0-9]+w[0-9]+$", "description": "Stable for the same bytes and options: p{page}w{n}, n in line order then left to right." },
+        "text": { "type": "string", "description": "The PDF's own characters." },
+        "bbox": { "$ref": "#/$defs/BBox" }
+      },
+      "additionalProperties": false
+    },
+    "PdfRequest": {
+      "type": "object",
+      "required": ["id", "page", "kind", "prompt", "bbox", "words", "variant", "hint"],
+      "properties": {
+        "id": { "type": "string", "description": "Echo in PdfResponse.request_id. p{page}:table{k} | p{page}:page:v{1|2} | p{page}:img{k}:v{1|2}." },
+        "page": { "type": "integer", "minimum": 1 },
+        "kind": { "enum": ["table_structure", "vision_page", "vision_region"] },
+        "prompt": { "type": "string", "description": "A key into the host's prompt config (default: rust/data/pdf_prompts.json)." },
+        "bbox": { "$ref": "#/$defs/BBox" },
+        "words": { "type": "array", "items": { "$ref": "#/$defs/PdfWord" } },
+        "variant": { "type": ["integer", "null"], "enum": [1, 2, null] },
+        "hint": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "table_structure" } } },
+          "then": {
+            "properties": {
+              "id": { "pattern": "^p[0-9]+:table[0-9]+$" },
+              "words": { "minItems": 1 },
+              "variant": { "const": null },
+              "hint": { "const": null }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "vision_page" } } },
+          "then": {
+            "properties": {
+              "id": { "pattern": "^p[0-9]+:page:v[12]$" },
+              "words": { "maxItems": 0 },
+              "variant": { "enum": [1, 2] },
+              "hint": { "type": "string" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "vision_region" } } },
+          "then": {
+            "properties": {
+              "id": { "pattern": "^p[0-9]+:img[0-9]+:v[12]$" },
+              "words": { "maxItems": 0 },
+              "variant": { "enum": [1, 2] },
+              "hint": { "type": "string" }
+            }
+          }
+        }
+      ]
+    },
+    "PdfCell": {
+      "description": "A cell: an array of word IDs (reading order), or an object with spans (HTML rules). An empty cell is [].",
+      "oneOf": [
+        { "type": "array", "items": { "type": "string" } },
+        {
+          "type": "object",
+          "required": ["words"],
+          "properties": {
+            "words": { "type": "array", "items": { "type": "string" } },
+            "colspan": { "type": ["integer", "null"], "minimum": 1 },
+            "rowspan": { "type": ["integer", "null"], "minimum": 1 }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "PdfGrid": {
+      "type": "object",
+      "required": ["rows"],
+      "properties": {
+        "rows": { "type": "array", "items": { "type": "array", "items": { "$ref": "#/$defs/PdfCell" } } }
+      },
+      "additionalProperties": false
+    },
+    "PdfResponse": {
+      "type": "object",
+      "required": ["request_id"],
+      "properties": {
+        "request_id": { "type": "string" },
+        "finish_reason": { "type": ["string", "null"], "description": "The model API's finish reason. Anything but a normal stop (stop, end_turn, stop_sequence, eos, complete) fails with failed_check=finish_reason. Omit or null when unknown." },
+        "tables": { "type": ["array", "null"], "items": { "$ref": "#/$defs/PdfGrid" }, "description": "table_structure only: grids over the request's word IDs. Never text." },
+        "markdown": { "type": ["string", "null"], "description": "vision_page / vision_region only. On a table_structure request it is rejected (model_text_on_text_layer)." }
+      },
+      "additionalProperties": false
+    },
+    "PdfResponses": { "type": "array", "items": { "$ref": "#/$defs/PdfResponse" } },
+    "FailedCheck": {
+      "enum": [
+        "finish_reason", "empty", "repetition", "unknown_word", "duplicate_word", "empty_grid",
+        "geometry_rows", "geometry_columns", "geometry_span", "partial_unit", "grid_coverage",
+        "model_text_on_text_layer", "malformed_response", "duplicate_response",
+        "digit_bag", "value_novel", "coverage", "novelty"
+      ]
+    },
+    "Provenance": {
+      "type": "object",
+      "required": ["route", "table_source", "vision_transcribed", "table_uncertain", "failed_check", "heading_source", "joined_hyphen", "vision_disputed"],
+      "properties": {
+        "route": { "enum": ["plain", "formatted", "table", "image", "scan", "ooxml"] },
+        "table_source": { "enum": ["struct_tree", "ruled", "tracks", "model_grid", "ooxml", null] },
+        "vision_transcribed": { "type": "boolean" },
+        "table_uncertain": { "type": "boolean" },
+        "failed_check": { "oneOf": [{ "$ref": "#/$defs/FailedCheck" }, { "type": "null" }] },
+        "heading_source": { "enum": ["struct_tree", "outline", "numbering", "font", "style", null] },
+        "joined_hyphen": { "type": "boolean" },
+        "vision_disputed": { "type": "boolean", "description": "Some or all vision text is disputed (the two transcriptions disagreed, or one only came back). Disputed text is inside <!-- vision_disputed ... --> blocks and is not citable." }
+      },
+      "additionalProperties": false
+    },
+    "DocUnit": {
+      "type": "object",
+      "required": ["page", "bbox", "kind", "level", "markdown", "provenance"],
+      "properties": {
+        "page": { "type": ["integer", "null"], "minimum": 1 },
+        "bbox": { "oneOf": [{ "$ref": "#/$defs/BBox" }, { "type": "null" }] },
+        "kind": { "enum": ["heading", "paragraph", "list", "table", "furniture", "image"] },
+        "level": { "type": ["integer", "null"], "minimum": 1, "maximum": 6 },
+        "markdown": { "type": "string" },
+        "provenance": { "$ref": "#/$defs/Provenance" }
+      },
+      "additionalProperties": false
+    },
+    "PdfPageInfo": {
+      "type": "object",
+      "required": ["page", "width", "height", "route", "signals"],
+      "properties": {
+        "page": { "type": "integer", "minimum": 1 },
+        "width": { "type": "number" },
+        "height": { "type": "number" },
+        "route": { "enum": ["plain", "formatted", "table", "image", "scan"] },
+        "signals": { "type": "object", "description": "The evidence behind the route (text-layer soundness, image coverage, ruling lines, column tracks, reading order). Informational; its keys may grow." },
+        "layout_text": { "type": ["string", "null"] }
+      }
+    },
+    "PdfDocumentSignals": {
+      "type": "object",
+      "required": ["pages", "responses_applied", "responses_rejected"],
+      "properties": {
+        "pages": { "type": "integer" },
+        "responses_applied": { "type": "integer", "description": "Responses that passed every check (a table grid that lost a GriTS competition still counts)." },
+        "responses_rejected": { "type": "integer" }
+      },
+      "description": "Document signals (headings, hyphens, furniture, response counts). Informational; its keys may grow."
+    },
+    "PdfUnitsOutput": {
+      "description": "PdfUnits / PdfAssemble output.",
+      "type": "object",
+      "required": ["units", "pages", "document"],
+      "properties": {
+        "units": { "type": "array", "items": { "$ref": "#/$defs/DocUnit" } },
+        "pages": { "type": "array", "items": { "$ref": "#/$defs/PdfPageInfo" } },
+        "document": { "$ref": "#/$defs/PdfDocumentSignals" }
+      },
+      "additionalProperties": false
+    },
+    "PdfPrepared": {
+      "description": "PdfPrepare output: the base result plus the requests.",
+      "type": "object",
+      "required": ["units", "pages", "document", "requests"],
+      "properties": {
+        "units": { "type": "array", "items": { "$ref": "#/$defs/DocUnit" } },
+        "pages": { "type": "array", "items": { "$ref": "#/$defs/PdfPageInfo" } },
+        "document": { "$ref": "#/$defs/PdfDocumentSignals" },
+        "requests": { "type": "array", "items": { "$ref": "#/$defs/PdfRequest" } }
+      },
+      "additionalProperties": false
+    }
+  }
+}
