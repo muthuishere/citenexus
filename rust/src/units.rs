@@ -151,3 +151,109 @@ pub struct DocUnit {
 /// ADR-0017 names the PDF unit `PdfUnit`; it is the same shape as every other
 /// format's unit.
 pub type PdfUnit = DocUnit;
+
+// ---------------------------------------------------------------------------
+// The PDF envelope: options in, units + per-page routing + document signals
+// out. Not behind the `pdf` feature, so bindings can name the types either way.
+// ---------------------------------------------------------------------------
+
+/// Options for `pdf_units` (JSON over the C ABI; every field optional).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PdfOptions {
+    /// BCP-47-ish language of the document ("nl", "en"); drives the hyphen
+    /// keep-lists. Unknown or absent → the union of every list.
+    #[serde(default)]
+    pub language: Option<String>,
+    /// Include each page's `pdftotext -layout`-style text in `pages[]`.
+    #[serde(default)]
+    pub layout_text: bool,
+}
+
+/// The evidence behind one page's route (ADR-0017 decision 2). Shares are in
+/// 0..1, rounded to 4 decimals.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PdfPageSignals {
+    /// Visible (non-generated, non-space) text-layer characters.
+    pub chars: u32,
+    /// U+FFFD / private-use / control / unicode-map-error share.
+    pub bad_char_share: f64,
+    /// Render-mode-3 (invisible, OCR-layer) share.
+    pub invisible_share: f64,
+    /// Glyphs drawn twice at the same spot (doubled layer) share.
+    pub duplicate_share: f64,
+    /// The text layer can be trusted as ground truth.
+    pub text_sound: bool,
+    /// Share of the page covered by image objects.
+    pub image_coverage: f64,
+    pub images: u32,
+    /// Thin, long horizontal / vertical path objects.
+    pub ruling_lines_h: u32,
+    pub ruling_lines_v: u32,
+    /// Left edges shared by ≥3 multi-segment lines.
+    pub column_tracks: u32,
+    /// Lines with ≥2 segments (a gap wider than 1.5 × font size).
+    pub multi_segment_lines: u32,
+    /// 1, or 2 when most lines split into two segments at ≤2 tracks.
+    pub text_columns: u32,
+    /// Distinct font sizes on the page (0.5 pt buckets).
+    pub font_sizes: u32,
+    /// `struct_tree` | `rule_based` | `xycut` | `none`.
+    pub reading_order: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PdfPageInfo {
+    /// 1-based.
+    pub page: u32,
+    pub width: f64,
+    pub height: f64,
+    pub route: Route,
+    pub signals: PdfPageSignals,
+    /// Only with `PdfOptions::layout_text`.
+    #[serde(default)]
+    pub layout_text: Option<String>,
+}
+
+/// How the document's headings were decided (the per-document rule).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HeadingAgreement {
+    /// Pages with a struct-tree heading or a font-evidence heading.
+    pub compared_pages: u32,
+    /// Of those, pages where both sources name the same heading blocks.
+    pub agreeing_pages: u32,
+    /// agreeing / compared, rounded to 4 decimals (1.0 when nothing compared).
+    pub rate: f64,
+    /// The struct tree was trusted for the WHOLE document.
+    pub struct_tree_trusted: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PdfDocumentSignals {
+    pub pages: u32,
+    /// The document has a structure tree with content on at least one page.
+    pub tagged: bool,
+    /// The structure tree carries at least one heading element.
+    pub struct_headings: bool,
+    pub outline_entries: u32,
+    /// `struct_tree` | `font` (outline/numbering refine levels) | `none`.
+    pub heading_source: String,
+    /// Present when the struct tree carries headings.
+    #[serde(default)]
+    pub heading_agreement: Option<HeadingAgreement>,
+    /// pdfium U+0002 hyphen markers seen / joined / kept as printed.
+    pub hyphen_markers: u32,
+    pub hyphens_joined: u32,
+    pub hyphens_kept: u32,
+    /// Running header/footer line occurrences detected, and the furniture
+    /// units they collapsed to (each distinct line kept once).
+    pub furniture_lines: u32,
+    pub furniture_units: u32,
+}
+
+/// Everything `pdf_units` returns.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PdfUnitsOutput {
+    pub units: Vec<DocUnit>,
+    pub pages: Vec<PdfPageInfo>,
+    pub document: PdfDocumentSignals,
+}

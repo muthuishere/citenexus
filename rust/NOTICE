@@ -1,0 +1,67 @@
+citenexus-core
+Copyright the CiteNexus authors. Licensed under Apache-2.0.
+
+Third-party attributions for the base PDF extractor (rust/src/extract/pdf/,
+ADR-0017 step 2).
+
+The PDF extractor contains NO code copied from the projects below. Each
+technique was reimplemented from the description in
+docs/research/2026-09-24-pdf-to-markdown.md (sections 3 and 8), which names
+the upstream file. Where the research recorded a commit, it is pinned here.
+Where it did not, the commit is marked "not pinned", meaning the upstream file
+was not read at a fixed revision for this port. Before code (not just an idea)
+is ported from any of these, pin the commit and add its licence text below.
+
+Nothing AGPL, GPL or non-commercial is used anywhere in the stack.
+
+--------------------------------------------------------------------------
+pdfium (BSD-3-Clause), loaded dynamically at runtime, not bundled
+  https://pdfium.googlesource.com/pdfium
+  Behaviour relied on: the U+0002 line-end hyphen marker
+  (core/fpdftext/cpdf_textpage.cpp, ProcessGenerateCharacter), the
+  FPDF_StructTree_* structure tree, and FPDFText_* character boxes.
+
+pdfium-render (MIT OR Apache-2.0), a Cargo dependency
+  https://github.com/ajrcarey/pdfium-render
+
+--------------------------------------------------------------------------
+Ideas ported (reimplemented; no code copied)
+
+Xberg (MIT) @ b4331e0
+  https://github.com/xberg-io/xberg
+  pdf/structure/pipeline.rs:5635-5891, collect_hyphen_witnesses /
+  should_preserve_lexical_hyphen: document witnesses for line-end hyphens.
+  -> src/extract/pdf/hyphen.rs
+
+pdftext (Apache-2.0), commit not pinned
+  https://github.com/datalab-to/pdftext
+  postprocessing handle_hyphens: handling of pdfium's U+0002 marker.
+  -> src/extract/pdf/hyphen.rs
+
+LiteParse (Apache-2.0) @ b754dc3d
+  https://github.com/run-llama/liteparse
+  extract.rs "is-complex" routing reasons; markdown_layout/repetition.rs
+  header/footer repetition.
+  -> src/extract/pdf/route.rs, src/extract/pdf/furniture.rs
+
+opendataloader-pdf (Apache-2.0) @ 323578b
+  https://github.com/opendataloader-project/opendataloader-pdf
+  TriageProcessor (conservative page triage), HeaderFooterProcessor.
+  -> src/extract/pdf/route.rs, src/extract/pdf/furniture.rs
+
+Docling (MIT), commit not pinned
+  https://github.com/docling-project/docling
+  reading_order_rb.py (rule-based reading order), rate_text_quality (text-
+  layer soundness), heading levels ("a wrong level is worse than none").
+  -> src/extract/pdf/order.rs, src/extract/pdf/route.rs,
+     src/extract/pdf/headings.rs
+
+Marker (Apache-2.0 since 2026-07-17), commit not pinned
+  https://github.com/datalab-to/marker
+  The >2% garbled-character threshold for an unsound text layer.
+  -> src/extract/pdf/route.rs
+
+XY-Cut++ (paper, arXiv 2504.10258)
+  Projection-profile XY-cut as the reading-order fallback. The paper's
+  cross-layout pre-mask is NOT implemented.
+  -> src/extract/pdf/order.rs
