@@ -7905,6 +7905,123 @@
           }
         ]
       }
+    },
+    {
+      "name": "verbpair/take-where-the-source-says-apply-across-languages (L-R9 shape)",
+      "answer": "You take the additional leave at least four weeks in advance [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Aanvullend geboorteverlof. De werknemer vraagt het aanvullend verlof ten minste vier weken van tevoren aan bij de leidinggevende."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "verb guard"
+          }
+        ]
+      },
+      "must_refuse": true,
+      "glossary": [
+        [
+          "aanvullend",
+          "additional"
+        ],
+        [
+          "verlof",
+          "leave"
+        ],
+        [
+          "leidinggevende",
+          "manager"
+        ]
+      ]
+    },
+    {
+      "name": "verbpair/apply-as-the-source-says-is-admitted",
+      "answer": "You apply for the additional leave at least four weeks in advance [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Aanvullend geboorteverlof. De werknemer vraagt het aanvullend verlof ten minste vier weken van tevoren aan bij de leidinggevende."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      },
+      "glossary": [
+        [
+          "aanvullend",
+          "additional"
+        ],
+        [
+          "verlof",
+          "leave"
+        ],
+        [
+          "leidinggevende",
+          "manager"
+        ]
+      ]
+    },
+    {
+      "name": "verbpair/neemt-op-where-the-source-says-vraagt-aan",
+      "answer": "De werknemer neemt het aanvullend verlof ten minste vier weken van tevoren op [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Aanvullend geboorteverlof. De werknemer vraagt het aanvullend verlof ten minste vier weken van tevoren aan bij de leidinggevende."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "verb guard"
+          }
+        ]
+      },
+      "must_refuse": true
     }
   ]
 }

@@ -128,6 +128,10 @@ type VerifyOptions struct {
 	// non-nil slice REPLACES it — extend with
 	// append(DefaultQualifierPairs, QualifierPair{...}); empty turns it off.
 	QualifierPairs []QualifierPair
+	// VerbPairs are distinct acts on the same object — apply for vs take
+	// (verify_verbpairs.go). nil means DefaultVerbPairs; a non-nil slice
+	// REPLACES it (append to DefaultVerbPairs to extend); empty turns it off.
+	VerbPairs []VerbPair
 	// Glossary is the caller's term pairs across languages ({"toestemming",
 	// "permission"}), lowercase, either order. It is read ONLY by the
 	// condition guard, to tell whether a claim in another language carries a
@@ -647,7 +651,11 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 	if opts.QualifierPairs != nil {
 		pairs = opts.QualifierPairs
 	}
-	cfg := guardConfig{aliases: opts.NameAliases, actors: actors, pairs: pairs, glossary: opts.Glossary}
+	verbs := DefaultVerbPairs
+	if opts.VerbPairs != nil {
+		verbs = opts.VerbPairs
+	}
+	cfg := guardConfig{aliases: opts.NameAliases, actors: actors, pairs: pairs, verbs: verbs, glossary: opts.Glossary}
 	frames := opts.LeadInFrames
 	if frames == nil {
 		frames = DefaultLeadInFrames

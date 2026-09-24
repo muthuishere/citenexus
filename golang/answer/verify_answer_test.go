@@ -458,3 +458,17 @@ func TestExclusionGuardHasNoVerdictAcrossLanguagesWithoutAGlossary(t *testing.T)
 		t.Fatalf("with a glossary: want the exclusion refused, got %q", reason)
 	}
 }
+
+// Across languages the verb guard needs the glossary to read the shared
+// object; without it, no verdict (the checker is then the barrier).
+func TestVerbPairGuardHasNoVerdictAcrossLanguagesWithoutAGlossary(t *testing.T) {
+	unit := EvidenceUnit{ID: "a", Language: "nl", Text: "De werknemer vraagt het aanvullend verlof ten minste vier weken van tevoren aan bij de leidinggevende."}
+	claim := "You take the additional leave at least four weeks in advance."
+	if reason := verbPairGuard(claim, "en", unit, DefaultVerbPairs, guardConfig{actors: DefaultActorLexicon}); reason != "" {
+		t.Fatalf("no glossary: want no verdict, got %q", reason)
+	}
+	cfg := guardConfig{actors: DefaultActorLexicon, glossary: [][2]string{{"verlof", "leave"}, {"aanvullend", "additional"}}}
+	if reason := verbPairGuard(claim, "en", unit, DefaultVerbPairs, cfg); !strings.HasPrefix(reason, "verb guard") {
+		t.Fatalf("with a glossary: want refused, got %q", reason)
+	}
+}
