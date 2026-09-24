@@ -1083,7 +1083,7 @@
         "claims": [
           {
             "supported": false,
-            "reason": "name guard"
+            "reason": "number guard"
           }
         ]
       }
@@ -5515,6 +5515,249 @@
           "document_id": "a",
           "language": "nl",
           "text": "Het opleidingsbudget bedraagt € 4.000 per jaar."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "date/numeric-date-over-another-written-month-refuses",
+      "must_refuse": true,
+      "answer": "De zomervakantie begint op 01-07-2026 [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De zomervakantie begint op 1 augustus 2026."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "date/numeric-date-over-another-written-day-month-refuses",
+      "must_refuse": true,
+      "answer": "Aanvragen moet je vóór 15-11-2026 indienen [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De zomervakantie valt in de periode van 1 juli 2026 tot en met 31 augustus 2026. Aanvragen voor 15 oktober 2026 indienen."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "date/an-ambiguous-english-numeric-date-is-not-equal",
+      "must_refuse": true,
+      "answer": "Apply before 01/06/2026 [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Aanvragen voor 6 januari 2026 indienen."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "date/an-english-written-date-over-a-dutch-one",
+      "answer": "Apply before October 15, 2026 [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De zomervakantie valt in de periode van 1 juli 2026 tot en met 31 augustus 2026. Aanvragen voor 15 oktober 2026 indienen."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "date/adv-nf-v2-01 (rag_go adv, fictional)",
+      "answer": "Als je op 01-06-2026 in dienst bent, ontvang je bij een voltijds dienstverband in juli 2026 een eenmalige uitkering van 1250 euro bruto [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "salarisregeling Gemeente Kraaijenburg",
+          "language": "nl",
+          "text": "Eenmalige uitkering. Medewerkers die op 1 juni 2026 in dienst zijn, ontvangen in juli 2026 een eenmalige uitkering van € 1.250,00 bruto bij een voltijds dienstverband. Deeltijders ontvangen de uitkering naar rato."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "date/adv-nf-v2-11 (rag_go adv, fictional)",
+      "answer": "Voor de fietsregeling geldt [eu:S1]:\n- Je kunt eens per 3 jaar een fiets van maximaal 1500 euro aanschaffen [eu:S1].\n- De aanvraag moet vóór 15-10-2026 zijn ingediend [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "fietsregeling Woonstichting Beekdal",
+          "language": "nl",
+          "text": "Fietsregeling. De medewerker kan eens per drie jaar een fiets aanschaffen met een waarde van maximaal € 1.500,-. De aanvraag moet vóór 15 oktober 2026 worden ingediend. De fiets wordt via de salarisadministratie verrekend."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "date/adv-nf-v2-30 (rag_go adv, fictional)",
+      "answer": "De zomervakantie van chauffeurs valt van 01-07-2026 tot en met 31-08-2026 [eu:S1]. Je krijgt binnen 2 weken na indiening antwoord op je aanvraag [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "vakantieregeling De Vaart Logistiek",
+          "language": "nl",
+          "text": "Zomervakantie chauffeurs. De zomervakantie van de chauffeurs valt in de periode van 1 juli 2026 tot en met 31 augustus 2026. Aanvragen worden uiterlijk twee weken na indiening beantwoord. Toegekende vakanties worden in het planbord vastgelegd."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "date/adv-nf-v2-16 (rag_go adv, fictional)",
+      "answer": "Vakantiedagen moeten uiterlijk op 31-12 van het volgende jaar zijn opgenomen [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "verlofregeling Maasoever Advocaten",
+          "language": "nl",
+          "text": "Vakantiedagen. Een medewerker met een voltijds dienstverband heeft recht op vijfentwintig vakantiedagen per kalenderjaar. Daarnaast ontvangt de medewerker vier ADV-dagen. Vakantiedagen moeten uiterlijk op 31 december van het volgende jaar zijn opgenomen."
         }
       ],
       "expect": {

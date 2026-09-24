@@ -153,6 +153,10 @@ func conditionGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfi
 	if cross && len(cfg.glossary) == 0 {
 		return ""
 	}
+	// Dates and clock times are compared as one token each ("01-06-2026" and
+	// "1 juni 2026" are the same condition word).
+	claim = canonicalDates(claim, claimLanguage)
+	eu.Text = canonicalDates(eu.Text, eu.Language)
 	c := carrier{claim: map[string]bool{}, crossLang: cross, translations: glossaryIndex(cfg.glossary)}
 	claimTokens := tokenize.TokenizeV2(claim)
 	for _, t := range claimTokens {
@@ -396,4 +400,31 @@ func abs(n int) int {
 func isContextStop(t string) bool {
 	_, ok := contextStop[t]
 	return ok
+}
+
+// canonicalDates replaces each date with one token, "d0106" (+ " y2026"), so
+// a date matches however it is written.
+func canonicalDates(text, language string) string {
+	dates, _ := datesIn(text, language)
+	if len(dates) == 0 {
+		return text
+	}
+	lowered := strings.ToLower(text)
+	var b strings.Builder
+	last := 0
+	for _, sp := range dateSpans(lowered, language) {
+		b.WriteString(lowered[last:sp.start])
+		d := sp.key
+		if d.ambiguous != "" {
+			b.WriteString(" " + d.ambiguous + " ")
+		} else {
+			fmt.Fprintf(&b, " d%02d%02d ", d.day, d.month)
+			if d.year != 0 {
+				fmt.Fprintf(&b, "y%d ", d.year)
+			}
+		}
+		last = sp.end
+	}
+	b.WriteString(lowered[last:])
+	return b.String()
 }

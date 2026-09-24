@@ -34,6 +34,21 @@ func numberGuard(claim, claimLanguage, passage, passageLanguage string) string {
 	// Clock times first, compared as times; then blanked for the rest.
 	claimClocks, claim := clockTimes(claim)
 	passageClocks, passage := clockTimes(passage)
+	// Dates next, compared as dates, then blanked.
+	claimDates, claim := datesIn(claim, claimLanguage)
+	passageDates, passage := datesIn(passage, passageLanguage)
+	for _, cd := range claimDates {
+		found := false
+		for _, pd := range passageDates {
+			if sameDate(cd, pd) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Sprintf("number guard: %s is not in the passage", cd)
+		}
+	}
 	for _, k := range sortedKeys(claimClocks) {
 		if _, ok := passageClocks[k]; !ok {
 			return fmt.Sprintf("number guard: %s is not in the passage", strings.TrimPrefix(k, "clock:"))

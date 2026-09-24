@@ -12,8 +12,10 @@
 package answer
 
 import (
+	"fmt"
 	"math/big"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -292,4 +294,144 @@ func joinSpacedThousands(text string) string {
 		text = next
 	}
 	return text
+}
+
+// Dates, numeric or written, are read as (day, month, year?) and compared as
+// dates: "01-06-2026" = "1 juni 2026" = "June 1, 2026". A numeric d-m(-y)
+// date is read day-first under a Dutch declaration; in any other language a
+// numeric date whose day and month could both be either ("01/06") is
+// AMBIGUOUS and matches only its own spelling — ambiguity refuses, it never
+// guesses (ADR-0015's rule for numbers). Months come from the same NL/EN
+// table the name guard folds.
+var (
+	numericDate = regexp.MustCompile(`\b([0-3]?[0-9])[-/.]([01]?[0-9])(?:[-/.]((?:19|20)[0-9]{2}))?\b`)
+	monthNames  = func() string {
+		names := make([]string, 0, len(monthNumber))
+		for n := range monthNumber {
+			names = append(names, n)
+		}
+		sort.Slice(names, func(i, j int) bool { return len(names[i]) > len(names[j]) })
+		return strings.Join(names, "|")
+	}()
+	dayMonth = regexp.MustCompile(`\b([0-3]?[0-9])(?:st|nd|rd|th|e|ste|de)?\s+(` + monthNames + `)\b(?:\s+((?:19|20)[0-9]{2}))?`)
+	monthDay = regexp.MustCompile(`\b(` + monthNames + `)\s+([0-3]?[0-9])(?:st|nd|rd|th)?\b(?:,?\s+((?:19|20)[0-9]{2}))?`)
+)
+
+var monthNumber = map[string]int{
+	"januari": 1, "februari": 2, "maart": 3, "april": 4, "mei": 5, "juni": 6, "juli": 7, "augustus": 8,
+	"september": 9, "oktober": 10, "november": 11, "december": 12,
+	"january": 1, "february": 2, "march": 3, "may": 5, "june": 6, "july": 7, "august": 8,
+	"october": 10,
+}
+
+type dateKey struct {
+	day, month, year int // year 0: not stated
+	ambiguous        string
+}
+
+func (d dateKey) String() string {
+	if d.ambiguous != "" {
+		return d.ambiguous
+	}
+	if d.year == 0 {
+		return fmt.Sprintf("%02d-%02d", d.day, d.month)
+	}
+	return fmt.Sprintf("%02d-%02d-%d", d.day, d.month, d.year)
+}
+
+// sameDate: equal day and month, and equal years when both state one.
+func sameDate(a, b dateKey) bool {
+	if a.ambiguous != "" || b.ambiguous != "" {
+		return a.ambiguous != "" && a.ambiguous == b.ambiguous
+	}
+	return a.day == b.day && a.month == b.month && (a.year == 0 || b.year == 0 || a.year == b.year)
+}
+
+func atoi(s string) int {
+	n := 0
+	for _, r := range s {
+		n = n*10 + int(r-'0')
+	}
+	return n
+}
+
+type dateSpan struct {
+	start, end int
+	key        dateKey
+}
+
+// datesIn returns the dates in text and the text with them blanked.
+func datesIn(text, language string) ([]dateKey, string) {
+	lowered := strings.ToLower(text)
+	blank := []byte(lowered)
+	var out []dateKey
+	for _, sp := range dateSpans(lowered, language) {
+		out = append(out, sp.key)
+		for i := sp.start; i < sp.end; i++ {
+			blank[i] = ' '
+		}
+	}
+	return out, string(blank)
+}
+
+// dateSpans finds the dates in lowered text, in text order.
+func dateSpans(lowered, language string) []dateSpan {
+	blank := []byte(lowered)
+	var spans []dateSpan
+	valid := func(d, m int) bool { return d >= 1 && d <= 31 && m >= 1 && m <= 12 }
+	var k dateKey
+	mark := func(start, end int) {
+		spans = append(spans, dateSpan{start, end, k})
+		for i := start; i < end; i++ {
+			blank[i] = ' '
+		}
+	}
+	for _, m := range dayMonth.FindAllStringSubmatchIndex(lowered, -1) {
+		d, mo := atoi(lowered[m[2]:m[3]]), monthNumber[lowered[m[4]:m[5]]]
+		if !valid(d, mo) {
+			continue
+		}
+		k = dateKey{day: d, month: mo}
+		if m[6] >= 0 {
+			k.year = atoi(lowered[m[6]:m[7]])
+		}
+		mark(m[0], m[1])
+	}
+	for _, m := range monthDay.FindAllStringSubmatchIndex(string(blank), -1) {
+		mo, d := monthNumber[string(blank[m[2]:m[3]])], atoi(string(blank[m[4]:m[5]]))
+		if !valid(d, mo) {
+			continue
+		}
+		k = dateKey{day: d, month: mo}
+		if m[6] >= 0 {
+			k.year = atoi(string(blank[m[6]:m[7]]))
+		}
+		mark(m[0], m[1])
+	}
+	dutch := primaryLanguageTag(language) == "nl"
+	for _, m := range numericDate.FindAllStringSubmatchIndex(string(blank), -1) {
+		raw := string(blank[m[0]:m[1]])
+		a, b := atoi(string(blank[m[2]:m[3]])), atoi(string(blank[m[4]:m[5]]))
+		year := 0
+		if m[6] >= 0 {
+			year = atoi(string(blank[m[6]:m[7]]))
+		} else if !strings.Contains(raw, "-") {
+			continue // "1.5" or "3/4" without a year is a number or a fraction
+		}
+		switch {
+		case dutch && valid(a, b):
+			k = dateKey{day: a, month: b, year: year}
+		case !dutch && valid(a, b) && valid(b, a) && a != b:
+			k = dateKey{ambiguous: "date?" + raw}
+		case valid(a, b):
+			k = dateKey{day: a, month: b, year: year}
+		case valid(b, a):
+			k = dateKey{day: b, month: a, year: year} // month-first, unambiguous
+		default:
+			continue
+		}
+		mark(m[0], m[1])
+	}
+	sort.Slice(spans, func(i, j int) bool { return spans[i].start < spans[j].start })
+	return spans
 }
