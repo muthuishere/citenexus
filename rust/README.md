@@ -12,7 +12,8 @@ real C ABI.
 |---|---|
 | **extract** — txt · csv · md · html · docx · pptx (OOXML-direct) · xlsx (calamine) | ✅ implemented, parity-tested |
 | **extract** — code (tree-sitter: python · go) — one verbatim `code` EU per top-level symbol, `structure_type=code_ast`, line range carried; unknown language → plain | ✅ implemented, parity-tested (`tests/core/test_rust_code_parity.py`) |
-| **extract** — pdf (pdfium, runtime-bound) | behind the `pdf` feature |
+| **extract** — pdf (pdfium, runtime-bound): `extract` keeps the one-paragraph-per-page `ExtractedDoc` | behind the `pdf` feature |
+| **pdf units** — `pdf_units` / `citenexus_pdf_units`: the no-model base extractor (ADR-0017 step 2). Layout lines/columns from pdfium char boxes, U+0002 hyphen join with document witnesses, running header/footer kept once as `furniture`, reading order (struct tree → rule-based → XY-cut), headings decided per document (struct tree trusted only when ≤20 % of pages disagree with font evidence), lists, per-page route (`plain`/`formatted`/`table`/`image`/`scan`) with its signals | behind the `pdf` feature; tested on synthetic PDFs (`tests/pdf_units_test.rs`); **tables are not built yet** (a table page is routed `table`, its text is still emitted as paragraphs) |
 | **emit** — any supported format → markdown (`citenexus_to_markdown`), deterministic, byte-identical with the Python reference | ✅ implemented, parity-tested |
 | **store** — Lance (`upsert/search/scan/drop`, merge-insert by `eu_id`) | ✅ implemented; `tests/core/test_rust_store_parity.py` proves Rust-written tables are read (scan + search) by Python's `LanceVectorStore` and vice versa — same URI, same bytes |
 | **detect** — fastText lid.176 (pure-Rust `fasttext` crate) | ✅ implemented — **dense `lid.176.bin` only**: the crate's quantized (`.ftz`) inference diverges from upstream in 0.8.0, so quantized models are refused with an error (see `src/detect.rs`) |
@@ -40,6 +41,11 @@ char* citenexus_extract(const uint8_t* bytes, size_t len,
 
 char* citenexus_to_markdown(const uint8_t* bytes, size_t len,
                            const char* source_type); // -> {"markdown": ...} or {"error": ...}
+
+// pdf units (feature `pdf`) — opts_json = {"language":"nl","layout_text":false}
+// or NULL. -> {"units":[DocUnit...],"pages":[...],"document":{...}} or
+// {"error": ...} (also when built without `pdf` or libpdfium is missing).
+char* citenexus_pdf_units(const uint8_t* bytes, size_t len, const char* opts_json);
 
 // rrf — reciprocal-rank fusion. lists_json = JSON array of arrays of eu_id
 // strings; k = the RRF constant (60 is standard). -> JSON array of fused
@@ -72,6 +78,36 @@ task core:build   # cargo build (cdylib + staticlib)
 task core:test    # cargo test + the Python↔Rust parity suite
 cargo build --features pdf   # enable the pdfium-backed PDF extractor
 ```
+
+### libpdfium (the `pdf` feature)
+
+pdfium-render binds libpdfium **dynamically at runtime**; nothing is bundled.
+The core looks for it in this order (`src/extract/pdf/raw.rs`, `pdfium()`):
+
+1. `PDFIUM_DYNAMIC_LIB_PATH`, which can be the library file itself or a
+   directory that holds `libpdfium.{so,dylib}` / `pdfium.dll`;
+2. the current directory;
+3. the system loader path.
+
+Production: ship a pinned `libpdfium.so` from bblanchon/pdfium-binaries next
+to the cdylib (ADR-0017 §Runtime). Locally, any pdfium build works. For
+example, the one inside a pypdfium2 wheel (the binary only, via uv's cache):
+
+```bash
+export PDFIUM_DYNAMIC_LIB_PATH=/path/to/pypdfium2_raw/libpdfium.dylib
+cargo test --features pdf                       # PDF tests run
+cargo build --release --features pdf            # for golang/core PdfUnits
+(cd ../golang && go test -tags citenexus_ffi ./core/)
+```
+
+Without libpdfium the PDF tests print `SKIP: libpdfium unavailable …` and
+pass, and Go's `TestPdfUnits` skips. pdfium is not thread-safe, so every call
+holds one process-wide lock.
+
+PDF test fixtures are **synthetic**: `tests/common/pdfgen.rs` writes PDF 1.7
+by hand, with no AGPL/GPL tool involved. `conformance/fixtures/pdf/*.pdf` is
+regenerated with `CITENEXUS_WRITE_PDF_FIXTURES=1 cargo test --test pdf_fixtures_test`.
+Third-party attributions: [`NOTICE`](NOTICE).
 
 Build prerequisite: `protoc` (lance's build scripts generate protobuf code) —
 `brew install protobuf` on macOS. The lid.176 real-model tests skip unless
