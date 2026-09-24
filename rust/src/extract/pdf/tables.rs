@@ -204,7 +204,8 @@ pub fn cell_text(segs: &[Segment], page: &RawPage, cell: &TCell) -> String {
     cell.prefix
         .iter()
         .chain(cell.words.iter())
-        .map(|&(s, k)| word_text(page, &segs[s], k))
+        .map(|&(s, k)| checks::strip_leaders(&word_text(page, &segs[s], k)))
+        .filter(|t| !t.is_empty())
         .collect::<Vec<_>>()
         .join(" ")
 }
@@ -283,6 +284,7 @@ fn gate(segs: &[Segment], page: &RawPage, rows: &[Vec<TCell>]) -> Result<(), Rej
                     words: c
                         .words
                         .iter()
+                        .filter(|&&(s, k)| !checks::has_leader(&word_text(page, &segs[s], k)))
                         .map(|&(s, k)| {
                             let id = format!("{s}:{k}");
                             boxes.insert(id.clone(), word_box(page, &segs[s], k));
@@ -1082,8 +1084,11 @@ fn track_tables(
         // whitespace rivers over the multi-segment lines
         let width = (x1 - x0).ceil() as usize + 1;
         let mut cover = vec![false; width];
+        let leader_seg = |s: usize| {
+            (0..segs[s].words.len()).all(|w| checks::is_leader(&word_text(page, &segs[s], w)))
+        };
         for &i in run.iter().filter(|&&i| body[i].len() >= 2) {
-            for &s in &body[i] {
+            for &s in body[i].iter().filter(|&&s| !leader_seg(s)) {
                 let a = (segs[s].bbox[0] - x0).floor().max(0.0) as usize;
                 let b = ((segs[s].bbox[2] - x0).ceil() as usize).min(width - 1);
                 cover[a..=b].iter_mut().for_each(|x| *x = true);
@@ -1111,8 +1116,12 @@ fn track_tables(
         }
         let col_of = |x: f64| seps.iter().filter(|&&s| x > s).count();
         let mut rows: Vec<Vec<TCell>> = Vec::new();
+        let mut leader_rows = 0usize;
         for &i in &run {
             let line = &body[i];
+            let mut leaders_in_row = line.iter().any(|&s| {
+                (0..segs[s].words.len()).any(|w| checks::has_leader(&word_text(page, &segs[s], w)))
+            });
             if line.len() < 2 && !rows.is_empty() && col_of(segs[line[0]].bbox[0]) > 0 {
                 // a wrapped continuation of the row above
                 let c = col_of(segs[line[0]].bbox[0]);
@@ -1133,6 +1142,14 @@ fn track_tables(
                 })
                 .collect();
             for &s in line {
+                if leader_seg(s) {
+                    // filler: accounted to the row (no split unit), never a column
+                    leaders_in_row = true;
+                    row[0]
+                        .words
+                        .extend((0..segs[s].words.len()).map(|w| (s, w)));
+                    continue;
+                }
                 let (a, b) = (col_of(segs[s].bbox[0] + 0.5), col_of(segs[s].bbox[2] - 0.5));
                 // a segment crossing a river keeps its words together in its first column
                 let c = a.min(b);
@@ -1141,6 +1158,7 @@ fn track_tables(
                     .extend((0..segs[s].words.len()).map(|w| (s, w)));
             }
             rows.push(row);
+            leader_rows += leaders_in_row as usize;
         }
         // An axis label directly above the sub-header row (tight line pitch),
         // right of an EMPTY stub column, spanning ≥2 sub-headers: prefix it
@@ -1198,6 +1216,22 @@ fn track_tables(
             }
         }
         let text = text_grid(segs, page, &rows);
+        // Leaders into bare page numbers: a table of contents, whatever the
+        // title column holds. No table, and no model request either.
+        let last_is_number = text
+            .iter()
+            .filter(|r| {
+                r.iter()
+                    .rev()
+                    .find(|c| !c.is_empty())
+                    .and_then(|c| c.split_whitespace().last())
+                    .is_some_and(is_page_number)
+            })
+            .count();
+        if leader_rows * 2 >= rows.len() && last_is_number * 10 >= rows.len() * 7 {
+            out.rejected.push((TableSource::Tracks, Reject::Toc));
+            continue;
+        }
         let score = match score_tracks(&text) {
             Ok(s) => s,
             Err(r) => {

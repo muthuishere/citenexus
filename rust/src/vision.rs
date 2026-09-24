@@ -35,6 +35,8 @@ use unicode_normalization::UnicodeNormalization;
 use crate::numbers::read_number;
 
 pub const OPEN: &str = "<!-- vision_disputed";
+/// Wraps an image description: never citable.
+pub const DESCRIPTION_OPEN: &str = "<!-- image_description";
 pub const CLOSE: &str = "-->";
 
 #[derive(Debug, Clone, PartialEq)]
@@ -236,12 +238,25 @@ pub fn reconcile(v1: Option<&str>, v2: Option<&str>, language: Option<&str>) -> 
     })
 }
 
-/// The markdown with every `vision_disputed` block removed: the only text a
+/// An image description as a never-citable block.
+pub fn description_block(text: &str) -> String {
+    format!("{DESCRIPTION_OPEN}\n{}\n{CLOSE}", safe(text.trim()))
+}
+
+fn next_block(s: &str) -> Option<usize> {
+    [s.find(OPEN), s.find(DESCRIPTION_OPEN)]
+        .into_iter()
+        .flatten()
+        .min()
+}
+
+/// The markdown with every `vision_disputed` and `image_description` block
+/// removed: the only text a
 /// host may cite or quote-match.
 pub fn citable_text(markdown: &str) -> String {
     let mut out = String::new();
     let mut rest = markdown;
-    while let Some(start) = rest.find(OPEN) {
+    while let Some(start) = next_block(rest) {
         out.push_str(&rest[..start]);
         match rest[start..].find(CLOSE) {
             Some(end) => rest = &rest[start + end + CLOSE.len()..],

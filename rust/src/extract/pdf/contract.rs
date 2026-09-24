@@ -130,6 +130,81 @@ fn words_in(b: &Base, p: usize, region: &[f64; 4]) -> Vec<PdfWord> {
         .collect()
 }
 
+/// Growth above this factor (words in the grown region over words in the
+/// original region) means the region was not a table region: skip it.
+pub const MAX_REGION_GROWTH: f64 = 2.5;
+
+/// The region's words as lines (by vertical centre, 3 pt), checked with the
+/// TOC validator (`checks::is_toc_lines`).
+fn is_toc_region(words: &[PdfWord], region: &[f64; 4]) -> bool {
+    let mut ws: Vec<&PdfWord> = words.iter().filter(|w| inside(&w.bbox, region)).collect();
+    ws.sort_by(|a, b| {
+        let (ya, yb) = ((a.bbox[1] + a.bbox[3]) / 2.0, (b.bbox[1] + b.bbox[3]) / 2.0);
+        ya.total_cmp(&yb).then(a.bbox[0].total_cmp(&b.bbox[0]))
+    });
+    let mut lines: Vec<(f64, Vec<&PdfWord>)> = Vec::new();
+    for w in ws {
+        let y = (w.bbox[1] + w.bbox[3]) / 2.0;
+        match lines.last_mut() {
+            Some((ly, l)) if (y - *ly).abs() <= 3.0 => l.push(w),
+            _ => lines.push((y, vec![w])),
+        }
+    }
+    let texts: Vec<String> = lines
+        .into_iter()
+        .map(|(_, mut l)| {
+            l.sort_by(|a, b| a.bbox[0].total_cmp(&b.bbox[0]));
+            l.iter()
+                .map(|w| w.text.as_str())
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .collect();
+    checks::is_toc_lines(&texts)
+}
+
+fn grow_to_units(b: &Base, p: usize, pg: u32, region: &[f64; 4]) -> Option<[f64; 4]> {
+    let centre_in = |bb: &[f64; 4], r: &[f64; 4]| inside(bb, r);
+    let boxes: BTreeMap<&str, [f64; 4]> = b.words[p]
+        .iter()
+        .map(|(w, _)| (w.id.as_str(), w.bbox))
+        .collect();
+    let before = boxes.values().filter(|bb| centre_in(bb, region)).count();
+    let mut grown = *region;
+    for (i, u) in b.out.units.iter().enumerate() {
+        if u.page != Some(pg)
+            || !matches!(
+                u.kind,
+                UnitKind::Paragraph | UnitKind::List | UnitKind::Heading | UnitKind::Table
+            )
+        {
+            continue;
+        }
+        let ws = &b.unit_words[i];
+        if ws.iter().any(|w| {
+            boxes
+                .get(w.as_str())
+                .is_some_and(|bb| centre_in(bb, region))
+        }) {
+            for w in ws {
+                if let Some(bb) = boxes.get(w.as_str()) {
+                    grown = [
+                        grown[0].min(bb[0]),
+                        grown[1].min(bb[1]),
+                        grown[2].max(bb[2]),
+                        grown[3].max(bb[3]),
+                    ];
+                }
+            }
+        }
+    }
+    let after = boxes.values().filter(|bb| centre_in(bb, &grown)).count();
+    if before == 0 || after as f64 > MAX_REGION_GROWTH * before as f64 {
+        return None;
+    }
+    Some(grown)
+}
+
 fn requests(b: &Base, opts: &PdfOptions) -> Vec<PdfRequest> {
     let mut out = Vec::new();
     for (p, info) in b.out.pages.iter().enumerate() {
@@ -164,13 +239,24 @@ fn requests(b: &Base, opts: &PdfOptions) -> Vec<PdfRequest> {
                 regions.extend(accepted.iter().copied());
             }
             regions.sort_by(|a, c| a[1].total_cmp(&c[1]).then(a[0].total_cmp(&c[0])));
-            for (k, region) in regions.iter().enumerate() {
-                let words = words_in(b, p, region);
-                if words.is_empty() {
+            let mut k = 0usize;
+            for region in &regions {
+                // Grow the region to the whole units it intersects: a grid
+                // over half a unit is a certain partial_unit. If growing more
+                // than doubles the words in play, the region was mostly
+                // something else: no request (the base stays).
+                let Some(region) = grow_to_units(b, p, pg, region) else {
+                    continue;
+                };
+                let words = words_in(b, p, &region);
+                if words.is_empty() || is_toc_region(&words, &region) {
+                    // a table of contents: no table, and no model call
                     continue;
                 }
+                let k_here = k;
+                k += 1;
                 out.push(PdfRequest {
-                    id: format!("p{pg}:table{k}"),
+                    id: format!("p{pg}:table{k_here}"),
                     page: pg,
                     kind: PdfRequestKind::TableStructure,
                     prompt: "table_structure".into(),
@@ -256,13 +342,20 @@ fn table_markdown(
     for (r, row) in rows.iter().enumerate() {
         for (k, cell) in row.iter().enumerate() {
             let (pr, pc) = placement[r][k];
-            let mut ws: Vec<(usize, &str)> = cell
+            let mut ws: Vec<(usize, String)> = cell
                 .words
                 .iter()
                 .filter_map(|w| text.get(w.as_str()).copied())
+                .map(|(i, t)| (i, checks::strip_leaders(t)))
+                .filter(|(_, t)| !t.is_empty())
                 .collect();
             ws.sort();
-            m[pr][pc] = escape_cell(&ws.iter().map(|(_, t)| *t).collect::<Vec<_>>().join(" "));
+            m[pr][pc] = escape_cell(
+                &ws.iter()
+                    .map(|(_, t)| t.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            );
         }
     }
     let line = |cells: &[String]| format!("| {} |", cells.join(" | "));
@@ -313,6 +406,8 @@ struct Edit {
     fill: Vec<Fill>,
     /// Kept deterministic tables a disagreeing model grid made uncertain.
     uncertain: Vec<usize>,
+    /// Units that get `model_verdict = "no_table"`.
+    verdict: Vec<usize>,
 }
 
 fn apply_table(
@@ -331,7 +426,14 @@ fn apply_table(
     };
     checks::guard_finish(resp.finish_reason.as_deref())?;
     if tables.is_empty() {
-        return Err(Failure::EmptyGrid);
+        // The model's verdict "no table here": informative, not a failure.
+        return Ok(Edit {
+            remove: BTreeSet::new(),
+            insert: vec![],
+            fill: vec![],
+            uncertain: vec![],
+            verdict: region_units(units, unit_words, req, &BTreeSet::new()),
+        });
     }
     let p = (req.page - 1) as usize;
     let boxes: BTreeMap<String, WordBox> =
@@ -341,11 +443,48 @@ fn apply_table(
         .enumerate()
         .map(|(i, (w, _))| (w.id.as_str(), (i, w.text.as_str())))
         .collect();
+    // words with leader runs are filler for the band test (they run across);
+    // pure leaders are also exempt from coverage and partial-unit accounting
+    let leaders: BTreeSet<&str> = req
+        .words
+        .iter()
+        .filter(|w| checks::has_leader(&w.text))
+        .map(|w| w.id.as_str())
+        .collect();
+    let pure_leaders: BTreeSet<&str> = req
+        .words
+        .iter()
+        .filter(|w| checks::is_leader(&w.text))
+        .map(|w| w.id.as_str())
+        .collect();
     let mut all: BTreeSet<String> = BTreeSet::new();
     let mut grids = Vec::new();
     for g in tables {
         let cells = to_cells(g);
-        let placement = checks::geometry_gate(&cells, &boxes)?;
+        // leaders are filler: outside the column-band test (they run across)
+        let gate_cells: Vec<Vec<GridCell>> = cells
+            .iter()
+            .map(|r| {
+                r.iter()
+                    .map(|c| GridCell {
+                        words: c
+                            .words
+                            .iter()
+                            .filter(|w| !leaders.contains(w.as_str()))
+                            .cloned()
+                            .collect(),
+                        colspan: c.colspan,
+                        rowspan: c.rowspan,
+                    })
+                    .collect()
+            })
+            .collect();
+        for w in cells.iter().flatten().flat_map(|c| c.words.iter()) {
+            if !boxes.contains_key(w) {
+                return Err(Failure::UnknownWord);
+            }
+        }
+        let placement = checks::geometry_gate(&gate_cells, &boxes)?;
         let ids: BTreeSet<String> = cells
             .iter()
             .flatten()
@@ -367,11 +506,12 @@ fn apply_table(
                 gb[3].max(w[3]),
             ];
         }
-        if req
-            .words
-            .iter()
-            .any(|w| !w.marker && !ids.contains(&w.id) && inside(&w.bbox, &gb))
-        {
+        if req.words.iter().any(|w| {
+            !w.marker
+                && !pure_leaders.contains(w.id.as_str())
+                && !ids.contains(&w.id)
+                && inside(&w.bbox, &gb)
+        }) {
             return Err(Failure::GridCoverage);
         }
         grids.push((cells, placement, ids));
@@ -391,9 +531,11 @@ fn apply_table(
         }
         // A grid may take a unit minus its list-marker glyphs (they are not
         // content and are not emitted); any other word left out splits it.
-        if w.iter()
-            .any(|x| !all.contains(*x) && !markers.contains(x.as_str()))
-        {
+        if w.iter().any(|x| {
+            !all.contains(*x)
+                && !markers.contains(x.as_str())
+                && !checks::is_leader(order.get(x.as_str()).map(|t| t.1).unwrap_or(""))
+        }) {
             return Err(Failure::PartialUnit);
         }
         for (g, (_, _, ids)) in grids.iter().enumerate() {
@@ -474,6 +616,7 @@ fn apply_table(
         insert,
         fill: vec![],
         uncertain: marks,
+        verdict: vec![],
     })
 }
 
@@ -484,18 +627,27 @@ fn validate_vision(
     req: &PdfRequest,
     resp: &PdfResponse,
     lang: Option<&str>,
-) -> Result<String, Failure> {
+) -> Result<(String, bool), Failure> {
     let Some(md) = resp.markdown.as_deref() else {
         return Err(Failure::Malformed);
     };
+    let description = match resp.mode.as_deref() {
+        None | Some("transcription") => false,
+        // a page with no text layer is text: it is transcribed, not described
+        Some("description") if req.kind == PdfRequestKind::VisionRegion => true,
+        _ => return Err(Failure::Malformed),
+    };
     checks::guard_text(md, resp.finish_reason.as_deref())?;
+    if description {
+        return Ok((md.trim().to_string(), true));
+    }
     if req.kind == PdfRequestKind::VisionPage {
         let reference = page_reference(units, req.page);
         if checks::tokens(&reference).len() >= MIN_REFERENCE_TOKENS {
             checks::check_text(md, &reference, lang)?;
         }
     }
-    Ok(md.trim().to_string())
+    Ok((md.trim().to_string(), false))
 }
 
 fn page_text_units(units: &[DocUnit], pg: u32) -> Vec<usize> {
@@ -535,6 +687,7 @@ fn vision_edit(
             insert: vec![],
             fill: vec![fill(i)],
             uncertain: vec![],
+            verdict: vec![],
         });
     }
     let page_units = on_page(units, req.page);
@@ -554,6 +707,7 @@ fn vision_edit(
             insert: vec![],
             fill: vec![fill(i)],
             uncertain: vec![],
+            verdict: vec![],
         }),
         None => {
             let at = text_units
@@ -578,6 +732,7 @@ fn vision_edit(
                 insert: vec![(at, unit, vec![])],
                 fill: vec![],
                 uncertain: vec![],
+                verdict: vec![],
             })
         }
     }
@@ -595,6 +750,9 @@ fn region_unit(units: &[DocUnit], req: &PdfRequest) -> Option<usize> {
 }
 
 fn commit(units: &mut Vec<DocUnit>, unit_words: &mut Vec<Vec<String>>, edit: Edit) {
+    for &i in &edit.verdict {
+        units[i].provenance.model_verdict = Some("no_table".into());
+    }
     for &i in &edit.uncertain {
         units[i].provenance.table_uncertain = true;
     }
@@ -635,10 +793,33 @@ fn commit(units: &mut Vec<DocUnit>, unit_words: &mut Vec<Vec<String>>, edit: Edi
     *unit_words = out_w;
 }
 
-/// The units a failed response is recorded on. A table request: the units of
-/// the table REGION — a word whose centre lies inside the request's region
-/// box (not the 12 pt listing margin) — plus any unit the response's grid
-/// referenced. Prose around the table keeps its base provenance.
+/// The units of a table request's REGION: a word whose centre lies inside
+/// the request's region box (not the 12 pt listing margin), plus any unit the
+/// response's grid referenced. Prose around the table is not touched.
+fn region_units(
+    units: &[DocUnit],
+    unit_words: &[Vec<String>],
+    req: &PdfRequest,
+    referenced: &BTreeSet<String>,
+) -> Vec<usize> {
+    let in_region: BTreeSet<&str> = req
+        .words
+        .iter()
+        .filter(|w| inside(&w.bbox, &req.bbox))
+        .map(|w| w.id.as_str())
+        .collect();
+    (0..units.len())
+        .filter(|&i| {
+            units[i].page == Some(req.page)
+                && unit_words[i]
+                    .iter()
+                    .any(|w| in_region.contains(w.as_str()) || referenced.contains(w))
+        })
+        .collect()
+}
+
+/// Record a failed response: on a table request's region units, or on the
+/// vision request's image unit / page text units.
 fn mark_failed(
     units: &mut [DocUnit],
     unit_words: &[Vec<String>],
@@ -646,12 +827,6 @@ fn mark_failed(
     resp: Option<&PdfResponse>,
     f: Failure,
 ) {
-    let in_region: BTreeSet<&str> = req
-        .words
-        .iter()
-        .filter(|w| inside(&w.bbox, &req.bbox))
-        .map(|w| w.id.as_str())
-        .collect();
     let referenced: BTreeSet<String> = resp
         .and_then(|r| r.tables.as_ref())
         .into_iter()
@@ -660,15 +835,8 @@ fn mark_failed(
         .collect();
     let targets: Vec<usize> = match req.kind {
         PdfRequestKind::VisionRegion => region_unit(units, req).into_iter().collect(),
-        PdfRequestKind::TableStructure => (0..units.len())
-            .filter(|&i| {
-                units[i].page == Some(req.page)
-                    && unit_words[i]
-                        .iter()
-                        .any(|w| in_region.contains(w.as_str()) || referenced.contains(w))
-            })
-            .collect(),
-        _ => on_page(units, req.page)
+        PdfRequestKind::TableStructure => region_units(units, unit_words, req, &referenced),
+        PdfRequestKind::VisionPage => on_page(units, req.page)
             .into_iter()
             .filter(|&i| !matches!(units[i].kind, UnitKind::Furniture | UnitKind::Image))
             .collect(),
@@ -710,6 +878,7 @@ pub fn pdf_assemble(
             let variants: Vec<&PdfRequest> =
                 reqs.iter().filter(|r| base_id(&r.id) == base).collect();
             let mut texts: Vec<Option<String>> = vec![None; VARIANTS as usize];
+            let mut descriptions: Vec<Option<String>> = vec![None; VARIANTS as usize];
             let mut first_fail: Option<Failure> = None;
             let mut any = false;
             for vr in &variants {
@@ -723,9 +892,13 @@ pub fn pdf_assemble(
                     validate_vision(&units, vr, rs[0], lang)
                 };
                 match res {
-                    Ok(t) => {
+                    Ok((t, described)) => {
                         let slot = vr.variant.unwrap_or(1).clamp(1, VARIANTS) as usize - 1;
-                        texts[slot] = Some(t);
+                        if described {
+                            descriptions[slot] = Some(t);
+                        } else {
+                            texts[slot] = Some(t);
+                        }
                         applied += 1;
                     }
                     Err(f) => {
@@ -736,6 +909,21 @@ pub fn pdf_assemble(
             }
             if !any {
                 continue;
+            }
+            // Only descriptions: an image_description unit (never citable,
+            // no dual agreement: it is not evidence). Any transcription:
+            // transcriptions alone go through dual agreement.
+            if texts.iter().all(|t| t.is_none()) {
+                if let Some(desc) = descriptions.iter().flatten().next() {
+                    if let Some(i) = region_unit(&units, req) {
+                        let u = &mut units[i];
+                        u.kind = UnitKind::ImageDescription;
+                        u.markdown = vision::description_block(desc);
+                        u.provenance.vision_transcribed = true;
+                        u.provenance.failed_check = first_fail.map(|f| f.as_str().to_string());
+                    }
+                    continue;
+                }
             }
             match vision::reconcile(texts[0].as_deref(), texts[1].as_deref(), lang) {
                 Some(rec) => match vision_edit(&units, req, rec, first_fail) {

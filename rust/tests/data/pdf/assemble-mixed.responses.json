@@ -50,30 +50,35 @@
         ]
       }
     ],
-    "markdown": null
+    "markdown": null,
+    "mode": null
   },
   {
     "request_id": "p2:page:v1",
     "finish_reason": null,
     "tables": null,
-    "markdown": "Declaratie reiskosten 2024\nReiskosten 7.000,00 geen voorschot\nHotel 5.100,00 per jaar\nDiner 1.250,00 vooraf betaald\nArtikel I.3 is van toepassing"
+    "markdown": "Declaratie reiskosten 2024\nReiskosten 7.000,00 geen voorschot\nHotel 5.100,00 per jaar\nDiner 1.250,00 vooraf betaald\nArtikel I.3 is van toepassing",
+    "mode": null
   },
   {
     "request_id": "p2:page:v2",
     "finish_reason": null,
     "tables": null,
-    "markdown": "Declaratie reiskosten 2024\nReiskosten 7.000,00 voorschot\nHotel 5.100,00 geen per jaar\nDiner 1.250,00 vooraf betaald\nArtikel I.3 is van toepassing"
+    "markdown": "Declaratie reiskosten 2024\nReiskosten 7.000,00 voorschot\nHotel 5.100,00 geen per jaar\nDiner 1.250,00 vooraf betaald\nArtikel I.3 is van toepassing",
+    "mode": null
   },
   {
     "request_id": "p3:img0:v1",
     "finish_reason": null,
     "tables": null,
-    "markdown": "Formulier: naam, datum, handtekening"
+    "markdown": "Formulier: naam, datum, handtekening",
+    "mode": null
   },
   {
     "request_id": "p3:img0:v2",
     "finish_reason": null,
     "tables": null,
-    "markdown": "Formulier: naam, datum, handtekening"
+    "markdown": "Formulier: naam, datum, handtekening",
+    "mode": null
   }
 ]

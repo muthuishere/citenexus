@@ -295,6 +295,14 @@
             "null"
           ],
           "description": "vision_page / vision_region only. On a table_structure request it is rejected (model_text_on_text_layer)."
+        },
+        "mode": {
+          "enum": [
+            "transcription",
+            "description",
+            null
+          ],
+          "description": "vision_region only. \"transcription\" (default): markdown copies text visible in the region, and the two variants must agree sentence by sentence. \"description\": the region has no meaningful text and markdown describes it; the unit becomes kind image_description, is never citable and is not put through dual agreement. On vision_page, \"description\" is malformed_response."
         }
       },
       "additionalProperties": false
@@ -338,7 +346,8 @@
         "heading_source",
         "joined_hyphen",
         "vision_disputed",
-        "header_flattened"
+        "header_flattened",
+        "model_verdict"
       ],
       "properties": {
         "route": {
@@ -397,6 +406,13 @@
         "header_flattened": {
           "type": "boolean",
           "description": "A header cell spanning several columns was flattened into its sub-headers as \"<label> <sub-header>\" (the PDF's own words; markdown cannot span)."
+        },
+        "model_verdict": {
+          "enum": [
+            "no_table",
+            null
+          ],
+          "description": "An informative model verdict, not a failure: \"no_table\" when a table_structure response returned {\"tables\": []} for the region (the base output stays)."
         }
       },
       "additionalProperties": false
@@ -436,7 +452,8 @@
             "list",
             "table",
             "furniture",
-            "image"
+            "image",
+            "image_description"
           ]
         },
         "level": {

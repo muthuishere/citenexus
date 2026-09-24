@@ -385,6 +385,12 @@ type PdfResponse struct {
 	FinishReason string    `json:"finish_reason,omitempty"`
 	Tables       []PdfGrid `json:"tables,omitempty"`
 	Markdown     *string   `json:"markdown,omitempty"`
+	// Mode is for vision_region only: "transcription" (default) when Markdown
+	// copies text visible in the region; "description" when the region has no
+	// meaningful text (a logo, a photo) and Markdown describes it. A
+	// description becomes an image_description unit: never citable, no dual
+	// agreement.
+	Mode string `json:"mode,omitempty"`
 }
 
 // PdfPrepare is phase one of the model contract (ADR-0017 decision 4).
@@ -431,15 +437,20 @@ func PdfAssembleJSON(pdf []byte, opts PdfOptions, responsesJSON []byte) ([]byte,
 	return pdfCall("assemble", pdf, opts, responsesJSON)
 }
 
-// CitableText returns markdown with every <!-- vision_disputed … --> block
-// removed: the only text a host may cite or quote-match (ADR-0017 decision 4).
+// CitableText returns markdown with every <!-- vision_disputed … --> and
+// <!-- image_description … --> block removed: the only text a host may cite or quote-match (ADR-0017 decision 4).
 // Mirrors the Rust core's vision::citable_text.
 func CitableText(markdown string) string {
-	const open, closing = "<!-- vision_disputed", "-->"
+	const closing = "-->"
 	var b strings.Builder
 	rest := markdown
 	for {
-		i := strings.Index(rest, open)
+		i := -1
+		for _, open := range []string{"<!-- vision_disputed", "<!-- image_description"} {
+			if j := strings.Index(rest, open); j >= 0 && (i < 0 || j < i) {
+				i = j
+			}
+		}
 		if i < 0 {
 			b.WriteString(rest)
 			break

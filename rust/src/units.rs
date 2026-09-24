@@ -32,6 +32,11 @@ pub enum UnitKind {
     /// An image region. On a text-layer page it is never merged into, and
     /// never overrides, text-layer content (ADR-0017 decision 9).
     Image,
+    /// A model's DESCRIPTION of an image region with no meaningful text (a
+    /// logo, a photo). Never citable: its markdown is wrapped in
+    /// `<!-- image_description … -->`, and it is not put through dual
+    /// agreement because it is not evidence.
+    ImageDescription,
 }
 
 /// How the page (or, for OOXML, the document) was classified — the router's
@@ -123,6 +128,10 @@ pub struct Provenance {
     /// markdown cannot span.
     #[serde(default)]
     pub header_flattened: bool,
+    /// A model's verdict that is informative, not a failure: `"no_table"` when
+    /// a `table_structure` response returned `{"tables": []}` for the region.
+    #[serde(default)]
+    pub model_verdict: Option<String>,
 }
 
 impl Provenance {
@@ -138,6 +147,7 @@ impl Provenance {
             joined_hyphen: false,
             vision_disputed: false,
             header_flattened: false,
+            model_verdict: None,
         }
     }
 }
@@ -393,7 +403,12 @@ pub struct PdfResponse {
     /// `table_structure`: one grid per table found in the request's words.
     #[serde(default)]
     pub tables: Option<Vec<PdfGrid>>,
-    /// `vision_page` / `vision_region`: the transcription.
+    /// `vision_page` / `vision_region`: the transcription (or description).
     #[serde(default)]
     pub markdown: Option<String>,
+    /// `vision_region` only: `"transcription"` (default) when `markdown`
+    /// copies text visible in the region, `"description"` when the region has
+    /// no meaningful text and `markdown` describes it.
+    #[serde(default)]
+    pub mode: Option<String>,
 }

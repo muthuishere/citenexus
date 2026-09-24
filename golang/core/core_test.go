@@ -356,4 +356,7 @@ func TestCitableText(t *testing.T) {
 	if got := CitableText(md); got != "Diner 1.250,00 vooraf betaald.\nArtikel I.3." {
 		t.Fatalf("CitableText: %q", got)
 	}
+	if got := CitableText("<!-- image_description\nEen logo\n-->"); got != "" {
+		t.Fatalf("an image description must not be citable: %q", got)
+	}
 }

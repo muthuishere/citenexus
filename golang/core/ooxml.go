@@ -48,6 +48,9 @@ type Provenance struct {
 	// HeaderFlattened: a table header cell spanning several columns was
 	// flattened into its sub-headers ("<label> <sub-header>", PDF words).
 	HeaderFlattened bool `json:"header_flattened"`
+	// ModelVerdict: an informative model verdict, not a failure. "no_table"
+	// when a table_structure response returned {"tables": []}.
+	ModelVerdict *string `json:"model_verdict"`
 }
 
 // OoxmlUnits converts a DOCX or PPTX (sourceType "docx" | "pptx") into

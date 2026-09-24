@@ -18,7 +18,7 @@ fn doc_unit_serializes_in_declaration_order() {
     let json = serde_json::to_string(&unit).unwrap();
     assert_eq!(
         json,
-        r##"{"page":2,"bbox":[72.0,90.5,300.25,110.0],"kind":"heading","level":1,"markdown":"# Scope","provenance":{"route":"formatted","table_source":null,"vision_transcribed":false,"table_uncertain":false,"failed_check":null,"heading_source":"struct_tree","joined_hyphen":false,"vision_disputed":false,"header_flattened":false}}"##
+        r##"{"page":2,"bbox":[72.0,90.5,300.25,110.0],"kind":"heading","level":1,"markdown":"# Scope","provenance":{"route":"formatted","table_source":null,"vision_transcribed":false,"table_uncertain":false,"failed_check":null,"heading_source":"struct_tree","joined_hyphen":false,"vision_disputed":false,"header_flattened":false,"model_verdict":null}}"##
     );
     let back: DocUnit = serde_json::from_str(&json).unwrap();
     assert_eq!(back, unit);

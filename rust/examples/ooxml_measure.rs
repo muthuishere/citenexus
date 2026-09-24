@@ -149,7 +149,7 @@ fn main() {
                 }
                 UnitKind::Furniture => furniture += 1,
                 UnitKind::Paragraph => paras += 1,
-                UnitKind::Image => {}
+                UnitKind::Image | UnitKind::ImageDescription => {}
             }
         }
         let merged = merged_cells(&bytes, docx);

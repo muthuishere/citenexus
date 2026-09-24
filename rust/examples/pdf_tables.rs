@@ -484,6 +484,8 @@ fn main() {
     let mut rejected: BTreeMap<String, usize> = BTreeMap::new();
     let (mut uncertain, mut uncertain_units) = (0, 0);
     let (mut treq, mut twords, mut tmax) = (0usize, 0usize, 0usize);
+    let (mut leader_reqs, mut leader_words) = (0usize, 0usize);
+    let mut leader_shapes: BTreeMap<&str, usize> = BTreeMap::new();
     for f in &files {
         let Ok(bytes) = std::fs::read(f) else {
             continue;
@@ -519,6 +521,45 @@ fn main() {
                 .iter()
                 .filter(|r| r.kind == PdfRequestKind::TableStructure)
             {
+                let leaders = r
+                    .words
+                    .iter()
+                    .filter(|w| citenexus_core::checks::is_leader(&w.text))
+                    .count();
+                let dotty = r
+                    .words
+                    .iter()
+                    .filter(|w| w.text.chars().filter(|c| *c == '.').count() >= 5)
+                    .count();
+                for w in r
+                    .words
+                    .iter()
+                    .filter(|w| w.text.chars().filter(|c| *c == '.').count() >= 5)
+                {
+                    let t = &w.text;
+                    let shape = if citenexus_core::checks::is_leader(t) {
+                        "pure leader"
+                    } else if t
+                        .trim_end_matches(|c: char| c.is_ascii_digit())
+                        .chars()
+                        .all(|c| c == '.')
+                    {
+                        "dots then digits"
+                    } else if t
+                        .trim_start_matches(|c: char| c.is_alphanumeric())
+                        .chars()
+                        .all(|c| c == '.')
+                    {
+                        "text then dots"
+                    } else {
+                        "mixed"
+                    };
+                    *leader_shapes.entry(shape).or_default() += 1;
+                }
+                if leaders > 0 || dotty > 0 {
+                    leader_reqs += 1;
+                    leader_words += r.words.len();
+                }
                 treq += 1;
                 twords += r.words.len();
                 tmax = tmax.max(r.words.len());
@@ -537,5 +578,6 @@ fn main() {
             0.0
         }
     );
+    println!("  requests containing leader-like words (5+ dots): {leader_reqs} ({leader_words} words); shapes {leader_shapes:?}");
     println!("positional integrity (corpus): {ok}/{tot} emitted cells made of text-layer words inside the table box");
 }

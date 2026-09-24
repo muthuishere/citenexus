@@ -276,6 +276,83 @@ pub fn check_text(candidate: &str, reference: &str, language: Option<&str>) -> R
     Ok(())
 }
 
+const LEADER_CHARS: &[char] = &['.', '…', '·', '_', '․', '‥'];
+
+/// The word contains a leader run: 4+ consecutive dot / ellipsis /
+/// middle-dot / underscore characters (TOC and form leaders), alone
+/// ("........") or glued to text ("Inleiding........", "......12").
+pub fn has_leader(text: &str) -> bool {
+    let mut run = 0;
+    for c in text.chars() {
+        if LEADER_CHARS.contains(&c) {
+            run += 1;
+            if run >= 4 {
+                return true;
+            }
+        } else {
+            run = 0;
+        }
+    }
+    false
+}
+
+/// The word's text with its leader runs removed (each run becomes a space).
+/// What remains is still the PDF's own characters: leaders are filler.
+pub fn strip_leaders(text: &str) -> String {
+    let chars: Vec<char> = text.chars().collect();
+    let mut out = String::new();
+    let mut i = 0;
+    while i < chars.len() {
+        let mut j = i;
+        while j < chars.len() && LEADER_CHARS.contains(&chars[j]) {
+            j += 1;
+        }
+        if j - i >= 4 {
+            out.push(' ');
+            i = j;
+        } else {
+            out.extend(&chars[i..j.max(i + 1)]);
+            i = j.max(i + 1);
+        }
+    }
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// A word that is ONLY a leader. It is FILLER, not content: kept in word
+/// accounting, left out of cell text and of the column-band test.
+pub fn is_leader(text: &str) -> bool {
+    has_leader(text) && strip_leaders(text).is_empty()
+}
+
+fn is_page_number_token(t: &str) -> bool {
+    let t = t.trim();
+    !t.is_empty()
+        && t.len() <= 4
+        && (t.chars().all(|c| c.is_ascii_digit())
+            || t.chars()
+                .all(|c| matches!(c, 'i' | 'v' | 'x' | 'I' | 'V' | 'X')))
+}
+
+/// Lines of a table of contents: at least 3 lines, and 70 % or more of them
+/// carry a leader and end in a bare page number (after the leader is
+/// stripped). Such a region is neither a table nor a model request.
+pub fn is_toc_lines(lines: &[String]) -> bool {
+    if lines.len() < 3 {
+        return false;
+    }
+    let toc = lines
+        .iter()
+        .filter(|l| {
+            has_leader(l)
+                && strip_leaders(l)
+                    .split_whitespace()
+                    .last()
+                    .is_some_and(is_page_number_token)
+        })
+        .count();
+    toc * 10 >= lines.len() * 7
+}
+
 // ----------------------------------------------------- geometry gate ----
 
 /// A word's box, top-left origin: `[x0, y0, x1, y1]`.
@@ -663,6 +740,38 @@ pub fn pipe_grid(md: &str) -> Vec<Vec<String>> {
         out.push(cells);
     }
     out
+}
+
+#[cfg(test)]
+mod leader_tests {
+    use super::*;
+
+    #[test]
+    fn leaders() {
+        assert!(is_leader("........") && is_leader("…………"));
+        assert!(!is_leader("...") && !is_leader("Inleiding........"));
+        assert!(has_leader("Inleiding........") && has_leader("......12"));
+        assert_eq!(strip_leaders("Inleiding........12"), "Inleiding 12");
+        assert_eq!(strip_leaders("einde..."), "einde...");
+        let toc: Vec<String> = [
+            "1 Inleiding.......3",
+            "2 Werktijden ......... 5",
+            "3 Verlof.........8",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        assert!(is_toc_lines(&toc));
+        let table: Vec<String> = [
+            "Reiskosten ........ 7.000,00",
+            "Hotel ........ 5.100,00",
+            "Diner ........ 1.250,00",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        assert!(!is_toc_lines(&table));
+    }
 }
 
 #[cfg(test)]

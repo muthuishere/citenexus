@@ -127,9 +127,21 @@ pub fn listtable_fixture() -> Doc {
     Doc::new(vec![page])
 }
 
+/// The T7 layout, but the last list item continues for two more lines below
+/// the table rows: the uncertain region clips that list unit.
+pub fn cliptable_fixture() -> Doc {
+    let mut doc = listtable_fixture();
+    let page = doc.pages.remove(0);
+    let page = page
+        .text(82.0, 160.0, 10.0, "met bonnen van het restaurant")
+        .text(82.0, 172.0, 10.0, "en een handtekening van de manager");
+    Doc::new(vec![page])
+}
+
 fn fixture(name: &str) -> Vec<u8> {
     match name {
         "listtable" => listtable_fixture(),
+        "cliptable" => cliptable_fixture(),
         "table" => table_fixture(),
         "scan" => scan_fixture(),
         "region" => region_fixture(),
@@ -205,6 +217,7 @@ fn responses(prep: &PdfPrepared, spec: &serde_json::Value) -> Vec<PdfResponse> {
                 finish_reason: r["finish_reason"].as_str().map(String::from),
                 tables,
                 markdown: r["markdown"].as_str().map(String::from),
+                mode: r["mode"].as_str().map(String::from),
             }
         })
         .collect()
@@ -306,6 +319,26 @@ fn assemble_vectors() {
             }
             None => assert!(failed.is_empty(), "{name}: {failed:?}"),
         }
+        if e["base_kept_all"].as_bool() == Some(true) {
+            assert_eq!(
+                out.units.iter().map(|u| &u.markdown).collect::<Vec<_>>(),
+                prep.units.iter().map(|u| &u.markdown).collect::<Vec<_>>(),
+                "{name}: base text must stay"
+            );
+        }
+        if let Some(n) = e["verdict_units"].as_u64() {
+            let v = out
+                .units
+                .iter()
+                .filter(|u| u.provenance.model_verdict.as_deref() == Some("no_table"))
+                .count();
+            assert_eq!(v as u64, n, "{name}: units with model_verdict");
+        }
+        for k in e["no_verdict"].as_array().into_iter().flatten() {
+            let k = k.as_str().unwrap();
+            let u = out.units.iter().find(|u| u.markdown == k).unwrap();
+            assert!(u.provenance.model_verdict.is_none(), "{name}: {k:?}");
+        }
         if let Some(n) = e["failed_units"].as_u64() {
             assert_eq!(failed.len() as u64, n, "{name}: units with failed_check");
         }
@@ -366,6 +399,9 @@ fn assemble_vectors() {
             assert_eq!(vt.len(), 1, "{name}");
             let u = vt[0];
             assert!(!u.markdown.is_empty());
+            if let Some(k) = e["kind"].as_str() {
+                assert_eq!(serde_json::to_value(u.kind).unwrap(), k, "{name}");
+            }
             if let Some(dsp) = e["vision_disputed"].as_bool() {
                 assert_eq!(u.provenance.vision_disputed, dsp, "{name}: {}", u.markdown);
             }
@@ -454,6 +490,7 @@ fn assemble_is_deterministic_and_units_is_assemble_without_responses() {
         finish_reason: None,
         tables: None,
         markdown: Some("x".into()),
+        mode: None,
     }];
     let s = serde_json::to_string(&pdf_assemble(&bytes, &opts(), &stray).unwrap()).unwrap();
     assert_eq!(s, base);
@@ -485,4 +522,36 @@ fn committed_golden_assemble_vector() {
         let on_disk = std::fs::read(&path).expect("regenerate with CITENEXUS_WRITE_PDF_FIXTURES=1");
         assert!(on_disk == content, "{name} drifted from its generator");
     }
+}
+
+#[test]
+fn a_request_region_grows_to_whole_units() {
+    if !have_pdfium() {
+        return;
+    }
+    let bytes = fixture("cliptable");
+    let prep = pdf_prepare(&bytes, &opts()).unwrap();
+    let req = prep
+        .requests
+        .iter()
+        .find(|r| r.kind == PdfRequestKind::TableStructure)
+        .expect("a table request");
+    let listed: Vec<&str> = req.words.iter().map(|w| w.text.as_str()).collect();
+    // every word of the list unit the region intersects, including the lines
+    // that continue below the table
+    for w in ["Diner", "restaurant", "handtekening", "manager"] {
+        assert!(listed.contains(&w), "{w} missing from {listed:?}");
+    }
+    let unit = prep
+        .units
+        .iter()
+        .find(|u| u.markdown.contains("manager"))
+        .unwrap();
+    let b = unit.bbox.unwrap();
+    assert!(
+        req.bbox[3] >= b[3] - 0.01,
+        "region {:?} must cover the unit {:?}",
+        req.bbox,
+        b
+    );
 }

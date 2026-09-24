@@ -421,3 +421,122 @@ fn a_caption_over_a_full_header_row_is_not_a_spanning_header() {
         |u| u.kind == UnitKind::Paragraph && u.markdown == "Tabel 1 Salarisschalen per functie"
     ));
 }
+
+// ------------------------------------------------- leaders and TOCs (A) ----
+
+#[test]
+fn a_toc_with_dot_leaders_is_neither_a_table_nor_a_model_request() {
+    if !have_pdfium() {
+        return;
+    }
+    // leaders are separate words that run into the page-number column: any
+    // grid fails geometry, so the region must not cost a model call.
+    let mut p = Page::a4();
+    for (k, (t, n)) in [
+        ("Inleiding", "3"),
+        ("Werktijden", "5"),
+        ("Verlof", "8"),
+        ("Ziekte", "12"),
+    ]
+    .iter()
+    .enumerate()
+    {
+        let y = 100.0 + k as f64 * 16.0;
+        p = p
+            .text(72.0, y, 10.0, t)
+            .text(
+                200.0,
+                y,
+                10.0,
+                "..........................................................................",
+            )
+            .text(480.0, y, 10.0, n);
+    }
+    let opts = PdfOptions {
+        language: Some("nl".into()),
+        ..Default::default()
+    };
+    let bytes = Doc::new(vec![p]).build();
+    let out = pdf_units(&bytes, &opts).unwrap();
+    assert!(tables(&out).is_empty());
+    let prep = citenexus_core::extract::pdf::pdf_prepare(&bytes, &opts).unwrap();
+    assert!(
+        prep.requests
+            .iter()
+            .all(|r| r.kind != PdfRequestKind::TableStructure),
+        "{:?}",
+        prep.requests
+    );
+}
+
+#[test]
+fn a_real_table_with_leaders_still_passes_and_drops_the_filler() {
+    if !have_pdfium() {
+        return;
+    }
+    let mut p = Page::a4();
+    for (k, (a, b)) in [
+        ("Omschrijving", "Bedrag"),
+        ("Reiskosten", "7.000,00"),
+        ("Hotel", "5.100,00"),
+        ("Diner", "1.250,00"),
+    ]
+    .iter()
+    .enumerate()
+    {
+        let y = 100.0 + k as f64 * 16.0;
+        p = p
+            .text(72.0, y, 10.0, a)
+            .text(150.0, y, 10.0, "..............................")
+            .text(330.0, y, 10.0, b);
+    }
+    let out = run(p);
+    let t = tables(&out);
+    assert_eq!(t.len(), 1, "{:?}", out.units);
+    assert_eq!(
+        t[0].markdown,
+        "| Omschrijving | Bedrag |\n| --- | --- |\n| Reiskosten | 7.000,00 |\n| Hotel | 5.100,00 |\n| Diner | 1.250,00 |"
+    );
+}
+
+#[test]
+fn a_toc_with_leaders_glued_to_the_titles_is_not_a_request_either() {
+    if !have_pdfium() {
+        return;
+    }
+    let mut p = Page::a4();
+    for (k, (n, t, pg)) in [
+        ("1", "Inleiding", "3"),
+        ("2", "Werktijden", "5"),
+        ("3", "Verlof", "8"),
+        ("4", "Ziekte", "12"),
+    ]
+    .iter()
+    .enumerate()
+    {
+        let y = 100.0 + k as f64 * 16.0;
+        p = p
+            .text(72.0, y, 10.0, n)
+            .text(
+                100.0,
+                y,
+                10.0,
+                &format!("{t}............................................................"),
+            )
+            .text(480.0, y, 10.0, pg);
+    }
+    let opts = PdfOptions {
+        language: Some("nl".into()),
+        ..Default::default()
+    };
+    let bytes = Doc::new(vec![p]).build();
+    assert!(tables(&pdf_units(&bytes, &opts).unwrap()).is_empty());
+    let prep = citenexus_core::extract::pdf::pdf_prepare(&bytes, &opts).unwrap();
+    assert!(
+        prep.requests
+            .iter()
+            .all(|r| r.kind != PdfRequestKind::TableStructure),
+        "{:?}",
+        prep.requests.len()
+    );
+}

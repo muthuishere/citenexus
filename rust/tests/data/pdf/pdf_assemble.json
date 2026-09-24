@@ -278,6 +278,29 @@
       }
     },
     {
+      "name": "table: {\"tables\": []} is the model's verdict 'no table', not a failure: the base stays, the region's units record model_verdict=no_table",
+      "fixture": "listtable",
+      "category": "must_accept",
+      "responses": [
+        {
+          "request": "p1:table0",
+          "finish_reason": "stop",
+          "tables": []
+        }
+      ],
+      "expect": {
+        "applied": 1,
+        "rejected": 0,
+        "failed_check": null,
+        "base_kept_all": true,
+        "verdict_units": 3,
+        "no_verdict": [
+          "Vergoedingen zijn per jaar.",
+          "Declaraties gaan naar de administratie."
+        ]
+      }
+    },
+    {
       "name": "table: amounts swapped between rows",
       "fixture": "table",
       "category": "must_reject",
@@ -1064,6 +1087,71 @@
         ],
         "markdown_contains": [
           "v2: Formulier: naam, datum, handtekening"
+        ]
+      }
+    },
+    {
+      "name": "region: two DESCRIPTIONS (mode=description) become one image_description unit, never citable, not put through dual agreement",
+      "fixture": "region",
+      "category": "must_accept",
+      "responses": [
+        {
+          "request": "p1:img0:v1",
+          "finish_reason": "stop",
+          "mode": "description",
+          "markdown": "Een logo met een blauwe cirkel"
+        },
+        {
+          "request": "p1:img0:v2",
+          "finish_reason": "stop",
+          "mode": "description",
+          "markdown": "Blauw rond logo van het bedrijf"
+        }
+      ],
+      "expect": {
+        "applied": 2,
+        "rejected": 0,
+        "failed_check": null,
+        "vision_transcribed": true,
+        "vision_disputed": false,
+        "kind": "image_description",
+        "citable_excludes": [
+          "logo",
+          "Blauw"
+        ],
+        "markdown_contains": [
+          "<!-- image_description",
+          "Een logo met een blauwe cirkel"
+        ]
+      }
+    },
+    {
+      "name": "region: one transcription + one description: the transcription is single-source, all disputed",
+      "fixture": "region",
+      "category": "must_reject",
+      "responses": [
+        {
+          "request": "p1:img0:v1",
+          "finish_reason": "stop",
+          "markdown": "Formulier: naam, datum, handtekening"
+        },
+        {
+          "request": "p1:img0:v2",
+          "finish_reason": "stop",
+          "mode": "description",
+          "markdown": "Een logo met een blauwe cirkel"
+        }
+      ],
+      "expect": {
+        "applied": 2,
+        "rejected": 0,
+        "failed_check": null,
+        "vision_transcribed": true,
+        "vision_disputed": true,
+        "kind": "image",
+        "citable_excludes": [
+          "Formulier",
+          "logo"
         ]
       }
     }
