@@ -224,7 +224,8 @@ pub struct HeadingAgreement {
     pub agreeing_pages: u32,
     /// agreeing / compared, rounded to 4 decimals (1.0 when nothing compared).
     pub rate: f64,
-    /// The struct tree was trusted for the WHOLE document.
+    /// ≤20 % of compared pages disagree (the per-document test; the shipped
+    /// per-heading policy reports it but does not depend on it).
     pub struct_tree_trusted: bool,
     /// Tagged heading blocks printed like body text (not larger, not bold).
     #[serde(default)]
@@ -246,7 +247,9 @@ pub struct PdfDocumentSignals {
     /// The structure tree carries at least one heading element.
     pub struct_headings: bool,
     pub outline_entries: u32,
-    /// `struct_tree` | `font` (outline/numbering refine levels) | `none`.
+    /// `struct_tree` (tagged document: tagged headings the print supports) |
+    /// `font` (untagged: strict font rule, outline/numbering refine levels) |
+    /// `none`.
     pub heading_source: String,
     /// Present when the struct tree carries headings.
     #[serde(default)]

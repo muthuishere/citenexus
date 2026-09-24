@@ -306,13 +306,13 @@ fn tagged_heading_hierarchy_from_the_struct_tree() {
 }
 
 #[test]
-fn tags_that_disagree_with_fonts_fall_back_to_font_for_the_whole_document() {
+fn tags_that_disagree_with_the_print_keep_only_agreeing_headings() {
     if !have_pdfium() {
         return;
     }
     // Page 1 agrees. Page 2's tags call a body sentence H1 and the big bold
-    // heading a P. One page in two disagrees (50 % > 20 %): font-only, for
-    // BOTH pages.
+    // heading a P. Default policy (per heading): the contradicted tag is
+    // dropped, and print alone never adds a heading to a tagged document.
     let p1 = Page::a4()
         .tagged("H1", 72.0, 60.0, 18.0, true, "Leave Policy")
         .tagged("P", 72.0, 100.0, 11.0, false, "Plain body sentence here.");
@@ -332,18 +332,23 @@ fn tags_that_disagree_with_fonts_fall_back_to_font_for_the_whole_document() {
     let a = d.heading_agreement.as_ref().unwrap();
     assert!(!a.struct_tree_trusted, "{a:?}");
     assert_eq!((a.compared_pages, a.agreeing_pages), (2, 1));
-    assert_eq!(d.heading_source, "font");
+    assert_eq!(d.heading_source, "struct_tree");
     let heads: Vec<(&str, Option<HeadingSource>)> = out
         .units
         .iter()
         .filter(|u| u.kind == UnitKind::Heading)
         .map(|u| (u.markdown.as_str(), u.provenance.heading_source))
         .collect();
-    let f = Some(HeadingSource::Font);
-    assert_eq!(heads, vec![("# Leave Policy", f), ("## Holidays", f)]);
-    assert!(out.units.iter().any(
-        |u| u.kind == UnitKind::Paragraph && u.markdown == "A body sentence tagged as heading."
-    ));
+    assert_eq!(
+        heads,
+        vec![("# Leave Policy", Some(HeadingSource::StructTree))]
+    );
+    for body in ["A body sentence tagged as heading.", "Holidays"] {
+        assert!(out
+            .units
+            .iter()
+            .any(|u| u.kind == UnitKind::Paragraph && u.markdown == body));
+    }
 }
 
 #[test]

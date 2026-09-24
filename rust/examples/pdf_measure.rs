@@ -172,7 +172,7 @@ fn main() {
         pdfs, others, errors, pages, secs
     );
     println!("tagged docs (struct tree with content): {tagged}");
-    println!("docs with struct-tree headings: {struct_head}; struct tree trusted: {trusted}; font-only fallback: {}", struct_head - trusted);
+    println!("docs with struct-tree headings: {struct_head}; per-document agreement test passes: {trusted}; fails: {}", struct_head - trusted);
     rates.sort_by(|a, b| a.total_cmp(b));
     let bucket = |lo: f64, hi: f64| rates.iter().filter(|&&r| r >= lo && r < hi).count();
     println!(

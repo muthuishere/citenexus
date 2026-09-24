@@ -23,19 +23,27 @@
 //! font-only documents were such lines, half of them followed directly by
 //! same-size body text: lead-ins ("Voorwaarden:", "Let op"), not headings.
 //!
-//! **Struct tree, decided per document.** When the tree carries headings, it
-//! is compared with the print on every page where either names a heading. A
-//! page DISAGREES when a tagged heading is printed like body text (not larger,
-//! not bold, not numbered), or when a strict font candidate at ≥1.15 × body
-//! is tagged as body text. If more than `MAX_DISAGREEMENT` (20 %) of the
-//! compared pages disagree, the WHOLE document uses the font rule; otherwise
-//! the WHOLE document uses the tags. Why 20 %: one odd page in five is a local
-//! quirk (a cover title tagged `/P`); two in five is a pattern. On Lex5, 766
-//! tagged headings are 99.6 % bold but 84 % at body size — Word heading styles
-//! printed at body size — so the tree, not the font size, knows these
-//! headings. The step-2 comparison penalised the tree for the font rule's own
-//! errors (table header cells, TOC entries) and trusted it on 16 of 46
-//! documents; with the strict rule it is trusted on 41.
+//! **Struct tree: per heading, where tag and print agree (the default,
+//! `Policy::PerHeading`).** On a document whose structure tree carries
+//! headings, a heading is emitted only where the tree tags one AND the print
+//! supports it (≥1.15 × body, bold, or a section number), outside tables and
+//! lists; the level comes from the tag. Print alone never adds a heading to a
+//! tagged document, and a tag the print contradicts is dropped. Only one source
+//! (the tree) ever names headings in a document, filtered by the other — the
+//! sources are never mixed page by page. On Lex5, 766 tagged headings are
+//! 99.6 % bold but 84 % at body size (Word heading styles printed at body
+//! size), which is why the tree, not the font size, knows these headings.
+//!
+//! The per-document agreement is still computed and exposed
+//! (`HeadingAgreement`): a page DISAGREES when a tagged heading is printed like
+//! body text, or when a strict font candidate at ≥1.15 × body is tagged as
+//! body text. `Policy::Doc` (the step-2 contract, kept for measurement) trusts
+//! the WHOLE tree when ≤ `MAX_DISAGREEMENT` (20 %) of compared pages disagree
+//! and uses the font rule for the WHOLE document otherwise. Why the default
+//! changed (Lex5, 28 documents in the 0.5–0.8 agreement bucket under the
+//! step-2 rule): per-heading emits 118 headings with 4 heading-to-heading spans
+//! under five words (1 flat), per-document 117 with 11 (7 flat) — the same
+//! headings, fewer that open an empty chunk.
 //!
 //! **Label + title merge (`merge_labels`).** Word writes "Artikel 5." and its
 //! title as two paragraphs in one heading style. A heading that is only a
@@ -80,18 +88,20 @@ pub struct Plan {
     pub source: &'static str,
 }
 
-/// How headings are decided. `Doc` is what `pdf_units` ships; the others
-/// exist so the diagnostics can measure the alternatives on one corpus.
+/// How headings are decided. `PerHeading` is what `pdf_units` ships; the
+/// others exist so the diagnostics can measure the alternatives on one corpus.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Policy {
     /// Step-2 rule: a bold body-size line was a heading candidate; struct tree
     /// trusted per document.
     V1Doc,
     /// Strict font rule; struct tree trusted per document (all or nothing).
-    #[default]
     Doc,
-    /// Strict font rule; on a struct-tagged document a heading is emitted only
-    /// where the tag AND the print agree (larger, bold or numbered).
+    /// The shipped default (consumer decision, 2026-09-25). Strict font rule
+    /// on untagged documents; on a struct-tagged document a heading is emitted
+    /// only where the tag AND the print agree (larger, bold or numbered) —
+    /// never from print alone.
+    #[default]
     PerHeading,
 }
 
@@ -471,7 +481,22 @@ mod tests {
     }
 
     #[test]
-    fn disagreeing_tags_fall_back_to_font_for_the_whole_document() {
+    fn per_heading_is_the_default_and_keeps_only_agreeing_tags() {
+        let b = vec![
+            hb(0, "Title", 18.0, true, Some(1)),
+            hb(1, "Body text that is tagged.", 11.0, false, Some(2)),
+            hb(1, "Real heading", 14.0, true, None),
+        ];
+        let p = plan(&b, 11.0, &[], 2);
+        assert_eq!(Policy::default(), Policy::PerHeading);
+        assert_eq!(p.levels[0], Some((1, HeadingSource::StructTree)));
+        assert_eq!(p.levels[1], None); // tag contradicted by the print
+        assert_eq!(p.levels[2], None); // print alone never adds one
+        assert!(!p.agreement.unwrap().struct_tree_trusted);
+    }
+
+    #[test]
+    fn doc_policy_falls_back_to_font_for_the_whole_document() {
         // Page 0 agrees; page 1 tags a body paragraph as H2 and misses a real
         // heading: 1 of 2 pages disagree (50 % > 20 %).
         let b = vec![
@@ -479,7 +504,7 @@ mod tests {
             hb(1, "Body text that is tagged.", 11.0, false, Some(2)),
             hb(1, "Real heading", 14.0, true, None),
         ];
-        let p = plan(&b, 11.0, &[], 2);
+        let p = plan_with(&b, 11.0, &[], 2, Policy::Doc);
         let a = p.agreement.unwrap();
         assert!(!a.struct_tree_trusted);
         assert_eq!((a.compared_pages, a.agreeing_pages), (2, 1));
