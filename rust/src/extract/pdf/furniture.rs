@@ -1,7 +1,8 @@
 //! Running headers and footers (ADR-0017 decision 1; research §8 #7, #14).
 //!
 //! A segment is a candidate when it sits in the top 12 % or bottom 12 % band
-//! of its page. Its key is the text lower-cased, whitespace-collapsed, with
+//! of its page AND belongs to the band's edge-most block (lines chained from
+//! the page edge at ≤ 1.6 × font-size pitch; `edge_block`). Its key is the text lower-cased, whitespace-collapsed, with
 //! every digit replaced by `#` (so "Page 3 of 9" and "Page 4 of 9" match). A
 //! key is **running** when it occurs on at least 2 pages of one band and
 //! either on at least half the pages, or on ≥3 pages each of which has
@@ -57,6 +58,31 @@ pub fn is_page_number(key: &str) -> bool {
             .all(|w| w.chars().all(|c| c == '#') || PAGE_WORDS.contains(&w))
 }
 
+/// Of a band's segments (sorted from the page edge inward), only the
+/// EDGE-MOST BLOCK may be furniture: the chain of lines from the edge whose
+/// baselines follow each other within 1.6 × the font size. A body block
+/// separated from the header by whitespace can never be taken for furniture,
+/// even when digit masking makes it repeat ("zie pagina 3 van 12" on every
+/// page): keeping furniture once would otherwise DELETE that body text from
+/// every other page. Segments on one baseline (a header split in columns)
+/// stay together.
+fn edge_block(segs: &[Segment], sorted: &[usize]) -> Vec<usize> {
+    let mut out: Vec<usize> = Vec::new();
+    let mut last: Option<usize> = None;
+    for &i in sorted {
+        if let Some(l) = last {
+            let size = segs[i].size.max(segs[l].size).max(1.0);
+            let gap = (segs[i].baseline - segs[l].baseline).abs();
+            if gap > 1.6 * size {
+                break;
+            }
+        }
+        out.push(i);
+        last = Some(i);
+    }
+    out
+}
+
 /// The segments of each page that are running furniture: `(page, seg)`.
 pub fn detect(pages: &[(f64, &[Segment])]) -> Vec<(usize, usize)> {
     let n = pages.len();
@@ -80,7 +106,7 @@ pub fn detect(pages: &[(f64, &[Segment])]) -> Vec<(usize, usize)> {
         top.sort_by(|&a, &b| segs[a].bbox[1].total_cmp(&segs[b].bbox[1]).then(a.cmp(&b)));
         bottom.sort_by(|&a, &b| segs[b].bbox[3].total_cmp(&segs[a].bbox[3]).then(a.cmp(&b)));
         for (band, list) in [(Band::Top, top), (Band::Bottom, bottom)] {
-            for i in list.into_iter().take(CAP_PER_BAND) {
+            for i in edge_block(segs, &list).into_iter().take(CAP_PER_BAND) {
                 let k = key(&segs[i].text);
                 let e = occ.entry((band, k.clone())).or_default();
                 if e.last() != Some(&p) {
