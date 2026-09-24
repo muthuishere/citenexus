@@ -264,32 +264,45 @@ fn main() {
         }
     }
 
-    // The 0.5–0.8 agreement bucket under the shipped rule: both options.
-    let bucket: Vec<&HeadingDiag> = diags
-        .iter()
-        .filter(|d| d.agreement_rate.is_some_and(|r| (0.5..0.8).contains(&r)))
-        .collect();
+    // The 0.5–0.8 agreement bucket, as defined under the step-2 rule (the
+    // 28 documents) and under the shipped rule: both options on each.
     let trusted = diags
         .iter()
         .filter(|d| d.stats["doc"].struct_tree_used)
         .count();
     let tagged = diags.iter().filter(|d| d.struct_headings).count();
     println!("\nstruct-heading docs {tagged}; struct tree trusted under `doc`: {trusted}");
-    println!(
-        "agreement bucket [0.5,0.8) under `doc`: {} docs",
-        bucket.len()
-    );
-    for pol in ["doc", "per_heading"] {
-        let (mut h, mut s, mut pp) = (0, 0, Vec::new());
-        for d in &bucket {
-            h += d.stats[pol].headings;
-            s += d.stats[pol].short_spans;
-            pp.extend(d.stats[pol].per_page.iter().copied());
-        }
-        let mx = pp.iter().max().copied().unwrap_or(0);
+    for (label, key) in [
+        ("step-2 (v1) rule", "v1_doc"),
+        ("shipped (doc) rule", "doc"),
+    ] {
+        let bucket: Vec<&HeadingDiag> = diags
+            .iter()
+            .filter(|d| d.agreement_rates[key].is_some_and(|r| (0.5..0.8).contains(&r)))
+            .collect();
+        let now_trusted = bucket
+            .iter()
+            .filter(|d| d.stats["doc"].struct_tree_used)
+            .count();
         println!(
-            "  {pol:<12} headings {h:>5}  per page median {} max {mx}  spans<5 words {s}",
-            median(&mut pp)
+            "agreement bucket [0.5,0.8) under the {label}: {} docs ({} trusted under `doc`)",
+            bucket.len(),
+            now_trusted
         );
+        for pol in ["doc", "per_heading"] {
+            let (mut h, mut s, mut n, mut pp) = (0, 0, 0, Vec::new());
+            for d in &bucket {
+                h += d.stats[pol].headings;
+                s += d.stats[pol].short_spans;
+                n += d.stats[pol].short_nested;
+                pp.extend(d.stats[pol].per_page.iter().copied());
+            }
+            let mx = pp.iter().max().copied().unwrap_or(0);
+            println!(
+                "  {pol:<12} headings {h:>5}  per page median {} max {mx}  spans<5 words {s} (flat {})",
+                median(&mut pp),
+                s - n
+            );
+        }
     }
 }

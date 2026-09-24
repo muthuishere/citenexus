@@ -88,6 +88,8 @@ pub struct HeadingDiag {
     pub stats: BTreeMap<&'static str, PolicyStats>,
     /// Agreement under the document rule (the default policy).
     pub agreement_rate: Option<f64>,
+    /// Agreement under each policy's own font rule.
+    pub agreement_rates: BTreeMap<&'static str, Option<f64>>,
 }
 
 fn stats_for(
@@ -208,8 +210,10 @@ pub fn diagnose_raw(raw: &RawDoc, opts: &PdfOptions) -> HeadingDiag {
     let mut levels = BTreeMap::new();
     let mut stats = BTreeMap::new();
     let mut agreement_rate = None;
+    let mut agreement_rates = BTreeMap::new();
     for policy in Policy::ALL {
         let plan = headings::plan_with(hb, st.body_size, &raw.outline, pages, policy);
+        agreement_rates.insert(policy.name(), plan.agreement.as_ref().map(|a| a.rate));
         if policy == Policy::default() {
             agreement_rate = plan.agreement.as_ref().map(|a| a.rate);
         }
@@ -227,5 +231,6 @@ pub fn diagnose_raw(raw: &RawDoc, opts: &PdfOptions) -> HeadingDiag {
         levels,
         stats,
         agreement_rate,
+        agreement_rates,
     }
 }
