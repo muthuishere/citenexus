@@ -5949,6 +5949,124 @@
           }
         ]
       }
+    },
+    {
+      "name": "cents/18-cent-over-0-16-refuses",
+      "must_refuse": true,
+      "answer": "De vergoeding voor woon-werkverkeer is 18 cent per kilometer [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De vergoeding voor woon-werkverkeer bedraagt € 0,16 per kilometer. Voor dienstreizen ontvang je € 0,23 per kilometer."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "cents/23-euro-over-0-23-refuses",
+      "must_refuse": true,
+      "answer": "Voor dienstreizen ontvang je 23 euro per kilometer [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De vergoeding voor woon-werkverkeer bedraagt € 0,16 per kilometer. Voor dienstreizen ontvang je € 0,23 per kilometer."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "cents/adv-nf-01 (rag_go adv, fictional)",
+      "answer": "Met een vast dienstverband en meer dan tien kilometer woon-werkafstand ontvang je 23 cent per kilometer [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "reiskostenregeling",
+          "language": "nl",
+          "text": "Reiskostenregeling. Werknemers met een vast dienstverband die meer dan tien kilometer van het werk wonen, ontvangen een reiskostenvergoeding van € 0,23 per kilometer. De vergoeding wordt maandelijks door de werkgever uitbetaald. Werknemers met een tijdelijk contract komen niet in aanmerking voor de reiskostenvergoeding."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "cents/adv-nf-v2-24 (rag_go adv, fictional)",
+      "answer": "De vergoeding voor woon-werkverkeer is 16 cent per kilometer, voor maximaal zestig kilometer per dag [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "reiskostenregeling Gemeente Kraaijenburg",
+          "language": "nl",
+          "text": "Kilometervergoeding. Voor dienstreizen met de eigen auto ontvangt de medewerker € 0,23 per kilometer. De vergoeding voor woon-werkverkeer bedraagt € 0,16 per kilometer, tot een maximum van 60 kilometer per dag. De vergoedingen worden maandelijks uitbetaald."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
     }
   ]
 }

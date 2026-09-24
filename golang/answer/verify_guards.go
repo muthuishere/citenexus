@@ -10,6 +10,7 @@ package answer
 
 import (
 	"fmt"
+	"math/big"
 	"regexp"
 	"strings"
 	"unicode"
@@ -56,7 +57,7 @@ func numberGuard(claim, claimLanguage, passage, passageLanguage string) string {
 	}
 	have := map[string]struct{}{}
 	for _, m := range numbersIn(passage, passageLanguage) {
-		have[m.reading.Key] = struct{}{}
+		have[centsAsEuros(m)] = struct{}{}
 		if _, ordinal := ordinalSuffixes[m.unit]; ordinal && m.attached {
 			have["ord:"+m.reading.Key] = struct{}{}
 		}
@@ -70,7 +71,7 @@ func numberGuard(claim, claimLanguage, passage, passageLanguage string) string {
 		}
 	}
 	for _, m := range numbersIn(claim, claimLanguage) {
-		key := m.reading.Key
+		key := centsAsEuros(m)
 		if _, ordinal := ordinalSuffixes[m.unit]; ordinal && m.attached {
 			key = "ord:" + key
 		}
@@ -669,4 +670,17 @@ func boundMarkerPositions(tokens []string, passage map[string]bool) map[int]bool
 		}
 	}
 	return out
+}
+
+// centsAsEuros is a number's key, with an amount in cents read in euros:
+// "23 cent" = "€ 0,23" (key 0.23). "23 euro" stays 23, so a cent-euro swap
+// refuses.
+func centsAsEuros(m numberMatch) string {
+	switch m.unit {
+	case "cent", "cents", "ct", "eurocent", "eurocents":
+		if m.reading.Value != nil {
+			return ratKey(new(big.Rat).Quo(m.reading.Value, big.NewRat(100, 1)))
+		}
+	}
+	return m.reading.Key
 }
