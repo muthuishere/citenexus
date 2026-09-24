@@ -10,6 +10,8 @@
 //! # PdfAssemble and wrote <file_id>.json per file, the PdfUnitsOutput JSON):
 //!     --assembled <dir> --gt-map <...> --gt <dir> [--originals <dir> --manifest <json>]
 //! ```
+//! `--gt-corrections <json>` applies a GT overlay before scoring:
+//! `{"<gt file>.md": [{"table":0,"row":r,"col":c,"value":"…"} | {"from":"…","to":"…"}]}`.
 //! (`--originals`/`--manifest` add positional integrity; the old positional
 //! form `<originals> <manifest> <measure_tables.py> <gt-dir>` still works.)
 //! Disputed vision text is excluded from scoring (`vision::citable_text`).
@@ -114,8 +116,37 @@ struct Score {
     n_tables: usize,
 }
 
-fn score(gt_md: &str, cand_md: &str) -> Score {
-    let gts = tables(gt_md);
+/// Apply a GT corrections overlay (`--gt-corrections`) to one GT file's
+/// tables. Each entry addresses a cell either by position
+/// `{"table": 0, "row": r, "col": c, "value": "…"}` (0-based, separator row
+/// not counted) or by its exact text `{"from": "…", "to": "…"}` (every cell
+/// equal to `from` after trimming).
+fn correct(gts: &mut [Vec<Vec<String>>], entries: &[serde_json::Value]) -> usize {
+    let mut applied = 0;
+    for e in entries {
+        if let (Some(r), Some(c)) = (e["row"].as_u64(), e["col"].as_u64()) {
+            let t = e["table"].as_u64().unwrap_or(0) as usize;
+            if let Some(cell) = gts
+                .get_mut(t)
+                .and_then(|t| t.get_mut(r as usize))
+                .and_then(|row| row.get_mut(c as usize))
+            {
+                *cell = e["value"].as_str().unwrap_or_default().to_string();
+                applied += 1;
+            }
+        } else if let (Some(from), Some(to)) = (e["from"].as_str(), e["to"].as_str()) {
+            for cell in gts.iter_mut().flatten().flatten() {
+                if cell.trim() == from.trim() {
+                    *cell = to.to_string();
+                    applied += 1;
+                }
+            }
+        }
+    }
+    applied
+}
+
+fn score_tables(gts: Vec<Vec<Vec<String>>>, cand_md: &str) -> Score {
     let cands = tables(cand_md);
     let (mut gt_cells, mut matched) = (0, 0);
     let mut best_shape = "-".to_string();
@@ -234,9 +265,17 @@ fn gt_map(path: &Path) -> Vec<(String, String)> {
 fn integrity(bytes: &[u8], opts: &PdfOptions, out: &PdfUnitsOutput) -> (usize, usize) {
     let words = diag::page_words(bytes, opts).unwrap_or_default();
     let (mut ok, mut total) = (0, 0);
-    for u in out.units.iter().filter(|u| u.kind == UnitKind::Table && !u.provenance.vision_transcribed) {
-        let (Some(p), Some(b)) = (u.page, u.bbox) else { continue };
-        let Some(page_words) = words.get((p - 1) as usize) else { continue };
+    for u in out
+        .units
+        .iter()
+        .filter(|u| u.kind == UnitKind::Table && !u.provenance.vision_transcribed)
+    {
+        let (Some(p), Some(b)) = (u.page, u.bbox) else {
+            continue;
+        };
+        let Some(page_words) = words.get((p - 1) as usize) else {
+            continue;
+        };
         let mut pool: BTreeMap<String, usize> = BTreeMap::new();
         for w in page_words {
             let (cx, cy) = ((w.bbox[0] + w.bbox[2]) / 2.0, (w.bbox[1] + w.bbox[3]) / 2.0);
@@ -273,6 +312,7 @@ fn citable_markdown(out: &PdfUnitsOutput) -> String {
 }
 
 struct Args {
+    corrections: Option<PathBuf>,
     originals: Option<PathBuf>,
     manifest: Option<PathBuf>,
     gt_map: PathBuf,
@@ -288,6 +328,7 @@ fn args() -> Args {
     // legacy positional form: <originals> <manifest> <measure_tables.py> <gt-dir>
     if a.len() >= 4 && !a[0].starts_with("--") {
         return Args {
+            corrections: flag("--gt-corrections").map(PathBuf::from),
             originals: Some(PathBuf::from(&a[0])),
             manifest: Some(PathBuf::from(&a[1])),
             gt_map: PathBuf::from(&a[2]),
@@ -298,6 +339,7 @@ fn args() -> Args {
         };
     }
     Args {
+        corrections: flag("--gt-corrections").map(PathBuf::from),
         originals: flag("--originals").map(PathBuf::from),
         manifest: flag("--manifest").map(PathBuf::from),
         gt_map: PathBuf::from(flag("--gt-map").expect("--gt-map <measure_tables.py | map.json>")),
@@ -342,6 +384,16 @@ fn main() {
         "deterministic (no model)"
     };
     let gt = gt_map(&args.gt_map);
+    // {"<gt file>.md": [entry, …]} — see `correct`
+    let corrections: serde_json::Value = args
+        .corrections
+        .as_ref()
+        .map(|p| {
+            serde_json::from_str(&std::fs::read_to_string(p).expect("--gt-corrections"))
+                .expect("corrections JSON")
+        })
+        .unwrap_or(serde_json::Value::Null);
+    let mut corrected = 0;
     let (mut cells, mut cell_tot, mut rows, mut row_tot) = (0, 0, 0, 0);
     let (mut integ_ok, mut integ_tot, mut vision_tables) = (0, 0, 0);
     println!("mode: {mode}; GT tables: {}", gt.len());
@@ -382,7 +434,11 @@ fn main() {
             }
             Err(e) => (String::new(), e),
         };
-        let s = score(&gt_md, &md);
+        let mut gts = tables(&gt_md);
+        if let Some(entries) = corrections.get(gtf.as_str()).and_then(|v| v.as_array()) {
+            corrected += correct(&mut gts, entries);
+        }
+        let s = score_tables(gts, &md);
         cells += s.matched;
         cell_tot += s.gt_cells;
         rows += s.row_hits;
@@ -399,7 +455,12 @@ fn main() {
             s.n_tables
         );
     }
-    println!("TOTAL {mode}: cells {cells}/{cell_tot}, rows {rows}/{row_tot}");
+    let with = if args.corrections.is_some() {
+        format!(" (GT corrections applied: {corrected} cells)")
+    } else {
+        String::new()
+    };
+    println!("TOTAL {mode}: cells {cells}/{cell_tot}, rows {rows}/{row_tot}{with}");
     if args.originals.is_some() {
         println!("positional integrity (GT files, text-layer tables): {integ_ok}/{integ_tot} cells made of text-layer words inside the table box; vision tables (not text-layer, not counted): {vision_tables}");
     } else {

@@ -141,7 +141,11 @@ cargo run --profile measure --features pdf --example pdf_tables -- \
   [--originals <dir> --manifest <json>]   # adds positional integrity (needs libpdfium)
 ```
 
-`--gt-map` also accepts a JSON object `{"<gt file>.md": "<file_id>"}`. The host
+`--gt-map` also accepts a JSON object `{"<gt file>.md": "<file_id>"}`.
+`--gt-corrections <json>` applies a GT overlay before scoring (for GT typos
+confirmed against the PDF): `{"<gt file>.md": [{"table": 0, "row": r, "col": c,
+"value": "…"} | {"from": "…", "to": "…"}]}`; the total line reports how many
+cells it changed. The host
 contract itself is [`docs/pdf-model-contract.md`](../docs/pdf-model-contract.md).
 
 `examples/pdf_measure.rs` measures `pdf_units` over a directory of PDFs and
