@@ -267,6 +267,16 @@ func isListMarker(field string) bool { return listMarker.MatchString(field) }
 func nameGuard(claim, passage string) string { return nameGuardWith(claim, passage, nil) }
 
 func nameGuardWith(claim, passage string, aliases map[string][]string) string {
+	if name := absentName(names(claim), passage, aliases); name != "" {
+		return fmt.Sprintf("name guard: %q is not in the passage", name)
+	}
+	return ""
+}
+
+// absentName is the first of names not present in passage ("" when all are),
+// by the name guard's rules: tokens, calendar folding, the caller's aliases,
+// and a hyphenated word's capitalised parts.
+func absentName(names []string, passage string, aliases map[string][]string) string {
 	have := map[string]struct{}{}
 	for _, tok := range tokenize.TokenizeV2(passage) {
 		have[tok] = struct{}{}
@@ -300,7 +310,7 @@ func nameGuardWith(claim, passage string, aliases map[string][]string) string {
 		}
 		return true
 	}
-	for _, name := range names(claim) {
+	for _, name := range names {
 		// "Wwft-related": the whole word first, then only its capitalised parts
 		// ("Wwft"). A word with digits stays whole ("104-week").
 		if strings.Contains(name, "-") && !allPresent(name) && !strings.ContainsAny(name, "0123456789") {
@@ -329,7 +339,7 @@ func nameGuardWith(claim, passage string, aliases map[string][]string) string {
 		}
 		for _, tok := range tokenize.TokenizeV2(name) {
 			if !present(tok) {
-				return fmt.Sprintf("name guard: %q is not in the passage", name)
+				return name
 			}
 		}
 	}

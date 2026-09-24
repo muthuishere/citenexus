@@ -1,0 +1,293 @@
+{
+  "_about": "HeadingNeedsCheck / HeadingNameUnsupported vectors. A host that exempts markdown headings from VerifyAnswer (rag_go's post-pass) asks these two before exempting one. outcome simulates the host: VerifyAnswer on the heading line (cited when 'cite' is set, RequireCitations on) -> 'admitted' if supported; else 'refused' when needs_check or a name_reason; else 'exempt' (served unchecked). Synthetic text only.",
+  "cases": [
+    {
+      "name": "modal/swapped-role-is-a-claim-and-refuses",
+      "heading": "## De werkgever moet de reiskosten voorschieten",
+      "language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werknemer moet de reiskosten zelf voorschieten."
+        }
+      ],
+      "expect": {
+        "needs_check": true,
+        "reason": "heading states a rule: modal",
+        "name_reason": "",
+        "outcome": "refused"
+      },
+      "cite": "a",
+      "must_refuse": true
+    },
+    {
+      "name": "verb/swapped-noun-in-a-long-verb-heading-refuses",
+      "heading": "### Het reiskostenbudget wordt jaarlijks vastgesteld door de ondernemingsraad",
+      "language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Het reiskostenbudget wordt jaarlijks vastgesteld door de directie."
+        }
+      ],
+      "expect": {
+        "needs_check": true,
+        "reason": "heading states a rule: verb",
+        "name_reason": "",
+        "outcome": "refused"
+      },
+      "cite": "a",
+      "must_refuse": true
+    },
+    {
+      "name": "name/a-name-in-no-evidence-unit-refuses",
+      "heading": "**Bezwaar via het UWV**",
+      "language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Tegen een ontslag kun je bezwaar maken bij de kantonrechter."
+        },
+        {
+          "id": "b",
+          "document_id": "b",
+          "language": "nl",
+          "text": "Het ontslag gaat in na de opzegtermijn."
+        }
+      ],
+      "expect": {
+        "needs_check": false,
+        "reason": "",
+        "name_reason": "heading name guard",
+        "outcome": "refused"
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "exclusive/an-exclusive-heading-is-a-claim",
+      "heading": "## Alleen voor stagiairs",
+      "language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Voor werknemers geldt een reiskostenvergoeding."
+        }
+      ],
+      "expect": {
+        "needs_check": true,
+        "reason": "heading states a rule: exclusive",
+        "name_reason": "",
+        "outcome": "refused"
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "number/a-number-word-heading-is-a-claim",
+      "heading": "## Drie manieren om te melden",
+      "language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Je kunt op twee manieren melden."
+        }
+      ],
+      "expect": {
+        "needs_check": true,
+        "reason": "heading states a rule: number",
+        "name_reason": "",
+        "outcome": "refused"
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "modal/en-must-is-a-claim",
+      "heading": "## Employees must submit receipts",
+      "language": "en",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "en",
+          "text": "Employees may submit receipts."
+        }
+      ],
+      "expect": {
+        "needs_check": true,
+        "reason": "heading states a rule: modal",
+        "name_reason": "",
+        "outcome": "refused"
+      },
+      "cite": "a",
+      "must_refuse": true
+    },
+    {
+      "name": "modal/a-true-modal-heading-is-admitted",
+      "heading": "## De werknemer moet de reiskosten zelf voorschieten",
+      "language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werknemer moet de reiskosten zelf voorschieten."
+        }
+      ],
+      "expect": {
+        "needs_check": true,
+        "reason": "heading states a rule: modal",
+        "name_reason": "",
+        "outcome": "admitted"
+      },
+      "cite": "a"
+    },
+    {
+      "name": "table/title-case-header-row-stays-exempt",
+      "heading": "| Soort Verlof | Duur | Vergoeding |",
+      "language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Bij geboorte krijg je vijf dagen verlof."
+        }
+      ],
+      "expect": {
+        "needs_check": false,
+        "reason": "",
+        "name_reason": "",
+        "outcome": "exempt"
+      }
+    },
+    {
+      "name": "table/title-case-heading-stays-exempt",
+      "heading": "## Bijzonder Verlof En Permanente Educatie",
+      "language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Bij geboorte krijg je vijf dagen verlof."
+        }
+      ],
+      "expect": {
+        "needs_check": false,
+        "reason": "",
+        "name_reason": "",
+        "outcome": "exempt"
+      }
+    },
+    {
+      "name": "name/may-the-month-is-not-a-modal-and-folds-to-mei",
+      "heading": "## Holiday pay in May",
+      "language": "en",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Het vakantiegeld wordt in mei uitbetaald."
+        }
+      ],
+      "expect": {
+        "needs_check": false,
+        "reason": "",
+        "name_reason": "",
+        "outcome": "exempt"
+      }
+    },
+    {
+      "name": "name/a-name-in-a-document-title-is-present",
+      "heading": "## Verlof bij Ploum",
+      "language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Ploum verlofregeling",
+          "language": "nl",
+          "text": "Je krijgt vijf dagen verlof."
+        }
+      ],
+      "expect": {
+        "needs_check": false,
+        "reason": "",
+        "name_reason": "",
+        "outcome": "exempt"
+      }
+    },
+    {
+      "name": "name/a-name-in-one-of-several-units-is-present",
+      "heading": "**Bezwaar via het UWV**",
+      "language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Tegen een ontslag kun je bezwaar maken bij de kantonrechter."
+        },
+        {
+          "id": "b",
+          "document_id": "b",
+          "language": "nl",
+          "text": "Een WW-uitkering vraag je aan bij het UWV."
+        }
+      ],
+      "expect": {
+        "needs_check": false,
+        "reason": "",
+        "name_reason": "",
+        "outcome": "exempt"
+      }
+    },
+    {
+      "name": "short/a-plain-short-heading-stays-exempt",
+      "heading": "## Reiskosten en parkeren",
+      "language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De werkgever vergoedt reiskosten."
+        }
+      ],
+      "expect": {
+        "needs_check": false,
+        "reason": "",
+        "name_reason": "",
+        "outcome": "exempt"
+      }
+    },
+    {
+      "name": "verb/five-words-with-a-verb-stays-exempt",
+      "heading": "## Wat je krijgt bij ziekte",
+      "language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Bij ziekte krijg je 70% doorbetaald."
+        }
+      ],
+      "expect": {
+        "needs_check": false,
+        "reason": "",
+        "name_reason": "",
+        "outcome": "exempt"
+      }
+    }
+  ]
+}
