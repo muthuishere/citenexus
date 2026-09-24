@@ -1701,6 +1701,7 @@ def _conflict_table() -> dict[str, Any]:
     from citenexus.answer import conflict as conflict_module
     from citenexus.answer.tables import (
         CONFLICT_ANTONYMS,
+        CONFLICT_LANGUAGES,
         CONFLICT_NEGATIONS,
         CONFLICT_REPORT_BIGRAMS,
         CONFLICT_SCOPE_MARKERS,
@@ -1708,7 +1709,9 @@ def _conflict_table() -> dict[str, Any]:
     )
 
     return {
-        "languages": ["en"],
+        # Round-tripped, never re-declared: a literal here silently dropped
+        # every language claim added to conformance/conflict.json.
+        "languages": list(CONFLICT_LANGUAGES),
         "negations": sorted(CONFLICT_NEGATIONS),
         "antonyms": sorted(sorted(pair) for pair in CONFLICT_ANTONYMS),
         "report_bigrams": sorted(list(pair) for pair in CONFLICT_REPORT_BIGRAMS),
@@ -1958,6 +1961,107 @@ _SEGMENTATION_CASES: list[tuple[str, str, list[str], str | None]] = [
         ["The U.S.", "Army moved."],
         "Named in the module docstring as one of the two residual failures the "
         "ADR-0009 spike could not fix; UAX #29 calls it a required tailoring.",
+    ),
+    # ── R3, Dutch: multi-dot forms are stored WITH their interior dots, which
+    #    is the only form R3 ever sees ("i.v.m." -> "i.v.m"). ────────────────
+    (
+        "abbrev-nl/incl-and-o.a.",
+        "De vergoeding is € 25 incl. btw en geldt o.a. voor reizen.",
+        ["De vergoeding is € 25 incl. btw en geldt o.a. voor reizen."],
+        None,
+    ),
+    (
+        "abbrev-nl/excl",
+        "De cursus kost € 500 excl. btw per deelnemer.",
+        ["De cursus kost € 500 excl. btw per deelnemer."],
+        None,
+    ),
+    (
+        "abbrev-nl/bijv",
+        "Declareer kosten, bijv. parkeerkosten, via het portaal.",
+        ["Declareer kosten, bijv. parkeerkosten, via het portaal."],
+        None,
+    ),
+    (
+        "abbrev-nl/i.v.m.",
+        "Het verlof vervalt i.v.m. de reorganisatie.",
+        ["Het verlof vervalt i.v.m. de reorganisatie."],
+        None,
+    ),
+    (
+        "abbrev-nl/m.b.t.",
+        "Vragen m.b.t. het pensioen gaan naar HR.",
+        ["Vragen m.b.t. het pensioen gaan naar HR."],
+        None,
+    ),
+    (
+        "abbrev-nl/t.o.v.",
+        "Het budget stijgt t.o.v. vorig jaar.",
+        ["Het budget stijgt t.o.v. vorig jaar."],
+        None,
+    ),
+    ("abbrev-nl/ca", "De reistijd is ca. 40 minuten.", ["De reistijd is ca. 40 minuten."], None),
+    (
+        "abbrev-nl/evt",
+        "Neem evt. vragen mee naar het gesprek.",
+        ["Neem evt. vragen mee naar het gesprek."],
+        None,
+    ),
+    (
+        "abbrev-nl/d.w.z.",
+        "De proeftijd is kort, d.w.z. een maand.",
+        ["De proeftijd is kort, d.w.z. een maand."],
+        None,
+    ),
+    (
+        "abbrev-nl/m.u.v.",
+        "Alle medewerkers m.u.v. stagiairs krijgen een laptop.",
+        ["Alle medewerkers m.u.v. stagiairs krijgen een laptop."],
+        None,
+    ),
+    ("abbrev-nl/blz", "Zie blz. 12 van de regeling.", ["Zie blz. 12 van de regeling."], None),
+    (
+        "abbrev-nl/mr",
+        "Mr. De Vries adviseert de ondernemingsraad.",
+        ["Mr. De Vries adviseert de ondernemingsraad."],
+        None,
+    ),
+    # A real Dutch boundary still breaks: "btw" is not an abbreviation.
+    (
+        "abbrev-nl/boundary-after-incl-btw",
+        "De vergoeding is € 25 incl. btw. De regeling geldt vanaf maart.",
+        ["De vergoeding is € 25 incl. btw.", "De regeling geldt vanaf maart."],
+        None,
+    ),
+    # REJECTED entries: each routinely ends a sentence, so the table leaves them
+    # out and the boundary after them is kept...
+    (
+        "abbrev-nl/enz-not-in-table",
+        "Declareer reis- en parkeerkosten enz. Bonnen zijn verplicht.",
+        ["Declareer reis- en parkeerkosten enz.", "Bonnen zijn verplicht."],
+        None,
+    ),
+    (
+        "abbrev-nl/jl-not-in-table",
+        "De regeling geldt sinds 1 maart jl. Eerdere afspraken vervallen.",
+        ["De regeling geldt sinds 1 maart jl.", "Eerdere afspraken vervallen."],
+        None,
+    ),
+    (
+        "abbrev-nl/z.s.m.-not-in-table",
+        "Meld een ziekte z.s.m. De manager neemt contact op.",
+        ["Meld een ziekte z.s.m.", "De manager neemt contact op."],
+        None,
+    ),
+    # ...and this is the price of leaving z.s.m. out, pinned rather than hidden.
+    (
+        "abbrev-nl/z.s.m.-mid-sentence",
+        "Neem z.s.m. contact op met HR.",
+        ["Neem z.s.m.", "contact op met HR."],
+        '"z.s.m." is left out of ABBREVIATIONS because it is clause-final as often '
+        "as not; mid-sentence it therefore breaks and yields a fragment claim. A "
+        "fragment fails the gate and is dropped (safe); a false merge would pass "
+        "or fail two sentences together (unsafe).",
     ),
     # ── R2: digits ──────────────────────────────────────────────────────────
     (

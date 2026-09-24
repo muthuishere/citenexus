@@ -215,6 +215,94 @@
       "right": "The reaction does not conserve momentum in this frame.",
       "conflict": true,
       "rule": "negation"
+    },
+    {
+      "domain": "hr-nl",
+      "label": "negation (niet)",
+      "left": "De werkgever vergoedt de reiskosten voor woon-werkverkeer.",
+      "right": "De werkgever vergoedt de reiskosten voor woon-werkverkeer niet.",
+      "conflict": true,
+      "rule": "negation"
+    },
+    {
+      "domain": "hr-nl",
+      "label": "negation (geen)",
+      "left": "Een uitzendkracht heeft recht op de eindejaarsuitkering.",
+      "right": "Een uitzendkracht heeft geen recht op de eindejaarsuitkering.",
+      "conflict": true,
+      "rule": "negation"
+    },
+    {
+      "domain": "hr-nl",
+      "label": "negation (geen replaces een)",
+      "left": "De medewerker ontvangt een vergoeding voor thuiswerken.",
+      "right": "De medewerker ontvangt geen vergoeding voor thuiswerken.",
+      "conflict": true,
+      "rule": "negation"
+    },
+    {
+      "domain": "hr-nl",
+      "label": "negation (nooit)",
+      "left": "Overuren worden uitbetaald in de volgende salarisperiode.",
+      "right": "Overuren worden nooit uitbetaald in de volgende salarisperiode.",
+      "conflict": true,
+      "rule": "negation"
+    },
+    {
+      "domain": "hr-nl",
+      "label": "negation (verboden)",
+      "left": "Het gebruik van privelaptops is toegestaan voor zakelijk werk.",
+      "right": "Het gebruik van privelaptops is verboden voor zakelijk werk.",
+      "conflict": true,
+      "rule": "negation"
+    },
+    {
+      "domain": "hr-nl",
+      "label": "negation (niet toegestaan)",
+      "left": "Thuiswerken is toegestaan tijdens de proeftijd.",
+      "right": "Thuiswerken is niet toegestaan tijdens de proeftijd.",
+      "conflict": true,
+      "rule": "negation"
+    },
+    {
+      "domain": "hr-nl",
+      "label": "comparator (verplicht/optioneel)",
+      "left": "Deelname aan de jaarlijkse beoordeling is verplicht voor alle medewerkers.",
+      "right": "Deelname aan de jaarlijkse beoordeling is optioneel voor alle medewerkers.",
+      "conflict": true,
+      "rule": "antonym"
+    },
+    {
+      "domain": "hr-nl",
+      "label": "comparator (goedgekeurd/afgewezen)",
+      "left": "Het verzoek om ouderschapsverlof is goedgekeurd door de afdeling HR.",
+      "right": "Het verzoek om ouderschapsverlof is afgewezen door de afdeling HR.",
+      "conflict": true,
+      "rule": "antonym"
+    },
+    {
+      "domain": "hr-nl",
+      "label": "value",
+      "left": "De opzegtermijn bedraagt 30 dagen.",
+      "right": "De opzegtermijn bedraagt 60 dagen.",
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "finance-nl",
+      "label": "value (euro)",
+      "left": "De thuiswerkvergoeding is € 2 per dag.",
+      "right": "De thuiswerkvergoeding is € 3 per dag.",
+      "conflict": true,
+      "rule": "value"
+    },
+    {
+      "domain": "legal-nl",
+      "label": "negation in a long policy sentence",
+      "left": "Een medewerker die langer dan twee jaar in dienst is, heeft bij ontslag op initiatief van de werkgever recht op een transitievergoeding.",
+      "right": "Een medewerker die langer dan twee jaar in dienst is, heeft bij ontslag op initiatief van de werkgever geen recht op een transitievergoeding.",
+      "conflict": true,
+      "rule": "negation"
     }
   ],
   "hard_negatives": [
@@ -433,6 +521,102 @@
       "right": "Sound travels at 1480 metres per second in water.",
       "conflict": false,
       "rule": null
+    },
+    {
+      "domain": "hr-nl",
+      "label": "restrictor not negation (behalve)",
+      "left": "Alle medewerkers behalve stagiairs ontvangen een laptop.",
+      "right": "Alle medewerkers ontvangen een laptop.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "hr-nl",
+      "label": "restrictor not negation (uitgezonderd)",
+      "left": "Alle functies uitgezonderd de directie vallen onder de cao.",
+      "right": "Alle functies vallen onder de cao.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "hr-nl",
+      "label": "restrictor not negation (tenzij)",
+      "left": "Vakantiedagen vervallen na vijf jaar tenzij anders is afgesproken.",
+      "right": "Vakantiedagen vervallen na vijf jaar.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "hr-nl",
+      "label": "zonder scopes a population",
+      "left": "Medewerkers zonder vast contract krijgen de eindejaarsuitkering.",
+      "right": "Medewerkers met vast contract krijgen de eindejaarsuitkering.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "hr-nl",
+      "label": "negation different population",
+      "left": "Stagiairs hebben geen recht op een leaseauto.",
+      "right": "Managers hebben recht op een leaseauto.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "hr-nl",
+      "label": "threshold comparative (meer/minder)",
+      "left": "Medewerkers met meer dan 10 dienstjaren krijgen 25 vakantiedagen.",
+      "right": "Medewerkers met minder dan 10 dienstjaren krijgen 20 vakantiedagen.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance-nl",
+      "label": "threshold comparative (hoger/lager)",
+      "left": "Bij een jaarsalaris hoger dan 50000 euro geldt een bijdrage van 6 procent.",
+      "right": "Bij een jaarsalaris lager dan 50000 euro geldt een bijdrage van 4 procent.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance-nl",
+      "label": "same price quoted excl and incl btw",
+      "left": "De vergoeding bedraagt € 100 exclusief btw.",
+      "right": "De vergoeding bedraagt € 121 inclusief btw.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance-nl",
+      "label": "same price quoted excl. and incl. btw (abbreviated)",
+      "left": "De cursus kost € 500 excl. btw.",
+      "right": "De cursus kost € 605 incl. btw.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "hr-nl",
+      "label": "different subject same verb",
+      "left": "De reiskosten worden maandelijks vergoed.",
+      "right": "De studiekosten worden maandelijks vergoed.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal-nl",
+      "label": "quoted negation",
+      "left": "De bewering dat de medewerker niet verzekerd is, is onjuist.",
+      "right": "De medewerker is verzekerd.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal-nl",
+      "label": "double negation restatement",
+      "left": "Het beding is niet ongeldig.",
+      "right": "Het beding is geldig.",
+      "conflict": false,
+      "rule": null
     }
   ],
   "unrelated": [
@@ -609,6 +793,46 @@
       "label": "shared 'exposure'",
       "left": "Net exposure fell to 4.2 million.",
       "right": "Radiation exposure is limited to 20 millisieverts.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "legal-nl",
+      "label": "shared 'termijn'",
+      "left": "De termijn voor betaling is 30 dagen.",
+      "right": "De termijn van de huurovereenkomst is 5 jaar.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "hr-nl",
+      "label": "shared 'recht'",
+      "left": "De medewerker heeft recht op ouderschapsverlof.",
+      "right": "Het Nederlands recht is van toepassing op deze overeenkomst.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "finance-nl",
+      "label": "shared 'vergoeding'",
+      "left": "De vergoeding voor thuiswerken is 2 euro per dag.",
+      "right": "De rechter kende de eiser een vergoeding van 5000 euro toe.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "hr-nl",
+      "label": "shared 'contract'",
+      "left": "Het contract wordt niet stilzwijgend verlengd.",
+      "right": "Het contract met de leverancier loopt tot 2027.",
+      "conflict": false,
+      "rule": null
+    },
+    {
+      "domain": "hr-nl",
+      "label": "shared function words only",
+      "left": "De werkgever betaalt de premie van de verzekering.",
+      "right": "De medewerker leest de tekst van de regeling niet.",
       "conflict": false,
       "rule": null
     }

@@ -72,6 +72,9 @@ def render_python(table: dict[str, Any]) -> str:
         f"    {json.dumps(k)}: {v!r},\n" for k, v in table["thresholds"].items()
     )
     langs = ", ".join(json.dumps(v) for v in table["languages"])
+    # A one-tuple needs its comma; a longer one must not carry a trailing comma,
+    # which ruff's magic-trailing-comma rule would explode over several lines.
+    langs_tuple = f"({langs},)" if len(table["languages"]) == 1 else f"({langs})"
     return (
         f'"""{_BANNER}\n\n{_SOURCE}\n{_REGEN}\n\n'
         "Bundled as literals rather than read from disk so the published wheel is\n"
@@ -86,7 +89,7 @@ def render_python(table: dict[str, Any]) -> str:
         '    "CONFLICT_THRESHOLDS",\n'
         '    "MEASUREMENT_UNITS",\n'
         "]\n\n"
-        f"CONFLICT_LANGUAGES: tuple[str, ...] = ({langs},)\n\n"
+        f"CONFLICT_LANGUAGES: tuple[str, ...] = {langs_tuple}\n\n"
         + _py_strs("CONFLICT_NEGATIONS", table["negations"])
         + "\n"
         + _py_pairs("CONFLICT_ANTONYMS", table["antonyms"])

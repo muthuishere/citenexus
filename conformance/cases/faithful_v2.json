@@ -53,6 +53,72 @@
       "passage": "Pressure in chamber one is greater than pressure in chamber two.",
       "answer": "Pressure in chamber two is greater than pressure in chamber one.",
       "supported": false
+    },
+    {
+      "name": "nl/negation-deletion (niet)",
+      "passage": "De werknemer mag vertrouwelijke informatie niet aan derden verstrekken.",
+      "answer": "De werknemer mag vertrouwelijke informatie aan derden verstrekken.",
+      "supported": false
+    },
+    {
+      "name": "nl/negation-deletion (geen)",
+      "passage": "Een uitzendkracht heeft geen recht op de eindejaarsuitkering.",
+      "answer": "Een uitzendkracht heeft recht op de eindejaarsuitkering.",
+      "supported": false
+    },
+    {
+      "name": "nl/negation-deletion (nooit)",
+      "passage": "Wachtwoorden mogen nooit per e-mail worden gedeeld.",
+      "answer": "Wachtwoorden mogen per e-mail worden gedeeld.",
+      "supported": false
+    },
+    {
+      "name": "nl/negation-deletion (zonder)",
+      "passage": "Overwerk wordt zonder schriftelijke goedkeuring uitbetaald.",
+      "answer": "Overwerk wordt schriftelijke goedkeuring uitbetaald.",
+      "supported": false
+    },
+    {
+      "name": "nl/negation-deletion (niemand)",
+      "passage": "Buiten kantooruren mag niemand de serverruimte betreden.",
+      "answer": "Buiten kantooruren mag de serverruimte betreden.",
+      "supported": false
+    },
+    {
+      "name": "nl/negation-deletion (niets)",
+      "passage": "De werkgever vergoedt niets van de reiskosten bij thuiswerk.",
+      "answer": "De werkgever vergoedt van de reiskosten bij thuiswerk.",
+      "supported": false
+    },
+    {
+      "name": "nl/negation-deletion (verboden)",
+      "passage": "Roken is verboden in alle bedrijfsgebouwen.",
+      "answer": "Roken is in alle bedrijfsgebouwen.",
+      "supported": false
+    },
+    {
+      "name": "nl/negation-deletion (one noch of two)",
+      "passage": "Noch de proeftijd noch de opzegtermijn mag worden verlengd.",
+      "answer": "Noch de proeftijd de opzegtermijn mag worden verlengd.",
+      "supported": false
+    },
+    {
+      "name": "nl/restrictor-deletion (behalve)",
+      "passage": "Alle medewerkers behalve stagiairs ontvangen een laptop.",
+      "answer": "Alle medewerkers ontvangen een laptop.",
+      "supported": false
+    },
+    {
+      "name": "nl/restrictor-deletion (uitgezonderd)",
+      "passage": "Alle functies uitgezonderd de directie vallen onder de cao.",
+      "answer": "Alle functies vallen onder de cao.",
+      "supported": false
+    },
+    {
+      "name": "nl/restrictor-deletion (tenzij)",
+      "passage": "Het verlof wordt tenzij anders overeengekomen in hele dagen opgenomen.",
+      "answer": "Het verlof wordt in hele dagen opgenomen.",
+      "supported": false
     }
   ],
   "controls": [
@@ -234,6 +300,54 @@
       "name": "negation-kept/physics",
       "passage": "The sample does not melt below 240 kelvin.",
       "answer": "The sample does not melt below 240 kelvin.",
+      "supported": true
+    },
+    {
+      "name": "nl/verbatim-negated",
+      "passage": "Een uitzendkracht heeft geen recht op de eindejaarsuitkering.",
+      "answer": "Een uitzendkracht heeft geen recht op de eindejaarsuitkering.",
+      "supported": true
+    },
+    {
+      "name": "nl/negation-kept-compressed",
+      "passage": "De werknemer mag vertrouwelijke informatie niet aan derden verstrekken.",
+      "answer": "De werknemer mag informatie niet aan derden verstrekken",
+      "supported": true
+    },
+    {
+      "name": "nl/compress",
+      "passage": "De werkgever vergoedt de reiskosten voor woon-werkverkeer maandelijks achteraf.",
+      "answer": "De werkgever vergoedt de reiskosten maandelijks achteraf",
+      "supported": true
+    },
+    {
+      "name": "nl/subspan",
+      "passage": "De proeftijd bedraagt twee maanden bij een contract voor onbepaalde tijd.",
+      "answer": "De proeftijd bedraagt twee maanden",
+      "supported": true
+    },
+    {
+      "name": "nl/noise",
+      "passage": "De opzegtermijn voor de werkgever is een maand per vijf dienstjaren.",
+      "answer": "  de OPZEGTERMIJN voor de werkgever is een maand!  ",
+      "supported": true
+    },
+    {
+      "name": "nl/markers-kept",
+      "passage": "Buiten kantooruren mag niemand zonder begeleiding de serverruimte betreden.",
+      "answer": "Buiten kantooruren mag niemand zonder begeleiding de serverruimte betreden",
+      "supported": true
+    },
+    {
+      "name": "nl/double-noch-kept",
+      "passage": "Noch de proeftijd noch de opzegtermijn mag worden verlengd.",
+      "answer": "noch de proeftijd noch de opzegtermijn mag worden verlengd",
+      "supported": true
+    },
+    {
+      "name": "nl/restrictor-kept-compressed",
+      "passage": "Alle medewerkers behalve stagiairs ontvangen jaarlijks een nieuwe laptop.",
+      "answer": "Alle medewerkers behalve stagiairs ontvangen een laptop",
       "supported": true
     }
   ]

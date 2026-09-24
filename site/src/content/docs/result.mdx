@@ -218,7 +218,7 @@ the passage, read `conflicts_detected` before assuming a retrieval bug.
 
 <Aside type="caution" title="Detection is at parity in all three ports; the mode selector and the thresholds are the caveats">
 `conflicts` / `conflicts_detected` are populated natively in Python, Go and
-JavaScript from one predicate pinned by 132 committed vectors
+JavaScript from one predicate pinned by 160 committed vectors
 (`conformance/cases/conflict.json`). What is **not** at parity is the mode
 selector: Go and JavaScript define `strict` alone, so those ports always take the
 `strict` row of the table above.
@@ -227,7 +227,7 @@ The detector's thresholds (`MAX_RESIDUAL = 1`, `SUBJECT_OVERLAP = 0.60`,
 `MAX_SYMDIFF = 3`, `MIN_CONTENT = 3`, `DUPLICATE_JACCARD = 0.80`,
 `CONFLICT_TOP_K = 6`) are pinned, non-configurable, and were swept on **synthetic
 English** sentences. And on a non-Latin corpus only the numeric-value rule can
-fire at all — negation and antonym are driven by English wordlists. Read
+fire at all — negation and antonym are driven by English and Dutch wordlists. Read
 `conflicts_detected = 0` there as "no *numeric* conflict found":
 [the known misses, in detail](/citenexus/scenarios/conflicting-sources/#non-latin-scripts-one-rule-of-three).
 </Aside>

@@ -105,16 +105,31 @@ FROZEN_MEASUREMENT_UNITS = frozenset(
 )  # fmt: skip
 
 
+# ── The Dutch ("nl") additions, pinned separately so the English memberships
+#    above stay a literal record of the pre-extraction tables. Each entry is
+#    backed by a fixture in tests/answer/test_conflict.py (``*-nl`` domains) and
+#    was measured with spikes/nl-tables/measure.py. ─────────────────────────────
+
+DUTCH_NEGATIONS = frozenset(
+    {"geen", "niemand", "niet", "niets", "noch", "nooit", "verboden"}
+)  # fmt: skip
+
+DUTCH_ANTONYMS = frozenset(
+    {("verplicht", "optioneel"), ("goedgekeurd", "afgewezen")}
+)  # fmt: skip
+
+
 def test_sizes_are_unchanged() -> None:
-    assert len(CONFLICT_NEGATIONS) == 21
-    assert len(CONFLICT_ANTONYMS) == 30
+    assert len(CONFLICT_NEGATIONS) == 21 + 7
+    assert len(CONFLICT_ANTONYMS) == 30 + 2
     assert len(CONFLICT_REPORT_BIGRAMS) == 11
     assert len(CONFLICT_SCOPE_MARKERS) == 27
     assert len(MEASUREMENT_UNITS) == 73
 
 
 def test_membership_is_byte_identical_to_the_pre_extraction_tables() -> None:
-    assert CONFLICT_NEGATIONS == FROZEN_NEGATIONS
+    assert CONFLICT_NEGATIONS == FROZEN_NEGATIONS | DUTCH_NEGATIONS
+    assert not (FROZEN_NEGATIONS & DUTCH_NEGATIONS)
     assert CONFLICT_REPORT_BIGRAMS == FROZEN_REPORT_BIGRAMS
     assert CONFLICT_SCOPE_MARKERS == FROZEN_SCOPE_MARKERS
     assert MEASUREMENT_UNITS == FROZEN_MEASUREMENT_UNITS
@@ -132,12 +147,13 @@ def test_antonym_pairs_are_unchanged_as_unordered_pairs() -> None:
     were always going to load the alphabetised form. Both facts are asserted
     here so nobody has to re-derive them.
     """
-    assert {frozenset(p) for p in CONFLICT_ANTONYMS} == {frozenset(p) for p in FROZEN_ANTONYMS}
+    expected = FROZEN_ANTONYMS | DUTCH_ANTONYMS
+    assert {frozenset(p) for p in CONFLICT_ANTONYMS} == {frozenset(p) for p in expected}
     assert frozenset(
-        pair for a, b in FROZEN_ANTONYMS for pair in ((a, b), (b, a))
+        pair for a, b in expected for pair in ((a, b), (b, a))
     ) == conflict_module._ANTONYMS
-    # No pair is degenerate, so 30 unordered pairs symmetrise to exactly 60.
-    assert len(conflict_module._ANTONYMS) == 60
+    # No pair is degenerate, so 32 unordered pairs symmetrise to exactly 64.
+    assert len(conflict_module._ANTONYMS) == 64
 
 
 def test_negations_are_still_derived_from_polarity_markers() -> None:

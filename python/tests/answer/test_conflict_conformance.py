@@ -10,7 +10,7 @@ but never a wrong verdict). ``tests/answer/test_conflict.py`` asserts the same
 fixtures from the Python-side lists, not from the committed JSON.
 
 This module closes that hole from the other side: it reads the committed JSON as
-opaque data and asserts every one of its 132 vectors — verdict *and* rule name —
+opaque data and asserts every one of its 160 vectors — verdict *and* rule name —
 against the shipped functions. A Go or JS port is held to exactly this file, so
 Python must be held to it first.
 """
@@ -32,9 +32,9 @@ VECTORS: dict[str, list[dict[str, Any]]] = json.loads(_CASES.read_text(encoding=
 #: Bucket sizes, pinned. A vector silently dropped from a bucket is a weakened
 #: contract that no per-case assertion can see.
 EXPECTED_COUNTS: dict[str, int] = {
-    "true_conflicts": 27,
-    "hard_negatives": 27,
-    "unrelated": 22,
+    "true_conflicts": 38,  # 27 English + 11 Dutch
+    "hard_negatives": 39,  # 27 English + 12 Dutch
+    "unrelated": 27,  # 22 English + 5 Dutch
     "heldout_conflicts": 5,
     "heldout_negatives": 10,
     "non_latin": 30,
@@ -61,7 +61,7 @@ def _pairs(bucket: str) -> list[Any]:
 def test_bucket_names_and_sizes() -> None:
     assert set(VECTORS) == set(EXPECTED_COUNTS)
     assert {k: len(v) for k, v in VECTORS.items()} == EXPECTED_COUNTS
-    assert sum(EXPECTED_COUNTS.values()) == 132
+    assert sum(EXPECTED_COUNTS.values()) == 160
 
 
 @pytest.mark.parametrize(

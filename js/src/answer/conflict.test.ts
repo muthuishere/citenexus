@@ -51,9 +51,9 @@ const VECTORS = loadCase<{
 /** Bucket sizes, pinned. A vector silently dropped from a bucket is a weakened
  *  contract that no per-case assertion can see. */
 const EXPECTED_COUNTS: Record<string, number> = {
-  true_conflicts: 27,
-  hard_negatives: 27,
-  unrelated: 22,
+  true_conflicts: 38, // 27 en + 11 nl
+  hard_negatives: 39, // 27 en + 12 nl
+  unrelated: 27, // 22 en + 5 nl
   heldout_conflicts: 5,
   heldout_negatives: 10,
   non_latin: 30,
@@ -78,7 +78,7 @@ describe("conflict.json bucket shape", () => {
       Object.entries(VECTORS).map(([k, v]) => [k, (v as unknown[]).length]),
     );
     expect(sizes).toEqual(EXPECTED_COUNTS);
-    expect(Object.values(EXPECTED_COUNTS).reduce((a, b) => a + b, 0)).toBe(132);
+    expect(Object.values(EXPECTED_COUNTS).reduce((a, b) => a + b, 0)).toBe(160);
   });
 });
 

@@ -74,7 +74,12 @@ def test_corrupted_table_raises_false_abstention(
 
 def test_table_claims_only_languages_with_fixtures() -> None:
     """No language may be claimed by the table without a golden fixture."""
-    assert POLARITY_LANGUAGES == ("en",)
+    assert POLARITY_LANGUAGES == ("en", "nl")
+    # The Dutch claim rests on these fixtures; removing them must fail here.
+    from .test_verify_v2 import DUTCH_ATTACKS, DUTCH_CONTROLS
+
+    assert len(DUTCH_ATTACKS) == 11
+    assert len(DUTCH_CONTROLS) == 8
 
 
 def test_generated_table_matches_the_reference() -> None:

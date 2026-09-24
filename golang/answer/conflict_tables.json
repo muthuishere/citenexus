@@ -1,6 +1,7 @@
 {
   "languages": [
-    "en"
+    "en",
+    "nl"
   ],
   "negations": [
     "absent",
@@ -11,18 +12,25 @@
     "failed",
     "fails",
     "forbidden",
+    "geen",
     "lack",
     "lacks",
     "neither",
     "never",
+    "niemand",
+    "niet",
+    "niets",
     "no",
     "nobody",
+    "noch",
     "none",
+    "nooit",
     "nor",
     "not",
     "nothing",
     "prohibited",
     "unable",
+    "verboden",
     "without"
   ],
   "antonyms": [
@@ -33,6 +41,10 @@
     [
       "accelerates",
       "decelerates"
+    ],
+    [
+      "afgewezen",
+      "goedgekeurd"
     ],
     [
       "after",
@@ -137,6 +149,10 @@
     [
       "optional",
       "required"
+    ],
+    [
+      "optioneel",
+      "verplicht"
     ],
     [
       "overturned",

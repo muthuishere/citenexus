@@ -1,9 +1,11 @@
 {
   "languages": [
-    "en"
+    "en",
+    "nl"
   ],
   "markers": [
     "absent",
+    "behalve",
     "cannot",
     "denied",
     "except",
@@ -11,17 +13,27 @@
     "failed",
     "fails",
     "forbidden",
+    "geen",
     "neither",
     "never",
+    "niemand",
+    "niet",
+    "niets",
     "no",
     "nobody",
+    "noch",
     "none",
+    "nooit",
     "nor",
     "not",
     "nothing",
     "other",
     "prohibited",
+    "tenzij",
+    "uitgezonderd",
     "unless",
-    "without"
+    "verboden",
+    "without",
+    "zonder"
   ]
 }

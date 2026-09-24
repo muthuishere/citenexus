@@ -17,13 +17,13 @@ interface V2Fixture {
 }
 
 // The ADR-0009 contract: every verdict in conformance/cases/faithful_v2.json is
-// reproduced exactly. The attacks are nine false answers the frozen v1 predicate
-// accepts 9/9; the controls are legitimately-supported answers in four shapes
+// reproduced exactly. The attacks are twenty false answers (9 English, 11 Dutch)
+// the frozen v1 predicate accepts 20/20; the controls are legitimately-supported answers in four shapes
 // (verbatim, subspan, punctuation/case noise, interior-word compression) that
 // must stay accepted — measured false rejection is 0.0%.
 /** Bucket sizes, pinned. A vector silently dropped from a bucket is a weakened
  *  contract that no per-case assertion can see. */
-const EXPECTED_COUNTS: Record<string, number> = { attacks: 9, controls: 30 };
+const EXPECTED_COUNTS: Record<string, number> = { attacks: 20, controls: 38 };
 
 describe("isSupportedV2 conformance", () => {
   const fixture = loadCase<V2Fixture>("faithful_v2.json");
