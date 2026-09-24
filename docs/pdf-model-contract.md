@@ -316,6 +316,77 @@ for _, u := range res.Units {
   untouched, which is useful for byte-level determinism checks.
 - `core.PdfUnits(pdf, opts)` is the no-model path.
 
+## 7b. Python (`citenexus.core`)
+
+Build the core with `cd rust && cargo build --release --features pdf`. Point
+`CITENEXUS_CORE_LIB` at the cdylib, unless you run from a checkout, and
+`PDFIUM_DYNAMIC_LIB_PATH` at libpdfium. The binding is typed with pydantic
+models, and its `*_json` variants return the core's bytes untouched. It is
+covered by `python/tests/core/test_rust_pdf.py`, which checks the golden
+byte for byte.
+
+```python
+from citenexus import core
+
+opts = core.PdfOptions(language="nl")
+prep = core.pdf_prepare(pdf, opts)
+
+responses: list[core.PdfResponse] = []
+for req in prep.requests:
+    if req.kind == "table_structure":
+        # send req.words (id, text, bbox, marker) + a render of req.bbox
+        grids = table_model(req)                 # your model -> list of {"rows": [...]} or []
+        if grids is None:
+            continue                             # error/timeout: omit -> base output
+        responses.append(core.PdfResponse(request_id=req.id, finish_reason="stop",
+                                          tables=[core.PdfGrid.model_validate(g) for g in grids]))
+    else:  # vision_page / vision_region, asked twice (req.variant 1 and 2)
+        text, mode = vision_model(render(pdf, req.page, req.bbox), seed=req.variant)
+        responses.append(core.PdfResponse(request_id=req.id, finish_reason="stop",
+                                          markdown=text, mode=mode))
+
+out = core.pdf_assemble(pdf, responses, opts)
+for unit in out.units:
+    chunk = core.citable_text(unit.markdown)     # never the disputed / description blocks
+```
+
+## 7c. JavaScript (`@muthuishere/citenexus/ffi`, koffi)
+
+The build prerequisites are the same. Set `CITENEXUS_CORE_LIB` to override the
+cdylib path. Covered by `js/src/core/core.test.ts`, which checks the golden
+byte for byte.
+
+```ts
+import { pdfPrepare, pdfAssemble, citableText, type PdfResponse } from "@muthuishere/citenexus/ffi";
+
+const opts = { language: "nl" };
+const prep = pdfPrepare(pdf, opts);
+const responses: PdfResponse[] = [];
+for (const req of prep.requests) {
+  if (req.kind === "table_structure") {
+    const grids = await tableModel(req);        // [] = "no table here"
+    if (grids) responses.push({ request_id: req.id, finish_reason: "stop", tables: grids });
+  } else {
+    // vision: two independent calls, req.variant 1 and 2
+    const { text, mode } = await visionModel(render(pdf, req.page, req.bbox), req.variant);
+    responses.push({ request_id: req.id, finish_reason: "stop", markdown: text, mode });
+  }
+}
+const out = pdfAssemble(pdf, responses, opts);
+const chunks = out.units.map((u) => citableText(u.markdown));
+```
+
+**Not changed by this contract:** the older `extract()` PDF paths, which are
+separate from `pdf_units`.
+- The Rust core's `citenexus_extract` for PDF
+  (`rust/src/extract/pdf/mod.rs`, `page.text().all()`) still emits one
+  paragraph per page and leaks U+0002. Go's `core.Extract` and JS's `extract`
+  use it.
+- Python's `citenexus.extract` PDF extractor uses pdfplumber, not the core.
+
+Both outputs are pinned where they are, and moving them onto `pdf_units` is a
+separate, tracked follow-up.
+
 ## 8. C ABI
 
 ```c
