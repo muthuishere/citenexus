@@ -15,6 +15,57 @@ import (
 	"github.com/muthuishere/citenexus/golang/tokenize"
 )
 
+// ─── polarity-swap guard ─────────────────────────────────────────────────────
+
+// polaritySwaps are single-word substitutions that flip a claim's polarity,
+// both directions, NL + EN.
+var polaritySwaps = map[string][]string{
+	"een": {"geen"}, "geen": {"een"},
+	"wel": {"niet"}, "niet": {"wel"},
+	"altijd": {"nooit"}, "nooit": {"altijd"},
+	"always": {"never"}, "never": {"always"},
+	"a": {"no"}, "an": {"no"}, "no": {"a", "an"},
+	"toegestaan": {"verboden"}, "verboden": {"toegestaan"},
+	"allowed": {"forbidden", "prohibited"}, "forbidden": {"allowed"}, "prohibited": {"allowed"},
+	"permitted": {"prohibited"}, "verplicht": {"optioneel"}, "optioneel": {"verplicht"},
+	"required": {"optional"}, "optional": {"required"},
+}
+
+// polaritySwapGuard refuses a claim that is the passage with ONE polarity word
+// swapped: "Er bestaat een recht op thuiswerken" over "Er bestaat geen recht op
+// thuiswerken", "worden wel opgebouwd" over "worden niet opgebouwd". rag_go's
+// checker admits both at its recommended τ (P(E) 0.197 / 0.21 against τ 0.154).
+//
+// Test: the claim does not align with the passage (the gate's ordered,
+// gap-bounded alignment), but after swapping one word for its polar
+// counterpart it does. A claim that aligns as written is never refused here — so
+// "niet alleen … maar ook", double negation and every verbatim claim pass.
+// Near-verbatim wording is required, which makes the guard same-language by
+// construction; a translated claim is left to the checker and the other guards.
+func polaritySwapGuard(claim, passage string) string {
+	claimTokens := tokenize.TokenizeV2(claim)
+	// The whole passage, not clause by clause: a claim may span a comma ("…
+	// opgebouwd, wel naar rato …"), and the gate's gap budget already keeps the
+	// alignment local.
+	passageTokens := tokenize.TokenizeV2(passage)
+	aligns := func(tokens []string) bool {
+		_, ok := gate.Align(tokens, passageTokens)
+		return ok
+	}
+	if len(claimTokens) == 0 || aligns(claimTokens) {
+		return ""
+	}
+	for i, t := range claimTokens {
+		for _, swap := range polaritySwaps[t] {
+			variant := append(append(append([]string{}, claimTokens[:i]...), swap), claimTokens[i+1:]...)
+			if aligns(variant) {
+				return fmt.Sprintf("negation guard: the claim says %q where the passage says %q", t, swap)
+			}
+		}
+	}
+	return ""
+}
+
 // ─── unit guard ──────────────────────────────────────────────────────────────
 
 // timeUnits maps a unit word (NL + EN, with abbreviations) to its class. Work

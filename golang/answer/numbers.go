@@ -159,6 +159,10 @@ type numberMatch struct {
 	raw     string // the matched digits and separators, as written
 	reading NumberReading
 	unit    string
+	// attached is true when the unit follows the digits with no space ("1st",
+	// "2de") — required to read it as an ordinal suffix: "4 de werkgever" is
+	// a 4 and an article.
+	attached bool
 }
 
 // numbersIn finds every measured number in text, skipping identifiers such as
@@ -177,6 +181,7 @@ func numbersIn(text, language string) []numberMatch {
 		match := numberMatch{raw: lowered[m[2]:m[3]], reading: ReadNumber(lowered[m[2]:m[3]], m[4] >= 0, language)}
 		if m[6] >= 0 {
 			match.unit = lowered[m[6]:m[7]]
+			match.attached = m[6] == m[3]
 		}
 		out = append(out, match)
 	}

@@ -45,8 +45,8 @@ func TestVerifyAnswerConformance(t *testing.T) {
 		Cases []verifyVector `json:"cases"`
 	}
 	conform.Case(t, "verify_answer.json", &file)
-	if len(file.Cases) != 26 {
-		t.Fatalf("verify_answer.json: got %d cases, want 26", len(file.Cases))
+	if len(file.Cases) != 35 {
+		t.Fatalf("verify_answer.json: got %d cases, want 35", len(file.Cases))
 	}
 	refuseControls := 0
 	for _, c := range file.Cases {

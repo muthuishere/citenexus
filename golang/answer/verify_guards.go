@@ -23,17 +23,51 @@ import (
 // an English "1,500" over a Dutch "1.500" matches, and "25,00" matches "25".
 // A number neither language can resolve ("1.500" undeclared) matches only the
 // same spelling: ambiguity refuses, it never guesses.
+//
+// The passage side also reads SPELLED-OUT numbers: policy text writes small
+// numbers as words ("één vakantiedag"), and a true "1 day" was being refused.
+// Cardinals come from numberWords, minus "een" — it is also the article "a",
+// and reading it as 1 would let any "1" through. Ordinal words ("eerste",
+// "first") satisfy only an ORDINAL in the claim ("1st", "1e"), never a bare
+// "1": "1 dag" and "de eerste dag" are different facts.
 func numberGuard(claim, claimLanguage, passage, passageLanguage string) string {
 	have := map[string]struct{}{}
 	for _, m := range numbersIn(passage, passageLanguage) {
 		have[m.reading.Key] = struct{}{}
+		if _, ordinal := ordinalSuffixes[m.unit]; ordinal && m.attached {
+			have["ord:"+m.reading.Key] = struct{}{}
+		}
+	}
+	for _, word := range unitScan.FindAllString(strings.ToLower(passage), -1) {
+		if value, ok := numberWords[word]; ok && word != "een" {
+			have[value] = struct{}{}
+		}
+		if value, ok := ordinalWords[word]; ok {
+			have["ord:"+value] = struct{}{}
+		}
 	}
 	for _, m := range numbersIn(claim, claimLanguage) {
-		if _, ok := have[m.reading.Key]; !ok {
-			return fmt.Sprintf("number guard: %s is not in the passage", strings.TrimPrefix(m.reading.Key, "?"))
+		key := m.reading.Key
+		if _, ordinal := ordinalSuffixes[m.unit]; ordinal && m.attached {
+			key = "ord:" + key
+		}
+		if _, ok := have[key]; !ok {
+			return fmt.Sprintf("number guard: %s is not in the passage", strings.TrimPrefix(strings.TrimPrefix(key, "ord:"), "?"))
 		}
 	}
 	return ""
+}
+
+// ordinalSuffixes follow a digit to make it an ordinal: 1st, 2nd, 3rd, 4th,
+// 1e, 2de, 8ste.
+var ordinalSuffixes = map[string]struct{}{"st": {}, "nd": {}, "rd": {}, "th": {}, "e": {}, "de": {}, "ste": {}}
+
+// ordinalWords are spelled-out ordinals, NL + EN, 1–12.
+var ordinalWords = map[string]string{
+	"eerste": "1", "tweede": "2", "derde": "3", "vierde": "4", "vijfde": "5", "zesde": "6",
+	"zevende": "7", "achtste": "8", "negende": "9", "tiende": "10", "elfde": "11", "twaalfde": "12",
+	"first": "1", "second": "2", "third": "3", "fourth": "4", "fifth": "5", "sixth": "6",
+	"seventh": "7", "eighth": "8", "ninth": "9", "tenth": "10", "eleventh": "11", "twelfth": "12",
 }
 
 // negationGuard: a claim that carries a polarity marker needs a passage that
@@ -85,6 +119,10 @@ func names(claim string) []string {
 		opensQuote := strings.IndexAny(f, `"“„«([{'‘`) == 0
 		word := strings.Trim(f, `"“”„«»()[]{},;:.!?'‘’`)
 		runes := []rune(word)
+		if ordinalToken.MatchString(strings.ToLower(word)) {
+			initial = false
+			continue // "1st", "2de": a number, not a name
+		}
 		if len(runes) > 1 {
 			hasDigit, hasLetter, allUpper := false, false, true
 			for _, r := range runes {
@@ -112,6 +150,8 @@ func names(claim string) []string {
 	}
 	return out
 }
+
+var ordinalToken = regexp.MustCompile(`^[0-9]+(st|nd|rd|th|e|de|ste)$`)
 
 var listMarker = regexp.MustCompile(`^([-*•·–—]|#{1,6}|[0-9]{1,3}[.)]|[a-z][.)])$`)
 
@@ -147,7 +187,7 @@ func guards(claim, claimLanguage string, eu EvidenceUnit) string {
 	if reason := unitGuard(claim, claimLanguage, eu.Text, eu.Language); reason != "" {
 		return reason
 	}
-	for _, g := range []func(string, string) string{negationGuard, clauseNegationGuard, qualifierGuard, scopeGuard, nameGuard} {
+	for _, g := range []func(string, string) string{negationGuard, clauseNegationGuard, polaritySwapGuard, qualifierGuard, scopeGuard, nameGuard} {
 		if reason := g(claim, eu.Text); reason != "" {
 			return reason
 		}

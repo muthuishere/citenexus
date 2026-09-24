@@ -714,6 +714,272 @@
           }
         ]
       }
+    },
+    {
+      "name": "polarity/een-where-the-passage-says-geen",
+      "must_refuse": true,
+      "answer": "Er bestaat een recht op thuiswerken [eu:g].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "g": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "g",
+          "document_id": "g",
+          "language": "nl",
+          "text": "Er bestaat geen recht op thuiswerken."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "negation guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "polarity/wel-where-the-passage-says-niet",
+      "must_refuse": true,
+      "answer": "Vakantie-uren worden wel volledig opgebouwd [eu:w].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "w": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "w",
+          "document_id": "w",
+          "language": "nl",
+          "text": "Vakantie-uren worden tijdens verlof niet volledig opgebouwd."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "negation guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "polarity/always-where-the-passage-says-never",
+      "must_refuse": true,
+      "answer": "The bonus is always paid in cash [eu:b].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "b": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "b",
+          "document_id": "b",
+          "language": "en",
+          "text": "The bonus is never paid in cash."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "negation guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "polarity/double-negation-is-admitted",
+      "answer": "Het beding is geldig [eu:d].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "d": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "d",
+          "document_id": "d",
+          "language": "nl",
+          "text": "Het beding is niet ongeldig."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "polarity/niet-alleen-maar-ook-is-admitted",
+      "answer": "Stagiairs krijgen ook een laptop [eu:l].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "l": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "l",
+          "document_id": "l",
+          "language": "nl",
+          "text": "Niet alleen werknemers maar ook stagiairs krijgen een laptop."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "number/spelled-out-one-is-admitted",
+      "answer": "Per ziekmelding wordt 1 vakantiedag ingehouden [eu:n].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "n": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "n",
+          "document_id": "n",
+          "language": "nl",
+          "text": "Bij iedere ziekmelding wordt één vakantiedag ingehouden."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "number/spelled-out-value-still-refuses-another-number",
+      "must_refuse": true,
+      "answer": "Per ziekmelding worden 2 vakantiedagen ingehouden [eu:n].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "n": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "n",
+          "document_id": "n",
+          "language": "nl",
+          "text": "Bij iedere ziekmelding wordt één vakantiedag ingehouden."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "number/ordinal-word-admits-an-ordinal",
+      "answer": "The 1st payment follows in January [eu:o].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "o": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "o",
+          "document_id": "o",
+          "language": "en",
+          "text": "The first payment follows in January."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "number/ordinal-word-does-not-admit-a-cardinal",
+      "must_refuse": true,
+      "answer": "1 payment follows in January [eu:o].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "o": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "o",
+          "document_id": "o",
+          "language": "en",
+          "text": "The first payment follows in January."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
     }
   ]
 }
