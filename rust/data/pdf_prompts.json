@@ -1,0 +1,18 @@
+{
+  "_about": "Default prompts for the ADR-0017 model contract. DATA, not code: the core never reads this file or calls a model. A host maps PdfRequest.prompt to one of these, fills {words_json} / renders PdfRequest.bbox, calls its own model, and sends the answer back as a PdfResponse. Override freely; the response SHAPE is the contract, the wording is not.",
+  "table_structure": {
+    "input": "PdfRequest.words (id, text, bbox in PDF points, top-left origin); optionally a render of PdfRequest.bbox",
+    "prompt": "You are given the words of one PDF page, each with an id, its text and its box. Find the table(s) among them and return their STRUCTURE only: JSON {\"tables\": [{\"rows\": [[[\"<word id>\", ...], ...], ...]}]}. Each row is a list of cells top to bottom; each cell is a list of word ids left to right, or {\"words\": [...], \"colspan\": n, \"rowspan\": n} for a spanning cell; an empty cell is []. Use every word inside a table exactly once and never write any text yourself: only ids from the list. Words outside tables are not part of the answer.\n\nWords:\n{words_json}",
+    "response": "PdfResponse.tables; text written by the model on a text-layer page is rejected (model_text_on_text_layer)"
+  },
+  "vision_page": {
+    "input": "a render of the whole page (PdfRequest.bbox = the page box)",
+    "prompt": "Transcribe this scanned page to GitHub-flavoured markdown. Copy every number, date and amount exactly as printed, in the same place; do not correct, round, reformat or complete anything. Keep headings, lists and tables. Output only the markdown.",
+    "response": "PdfResponse.markdown; checked against any OCR layer (digit bag, values, coverage 0.90 / novelty 0.08) and labelled vision_transcribed"
+  },
+  "vision_region": {
+    "input": "a render of PdfRequest.bbox (an image region with no text layer inside)",
+    "prompt": "Transcribe the text in this image region to markdown, exactly as printed. If it contains no text, describe it in one short sentence. Output only the markdown.",
+    "response": "PdfResponse.markdown; fills the image unit, labelled vision_transcribed; never merged into text-layer content"
+  }
+}

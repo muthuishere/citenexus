@@ -115,6 +115,62 @@ pub unsafe extern "C" fn citenexus_pdf_units(
     len: usize,
     opts_json: *const c_char,
 ) -> *mut c_char {
+    pdf_call(bytes, len, opts_json, None, PdfCall::Units)
+}
+
+/// Phase one of the model contract (ADR-0017 decision 4): the base output plus
+/// the requests a host may fulfil with its own model. Returns malloc'd JSON: a
+/// `PdfPrepared` (`units`, `pages`, `document`, `requests`), or `{"error": ...}`.
+///
+/// # Safety
+/// As `citenexus_pdf_units`.
+#[no_mangle]
+pub unsafe extern "C" fn citenexus_pdf_prepare(
+    bytes: *const u8,
+    len: usize,
+    opts_json: *const c_char,
+) -> *mut c_char {
+    pdf_call(bytes, len, opts_json, None, PdfCall::Prepare)
+}
+
+/// Phase two: re-parse the PDF and apply every response (a JSON array of
+/// `PdfResponse`, or null for none) that passes the deterministic checks.
+/// Returns malloc'd JSON: a `PdfUnitsOutput`, or `{"error": ...}`. With no
+/// responses it is byte-identical to `citenexus_pdf_units`.
+///
+/// # Safety
+/// As `citenexus_pdf_units`; `responses_json` must be a valid NUL-terminated
+/// UTF-8 C string, or null.
+#[no_mangle]
+pub unsafe extern "C" fn citenexus_pdf_assemble(
+    bytes: *const u8,
+    len: usize,
+    opts_json: *const c_char,
+    responses_json: *const c_char,
+) -> *mut c_char {
+    pdf_call(
+        bytes,
+        len,
+        opts_json,
+        Some(responses_json),
+        PdfCall::Assemble,
+    )
+}
+
+#[derive(Clone, Copy)]
+enum PdfCall {
+    Units,
+    Prepare,
+    Assemble,
+}
+
+unsafe fn pdf_call(
+    bytes: *const u8,
+    len: usize,
+    opts_json: *const c_char,
+    responses_json: Option<*const c_char>,
+    call: PdfCall,
+) -> *mut c_char {
     if bytes.is_null() {
         return to_c_string(error_json("null argument"));
     }
@@ -131,19 +187,49 @@ pub unsafe extern "C" fn citenexus_pdf_units(
             Err(msg) => return to_c_string(error_json(&msg)),
         }
     };
-    to_c_string(pdf_units_json(data, &opts))
+    let responses: Vec<crate::units::PdfResponse> = match responses_json {
+        Some(ptr) if !ptr.is_null() => match utf8_arg(ptr, "responses_json") {
+            Ok(raw) if raw.trim().is_empty() || raw.trim() == "null" => Vec::new(),
+            Ok(raw) => match serde_json::from_str(raw) {
+                Ok(r) => r,
+                Err(e) => return to_c_string(error_json(&format!("responses_json: {e}"))),
+            },
+            Err(msg) => return to_c_string(error_json(&msg)),
+        },
+        _ => Vec::new(),
+    };
+    to_c_string(pdf_json(data, &opts, &responses, call))
 }
 
 #[cfg(feature = "pdf")]
-fn pdf_units_json(data: &[u8], opts: &crate::units::PdfOptions) -> String {
-    match crate::extract::pdf::pdf_units(data, opts) {
-        Ok(out) => serde_json::to_string(&out).unwrap_or_else(|e| error_json(&e.to_string())),
+fn pdf_json(
+    data: &[u8],
+    opts: &crate::units::PdfOptions,
+    responses: &[crate::units::PdfResponse],
+    call: PdfCall,
+) -> String {
+    use crate::extract::pdf;
+    let result = match call {
+        PdfCall::Units => pdf::pdf_units(data, opts).map(|o| serde_json::to_string(&o)),
+        PdfCall::Prepare => pdf::pdf_prepare(data, opts).map(|o| serde_json::to_string(&o)),
+        PdfCall::Assemble => {
+            pdf::pdf_assemble(data, opts, responses).map(|o| serde_json::to_string(&o))
+        }
+    };
+    match result {
+        Ok(Ok(json)) => json,
+        Ok(Err(e)) => error_json(&e.to_string()),
         Err(message) => error_json(&message),
     }
 }
 
 #[cfg(not(feature = "pdf"))]
-fn pdf_units_json(_data: &[u8], _opts: &crate::units::PdfOptions) -> String {
+fn pdf_json(
+    _data: &[u8],
+    _opts: &crate::units::PdfOptions,
+    _responses: &[crate::units::PdfResponse],
+    _call: PdfCall,
+) -> String {
     error_json("pdf support requires the `pdf` feature")
 }
 
@@ -200,8 +286,7 @@ pub unsafe extern "C" fn citenexus_rrf(lists_json: *const c_char, k: i64) -> *mu
         Err(e) => return to_c_string(error_json(&format!("lists_json: {e}"))),
     };
     let fused = crate::rrf::rrf(&lists, k);
-    let payload =
-        serde_json::to_string(&fused).unwrap_or_else(|e| error_json(&e.to_string()));
+    let payload = serde_json::to_string(&fused).unwrap_or_else(|e| error_json(&e.to_string()));
     to_c_string(payload)
 }
 

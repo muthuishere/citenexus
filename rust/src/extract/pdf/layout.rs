@@ -35,6 +35,9 @@ pub struct Segment {
     pub bold: bool,
     /// Dominant marked-content ID (-1 when untagged).
     pub mcid: i32,
+    /// The segment's words, split exactly where `text` has a space: each an
+    /// ordered list of indices into `RawPage::chars`.
+    pub words: Vec<Vec<usize>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -91,8 +94,10 @@ fn build_segment(page: &RawPage, idx: Vec<usize>) -> Segment {
     let mut text = String::new();
     let mut bbox = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
     let mut prev: Option<usize> = None;
+    let mut words: Vec<Vec<usize>> = Vec::new();
     for &i in &idx {
         let c = &chars[i];
+        let mut new_word = prev.is_none();
         if let Some(p) = prev {
             let pc = &chars[p];
             let gap = c.lx0 - pc.lx1;
@@ -103,8 +108,13 @@ fn build_segment(page: &RawPage, idx: Vec<usize>) -> Segment {
                 c.space_before && i > p && chars[p + 1..i].iter().all(|x| x.ch.is_whitespace());
             if gap > 0.1 * size || (stream_space && gap > -0.01 * size) {
                 text.push(' ');
+                new_word = true;
             }
         }
+        if new_word {
+            words.push(Vec::new());
+        }
+        words.last_mut().expect("a word is open").push(i);
         text.push(if c.hyphen { HYPHEN_MARK } else { c.ch });
         bbox = union(bbox, [c.x0, c.y0, c.x1, c.y1]);
         prev = Some(i);
@@ -139,6 +149,7 @@ fn build_segment(page: &RawPage, idx: Vec<usize>) -> Segment {
         .unwrap_or(-1);
     let baseline = mode_half(idx.iter().map(|&i| (chars[i].baseline, 1))).unwrap_or(bbox[3]);
     Segment {
+        words,
         chars: idx,
         text,
         bbox,

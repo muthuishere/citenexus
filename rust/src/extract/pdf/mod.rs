@@ -11,6 +11,7 @@ use pdfium_render::prelude::*;
 use crate::types::*;
 
 pub mod build;
+pub mod contract;
 pub mod diag;
 pub mod furniture;
 pub mod headings;
@@ -20,7 +21,8 @@ pub mod order;
 pub mod raw;
 pub mod route;
 
-pub use build::{analyze, pdf_units};
+pub use build::analyze;
+pub use contract::{pdf_assemble, pdf_prepare, pdf_units};
 
 pub fn extract(
     bytes: &[u8],

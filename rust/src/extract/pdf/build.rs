@@ -11,15 +11,9 @@ use super::headings::{self, HBlock};
 use super::hyphen::{self, Decision, HyphenStats, Lang, Witnesses};
 use super::layout::{self, Block, PageLayout, Segment, HYPHEN_MARK};
 use super::order;
-use super::raw::{self, r2, RawDoc, StructNode};
+use super::raw::{r2, RawDoc, StructNode};
 use super::route;
 use crate::units::*;
-
-/// Extract structured units from PDF bytes.
-pub fn pdf_units(bytes: &[u8], opts: &PdfOptions) -> Result<PdfUnitsOutput, String> {
-    let raw = raw::read(bytes)?;
-    Ok(analyze(&raw, opts))
-}
 
 const BLOCK_ROLES: &[&str] = &[
     "P",
@@ -98,6 +92,14 @@ pub(crate) struct Staged {
     hblocks: Vec<HBlock>,
     pub(crate) body_size: f64,
     stats: HyphenStats,
+    /// `[page][segment]` → the 1-based page ordinals of the segment's words
+    /// (line order, then left to right): the `p{page}w{n}` word IDs.
+    word_ord: Vec<Vec<Vec<usize>>>,
+}
+
+/// The stable word ID for 0-based page `p`, 1-based ordinal `n`.
+pub fn word_id(p: usize, n: usize) -> String {
+    format!("p{}w{}", p + 1, n)
 }
 
 /// The block's centre lies inside the box spanned by the page's ruling lines
@@ -148,7 +150,7 @@ fn list_markdown(text: &str) -> String {
 pub fn analyze(raw: &RawDoc, opts: &PdfOptions) -> PdfUnitsOutput {
     let st = stage(raw, opts);
     let plan = headings::plan(&st.hblocks, st.body_size, &raw.outline, raw.pages.len());
-    emit(raw, opts, st, plan)
+    emit(raw, opts, st, plan).0
 }
 
 pub(crate) fn stage(raw: &RawDoc, opts: &PdfOptions) -> Staged {
@@ -318,6 +320,22 @@ pub(crate) fn stage(raw: &RawDoc, opts: &PdfOptions) -> Staged {
             }
         })
         .collect();
+    let word_ord = work
+        .iter()
+        .map(|w| {
+            let mut ord = vec![Vec::new(); w.pl.segments.len()];
+            let mut n = 0usize;
+            for line in &w.pl.lines {
+                for &s in line {
+                    for _ in &w.pl.segments[s].words {
+                        n += 1;
+                        ord[s].push(n);
+                    }
+                }
+            }
+            ord
+        })
+        .collect();
     Staged {
         work,
         furn,
@@ -327,10 +345,40 @@ pub(crate) fn stage(raw: &RawDoc, opts: &PdfOptions) -> Staged {
         hblocks,
         body_size,
         stats,
+        word_ord,
     }
 }
 
 impl Staged {
+    /// Every word on page `p` in ID order, and whether it is running furniture.
+    pub(crate) fn page_words(&self, raw: &RawDoc, p: usize) -> Vec<(PdfWord, bool)> {
+        let w = &self.work[p];
+        let chars = &raw.pages[p].chars;
+        let mut out = Vec::new();
+        for line in &w.pl.lines {
+            for &s in line {
+                let furn = self.furn.binary_search(&(p, s)).is_ok();
+                for (k, word) in w.pl.segments[s].words.iter().enumerate() {
+                    let mut bb = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
+                    let mut text = String::new();
+                    for &c in word {
+                        let ch = &chars[c];
+                        text.push(if ch.hyphen { '-' } else { ch.ch });
+                        bb = [
+                            bb[0].min(ch.x0),
+                            bb[1].min(ch.y0),
+                            bb[2].max(ch.x1),
+                            bb[3].max(ch.y1),
+                        ];
+                    }
+                    let id = word_id(p, self.word_ord[p][s][k]);
+                    out.push((PdfWord { id, text, bbox: bb }, furn));
+                }
+            }
+        }
+        out
+    }
+
     pub(crate) fn hblocks(&self) -> &[HBlock] {
         &self.hblocks
     }
@@ -358,7 +406,7 @@ pub(crate) fn emit(
     opts: &PdfOptions,
     st: Staged,
     plan: headings::Plan,
-) -> PdfUnitsOutput {
+) -> (PdfUnitsOutput, Vec<Vec<String>>) {
     let Staged {
         work,
         furn,
@@ -367,8 +415,20 @@ pub(crate) fn emit(
         joined,
         hblocks,
         stats,
+        word_ord,
         ..
     } = st;
+    let seg_ids = |p: usize, s: usize| -> Vec<String> {
+        word_ord[p][s].iter().map(|&n| word_id(p, n)).collect()
+    };
+    let block_ids = |p: usize, b: usize| -> Vec<String> {
+        work[p].pl.blocks[b]
+            .segs
+            .iter()
+            .flat_map(|&s| seg_ids(p, s))
+            .collect()
+    };
+    let mut unit_words: Vec<Vec<String>> = Vec::new();
     let n_pages = raw.pages.len();
     let struct_headings = raw.pages.iter().any(|p| {
         p.struct_nodes
@@ -382,10 +442,11 @@ pub(crate) fn emit(
     let mut units: Vec<DocUnit> = Vec::new();
     let mut pages_out: Vec<PdfPageInfo> = Vec::new();
     let mut k = 0usize; // index into doc_blocks
+    type Tracked = (DocUnit, Vec<String>);
     for (p, w) in work.iter().enumerate() {
         let page = &raw.pages[p];
         let pg = (p + 1) as u32;
-        let mut body: Vec<DocUnit> = Vec::new();
+        let mut body: Vec<Tracked> = Vec::new();
         let mut structure = false;
         let mut i = 0;
         let count = w.order.len();
@@ -398,7 +459,9 @@ pub(crate) fn emit(
                 let mut text = text;
                 let mut bbox = b.bbox;
                 let mut joined_h = joined[idx];
+                let mut ids = block_ids(p, doc_blocks[idx].1);
                 if plan.merge_next[idx] && i + 1 < count {
+                    ids.extend(block_ids(p, doc_blocks[idx + 1].1));
                     let nb = &w.pl.blocks[doc_blocks[idx + 1].1];
                     text = format!("{} {}", text, texts[idx + 1].trim())
                         .trim()
@@ -416,14 +479,17 @@ pub(crate) fn emit(
                     let mut prov = Provenance::new(Route::Plain);
                     prov.heading_source = Some(src);
                     prov.joined_hyphen = joined_h;
-                    body.push(DocUnit {
-                        page: Some(pg),
-                        bbox: Some(bbox),
-                        kind: UnitKind::Heading,
-                        level: Some(lvl),
-                        markdown: format!("{} {}", "#".repeat(lvl as usize), text),
-                        provenance: prov,
-                    });
+                    body.push((
+                        DocUnit {
+                            page: Some(pg),
+                            bbox: Some(bbox),
+                            kind: UnitKind::Heading,
+                            level: Some(lvl),
+                            markdown: format!("{} {}", "#".repeat(lvl as usize), text),
+                            provenance: prov,
+                        },
+                        ids,
+                    ));
                 }
                 i += 1;
                 continue;
@@ -433,7 +499,9 @@ pub(crate) fn emit(
                 let mut md = Vec::new();
                 let mut bbox = b.bbox;
                 let mut j_any = false;
+                let mut ids = Vec::new();
                 while i < count && hblocks[k + i].list && plan.levels[k + i].is_none() {
+                    ids.extend(block_ids(p, doc_blocks[k + i].1));
                     let bb = &w.pl.blocks[doc_blocks[k + i].1];
                     bbox = [
                         bbox[0].min(bb.bbox[0]),
@@ -450,14 +518,17 @@ pub(crate) fn emit(
                 }
                 let mut prov = Provenance::new(Route::Plain);
                 prov.joined_hyphen = j_any;
-                body.push(DocUnit {
-                    page: Some(pg),
-                    bbox: Some(bbox),
-                    kind: UnitKind::List,
-                    level: None,
-                    markdown: md.join("\n"),
-                    provenance: prov,
-                });
+                body.push((
+                    DocUnit {
+                        page: Some(pg),
+                        bbox: Some(bbox),
+                        kind: UnitKind::List,
+                        level: None,
+                        markdown: md.join("\n"),
+                        provenance: prov,
+                    },
+                    ids,
+                ));
                 continue;
             }
             if b.bold {
@@ -466,22 +537,25 @@ pub(crate) fn emit(
             if !text.is_empty() {
                 let mut prov = Provenance::new(Route::Plain);
                 prov.joined_hyphen = joined[idx];
-                body.push(DocUnit {
-                    page: Some(pg),
-                    bbox: Some(b.bbox),
-                    kind: UnitKind::Paragraph,
-                    level: None,
-                    markdown: text,
-                    provenance: prov,
-                });
+                body.push((
+                    DocUnit {
+                        page: Some(pg),
+                        bbox: Some(b.bbox),
+                        kind: UnitKind::Paragraph,
+                        level: None,
+                        markdown: text,
+                        provenance: prov,
+                    },
+                    block_ids(p, doc_blocks[idx].1),
+                ));
             }
             i += 1;
         }
         k += count;
 
         // furniture: first occurrence of each distinct line, top then bottom
-        let mut top: Vec<DocUnit> = Vec::new();
-        let mut bottom: Vec<DocUnit> = Vec::new();
+        let mut top: Vec<(DocUnit, Vec<String>)> = Vec::new();
+        let mut bottom: Vec<(DocUnit, Vec<String>)> = Vec::new();
         let mut fsegs: Vec<usize> = furn
             .iter()
             .filter(|(fp, _)| *fp == p)
@@ -520,8 +594,8 @@ pub(crate) fn emit(
                 Band::Bottom
             };
             match band {
-                Band::Top => top.push(u),
-                Band::Bottom => bottom.push(u),
+                Band::Top => top.push((u, seg_ids(p, s))),
+                Band::Bottom => bottom.push((u, seg_ids(p, s))),
             }
         }
 
@@ -534,7 +608,7 @@ pub(crate) fn emit(
             .filter(|b| (b[2] - b[0]) * (b[3] - b[1]) >= 0.05 * page_area)
             .collect();
         imgs.sort_by(|a, b| a[1].total_cmp(&b[1]).then(a[0].total_cmp(&b[0])));
-        let image_units: Vec<DocUnit> = imgs
+        let image_units: Vec<(DocUnit, Vec<String>)> = imgs
             .into_iter()
             .map(|b| DocUnit {
                 page: Some(pg),
@@ -549,6 +623,7 @@ pub(crate) fn emit(
                 markdown: String::new(),
                 provenance: Provenance::new(Route::Plain),
             })
+            .map(|u| (u, Vec::new()))
             .collect();
 
         let mut sig = route::signals(page, &w.pl, w.dups);
@@ -558,16 +633,21 @@ pub(crate) fn emit(
             w.method.as_str().into()
         };
         let rt = route::route(&sig, structure);
-        let mut page_units: Vec<DocUnit> = top
-            .into_iter()
-            .chain(body)
-            .chain(image_units)
-            .chain(bottom)
-            .collect();
-        for u in page_units.iter_mut() {
-            u.provenance.route = rt;
+        // Each image region goes before the first body unit that starts below
+        // its top, so it keeps its place in the reading order.
+        for img in image_units {
+            let y = img.0.bbox.map(|b| b[1]).unwrap_or(0.0);
+            let at = body
+                .iter()
+                .position(|(u, _)| u.bbox.is_some_and(|b| b[1] >= y))
+                .unwrap_or(body.len());
+            body.insert(at, img);
         }
-        units.extend(page_units);
+        for (mut u, ids) in top.into_iter().chain(body).chain(bottom) {
+            u.provenance.route = rt;
+            units.push(u);
+            unit_words.push(ids);
+        }
         pages_out.push(PdfPageInfo {
             page: pg,
             width: page.width,
@@ -590,10 +670,15 @@ pub(crate) fn emit(
         hyphens_kept: stats.kept as u32,
         furniture_lines: furn.len() as u32,
         furniture_units,
+        responses_applied: 0,
+        responses_rejected: 0,
     };
-    PdfUnitsOutput {
-        units,
-        pages: pages_out,
-        document,
-    }
+    (
+        PdfUnitsOutput {
+            units,
+            pages: pages_out,
+            document,
+        },
+        unit_words,
+    )
 }

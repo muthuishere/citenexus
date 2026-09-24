@@ -1,0 +1,67 @@
+[
+  {
+    "request_id": "p1:table",
+    "finish_reason": "stop",
+    "tables": [
+      {
+        "rows": [
+          [
+            [
+              "p1w8"
+            ],
+            [
+              "p1w9"
+            ],
+            [
+              "p1w10"
+            ]
+          ],
+          [
+            [
+              "p1w11"
+            ],
+            [
+              "p1w12"
+            ],
+            [
+              "p1w13"
+            ]
+          ],
+          [
+            [
+              "p1w14"
+            ],
+            [
+              "p1w15"
+            ],
+            []
+          ],
+          [
+            [
+              "p1w16"
+            ],
+            [
+              "p1w17"
+            ],
+            [
+              "p1w18"
+            ]
+          ]
+        ]
+      }
+    ],
+    "markdown": null
+  },
+  {
+    "request_id": "p2:page",
+    "finish_reason": null,
+    "tables": null,
+    "markdown": "Declaratie reiskosten 2024\nReiskosten 7.000,00 geen voorschot\nHotel 5.100,00 per jaar\nDiner 1.250,00 vooraf betaald\nArtikel I.3 is van toepassing"
+  },
+  {
+    "request_id": "p3:img0",
+    "finish_reason": null,
+    "tables": null,
+    "markdown": "Formulier: naam, datum, handtekening"
+  }
+]

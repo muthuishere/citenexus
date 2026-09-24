@@ -262,6 +262,12 @@ pub struct PdfDocumentSignals {
     /// units they collapsed to (each distinct line kept once).
     pub furniture_lines: u32,
     pub furniture_units: u32,
+    /// `pdf_assemble`: responses applied / rejected by a check (0 for
+    /// `pdf_units`).
+    #[serde(default)]
+    pub responses_applied: u32,
+    #[serde(default)]
+    pub responses_rejected: u32,
 }
 
 /// Everything `pdf_units` returns.
@@ -270,4 +276,94 @@ pub struct PdfUnitsOutput {
     pub units: Vec<DocUnit>,
     pub pages: Vec<PdfPageInfo>,
     pub document: PdfDocumentSignals,
+}
+
+// ---------------------------------------------------------------------------
+// The two-phase model contract (ADR-0017 decisions 4 and 10): `pdf_prepare`
+// returns the base output plus REQUESTS; the host fulfils them with its own
+// injected model; `pdf_assemble` re-parses the PDF and applies the RESPONSES
+// that pass every deterministic check. `pdf_units` == `pdf_assemble` with no
+// responses. The core never makes a network call.
+// ---------------------------------------------------------------------------
+
+/// One text-layer word, addressable by the model. IDs are stable for the same
+/// bytes and options: `p{page}w{n}`, numbered in line order, then left to right.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PdfWord {
+    pub id: String,
+    /// The PDF's own characters (a pdfium hyphen marker prints as `-`).
+    pub text: String,
+    pub bbox: BBox,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PdfRequestKind {
+    /// A text-layer page with table evidence: return a grid of WORD IDS
+    /// (`PdfResponse::tables`). Text written by the model is never used.
+    TableStructure,
+    /// A page with no usable text layer: return markdown (`vision_transcribed`).
+    VisionPage,
+    /// An image region with (almost) no text-layer words inside it.
+    VisionRegion,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PdfRequest {
+    /// Echo it in `PdfResponse::request_id`: `p{page}:table`, `p{page}:page`,
+    /// `p{page}:img{k}`.
+    pub id: String,
+    pub page: u32,
+    pub kind: PdfRequestKind,
+    /// A key into the host's prompt config (default: `rust/data/pdf_prompts.json`).
+    pub prompt: String,
+    /// The region to show the model (render it host-side for vision).
+    pub bbox: BBox,
+    /// `table_structure` only: the words the grid may reference.
+    #[serde(default)]
+    pub words: Vec<PdfWord>,
+}
+
+/// `pdf_prepare`'s output: the base result plus the requests.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PdfPrepared {
+    pub units: Vec<DocUnit>,
+    pub pages: Vec<PdfPageInfo>,
+    pub document: PdfDocumentSignals,
+    pub requests: Vec<PdfRequest>,
+}
+
+/// A grid cell: a list of word IDs, or an object with spans.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum PdfCell {
+    Words(Vec<String>),
+    Spanned {
+        words: Vec<String>,
+        #[serde(default)]
+        colspan: Option<u32>,
+        #[serde(default)]
+        rowspan: Option<u32>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PdfGrid {
+    /// Rows top to bottom; cells left to right (HTML span rules).
+    pub rows: Vec<Vec<PdfCell>>,
+}
+
+/// The host's answer to one request.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PdfResponse {
+    pub request_id: String,
+    /// The model API's finish reason; anything but a normal stop fails.
+    #[serde(default)]
+    pub finish_reason: Option<String>,
+    /// `table_structure`: one grid per table found in the request's words.
+    #[serde(default)]
+    pub tables: Option<Vec<PdfGrid>>,
+    /// `vision_page` / `vision_region`: the transcription.
+    #[serde(default)]
+    pub markdown: Option<String>,
 }

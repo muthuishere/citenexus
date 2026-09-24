@@ -21,6 +21,13 @@ pub enum Item {
         text: String,
         tag: Option<String>,
     },
+    /// Invisible text (render mode 3): the OCR layer under a scan.
+    Ocr {
+        x: f64,
+        y: f64,
+        size: f64,
+        text: String,
+    },
     Line {
         x0: f64,
         y0: f64,
@@ -86,6 +93,15 @@ impl Page {
             bold,
             text: text.into(),
             tag: Some(tag.into()),
+        });
+        self
+    }
+    pub fn ocr(mut self, x: f64, y: f64, size: f64, text: &str) -> Self {
+        self.items.push(Item::Ocr {
+            x,
+            y,
+            size,
+            text: text.into(),
         });
         self
     }
@@ -232,6 +248,14 @@ impl Doc {
                             per_page_elems[pi].push(id);
                             mcid += 1;
                         }
+                    }
+                    Item::Ocr { x, y, size, text } => {
+                        let py = page.height - y - size;
+                        c.extend(
+                            format!("BT 3 Tr /F1 {} Tf {} {} Td (", f(*size), f(*x), f(py)).bytes(),
+                        );
+                        c.extend(esc(text));
+                        c.extend(b") Tj ET\n");
                     }
                     Item::Line { x0, y0, x1, y1 } => c.extend(
                         format!(
