@@ -452,6 +452,12 @@ func guards(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfig) strin
 	if reason := relationGuard(claim, claimLanguage, eu, actors); reason != "" {
 		return reason
 	}
+	// A claim that is a cut span of a unit sentence whose restriction follows
+	// (P1) is refused on every path, not only after the gate: the model admits
+	// such prefixes at P(E) >= 0.99.
+	if reason := truncationGuard(claim, eu.Text); reason != "" {
+		return reason
+	}
 	if reason := exclusionGuard(claim, claimLanguage, eu, cfg); reason != "" {
 		return reason
 	}
@@ -579,12 +585,14 @@ var restrictiveTail = map[string]struct{}{
 	"met": {}, "van": {}, "voor": {}, "tot": {}, "boven": {}, "onder": {}, "bij": {}, "aan": {},
 	"zonder": {}, "behalve": {}, "uitgezonderd": {}, "alleen": {}, "uitsluitend": {},
 	"mits": {}, "tenzij": {}, "indien": {}, "als": {}, "wanneer": {}, "die": {}, "dat": {}, "waarvan": {},
-	"with": {}, "of": {}, "for": {}, "above": {}, "below": {}, "over": {}, "provided": {},
+	// Not "of": in Dutch it is "or" ("via HR of via de vertrouwenspersoon").
+	"with": {}, "for": {}, "above": {}, "below": {}, "over": {}, "provided": {},
 	"unless": {}, "if": {}, "when": {}, "who": {}, "that": {}, "which": {},
 	"without": {}, "except": {}, "only": {},
 }
 
-// truncationGuard runs AFTER a gate admission. The gate (gate.IsSupportedV2,
+// truncationGuard runs after every gate admission and inside guards() (every
+// model, quote and union admission), and refuses outright. The gate (gate.IsSupportedV2,
 // ADR-0009) admits a claim that is a verbatim span of a unit sentence, and a
 // span can stop exactly where the sentence restricts it: "Medewerkers mogen
 // geen geschenken aannemen." over "… aannemen met een waarde van meer dan
@@ -593,11 +601,11 @@ var restrictiveTail = map[string]struct{}{
 // For every clause of the passage the claim aligns within, it looks at the
 // clause's next word after the aligned span: a restrictive word (a preposition,
 // a relative, a condition — restrictiveTail, or "up to") means that clause
-// narrows the claim. The claim keeps its gate admission when ANY clause it
-// aligns in does not continue that way (it ends there, or a new clause starts:
-// ", en …"), and when it aligns in no single clause (the gate's own verdict
-// stands). Otherwise the gate admission is withdrawn and the claim goes on to
-// the guards and the model, as if the gate had refused.
+// narrows the claim. There is no verdict when ANY clause it aligns in does not
+// continue that way (it ends there, or a new clause starts: ", en …"), or when
+// it aligns in no single clause. Otherwise the claim is REFUSED: the source
+// states the restriction explicitly, and the model admits such cut prefixes
+// at P(E) >= 0.99 (rag_go adv dh-v2-05/09/17/29).
 //
 // It lives here, above the gate, on purpose: the gate predicate is pinned
 // byte for byte in Python, Go and JS by conformance vectors, and this check is
@@ -621,6 +629,9 @@ func truncationGuard(claim, passage string) string {
 		if next == "up" && len(tail) > 1 && tail[1] == "to" {
 			narrows, next = true, "up to"
 		}
+		if next == "in" && len(tail) > 2 && tail[1] == "so" && tail[2] == "far" {
+			narrows, next = true, "in so far as"
+		}
 		if !narrows {
 			return "" // a clause that states the claim as it is
 		}
@@ -631,7 +642,7 @@ func truncationGuard(claim, passage string) string {
 	if restricted == "" {
 		return ""
 	}
-	return fmt.Sprintf("truncation guard: the passage continues with %q after the matched words", restricted)
+	return fmt.Sprintf("truncation guard: the claim omits a restriction the source attaches (%q)", restricted)
 }
 
 // Bounds: phrases that set an upper or a lower limit, NL + EN. A phrase that

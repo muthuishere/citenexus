@@ -6658,6 +6658,176 @@
           }
         ]
       }
+    },
+    {
+      "name": "truncation/model-path/adv-dh-v2-05 the model admits it; the cut restriction refuses it (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "De werkgever vergoedt de kosten van de opleiding [eu:S1]. Voor opleidingen die de werkgever verplicht stelt, geldt geen maximum [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "opleidingsregeling Woonstichting Beekdal",
+          "language": "nl",
+          "text": "Opleidingskosten. De werkgever vergoedt de kosten van de opleiding tot een maximum van € 2.500 per kalenderjaar. Voor opleidingen die de werkgever verplicht stelt, geldt geen maximum. De medewerker kan de opleiding in beginsel in werktijd volgen."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "truncation guard: th"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "truncation/model-path/adv-dh-v2-07 the model admits it; the cut restriction refuses it (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "Voor overwerk geldt [eu:S1]:\n- Overwerk wordt uitbetaald [eu:S1].\n- Overwerk tot en met vier uur per maand wordt gecompenseerd in vrije tijd [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "overwerkregeling Stichting Openbaar Onderwijs Duinrand",
+          "language": "nl",
+          "text": "Overwerk onderwijsondersteunend personeel. Overwerk wordt uitbetaald voor zover het meer dan vier uur per maand bedraagt. Overwerk tot en met vier uur per maand wordt gecompenseerd in vrije tijd. Overwerk wordt alleen erkend als de schoolleider het vooraf heeft opgedragen."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "truncation guard"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "truncation/model-path/adv-dh-v2-09 the model admits it; the cut restriction refuses it (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "Medewerkers mogen tijdens hun dienst geen privételefoon gebruiken [eu:S1]. In de pauzeruimte is gebruik van de privételefoon toegestaan [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "huisregels Ziekenhuis Oosterlanden",
+          "language": "nl",
+          "text": "Telefoongebruik. Medewerkers mogen tijdens hun dienst geen privételefoon gebruiken aan het bed van de patiënt. In de pauzeruimte is gebruik toegestaan. In noodgevallen kan de teamleider een uitzondering toestaan. Zakelijke oproepen via de afdelingstelefoon vallen niet onder deze regel."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "truncation guard: th"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "truncation/model-path/adv-dh-v2-17 the model admits it; the cut restriction refuses it (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "The employer will reimburse the costs of reading glasses [eu:S1]. The reimbursement is capped at €150 per three years [eu:S1].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "Health and Safety Policy Northquay Freight",
+          "language": "en",
+          "text": "Screen work. The employer will reimburse the costs of reading glasses if the occupational physician confirms they are needed for screen work. The reimbursement is capped at €150 per three years."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "truncation guard: th"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "truncation/model-path/adv-dh-v2-29 the model admits it; the cut restriction refuses it (rag_go adv, fictional)",
+      "must_refuse": true,
+      "answer": "Medewerkers mogen op sociale media geen informatie delen [eu:S1]. Algemene juridische onderwerpen mogen op sociale media worden besproken, mits er geen herleidbare cliëntinformatie wordt genoemd [eu:S1].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "S1": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "S1",
+          "document_id": "gedragscode Maasoever Advocaten",
+          "language": "nl",
+          "text": "Sociale media. Medewerkers mogen op sociale media geen informatie delen over zaken van cliënten. Algemene juridische onderwerpen mogen worden besproken, mits er geen herleidbare cliëntinformatie wordt genoemd. Bij twijfel wordt vooraf contact opgenomen met de afdeling communicatie."
+        }
+      ],
+      "expect": {
+        "decision": "partial",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "truncation guard: th"
+          },
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
     }
   ]
 }

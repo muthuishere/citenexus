@@ -706,6 +706,9 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 				if reason == "" {
 					reason = truncationGuard(text, eu.Text)
 				}
+				if reason == "" && pc.item != "" {
+					reason = truncationGuard(stripMarkup(pc.item), eu.Text)
+				}
 				if reason == "" {
 					reason = exclusionGuard(text, declared, eu, cfg)
 				}
@@ -764,7 +767,13 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 		if !v.supported && v.reason != ReasonContradicted && opts.Checker != nil && len(pc.cited) > 0 {
 			guardReason := ""
 			admit := func(eu EvidenceUnit) (bool, error) {
-				if reason := guards(text, declared, eu, cfg); reason != "" {
+				reason := guards(text, declared, eu, cfg)
+				if reason == "" && pc.item != "" {
+					// A joined item is also a cut span on its own words:
+					// "Overwerk wordt uitbetaald" under "Voor overwerk geldt:".
+					reason = truncationGuard(stripMarkup(pc.item), eu.Text)
+				}
+				if reason != "" {
 					if guardReason == "" {
 						guardReason = reason // the FIRST cited unit refused, not the last
 					}
