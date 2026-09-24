@@ -32,10 +32,12 @@ type VerbPair struct {
 	A, B []string
 }
 
-// DefaultVerbPairs: applying for something and taking or using it.
+// DefaultVerbPairs: applying for something and taking or using it. The
+// nominalisations count as the act: "(het) opnemen van", "opname van" (take),
+// "aanvraag", "application" (apply).
 var DefaultVerbPairs = []VerbPair{{
-	A: []string{"aanvragen", "aanvraagt", "aangevraagd", "vraagt+aan", "vraag+aan", "vragen+aan", "apply", "applies", "applied", "request", "requests", "requested"},
-	B: []string{"opnemen", "opneemt", "opgenomen", "neemt+op", "neem+op", "nemen+op", "take", "takes", "taken", "took", "use", "uses", "used"},
+	A: []string{"aanvragen", "aanvraagt", "aangevraagd", "aanvraag", "aanvragen", "application", "vraagt+aan", "vraag+aan", "vragen+aan", "apply", "applies", "applied", "request", "requests", "requested"},
+	B: []string{"opnemen", "opneemt", "opgenomen", "opname", "opnames", "neemt+op", "neem+op", "nemen+op", "take", "takes", "taken", "took", "use", "uses", "used"},
 }}
 
 // sideIn: 0 (A), 1 (B), -1 none or both, and the matched tokens' positions.

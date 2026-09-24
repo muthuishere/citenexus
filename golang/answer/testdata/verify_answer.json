@@ -8715,6 +8715,136 @@
           "case manager"
         ]
       ]
+    },
+    {
+      "name": "verbpair/a-nominalised-act-is-the-act (R-74 / V1 shape)",
+      "answer": "Pension accrual continues when you have taken unpaid leave [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Onbetaald verlof. Bij opname van onbetaald verlof loopt de pensioenopbouw door. Het onbetaald verlof vraag je minimaal een maand van tevoren aan."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      },
+      "glossary": [
+        [
+          "onbetaald",
+          "unpaid"
+        ],
+        [
+          "verlof",
+          "leave"
+        ],
+        [
+          "pensioenopbouw",
+          "pension accrual"
+        ]
+      ]
+    },
+    {
+      "name": "verbpair/a-nominalised-act-still-differs-from-the-other-act",
+      "answer": "Pension accrual continues when you apply for unpaid leave [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Onbetaald verlof. Bij opname van onbetaald verlof loopt de pensioenopbouw door. Het onbetaald verlof vraag je minimaal een maand van tevoren aan."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      },
+      "glossary": [
+        [
+          "onbetaald",
+          "unpaid"
+        ],
+        [
+          "verlof",
+          "leave"
+        ],
+        [
+          "pensioenopbouw",
+          "pension accrual"
+        ]
+      ]
+    },
+    {
+      "name": "verbpair/apply-where-the-unit-only-speaks-of-taking-it (L-R9 shape)",
+      "must_refuse": true,
+      "answer": "You apply for leave in consultation with your manager [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "glossary": [
+        [
+          "verlof",
+          "leave"
+        ],
+        [
+          "overleg",
+          "consultation"
+        ],
+        [
+          "leidinggevende",
+          "manager"
+        ]
+      ],
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Verlof opnemen. Het opnemen van verlof gebeurt in overleg met de leidinggevende."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "verb guard"
+          }
+        ]
+      }
     }
   ]
 }
