@@ -472,3 +472,19 @@ func TestVerbPairGuardHasNoVerdictAcrossLanguagesWithoutAGlossary(t *testing.T) 
 		t.Fatalf("with a glossary: want refused, got %q", reason)
 	}
 }
+
+// DisableDefinitions turns the definition guard off.
+func TestDisableDefinitions(t *testing.T) {
+	ev := []EvidenceUnit{{ID: "a", DocumentID: "a", Language: "nl", Text: "Een werknemer kan onbetaald verlof (hierna: het Verlof) opnemen. Tijdens het Verlof bouwt de werknemer geen vakantiedagen op."}}
+	answer := "Tijdens verlof bouw je geen vakantiedagen op [eu:a]."
+	chk := &fakeChecker{scores: map[string][2]float64{ev[0].Text: {0.999, 0}}}
+	on := VerifyOptions{AnswerLanguage: "nl", AdmitParaphrase: true, Checker: chk, CheckerName: "fake"}
+	if res := verify(t, answer, ev, on); res.Claims[0].Supported {
+		t.Fatalf("default: the defined subtype must be refused: %+v", res.Claims)
+	}
+	off := on
+	off.DisableDefinitions = true
+	if res := verify(t, answer, ev, off); !res.Claims[0].Supported {
+		t.Fatalf("disabled: the checker decides: %+v", res.Claims)
+	}
+}

@@ -8022,6 +8022,172 @@
         ]
       },
       "must_refuse": true
+    },
+    {
+      "name": "definition/the-generic-noun-for-a-defined-subtype-refuses (L-R23 shape)",
+      "answer": "Tijdens verlof bouw je geen vakantiedagen op [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Onbetaald verlof. Een werknemer kan onbetaald verlof (hierna: het Verlof) opnemen voor ten hoogste zes maanden. Tijdens het Verlof bouwt de werknemer geen vakantiedagen op."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "definition guard"
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "definition/across-languages-through-the-glossary",
+      "answer": "During leave you do not accrue holiday days [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Onbetaald verlof. Een werknemer kan onbetaald verlof (hierna: het Verlof) opnemen voor ten hoogste zes maanden. Tijdens het Verlof bouwt de werknemer geen vakantiedagen op."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "definition guard"
+          }
+        ]
+      },
+      "must_refuse": true,
+      "glossary": [
+        [
+          "onbetaald",
+          "unpaid"
+        ],
+        [
+          "verlof",
+          "leave"
+        ],
+        [
+          "vakantiedagen",
+          "holiday days"
+        ],
+        [
+          "bouwt",
+          "accrues"
+        ]
+      ]
+    },
+    {
+      "name": "definition/the-claim-that-keeps-the-qualifier-is-admitted",
+      "answer": "Tijdens onbetaald verlof bouw je geen vakantiedagen op [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Onbetaald verlof. Een werknemer kan onbetaald verlof (hierna: het Verlof) opnemen voor ten hoogste zes maanden. Tijdens het Verlof bouwt de werknemer geen vakantiedagen op."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "definition/the-defined-term-as-written-is-admitted",
+      "answer": "Tijdens het Verlof bouw je geen vakantiedagen op [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Onbetaald verlof. Een werknemer kan onbetaald verlof (hierna: het Verlof) opnemen voor ten hoogste zes maanden. Tijdens het Verlof bouwt de werknemer geen vakantiedagen op."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "definition/wordt-verstaan-onder",
+      "answer": "Verlof bedraagt twee dagen [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Buitengewoon verlof. Onder buitengewoon verlof wordt verstaan: verlof met behoud van loon bij bijzondere gebeurtenissen. Het buitengewoon verlof bedraagt twee dagen."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "definition guard"
+          }
+        ]
+      },
+      "must_refuse": true
     }
   ]
 }

@@ -132,6 +132,10 @@ type VerifyOptions struct {
 	// (verify_verbpairs.go). nil means DefaultVerbPairs; a non-nil slice
 	// REPLACES it (append to DefaultVerbPairs to extend); empty turns it off.
 	VerbPairs []VerbPair
+	// DisableDefinitions turns off the definition guard (verify_definitions.go),
+	// which by default refuses a claim using the generic noun for a subtype the
+	// unit defines explicitly ("onbetaald verlof (hierna: het Verlof)").
+	DisableDefinitions bool
 	// Glossary is the caller's term pairs across languages ({"toestemming",
 	// "permission"}), lowercase, either order. It is read ONLY by the
 	// condition guard, to tell whether a claim in another language carries a
@@ -655,7 +659,8 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 	if opts.VerbPairs != nil {
 		verbs = opts.VerbPairs
 	}
-	cfg := guardConfig{aliases: opts.NameAliases, actors: actors, pairs: pairs, verbs: verbs, glossary: opts.Glossary}
+	cfg := guardConfig{aliases: opts.NameAliases, actors: actors, pairs: pairs, verbs: verbs,
+		glossary: opts.Glossary, noDefinitions: opts.DisableDefinitions}
 	frames := opts.LeadInFrames
 	if frames == nil {
 		frames = DefaultLeadInFrames
@@ -719,6 +724,9 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 				}
 				if reason == "" {
 					reason = exclusionGuard(text, declared, eu, cfg)
+				}
+				if reason == "" {
+					reason = definitionGuard(text, declared, eu, cfg)
 				}
 				if reason == "" {
 					reason = conditionGuard(text, declared, eu, cfg)
