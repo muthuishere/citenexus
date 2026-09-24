@@ -1988,19 +1988,78 @@ _SEGMENTATION_CASES: list[tuple[str, str, list[str], str | None]] = [
         '"inc" is not in ABBREVIATIONS, so a company suffix breaks mid-sentence '
         "and produces a two-word fragment as an independent claim.",
     ),
+    # Were known misses until 2026-09-24: the table held only "eg"/"ie", while R3
+    # keeps interior dots and reads "e.g"/"i.e". The dotted forms are now tabled.
     (
         "abbrev/eg-dotted-form",
         "The tenant may sublet, e.g. to a relative.",
-        ["The tenant may sublet, e.g.", "to a relative."],
-        'ABBREVIATIONS holds "eg", but R3 reads the preceding token as "e.g" '
-        "(interior dots survive the rstrip), so the table entry never matches "
-        "the form English actually writes. Same for i.e.",
+        ["The tenant may sublet, e.g. to a relative."],
+        None,
     ),
     (
         "abbrev/ie-dotted-form",
         "This applies, i.e. to tenants only.",
-        ["This applies, i.e.", "to tenants only."],
-        'As above: the table has "ie", the scanner sees "i.e".',
+        ["This applies, i.e. to tenants only."],
+        None,
+    ),
+    # ── R3 behind an opening bracket or quote ────────────────────────────────
+    # The preceding token used to keep its opener — "(art" is not "art" — so a
+    # parenthesised citation split mid-reference and served "7:629 BW)." as a
+    # claim of its own (rag_go R-2 / R-32, 2026-09-24). Openers are stripped from
+    # the FRONT only; a closing mark before the dot still ends the sentence.
+    (
+        "opener/paren-art-nl",
+        "Het loon wordt doorbetaald (art. 7:629 BW). Dat is zo.",
+        ["Het loon wordt doorbetaald (art. 7:629 BW).", "Dat is zo."],
+        None,
+    ),
+    (
+        "opener/bracket-oa-nl",
+        "Dit geldt [o.a. voor reizen]. Klaar.",
+        ["Dit geldt [o.a. voor reizen].", "Klaar."],
+        None,
+    ),
+    (
+        "opener/paren-quote-bijv-nl",
+        'Dit geldt ("bijv. reizen"). Klaar.',
+        ['Dit geldt ("bijv. reizen").', "Klaar."],
+        None,
+    ),
+    (
+        "opener/low-quote-bijv-nl",
+        "Dit geldt (\u201ebijv. reizen\u201d). Klaar.",
+        ["Dit geldt (\u201ebijv. reizen\u201d).", "Klaar."],
+        None,
+    ),
+    (
+        "opener/paren-eg-en",
+        "This applies (e.g. travel). Done.",
+        ["This applies (e.g. travel).", "Done."],
+        None,
+    ),
+    (
+        "opener/paren-ie-en",
+        "This applies (i.e. travel). Done.",
+        ["This applies (i.e. travel).", "Done."],
+        None,
+    ),
+    (
+        "opener/paren-art-en",
+        "See (art. 5) here. Done.",
+        ["See (art. 5) here.", "Done."],
+        None,
+    ),
+    (
+        "opener/paren-initial",
+        "(J. Smith) signed. Done.",
+        ["(J. Smith) signed.", "Done."],
+        None,
+    ),
+    (
+        "opener/closing-mark-still-ends-the-sentence",
+        "Zie de regeling (nr). Dat is zo.",
+        ["Zie de regeling (nr).", "Dat is zo."],
+        None,
     ),
     (
         "abbrev/us-army",

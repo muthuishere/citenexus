@@ -85,7 +85,23 @@ function precedingWord(buffer: readonly string[]): string {
   // JS `toLowerCase` applies Unicode FULL case mapping, matching Python's
   // `str.lower()` — including U+0130 (İ) → "i" + U+0307, which is two code
   // points and therefore NOT a single-letter initial.
-  return buffer.slice(start, end).join("").toLowerCase();
+  return stripOpeners(buffer.slice(start, end).join("")).toLowerCase();
+}
+
+/**
+ * Opening brackets and quotes are stripped from the FRONT of the preceding
+ * token, so "(art." / "[o.a." / "(\"bijv." are looked up as "art" / "o.a" /
+ * "bijv" — Python's `segment._OPENERS`. Only the front: a CLOSING mark before
+ * the terminator ("(nr).") means the mark ended the token and the dot is a real
+ * sentence end.
+ */
+const OPENERS = new Set(["(", "[", "{", '"', "'", "\u201c", "\u2018", "\u201e", "\u201a", "\u00ab", "\u2039"]);
+
+function stripOpeners(word: string): string {
+  const chars = Array.from(word);
+  let i = 0;
+  while (i < chars.length && OPENERS.has(chars[i] as string)) i++;
+  return chars.slice(i).join("");
 }
 
 /**

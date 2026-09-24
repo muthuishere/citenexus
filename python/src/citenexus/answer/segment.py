@@ -45,13 +45,20 @@ def _is_digit(ch: str) -> bool:
     return "0" <= ch <= "9"
 
 
+#: Opening brackets and quotes stripped from the FRONT of the preceding token, so
+#: "(art." / "[o.a." / "(\"bijv." are looked up as "art" / "o.a" / "bijv". Only the
+#: front: a CLOSING mark before the terminator ("(nr).") means the mark ended the
+#: token and the dot after it is a real sentence end.
+_OPENERS = "([{\"'\u201c\u2018\u201e\u201a\u00ab\u2039"
+
+
 def _preceding_word(buffer: list[str]) -> str:
-    """The token immediately before the terminator run, lowercased."""
+    """The token immediately before the terminator run, lowercased, openers stripped."""
     text = "".join(buffer).rstrip(TERMINATORS)
     start = len(text)
     while start > 0 and text[start - 1] not in _WHITESPACE:
         start -= 1
-    return text[start:].lower()
+    return text[start:].lstrip(_OPENERS).lower()
 
 
 def split_claims(text: str) -> list[str]:

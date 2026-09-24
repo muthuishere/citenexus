@@ -122,8 +122,15 @@ func precedingWord(buffer []rune, terms map[rune]struct{}) string {
 	// single-letter initial) while Go yields a bare "i" (which WOULD be read as
 	// an initial and suppress a break). Pre-expand it, exactly as the tokenizer
 	// does, so the initial-detection rule cannot diverge.
-	return strings.ToLower(fullCaseLower.Replace(string(text[start:])))
+	word := strings.TrimLeft(string(text[start:]), openers)
+	return strings.ToLower(fullCaseLower.Replace(word))
 }
+
+// openers are stripped from the FRONT of the preceding token, so "(art." /
+// "[o.a." / "(\"bijv." are looked up as "art" / "o.a" / "bijv" — Python's
+// segment._OPENERS. Only the front: a CLOSING mark before the terminator
+// ("(nr).") means the mark ended the token and the dot is a real sentence end.
+const openers = "([{\"'\u201c\u2018\u201e\u201a\u00ab\u2039"
 
 var fullCaseLower = strings.NewReplacer("\u0130", "i\u0307")
 

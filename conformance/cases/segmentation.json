@@ -112,19 +112,87 @@
     "label": "abbrev/eg-dotted-form",
     "text": "The tenant may sublet, e.g. to a relative.",
     "claims": [
-      "The tenant may sublet, e.g.",
-      "to a relative."
-    ],
-    "known_miss": "ABBREVIATIONS holds \"eg\", but R3 reads the preceding token as \"e.g\" (interior dots survive the rstrip), so the table entry never matches the form English actually writes. Same for i.e."
+      "The tenant may sublet, e.g. to a relative."
+    ]
   },
   {
     "label": "abbrev/ie-dotted-form",
     "text": "This applies, i.e. to tenants only.",
     "claims": [
-      "This applies, i.e.",
-      "to tenants only."
-    ],
-    "known_miss": "As above: the table has \"ie\", the scanner sees \"i.e\"."
+      "This applies, i.e. to tenants only."
+    ]
+  },
+  {
+    "label": "opener/paren-art-nl",
+    "text": "Het loon wordt doorbetaald (art. 7:629 BW). Dat is zo.",
+    "claims": [
+      "Het loon wordt doorbetaald (art. 7:629 BW).",
+      "Dat is zo."
+    ]
+  },
+  {
+    "label": "opener/bracket-oa-nl",
+    "text": "Dit geldt [o.a. voor reizen]. Klaar.",
+    "claims": [
+      "Dit geldt [o.a. voor reizen].",
+      "Klaar."
+    ]
+  },
+  {
+    "label": "opener/paren-quote-bijv-nl",
+    "text": "Dit geldt (\"bijv. reizen\"). Klaar.",
+    "claims": [
+      "Dit geldt (\"bijv. reizen\").",
+      "Klaar."
+    ]
+  },
+  {
+    "label": "opener/low-quote-bijv-nl",
+    "text": "Dit geldt („bijv. reizen”). Klaar.",
+    "claims": [
+      "Dit geldt („bijv. reizen”).",
+      "Klaar."
+    ]
+  },
+  {
+    "label": "opener/paren-eg-en",
+    "text": "This applies (e.g. travel). Done.",
+    "claims": [
+      "This applies (e.g. travel).",
+      "Done."
+    ]
+  },
+  {
+    "label": "opener/paren-ie-en",
+    "text": "This applies (i.e. travel). Done.",
+    "claims": [
+      "This applies (i.e. travel).",
+      "Done."
+    ]
+  },
+  {
+    "label": "opener/paren-art-en",
+    "text": "See (art. 5) here. Done.",
+    "claims": [
+      "See (art. 5) here.",
+      "Done."
+    ]
+  },
+  {
+    "label": "opener/paren-initial",
+    "text": "(J. Smith) signed. Done.",
+    "claims": [
+      "(J. Smith) signed.",
+      "Done."
+    ]
+  },
+  {
+    "label": "opener/closing-mark-still-ends-the-sentence",
+    "text": "Zie de regeling (nr). Dat is zo.",
+    "claims": [
+      "Zie de regeling (nr).",
+      "Dat is zo."
+    ]
   },
   {
     "label": "abbrev/us-army",

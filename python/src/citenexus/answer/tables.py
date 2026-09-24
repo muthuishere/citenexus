@@ -144,6 +144,10 @@ ABBREVIATIONS: frozenset[str] = frozenset(
         "m.u.v",
         "o.a",
         "t.o.v",
+        # ── en, dotted forms (the undotted "eg"/"ie" below never matched what
+        # English writes: the scanner keeps interior dots) ──
+        "e.g",
+        "i.e",
         # ── existing ──
         "abs",
         "al",
