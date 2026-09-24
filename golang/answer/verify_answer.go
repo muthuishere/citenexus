@@ -37,8 +37,12 @@
 //  3. MODEL — the checker entails the claim from a cited unit whose declared
 //     language differs from the answer language, or from any cited unit when
 //     AdmitParaphrase is set. VerifiedBy "model:<name>".
+//  4. UNION — a list item joined to a content lead-in, where the lead-in and
+//     the item cite different units: the checker entails the joined claim
+//     from both units together, behind provenance-split guards and a scope
+//     rule (verify_union.go). VerifiedBy "model:<name>", citing both units.
 //
-// Steps 2 and 3 need an injected SupportChecker, and every admission they make
+// Steps 2 to 4 need an injected SupportChecker, and every admission they make
 // must also pass the deterministic guards (numbers, negation, names —
 // verify_guards.go), which the model cannot override. Model-admitted claims are
 // counted in Evidence.ModelVerifiedClaims.
@@ -166,6 +170,11 @@ type citedClaim struct {
 	text   string
 	cited  []string
 	facets []string
+	// A list item joined to a content lead-in keeps its parts: lead is the
+	// lead-in as joined (qualifiers stripped), item the item alone, and
+	// leadCited / itemCited the units each part cited itself. Empty otherwise.
+	lead, item           string
+	leadCited, itemCited []string
 }
 
 // parseCitations splits the answer into claims and attaches each marker to the
@@ -315,6 +324,8 @@ func joinListItems(claims []citedClaim, frames []string) []citedClaim {
 			c.text = item
 		} else {
 			c.text = joinText + " " + lowerFirst(item)
+			c.lead, c.item = joinText, lowerFirst(item)
+			c.leadCited, c.itemCited = leadIn.cited, c.cited
 		}
 		c.cited = appendUnique(append([]string{}, c.cited...), leadIn.cited...)
 		c.facets = appendUnique(append([]string{}, c.facets...), leadIn.facets...)
@@ -759,7 +770,71 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 					v.supported, v.verifiedBy, v.reason = true, modelLabel, ""
 				}
 			}
-			if !v.supported && guardReason != "" {
+			// 4. UNION: a list item joined to a content lead-in, where the lead-in
+			// and the item cite different units ("Volgens artikel 7:13 BW
+			// [eu:a]:" / "- … [eu:b]"). Checked alone, each unit lacks the
+			// other part's facts, and the guards refuse a true item for the
+			// lead-in's article number. See unionRefusal for what it takes.
+			unionReason := ""
+			if !v.supported && pc.lead != "" && len(pc.itemCited) > 0 {
+				lead, item := stripMarkup(pc.lead), stripMarkup(pc.item)
+				inItem, inLead := map[string]bool{}, map[string]bool{}
+				for _, id := range pc.itemCited {
+					inItem[id] = true
+				}
+				for _, id := range pc.leadCited {
+					inLead[id] = !inItem[id]
+				}
+				allowed := func(eu EvidenceUnit) bool {
+					pl := primaryLanguage(eu.Language)
+					return opts.AdmitParaphrase || (claimLanguage != "" && pl != "" && pl != claimLanguage)
+				}
+				for _, b := range candidates {
+					if !inItem[b.ID] || !allowed(b) {
+						continue
+					}
+					for _, a := range candidates {
+						if !inLead[a.ID] || !allowed(a) {
+							continue
+						}
+						reason := unionRefusal(text, lead, item, declared, a, b, opts.NameAliases)
+						if reason == "" {
+							// The checker may veto from either unit, and must entail the
+							// claim from both together.
+							for _, p := range []EvidenceUnit{a, b, unionPremise(a, b)} {
+								s, err := check(text, p)
+								if err != nil {
+									return result.Result{}, err
+								}
+								switch {
+								case s.contradicted >= contradictAt:
+									reason = ReasonContradicted
+								case p.ID == unionPremise(a, b).ID && s.entailed < entailAt:
+									reason = ReasonNotSupported
+								}
+								if reason != "" {
+									break
+								}
+							}
+						}
+						if reason != "" {
+							if unionReason == "" {
+								unionReason = reason // the FIRST pair refused, not the last
+							}
+							continue
+						}
+						v.sources = appendUnique(v.sources, a.ID, b.ID)
+					}
+				}
+				if len(v.sources) > 0 {
+					v.supported, v.verifiedBy, v.reason = true, modelLabel, ""
+				}
+			}
+			switch {
+			case v.supported:
+			case unionReason != "":
+				v.reason = unionReason
+			case guardReason != "":
 				v.reason = guardReason
 			}
 		}

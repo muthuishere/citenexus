@@ -17,8 +17,9 @@ type verifyVector struct {
 	AnswerLanguage  string              `json:"answer_language"`
 	AdmitParaphrase bool                `json:"admit_paraphrase"`
 	NameAliases     map[string][]string `json:"name_aliases"`
-	// Checker scores by unit id. CheckerClaims overrides it per claim text as
-	// the checker receives it (markup already stripped).
+	// Checker scores by premise: a unit id, or "a+b" for the union premise of a
+	// list item joined to its lead-in (unionPremise). CheckerClaims overrides it
+	// per claim text as the checker receives it (markup already stripped).
 	Checker       map[string][]float64            `json:"checker"`
 	CheckerClaims map[string]map[string][]float64 `json:"checker_claims"`
 	LeadInFrames  []string                        `json:"lead_in_frames"`
@@ -38,7 +39,7 @@ type verifyVector struct {
 	} `json:"expect"`
 }
 
-// idChecker scores by passage (a unit's text), and by
+// idChecker scores by passage (a unit's text, or a union premise), and by
 // (claim, passage) where a vector pins one claim.
 type idChecker struct {
 	byPassage map[string][2]float64
@@ -67,8 +68,8 @@ func TestVerifyAnswerConformance(t *testing.T) {
 	if err := json.Unmarshal(raw, &file); err != nil {
 		t.Fatal(err)
 	}
-	if len(file.Cases) != 78 {
-		t.Fatalf("verify_answer.json: got %d cases, want 78", len(file.Cases))
+	if len(file.Cases) != 90 {
+		t.Fatalf("verify_answer.json: got %d cases, want 90", len(file.Cases))
 	}
 	refuseControls := 0
 	for _, c := range file.Cases {
@@ -83,6 +84,9 @@ func TestVerifyAnswerConformance(t *testing.T) {
 				byID[e.ID] = evidence[i]
 			}
 			premise := func(key string) string {
+				if a, b, union := strings.Cut(key, "+"); union {
+					return unionPremise(byID[a], byID[b]).Text
+				}
 				return byID[key].Text
 			}
 			checker := idChecker{byPassage: map[string][2]float64{}, byClaim: map[[2]string][2]float64{}}

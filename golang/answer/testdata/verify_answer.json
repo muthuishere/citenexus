@@ -2157,6 +2157,440 @@
           }
         ]
       }
+    },
+    {
+      "name": "union/lead-in-names-the-article-item-states-the-fact",
+      "answer": "Volgens artikel 7:13 BW [eu:a]:\n- De werkgever mag loon inhouden als de werknemer schade veroorzaakt [eu:b]",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a+b": [
+          0.99,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Artikel 7:13 BW regelt wanneer de werkgever een bedrag op het loon mag inhouden."
+        },
+        {
+          "id": "b",
+          "document_id": "b",
+          "language": "nl",
+          "text": "De werkgever mag loon inhouden als de werknemer schade veroorzaakt."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "union/en-lead-in-names-the-article-item-states-the-fact",
+      "answer": "Under Article 7:13 of the Dutch Civil Code [eu:a]:\n- The employer may deduct wages when the employee causes damage [eu:b]",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a+b": [
+          0.99,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "en",
+          "text": "Article 7:13 of the Dutch Civil Code governs deductions from wages."
+        },
+        {
+          "id": "b",
+          "document_id": "b",
+          "language": "en",
+          "text": "The employer may deduct wages when the employee causes damage."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "union/restriction-cited-to-its-own-passage-still-refuses",
+      "must_refuse": true,
+      "answer": "Alleen voor stagiairs [eu:s]:\n- Er is recht op een reiskostenvergoeding [eu:w]",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "w": [
+          0.2,
+          0.0
+        ],
+        "s+w": [
+          0.99,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "s",
+          "document_id": "s",
+          "language": "nl",
+          "text": "Stagiairs ontvangen een stagevergoeding van € 300 per maand."
+        },
+        {
+          "id": "w",
+          "document_id": "w",
+          "language": "nl",
+          "text": "Voor werknemers geldt: er is recht op een reiskostenvergoeding."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "not supported"
+          },
+          {
+            "supported": false,
+            "reason": "lead-in guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "union/lead-in-number-in-neither-unit-refuses",
+      "must_refuse": true,
+      "answer": "Volgens artikel 7:14 BW [eu:a]:\n- De werkgever mag loon inhouden als de werknemer schade veroorzaakt [eu:b]",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a+b": [
+          0.99,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Artikel 7:13 BW regelt wanneer de werkgever een bedrag op het loon mag inhouden."
+        },
+        {
+          "id": "b",
+          "document_id": "b",
+          "language": "nl",
+          "text": "De werkgever mag loon inhouden als de werknemer schade veroorzaakt."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "union/item-number-only-in-the-lead-in-unit-and-contradicted-refuses",
+      "must_refuse": true,
+      "answer": "Volgens artikel 7:672 BW [eu:a]:\n- De opzegtermijn is 2 maanden [eu:b]",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a+b": [
+          0.99,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Artikel 7:672 BW: na tien jaar dienstverband is de opzegtermijn 2 maanden."
+        },
+        {
+          "id": "b",
+          "document_id": "b",
+          "language": "nl",
+          "text": "De opzegtermijn is 1 maand."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "union/item-role-only-in-the-lead-in-unit-and-swapped-refuses",
+      "must_refuse": true,
+      "answer": "Volgens artikel 12 van de CAO [eu:a]:\n- De werknemer betaalt de premie [eu:b]",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a+b": [
+          0.99,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Artikel 12 van de CAO: de werknemer betaalt de premie voor de aanvullende verzekering."
+        },
+        {
+          "id": "b",
+          "document_id": "b",
+          "language": "nl",
+          "text": "De werkgever betaalt de premie voor de aanvullende verzekering."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "qualifier guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "union/lead-in-condition-number-only-in-its-own-unit-refuses",
+      "must_refuse": true,
+      "answer": "Na 5 jaar dienstverband [eu:a]:\n- De opzegtermijn is 2 maanden [eu:b]",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a+b": [
+          0.99,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Na 5 jaar dienstverband heeft de werknemer recht op een extra verlofdag."
+        },
+        {
+          "id": "b",
+          "document_id": "b",
+          "language": "nl",
+          "text": "Na 10 jaar dienstverband is de opzegtermijn 2 maanden."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "lead-in guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "union/lead-in-negation-must-hold-in-the-item-unit",
+      "must_refuse": true,
+      "answer": "Niet vergoed [eu:a]:\n- De parkeerkosten [eu:b]",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a+b": [
+          0.99,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Niet vergoed worden: de reiskosten naar het buitenland."
+        },
+        {
+          "id": "b",
+          "document_id": "b",
+          "language": "nl",
+          "text": "De parkeerkosten worden vergoed."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "lead-in guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "union/the-gate-never-unions",
+      "must_refuse": true,
+      "answer": "Volgens artikel 7:13 BW [eu:a]:\n- De werkgever mag loon inhouden als de werknemer schade veroorzaakt [eu:b]",
+      "answer_language": "nl",
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Artikel 7:13 BW regelt wanneer de werkgever een bedrag op het loon mag inhouden."
+        },
+        {
+          "id": "b",
+          "document_id": "b",
+          "language": "nl",
+          "text": "De werkgever mag loon inhouden als de werknemer schade veroorzaakt."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "not supported"
+          }
+        ]
+      }
+    },
+    {
+      "name": "union/a-contradiction-from-either-unit-vetoes",
+      "must_refuse": true,
+      "answer": "Volgens artikel 7:13 BW [eu:a]:\n- De werkgever mag loon inhouden als de werknemer schade veroorzaakt [eu:b]",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a+b": [
+          0.99,
+          0.0
+        ],
+        "b": [
+          0.0,
+          0.9
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Artikel 7:13 BW regelt wanneer de werkgever een bedrag op het loon mag inhouden."
+        },
+        {
+          "id": "b",
+          "document_id": "b",
+          "language": "nl",
+          "text": "De werkgever mag loon inhouden als de werknemer schade veroorzaakt."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "contradicted"
+          }
+        ]
+      }
+    },
+    {
+      "name": "union/an-item-without-its-own-citation-is-not-unioned",
+      "must_refuse": true,
+      "answer": "Volgens artikel 7:13 BW [eu:a, eu:b]:\n- De werkgever mag loon inhouden als de werknemer schade veroorzaakt",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a+b": [
+          0.99,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Artikel 7:13 BW regelt wanneer de werkgever een bedrag op het loon mag inhouden."
+        },
+        {
+          "id": "b",
+          "document_id": "b",
+          "language": "nl",
+          "text": "De werkgever mag loon inhouden als de werknemer schade veroorzaakt."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "qualifier guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "union/same-language-without-admit-paraphrase-is-not-unioned",
+      "must_refuse": true,
+      "answer": "Volgens artikel 7:13 BW [eu:a]:\n- De werkgever mag loon inhouden als de werknemer schade veroorzaakt [eu:b]",
+      "answer_language": "nl",
+      "checker": {
+        "a+b": [
+          0.99,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Artikel 7:13 BW regelt wanneer de werkgever een bedrag op het loon mag inhouden."
+        },
+        {
+          "id": "b",
+          "document_id": "b",
+          "language": "nl",
+          "text": "De werkgever mag loon inhouden als de werknemer schade veroorzaakt."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "not supported"
+          }
+        ]
+      }
     }
   ]
 }
