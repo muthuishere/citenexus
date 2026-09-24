@@ -216,9 +216,9 @@ func names(claim string) []string {
 			continue
 		}
 		runes := []rune(word)
-		if ordinalToken.MatchString(strings.ToLower(word)) {
+		if ordinalToken.MatchString(strings.ToLower(word)) || numberWithUnit.MatchString(strings.ToLower(word)) {
 			initial = false
-			continue // "1st", "2de": a number, not a name
+			continue // "1st", "2de", "25-jarig", "40-hour", "1/12th": a number, not a name
 		}
 		if len(runes) > 1 {
 			hasDigit, hasLetter, allUpper := false, false, true
@@ -250,6 +250,11 @@ func names(claim string) []string {
 }
 
 var ordinalToken = regexp.MustCompile(`^[0-9]+(st|nd|rd|th|e|de|ste)$`)
+
+// numberWithUnit is a number joined to its unit or a fraction: "25-jarig",
+// "40-urige", "40-hour", "3-year", "1/12th", "1/12e". The number and unit
+// guards read them; they are not names.
+var numberWithUnit = regexp.MustCompile(`^[0-9]+([.,][0-9]+)?-?(jarig|jarige|urig|urige|daags|daagse|weeks|weekse|maands|maandse|hour|hours|day|days|week|weeks|month|months|year|years)$|^[0-9]+/[0-9]+(st|nd|rd|th|e|de|ste)?$`)
 
 var listMarker = regexp.MustCompile(`^([-*•·–—]|#{1,6}|[0-9]{1,3}[.)]|[a-z][.)])$`)
 

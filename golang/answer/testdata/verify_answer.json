@@ -4473,6 +4473,184 @@
         ]
       },
       "must_refuse": true
+    },
+    {
+      "name": "numword/25-jarig-over-25-jaar-is-a-number-not-a-name",
+      "answer": "Bij een 25-jarig dienstjubileum ontvang je een gratificatie [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Bij een dienstjubileum van 25 jaar ontvang je een gratificatie."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "numword/a-fraction-with-an-ordinal-is-a-number-not-a-name",
+      "answer": "Je spaart 1/12th van je salaris per maand [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Je spaart per maand 1/12e van je salaris."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "numword/12-jarig-over-10-jarige-refuses",
+      "answer": "Bij een 12-jarig dienstverband ontvang je een extra verlofdag [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Bij een 10-jarige dienstverband ontvang je een extra verlofdag."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "numword/1-11th-over-1-12e-refuses",
+      "answer": "Je spaart 1/11th van je salaris per maand [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Je spaart per maand 1/12e van je salaris."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "numword/40-hour-over-32-urig-refuses",
+      "answer": "A 40-hour working week applies [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Er geldt een 32-urige werkweek."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "numword/3-year-over-2-jarig-refuses",
+      "answer": "A 3-year contract is offered [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Er wordt een 2-jarig contract aangeboden."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      },
+      "must_refuse": true
     }
   ]
 }

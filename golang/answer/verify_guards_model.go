@@ -82,6 +82,8 @@ var timeUnits = map[string]string{
 	"year": "year", "years": "year", "jaar": "year", "jaren": "year", "jr": "year", "yr": "year", "yrs": "year",
 	"hour": "hour", "hours": "hour", "uur": "hour", "uren": "hour", "hr": "hour", "hrs": "hour",
 	"minute": "minute", "minutes": "minute", "minuut": "minute", "minuten": "minute", "min": "minute",
+	// Adjective forms after a number: "25-jarig", "32-urige", "5-daagse".
+	"jarig": "year", "jarige": "year", "urig": "hour", "urige": "hour", "daags": "day", "daagse": "day",
 }
 
 // unitModifiers precede "day(s)" in English and change its class.
