@@ -489,7 +489,7 @@ func guards(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfig) strin
 	if reason := qualifierPairGuard(claim, claimLanguage, eu, pairs); reason != "" {
 		return reason
 	}
-	if reason := partySwapGuard(claim, eu.Text, actors); reason != "" {
+	if reason := partySwapGuard(claim, claimLanguage, eu, actors); reason != "" {
 		return reason
 	}
 	if reason := subjectSwapGuard(claim, claimLanguage, eu, cfg); reason != "" {

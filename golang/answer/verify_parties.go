@@ -21,8 +21,20 @@
 // claim must be near-verbatim to the unit. An English claim over a Dutch unit
 // ("The complaints committee decides …" over "Het college van bestuur beslist
 // …") is left to the checker: aligning verbs across languages needs a
-// glossary this library does not have. A claim that aligns as written is never
-// refused here.
+// glossary this library does not have.
+//
+// A PAIR BINDS ITS VALUES. When the claim states a number, the swap is judged
+// by which word the unit binds that number to — the word governing it in its
+// clause, the nearest before it, else the nearest after it (bindValue). "De
+// maximumprijs van een fiets is € 4.000" over "De minimumprijs van een fiets is
+// € 500 en de maximumprijs is € 4.000" aligns only after the swap, yet € 4.000
+// is the maximum's: admitted. Refused only when the unit binds the number to
+// the other word; unresolved, no verdict. The same binding refuses a claim
+// that aligns as written but gives a value to the counterpart of the word the
+// unit binds it to (pairValueGuard: "minimumprijs" / "maximumprijs", "lower
+// limit" / "upper limit" — a shared head); that check reads no alignment and
+// also runs after a gate admission. Otherwise a claim that aligns as written
+// is never refused here.
 //
 // VALUE ROW. A number stated for one period is moved to another: "During the
 // first two years of illness, you receive 100%" over "Tijdens het eerste
@@ -132,7 +144,8 @@ func replaceSpans(tokens []string, repl map[span][]string) []string {
 }
 
 // partySwapGuard: see the file comment.
-func partySwapGuard(claim, passage string, lexicon ActorLexicon) string {
+func partySwapGuard(claim, claimLanguage string, eu EvidenceUnit, lexicon ActorLexicon) string {
+	passage := eu.Text
 	var sentences, bare [][]string
 	for _, s := range sentenceBreak.Split(softJoin(passage), -1) {
 		if toks := tokenize.TokenizeV2(s); len(toks) > 0 {
@@ -152,10 +165,14 @@ func partySwapGuard(claim, passage string, lexicon ActorLexicon) string {
 		}
 		return false
 	}
-	if aligns(claimTokens) {
-		return ""
-	}
 	parties := unitParties(sentences)
+	// Which of two words the unit binds each of the claim's numbers to.
+	binding := func(o, p []string) int {
+		return bindValue(claim, claimLanguage, eu.Text, eu.Language, o, p)
+	}
+	if aligns(claimTokens) {
+		return pairValueGuard(claim, claimLanguage, eu)
+	}
 	classOf := func(p []string) string {
 		if len(p) != 1 {
 			return ""
@@ -206,6 +223,14 @@ func partySwapGuard(claim, passage string, lexicon ActorLexicon) string {
 				continue
 			}
 			if aligns(replaceSpans(claimTokens, map[span][]string{o.at: p})) {
+				// The swap aligns — but a claim stating a number is refused only
+				// when the unit binds that number to the other word. Bound to
+				// the claim's own word, it is the true reading ("De maximumprijs
+				// … is € 4.000" over "De minimumprijs van een fiets is € 500 en
+				// de maximumprijs is € 4.000"); unresolved, no verdict.
+				if b := binding(o.party, p); b == bindOwn || b == bindUnresolved {
+					continue
+				}
 				return fmt.Sprintf("role guard: %q where the passage says %q", strings.Join(o.party, " "), strings.Join(p, " "))
 			}
 		}
@@ -225,6 +250,190 @@ func partySwapGuard(claim, passage string, lexicon ActorLexicon) string {
 		}
 	}
 	return ""
+}
+
+// pairValueGuard: a claim that states a number with one word of a pair the
+// unit binds to the pair's OTHER word: "De minimumprijs … is € 4.000" over
+// "De minimumprijs … is € 500 en de maximumprijs is € 4.000", "The lower
+// limit … is € 300" over two sentences each binding its own value. Only a
+// counterpart of the claim's party is compared (counterpartOf), never any
+// party that happens to stand near the number; unresolved gives no verdict.
+// It reads no alignment, so it also runs after a gate admission.
+func pairValueGuard(claim, claimLanguage string, eu EvidenceUnit) string {
+	var sentences [][]string
+	for _, s := range sentenceBreak.Split(softJoin(eu.Text), -1) {
+		if toks := tokenize.TokenizeV2(s); len(toks) > 0 {
+			sentences = append(sentences, toks)
+		}
+	}
+	claimTokens := withoutArticles(tokenize.TokenizeV2(claim))
+	parties := unitParties(sentences)
+	for _, o := range parties {
+		if len(findSpans(claimTokens, o)) == 0 {
+			continue
+		}
+		for _, p := range parties {
+			if equalTokens(o, p) || len(findSpans(claimTokens, p)) > 0 || !counterpartOf(o, p, sentences) {
+				continue
+			}
+			if bindValue(claim, claimLanguage, eu.Text, eu.Language, o, p) == bindOther {
+				return fmt.Sprintf("role guard: %q where the passage says %q", strings.Join(o, " "), strings.Join(p, " "))
+			}
+		}
+	}
+	return ""
+}
+
+const (
+	bindNoNumber   = -1 // the claim states no number
+	bindUnresolved = 0
+	bindOwn        = 1 // some unit clause binds a claim number to the claim's word
+	bindOther      = 2 // unit clauses bind the claim's numbers to the other word only
+)
+
+// bindValue: for each number of the claim (ADR-0015 key), the unit clauses
+// (roleClauses) holding the same number, each binding it to whichever of own
+// and other governs it in that clause — the nearest before it, else the
+// nearest after it (neither binds to nothing). bindOwn when any clause binds a claim number to own; bindOther
+// when none does and at least one binds one to other.
+func bindValue(claim, claimLanguage, unit, unitLanguage string, own, other []string) int {
+	var claimKeys [][]string
+	for _, c := range roleClauses(claim) {
+		for _, keys := range numberWordKeys(c, claimLanguage) {
+			claimKeys = append(claimKeys, keys)
+		}
+	}
+	if len(claimKeys) == 0 {
+		return bindNoNumber
+	}
+	toOther := false
+	for _, c := range roleClauses(unit) {
+		var words []string
+		for _, w := range lowerWords(c) {
+			w = strings.Trim(w, roleTrim+".,;:")
+			words = append(words, w)
+		}
+		// Positions of a phrase in the clause, articles skipped between its
+		// words ("bovengrens van de toeslag" = "bovengrens van toeslag").
+		positions := func(phrase []string) []int {
+			var out []int
+			for i := range words {
+				k, j := 0, i
+				for j < len(words) && k < len(phrase) {
+					if words[j] == phrase[k] {
+						k++
+						j++
+						continue
+					}
+					if _, art := articles[words[j]]; art && k > 0 {
+						j++
+						continue
+					}
+					break
+				}
+				if k == len(phrase) {
+					out = append(out, i)
+				}
+			}
+			return out
+		}
+		po, pp := positions(own), positions(other)
+		// The word governing a number is the nearest one BEFORE it in the
+		// clause ("De minimumprijs … is € 500 en de maximumprijs …": 500 is
+		// the minimum's); only when neither stands before it, the nearest
+		// after it ("€ 500 is de minimumprijs").
+		governor := func(at int) int {
+			before := func(ps []int) int {
+				best := -1
+				for _, x := range ps {
+					if x < at && x > best {
+						best = x
+					}
+				}
+				return best
+			}
+			bo, bp := before(po), before(pp)
+			switch {
+			case bo > bp:
+				return bindOwn
+			case bp > bo:
+				return bindOther
+			case bo >= 0: // equal: the same position cannot hold both
+				return bindUnresolved
+			}
+			after := func(ps []int) int {
+				best := -1
+				for _, x := range ps {
+					if x > at && (best < 0 || x < best) {
+						best = x
+					}
+				}
+				return best
+			}
+			ao, ap := after(po), after(pp)
+			switch {
+			case ao >= 0 && (ap < 0 || ao < ap):
+				return bindOwn
+			case ap >= 0 && (ao < 0 || ap < ao):
+				return bindOther
+			}
+			return bindUnresolved
+		}
+		for at, ukeys := range numberWordKeys(c, unitLanguage) {
+			for _, keys := range claimKeys {
+				if !sharesKey(keys, ukeys) {
+					continue
+				}
+				switch governor(at) {
+				case bindOwn:
+					return bindOwn
+				case bindOther:
+					toOther = true
+				}
+			}
+		}
+	}
+	if toOther {
+		return bindOther
+	}
+	return bindUnresolved
+}
+
+// counterpartOf: party p is the other word of a pair with o — the same head,
+// either as a compound ("minimumprijs" / "maximumprijs", "ondergrens" /
+// "bovengrens": a shared ending of four letters or more, each with its own
+// first part) or as a phrase (the same word right after both in the unit:
+// "minimum price" / "maximum price", "lower limit" / "upper limit").
+func counterpartOf(o, p []string, sentences [][]string) bool {
+	if len(o) != 1 || len(p) != 1 {
+		return false
+	}
+	a, b := []rune(o[0]), []rune(p[0])
+	common := 0
+	for common < len(a) && common < len(b) && a[len(a)-1-common] == b[len(b)-1-common] {
+		common++
+	}
+	if common >= 4 && len(a) > common && len(b) > common {
+		return true
+	}
+	next := func(w string) map[string]bool {
+		out := map[string]bool{}
+		for _, s := range sentences {
+			for i := 0; i+1 < len(s); i++ {
+				if s[i] == w && partyWord(s[i+1]) {
+					out[s[i+1]] = true
+				}
+			}
+		}
+		return out
+	}
+	no, np := next(o[0]), next(p[0])
+	for w := range no {
+		if np[w] {
+			return true
+		}
+	}
+	return false
 }
 
 // valueRowGuard: see the file comment.

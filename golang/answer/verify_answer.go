@@ -771,6 +771,12 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 				if reason == "" {
 					reason = relationGuard(text, declared, eu, actors)
 				}
+				if reason == "" {
+					// The gate aligns tokens, not which word of a pair a value
+					// belongs to: "De ondergrens … is € 300" over "De ondergrens …
+					// is € 100. De bovengrens … is € 300."
+					reason = pairValueGuard(text, declared, eu)
+				}
 				if reason != "" {
 					if gateReason == "" {
 						gateReason = reason // the FIRST cited unit refused, not the last
