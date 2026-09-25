@@ -164,6 +164,11 @@ pub struct RawChar {
     pub ink: [f64; 4],
     /// Baseline (origin y), top-left origin.
     pub baseline: f64,
+    /// EFFECTIVE font size in points: the `Tf` size times the em height of
+    /// the character matrix (text matrix x CTM). A PDF that sets `Tf 1` and
+    /// scales text with `Tm` has `FPDFText_GetFontSize` = 1 for 8 pt text;
+    /// every size-relative threshold (word and column gaps, block merging,
+    /// heading size, bands, row gaps) reads this value.
     pub size: f64,
     pub bold: bool,
     /// The glyph is rotated (|angle| > ~6 degrees): watermarks, vertical text.
@@ -454,6 +459,8 @@ unsafe fn read_page(b: &dyn PdfiumLibraryBindings, page: FPDF_PAGE) -> RawPage {
                 };
             }
             let m = [m.a as f64, m.b as f64, m.c as f64, m.d as f64];
+            let em = m[2].hypot(m[3]);
+            let em = if em.is_finite() && em > 1e-6 { em } else { 1.0 };
             // Advance in text space: the width the font states for this
             // character (FPDFText_GetFontSize is the Tf size, unscaled).
             let mut w_em = 0f32;
@@ -492,7 +499,7 @@ unsafe fn read_page(b: &dyn PdfiumLibraryBindings, page: FPDF_PAGE) -> RawPage {
                 y1: 0.0,
                 ink,
                 baseline: r2(top - oy),
-                size: r2(size),
+                size: r2(size * em),
                 bold,
                 rotated,
                 space_before,

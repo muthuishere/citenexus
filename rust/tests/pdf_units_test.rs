@@ -1223,3 +1223,42 @@ fn fill_and_stroke_text_is_bold_and_outlined_text_is_not() {
     assert!(bold_of("Nazorg"));
     assert!(!bold_of("Kwaliteit"));
 }
+
+#[test]
+fn tf_1_text_scaled_by_its_matrix_is_read_at_its_effective_size() {
+    if !have_pdfium() {
+        return;
+    }
+    // `Tf 1` with a 10x text matrix is 10 pt text. Read at size 1, every
+    // size-relative gap collapses (a 2.8 pt space splits a segment) and each
+    // word became its own unit.
+    let lines = [
+        "Deze regeling geldt voor alle medewerkers",
+        "in vaste dienst van de organisatie en wordt",
+        "jaarlijks door de directie herzien.",
+    ];
+    let content: String = lines
+        .iter()
+        .enumerate()
+        .map(|(i, t)| {
+            format!(
+                "BT /F1 1 Tf 10 0 0 10 72 {} Tm ({t}) Tj ET\n",
+                750 - 12 * i as i32
+            )
+        })
+        .collect();
+    let pdf = raw_page_pdf(&content);
+    let r = raw::read(&pdf).unwrap();
+    let c = r.pages[0].chars.iter().find(|c| !c.generated).unwrap();
+    assert_eq!(c.size, 10.0);
+    let out = pdf_units(
+        &pdf,
+        &PdfOptions {
+            language: Some("nl".into()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let texts: Vec<&str> = out.units.iter().map(|u| u.markdown.as_str()).collect();
+    assert_eq!(texts, vec![lines.join(" ")], "{texts:?}");
+}
