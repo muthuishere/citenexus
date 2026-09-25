@@ -189,6 +189,10 @@ type VerifyOptions struct {
 	// the glossary cannot see, and its no-verdict branch gives up refusals
 	// the glossary would otherwise make.
 	ConjunctPresence bool
+	// eagerScoring scores every unit the model path reaches whatever the
+	// guards decide (61ceddf). Unexported: the default is lazy scoring, whose
+	// output is the same (TestLazyScoringMatchesEager); tests compare the two.
+	eagerScoring bool
 }
 
 // Facet is one part of the question an answer must cover.
@@ -749,6 +753,11 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 		guardOf := map[string]string{}
 		scoredOf := map[string]scores{}
 		scoredOrder := []string{}
+		// Lazy scoring: a unit a guard refused is scored only when its score
+		// can reach the output (F0, below); its place in scoredOrder is kept
+		// from when it was first considered, so ties break as if eager.
+		considered := map[string]bool{}
+		deferred := map[string]EvidenceUnit{}
 		for _, eu := range candidates {
 			if gate.IsSupportedV2(text, eu.Text) {
 				reason := clauseNegationGuard(text, eu.Text)
@@ -841,14 +850,22 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 			// guard and no option (VerifyOptions.ConjunctPresence, …) can move
 			// it. The guards decide admission only.
 			admit := func(eu EvidenceUnit) (bool, error) {
-				s, err := check(text, eu)
-				if err != nil {
-					return false, err
-				}
-				if _, seen := scoredOf[eu.ID]; !seen {
+				if !considered[eu.ID] {
+					considered[eu.ID] = true
 					scoredOrder = append(scoredOrder, eu.ID)
 				}
-				scoredOf[eu.ID] = s
+				score := func() (scores, error) {
+					s, err := check(text, eu)
+					if err == nil {
+						scoredOf[eu.ID] = s
+					}
+					return s, err
+				}
+				if opts.eagerScoring {
+					if _, err := score(); err != nil {
+						return false, err
+					}
+				}
 				reason := guards(text, declared, eu, cfg)
 				if reason == "" && pc.item != "" {
 					// A joined item is also a cut span on its own words:
@@ -862,7 +879,17 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 					if _, seen := guardOf[eu.ID]; !seen {
 						guardOf[eu.ID] = reason
 					}
+					if !opts.eagerScoring {
+						deferred[eu.ID] = eu
+					}
 					return false, nil
+				}
+				s, ok := scoredOf[eu.ID]
+				if !opts.eagerScoring || !ok {
+					var err error
+					if s, err = score(); err != nil {
+						return false, err
+					}
 				}
 				return s.entailed >= entailAt && s.contradicted < contradictAt, nil
 			}
@@ -923,6 +950,7 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 			// the first model refusal (not supported / contradicted).
 			unionReason, unionGuard, unionAllGuarded := "", "", true
 			unionPairs, unionScored := 0, map[string]scores{}
+			var deferredPairs [][2]EvidenceUnit // guard-refused pairs, not yet scored
 			if !v.supported && pc.lead != "" && len(pc.itemCited) > 0 {
 				lead, item := stripMarkup(pc.lead), stripMarkup(pc.item)
 				inItem, inLead := map[string]bool{}, map[string]bool{}
@@ -946,9 +974,18 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 						}
 						unionPairs++
 						// The checker may veto from either unit, and must entail the
-						// claim from both together. It scores all three premises
-						// before the guards read the pair, whatever they decide (see
-						// admit): a guard verdict never moves what the model sees.
+						// claim from both together. A guard verdict never moves what
+						// the model is reported to have seen: a guard-refused pair's
+						// union premise is scored later when the reason is the
+						// model's (lazy), or here (eager).
+						reason := unionRefusal(text, lead, item, declared, a, b, cfg)
+						if reason != "" && !opts.eagerScoring {
+							if unionGuard == "" {
+								unionGuard = reason // the FIRST guard-refused pair
+							}
+							deferredPairs = append(deferredPairs, [2]EvidenceUnit{a, b})
+							continue
+						}
 						modelReason := ""
 						for _, p := range []EvidenceUnit{a, b, unionPremise(a, b)} {
 							s, err := check(text, p)
@@ -968,7 +1005,6 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 								modelReason = ReasonNotSupported
 							}
 						}
-						reason := unionRefusal(text, lead, item, declared, a, b, cfg)
 						if reason != "" {
 							if unionGuard == "" {
 								unionGuard = reason // the FIRST guard-refused pair
@@ -1001,6 +1037,15 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 				if unionAllGuarded {
 					guardOf["union"] = unionGuard // every pair refused by a guard
 				} else {
+					// The model's reason reports the best union premise over every
+					// pair, guard-refused ones included: score those now.
+					for _, pr := range deferredPairs {
+						s, err := check(text, unionPremise(pr[0], pr[1]))
+						if err != nil {
+							return result.Result{}, err
+						}
+						unionScored[pr[0].ID+"+"+pr[1].ID] = s
+					}
 					for label, sc := range unionScored {
 						scoredOf[label] = sc
 						scoredOrder = append(scoredOrder, label)
@@ -1026,12 +1071,36 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 					break
 				}
 			}
+			if !allGuarded && len(deferred) > 0 && (len(reasonUnits) == 0 || reasonUnits[0].ID != "union") {
+				// The reason reports the best scores over every scored unit:
+				// score the guard-refused units now, in their considered order.
+				for _, id := range scoredOrder {
+					eu, ok := deferred[id]
+					if !ok {
+						continue
+					}
+					if _, done := scoredOf[id]; done {
+						continue
+					}
+					s, err := check(text, eu)
+					if err != nil {
+						return result.Result{}, err
+					}
+					scoredOf[id] = s
+				}
+			}
 			switch {
 			case allGuarded:
 				v.reason = guardOf[reasonUnits[0].ID] // the first cited unit's guard
 			case len(scoredOf) > 0:
-				best := scoredOrder[0]
-				for _, id := range scoredOrder[1:] {
+				var order []string
+				for _, id := range scoredOrder {
+					if _, ok := scoredOf[id]; ok {
+						order = append(order, id)
+					}
+				}
+				best := order[0]
+				for _, id := range order[1:] {
 					b, s := scoredOf[best], scoredOf[id]
 					if s.entailed > b.entailed || (s.entailed == b.entailed && s.contradicted < b.contradicted) {
 						best = id
