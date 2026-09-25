@@ -434,8 +434,11 @@ type guardConfig struct {
 	glossary [][2]string
 	// sepOf / classOf: from VerifyOptions.GlossaryEntries (glossary.go).
 	sepOf, classOf map[string]string
-	// noDefinitions: VerifyOptions.DisableDefinitions.
+	// noDefinitions: VerifyOptions.DisableDefinitions. docDefs: every
+	// explicit definition in the evidence, by DocumentID.
 	noDefinitions bool
+	docDefs       map[string][]definition
+	subtypes      []SubtypeHead
 	// fragment: the text is a list lead-in checked on its own (union rule):
 	// it states no fact, so the hedge guard does not read it.
 	fragment bool
@@ -476,6 +479,9 @@ func guards(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfig) strin
 		return reason
 	}
 	if reason := definitionGuard(claim, claimLanguage, eu, cfg); reason != "" {
+		return reason
+	}
+	if reason := subtypeGuard(claim, eu, cfg); reason != "" {
 		return reason
 	}
 	if reason := conditionGuard(claim, claimLanguage, eu, cfg); reason != "" {

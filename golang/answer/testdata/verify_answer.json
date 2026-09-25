@@ -3872,7 +3872,7 @@
         "claims": [
           {
             "supported": false,
-            "reason": "condition guard"
+            "reason": "subtype guard"
           }
         ]
       }
@@ -8842,6 +8842,199 @@
           {
             "supported": false,
             "reason": "verb guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "definition/a-definition-applies-to-every-unit-of-its-document (L-R23 a)",
+      "must_refuse": true,
+      "answer": "Tijdens verlof bouw je geen vakantiedagen op [eu:s3].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "s3": [
+          0.999,
+          0.0
+        ],
+        "s2": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "s2",
+          "document_id": "regeling-onbetaald-verlof",
+          "language": "nl",
+          "text": "Onbetaald verlof. Een werknemer kan onbetaald verlof (hierna: het Verlof) opnemen voor ten hoogste zes maanden."
+        },
+        {
+          "id": "s3",
+          "document_id": "regeling-onbetaald-verlof",
+          "language": "nl",
+          "text": "Gevolgen. Tijdens het Verlof bouwt de werknemer geen vakantiedagen op."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "definition guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "definition/a-definition-does-not-cross-documents",
+      "answer": "Tijdens verlof bouw je geen vakantiedagen op [eu:s3].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "s3": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "s2",
+          "document_id": "regeling-onbetaald-verlof",
+          "language": "nl",
+          "text": "Onbetaald verlof. Een werknemer kan onbetaald verlof (hierna: het Verlof) opnemen voor ten hoogste zes maanden."
+        },
+        {
+          "id": "s3",
+          "document_id": "cao-verlof",
+          "language": "nl",
+          "text": "Gevolgen. Tijdens verlof bouwt de werknemer geen vakantiedagen op."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "subtype/the-bare-head-over-only-compounds-refuses (L-R23 b)",
+      "answer": "Tijdens verlof ontvang je een uitkering van het UWV [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Zwangerschapsverlof. Tijdens het zwangerschaps- en bevallingsverlof ontvangt de werknemer een uitkering van het UWV."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "subtype guard"
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "subtype/the-bare-head-across-languages-refuses",
+      "answer": "During leave you receive a benefit from the UWV [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Zwangerschapsverlof. Tijdens het zwangerschaps- en bevallingsverlof ontvangt de werknemer een uitkering van het UWV."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "subtype guard"
+          }
+        ]
+      },
+      "must_refuse": true
+    },
+    {
+      "name": "subtype/the-claim-that-keeps-the-subtype-is-admitted",
+      "answer": "Tijdens het bevallingsverlof ontvang je een uitkering van het UWV [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Zwangerschapsverlof. Tijdens het zwangerschaps- en bevallingsverlof ontvangt de werknemer een uitkering van het UWV."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "subtype/a-unit-that-also-uses-the-bare-head-is-admitted",
+      "answer": "Tijdens verlof ontvang je een uitkering van het UWV [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Verlof. Tijdens verlof en tijdens het bevallingsverlof ontvangt de werknemer een uitkering van het UWV."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
           }
         ]
       }

@@ -136,6 +136,12 @@ type VerifyOptions struct {
 	// which by default refuses a claim using the generic noun for a subtype the
 	// unit defines explicitly ("onbetaald verlof (hierna: het Verlof)").
 	DisableDefinitions bool
+	// SubtypeHeads are the head nouns whose subtypes are different facts
+	// (verlof / leave, …): a claim using the bare head over a unit that
+	// only has compounds or qualified forms of it is refused
+	// (verify_subtypes.go). nil means DefaultSubtypeHeads; a non-nil slice
+	// REPLACES it; empty turns it off.
+	SubtypeHeads []SubtypeHead
 	// Glossary is the caller's term pairs across languages ({"toestemming",
 	// "permission"}), lowercase, either order. It is read ONLY by the
 	// condition guard, to tell whether a claim in another language carries a
@@ -666,9 +672,14 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 		verbs = opts.VerbPairs
 	}
 	entryPairs, sepOf, classOf := expandGlossary(opts.GlossaryEntries)
+	subtypes := DefaultSubtypeHeads
+	if opts.SubtypeHeads != nil {
+		subtypes = opts.SubtypeHeads
+	}
 	cfg := guardConfig{aliases: opts.NameAliases, actors: actors, pairs: pairs, verbs: verbs,
 		glossary: append(append([][2]string{}, opts.Glossary...), entryPairs...),
-		sepOf:    sepOf, classOf: classOf, noDefinitions: opts.DisableDefinitions}
+		sepOf:    sepOf, classOf: classOf, noDefinitions: opts.DisableDefinitions,
+		docDefs: documentDefinitions(evidence), subtypes: subtypes}
 	frames := opts.LeadInFrames
 	if frames == nil {
 		frames = DefaultLeadInFrames
@@ -735,6 +746,9 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 				}
 				if reason == "" {
 					reason = definitionGuard(text, declared, eu, cfg)
+				}
+				if reason == "" {
+					reason = subtypeGuard(text, eu, cfg)
 				}
 				if reason == "" {
 					reason = conditionGuard(text, declared, eu, cfg)

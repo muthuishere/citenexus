@@ -15,7 +15,9 @@
 // A claim that uses the noun (in one language, or its glossary translation)
 // without the qualifier, and does not write the defined Term itself mid-
 // sentence ("het Verlof"), is refused. Across languages both words must be in
-// VerifyOptions.Glossary, else no verdict. On by default;
+// VerifyOptions.Glossary, else no verdict. A definition governs every unit of
+// its document that uses the defined Term (document scope: the definition may
+// sit in another cited unit). On by default;
 // VerifyOptions.DisableDefinitions turns it off. Can only refuse.
 
 package answer
@@ -61,6 +63,21 @@ func definitionGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConf
 		return ""
 	}
 	defs := definitionsIn(eu.Text)
+	// A definition in another unit of the SAME document governs this one when
+	// this unit uses the defined Term as written ("Tijdens het Verlof …" in S3,
+	// "(hierna: het Verlof)" in S2), or, for an "Onder … wordt verstaan"
+	// definition, the defined noun.
+	if eu.DocumentID != "" {
+		for _, d := range cfg.docDefs[eu.DocumentID] {
+			if containsDef(defs, d) {
+				continue
+			}
+			if (d.term != "" && writtenTerm(eu.Text, d.term)) ||
+				(d.term == "" && strings.Contains(strings.ToLower(eu.Text), d.qualifier+" "+d.noun)) {
+				defs = append(defs, d)
+			}
+		}
+	}
 	if len(defs) == 0 {
 		return ""
 	}
@@ -97,4 +114,42 @@ func definitionGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConf
 		return fmt.Sprintf("definition guard: the passage defines %q as %q", d.noun, d.qualifier+" "+d.noun)
 	}
 	return ""
+}
+
+func containsDef(defs []definition, d definition) bool {
+	for _, x := range defs {
+		if x == d {
+			return true
+		}
+	}
+	return false
+}
+
+// writtenTerm: the Term as written, not as the first word of a sentence.
+func writtenTerm(text, term string) bool {
+	for _, s := range sentenceBreak.Split(softJoin(text), -1) {
+		words := listLeadToken.FindAllString(s, -1)
+		for i, w := range words {
+			if i > 0 && strings.Trim(w, `.,;:!?"'()`) == term {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// documentDefinitions: the explicit definitions of every unit, by document.
+func documentDefinitions(evidence []EvidenceUnit) map[string][]definition {
+	out := map[string][]definition{}
+	for _, eu := range evidence {
+		if eu.DocumentID == "" {
+			continue
+		}
+		for _, d := range definitionsIn(eu.Text) {
+			if !containsDef(out[eu.DocumentID], d) {
+				out[eu.DocumentID] = append(out[eu.DocumentID], d)
+			}
+		}
+	}
+	return out
 }
