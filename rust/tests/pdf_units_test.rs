@@ -1156,3 +1156,70 @@ fn a_full_width_note_under_a_two_column_list_is_its_own_paragraph() {
         "{texts:?}"
     );
 }
+
+/// One A4 page with a hand-written content stream over standard-14 Helvetica
+/// (F1), for operators the generator does not emit (text render modes).
+fn raw_page_pdf(content: &str) -> Vec<u8> {
+    let objs = [
+        "<< /Type /Catalog /Pages 2 0 R >>".to_string(),
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_string(),
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R \
+         /Resources << /Font << /F1 5 0 R >> >> >>"
+            .to_string(),
+        format!(
+            "<< /Length {} >>\nstream\n{content}\nendstream",
+            content.len()
+        ),
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"
+            .to_string(),
+    ];
+    let mut out = b"%PDF-1.7\n".to_vec();
+    let mut offsets = Vec::new();
+    for (i, o) in objs.iter().enumerate() {
+        offsets.push(out.len());
+        out.extend(format!("{} 0 obj\n{o}\nendobj\n", i + 1).bytes());
+    }
+    let xref = out.len();
+    out.extend(format!("xref\n0 {}\n0000000000 65535 f \n", objs.len() + 1).bytes());
+    for o in offsets {
+        out.extend(format!("{o:010} 00000 n \n").bytes());
+    }
+    out.extend(
+        format!(
+            "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n",
+            objs.len() + 1
+        )
+        .bytes(),
+    );
+    out
+}
+
+#[test]
+fn fill_and_stroke_text_is_bold_and_outlined_text_is_not() {
+    if !have_pdfium() {
+        return;
+    }
+    // Same font, same size: only the render mode can make "Nazorg" bold.
+    // Mode 2 (fill + stroke) is synthetic bold; mode 1 (stroke only) is an
+    // outline, not bold. (Whether a bold line becomes a heading is the
+    // heading policy's call: bold alone never makes one.)
+    let body = "Om terugval te voorkomen is er een nazorggesprek na drie maanden.";
+    let content = format!(
+        "BT /F1 11 Tf 2 Tr 0.4 w 72 742 Td (Nazorg) Tj ET\n\
+         BT /F1 11 Tf 0 Tr 72 722 Td ({body}) Tj ET\n\
+         BT /F1 11 Tf 1 Tr 0.4 w 72 692 Td (Kwaliteit) Tj ET\n\
+         BT /F1 11 Tf 0 Tr 72 672 Td ({body}) Tj ET"
+    );
+    let r = raw::read(&raw_page_pdf(&content)).unwrap();
+    let bold_of = |word: &str| {
+        let first = word.chars().next().unwrap();
+        let i = r.pages[0]
+            .chars
+            .iter()
+            .position(|c| c.ch == first && !c.generated)
+            .unwrap();
+        r.pages[0].chars[i].bold
+    };
+    assert!(bold_of("Nazorg"));
+    assert!(!bold_of("Kwaliteit"));
+}

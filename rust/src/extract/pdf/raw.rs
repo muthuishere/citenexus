@@ -403,7 +403,15 @@ unsafe fn read_page(b: &dyn PdfiumLibraryBindings, page: FPDF_PAGE) -> RawPage {
             } else {
                 b.FPDFPageObj_GetMarkedContentID(obj)
             };
-            let invisible = !obj.is_null() && b.FPDFTextObj_GetTextRenderMode(obj) == 3;
+            let mode = if obj.is_null() {
+                -1
+            } else {
+                b.FPDFTextObj_GetTextRenderMode(obj)
+            };
+            let invisible = mode == 3;
+            // Render mode 2 (fill, then stroke the outline): synthetic bold, the
+            // way a PDF writer emboldens a font it has no bold face for.
+            let bold = bold || mode == 2;
             let unicode_error = b.FPDFText_HasUnicodeMapError(tp, i) == 1;
             let (mut ox, mut oy) = (0f64, 0f64);
             b.FPDFText_GetCharOrigin(tp, i, &mut ox, &mut oy);
