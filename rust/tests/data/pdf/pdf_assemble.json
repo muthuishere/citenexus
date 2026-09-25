@@ -274,7 +274,7 @@
           "Vergoedingen zijn per jaar.",
           "Declaraties gaan naar de administratie."
         ],
-        "failed_units": 3
+        "failed_units": 2
       }
     },
     {
@@ -293,7 +293,7 @@
         "rejected": 0,
         "failed_check": null,
         "base_kept_all": true,
-        "verdict_units": 3,
+        "verdict_units": 2,
         "no_verdict": [
           "Vergoedingen zijn per jaar.",
           "Declaraties gaan naar de administratie."

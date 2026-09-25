@@ -63,7 +63,7 @@ pub struct PageLayout {
 }
 
 fn visible(c: &RawChar) -> bool {
-    !c.generated && !c.rotated && (c.hyphen || !c.ch.is_whitespace()) && c.x1 > c.x0 - 0.001
+    !c.generated && !c.rotated && (c.hyphen || !c.ch.is_whitespace()) && c.ink[2] > c.ink[0] - 0.001
 }
 
 /// Most frequent value after rounding to 0.5, ties to the larger value.
@@ -102,7 +102,7 @@ fn build_segment(page: &RawPage, idx: Vec<usize>) -> Segment {
         let mut new_word = prev.is_none();
         if let Some(p) = prev {
             let pc = &chars[p];
-            let gap = c.lx0 - pc.lx1;
+            let gap = c.x0 - pc.x1;
             let size = c.size.max(pc.size).max(1.0);
             // A space in the stream right before this char, when the two chars are
             // stream-adjacent apart from whitespace, or a geometric word gap.
@@ -205,7 +205,7 @@ pub fn segments(page: &RawPage) -> (Vec<Segment>, Vec<Vec<usize>>, usize) {
         let mut run: Vec<usize> = Vec::new();
         for i in g {
             if let Some(&p) = run.last() {
-                let gap = c[i].lx0 - c[p].lx1;
+                let gap = c[i].x0 - c[p].x1;
                 if gap > 1.5 * c[i].size.max(c[p].size).max(1.0) {
                     line.push(segs.len());
                     segs.push(build_segment(page, std::mem::take(&mut run)));

@@ -48,6 +48,19 @@ Every request has `id`, `page` (1-based), `kind`, `prompt`, `bbox`, `words`,
 `variant` and `hint`.
 
 - `bbox` is `[x0, y0, x1, y1]` in PDF points, **top-left origin**.
+- **Every bbox is the PDF's STATED geometry, not the rendered glyph ink.** A
+  character's box is its origin plus the advance width the font states
+  (`/Widths`, or the standard-14 AFM metrics pdfium ships), projected through
+  the character matrix, with a size-derived ascent and descent (0.72 and 0.21
+  of the font size, `raw.rs` `STATED_ASCENT` / `STATED_DESCENT`). Every layout
+  decision (word and column gaps, running header/footer bands, reading order,
+  table tracks and regions) reads the same boxes. So when a PDF does not embed
+  its fonts and the platform substitutes a different face, text, units,
+  markdown **and** bboxes stay identical. Measured: 65 probe PDFs are
+  byte-identical on macOS arm64 and Linux arm64/x64 (pdfium chromium/8066). Before
+  this change, glyph boxes moved by up to 0.56 pt and flipped a running header in
+  or out of the 12 % band. The tight glyph box is still read, but only to tell
+  whether a character has any ink.
 - `prompt` is a key into your prompt config. The defaults are in
   `rust/data/pdf_prompts.json`. That file is data: override it freely. The
   response **shape** is the contract, not the wording.
@@ -100,9 +113,9 @@ be given as word IDs.
 ```json
 {"id": "p1:table0", "page": 1, "kind": "table_structure", "prompt": "table_structure",
  "bbox": [71.75, 99.75, 472.25, 180.25],
- "words": [{"id": "p1w8", "text": "Omschrijving", "bbox": [76.43, 106.72, 139.27, 116.09], "marker": false, "chunk": "p1c2"},
-           {"id": "p1w9", "text": "Bedrag", "bbox": [226.73, 106.84, 259.81, 116.09], "marker": false, "chunk": "p1c3"}, "…"],
- "chunks": [{"id": "p1c3", "text": "Bedrag", "bbox": [226.73, 106.84, 259.81, 116.09], "words": ["p1w9"]}, "…"],
+ "words": [{"id": "p1w8", "text": "Omschrijving", "bbox": [76.0, 106.8, 139.91, 116.1], "marker": false, "chunk": "p1c2"},
+           {"id": "p1w9", "text": "Bedrag", "bbox": [226.0, 106.8, 260.45, 116.1], "marker": false, "chunk": "p1c3"}, "…"],
+ "chunks": [{"id": "p1c3", "text": "Bedrag", "bbox": [226.0, 106.8, 260.45, 116.1], "words": ["p1w9"]}, "…"],
  "variant": null, "hint": null}
 ```
 
