@@ -1,0 +1,11 @@
+# context = repository root; send only what the smoke test needs
+**/target
+**/node_modules
+**/.venv
+python
+js
+site
+docs
+!docs/schema
+examples
+*.pdf.tmp
