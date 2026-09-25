@@ -4229,7 +4229,7 @@
         "claims": [
           {
             "supported": false,
-            "reason": "not supported by the cited evidence (model: best entailment 0.420, contradiction 0.030 on b)"
+            "reason": "not supported by the cited evidence (model: best entailment 0.990, contradiction 0.000 on a; a refused by number guard: 30 is not in the passage)"
           }
         ]
       }
