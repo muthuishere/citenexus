@@ -376,6 +376,35 @@ pub fn blocks(
                     }
                 }
             }
+            // A line that spans two side-by-side blocks ending on the same
+            // baseline right above it (a full-width note under a two-column
+            // list) continues neither column: it starts its own block.
+            let above: Vec<&Block> = blocks
+                .iter()
+                .filter(|b| {
+                    let d = s.baseline - segs[*b.segs.last().unwrap()].baseline;
+                    d > 0.0
+                        && d <= 1.35 * pitch.max(s.size)
+                        && x_overlap(b.bbox, s.bbox) > 0.0
+                        // A column of bare markers ("a)", "1.") is not a text
+                        // column: the text wrapping under it is its item.
+                        && !b.segs.iter().all(|&k| {
+                            segs[k].text.split_whitespace().all(is_marker_token)
+                        })
+                })
+                .collect();
+            let spans_columns = above.iter().enumerate().any(|(i, a)| {
+                above[i + 1..].iter().any(|b| {
+                    let (la, lb) = (
+                        segs[*a.segs.last().unwrap()].baseline,
+                        segs[*b.segs.last().unwrap()].baseline,
+                    );
+                    (la - lb).abs() < 0.5 && x_overlap(a.bbox, b.bbox) <= 0.0
+                })
+            });
+            if spans_columns {
+                best = None;
+            }
             match best {
                 Some((bi, _)) => {
                     let b = &mut blocks[bi];

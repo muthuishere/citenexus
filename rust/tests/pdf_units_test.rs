@@ -1130,3 +1130,29 @@ fn a_masthead_heavier_than_the_body_on_every_page() {
         vec!["Voorbeeld Groep B.V. Juridische Zaken"]
     );
 }
+
+#[test]
+fn a_full_width_note_under_a_two_column_list_is_its_own_paragraph() {
+    if !have_pdfium() {
+        return;
+    }
+    // The line runs under BOTH columns of the rows above it, so it continues
+    // neither: not the left list item, not the right column's text.
+    let page = Page::a4()
+        .text(72.0, 104.0, 10.0, "\u{2022} Reiskosten")
+        .text(250.0, 104.0, 10.0, "Vergoed per kilometer")
+        .text(72.0, 118.0, 10.0, "\u{2022} Hotel")
+        .text(250.0, 118.0, 10.0, "Vergoed per nacht")
+        .text(
+            72.0,
+            132.0,
+            10.0,
+            "Dit geldt voor alle medewerkers van de organisatie.",
+        );
+    let out = run(&Doc::new(vec![page]), Some("nl"));
+    let texts: Vec<&str> = out.units.iter().map(|u| u.markdown.as_str()).collect();
+    assert!(
+        texts.contains(&"Dit geldt voor alle medewerkers van de organisatie."),
+        "{texts:?}"
+    );
+}
