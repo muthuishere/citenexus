@@ -918,7 +918,10 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 			// [eu:a]:" / "- … [eu:b]"). Checked alone, each unit lacks the
 			// other part's facts, and the guards refuse a true item for the
 			// lead-in's article number. See unionRefusal for what it takes.
-			unionReason := ""
+			// A guard is named only when EVERY pair failed one (F0's rule):
+			// unionGuard is the first guard-refused pair's reason, unionReason
+			// the first model refusal (not supported / contradicted).
+			unionReason, unionGuard, unionAllGuarded := "", "", true
 			unionPairs, unionScored := 0, map[string]scores{}
 			if !v.supported && pc.lead != "" && len(pc.itemCited) > 0 {
 				lead, item := stripMarkup(pc.lead), stripMarkup(pc.item)
@@ -966,12 +969,16 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 							}
 						}
 						reason := unionRefusal(text, lead, item, declared, a, b, cfg)
-						if reason == "" {
-							reason = modelReason
-						}
 						if reason != "" {
+							if unionGuard == "" {
+								unionGuard = reason // the FIRST guard-refused pair
+							}
+							continue
+						}
+						unionAllGuarded = false
+						if modelReason != "" {
 							if unionReason == "" {
-								unionReason = reason // the FIRST pair refused, not the last
+								unionReason = modelReason // the FIRST model-refused pair
 							}
 							continue
 						}
@@ -991,8 +998,8 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 			if !v.supported && unionPairs > 0 && v.reason != ReasonContradicted {
 				guardOf, scoredOf, scoredOrder = map[string]string{}, map[string]scores{}, nil
 				reasonUnits = []EvidenceUnit{{ID: "union"}}
-				if unionReason != ReasonNotSupported && unionReason != ReasonContradicted && unionReason != "" {
-					guardOf["union"] = unionReason // every pair refused by a guard
+				if unionAllGuarded {
+					guardOf["union"] = unionGuard // every pair refused by a guard
 				} else {
 					for label, sc := range unionScored {
 						scoredOf[label] = sc
