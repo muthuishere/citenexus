@@ -759,6 +759,9 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 					reason = conditionGuard(text, declared, eu, cfg)
 				}
 				if reason == "" {
+					reason = conjunctTokenGuard(text, declared, eu, cfg)
+				}
+				if reason == "" {
 					// The gate's alignment may skip a hedge inside a gap: "The
 					// observatory opens on clear nights" over "… in principle opens …".
 					reason = hedgeGuard(text, declared, eu, cfg)

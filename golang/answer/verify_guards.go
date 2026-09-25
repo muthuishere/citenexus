@@ -486,6 +486,9 @@ func guards(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfig) strin
 	if reason := conditionGuard(claim, claimLanguage, eu, cfg); reason != "" {
 		return reason
 	}
+	if reason := conjunctTokenGuard(claim, claimLanguage, eu, cfg); reason != "" {
+		return reason
+	}
 	if reason := qualifierPairGuard(claim, claimLanguage, eu, pairs); reason != "" {
 		return reason
 	}

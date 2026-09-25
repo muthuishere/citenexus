@@ -9914,6 +9914,123 @@
           }
         ]
       }
+    },
+    {
+      "name": "condition/language-free-conjunct-num-refuse-3 (invented domain, no glossary)",
+      "must_refuse": true,
+      "answer": "A warehouse worker gets an extra day of leave if he is older than 55 [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Cao Pakhuis Noordkade",
+          "language": "nl",
+          "text": "Verlof. Een magazijnmedewerker krijgt een extra verlofdag, mits hij op 1 januari in dienst is en ouder is dan 55 jaar. De dag wordt in maart toegekend."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "condition guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "condition/language-free-conjunct-num-admit-1 (invented domain, no glossary)",
+      "answer": "A sawyer with at least 3 years of service who works nights gets a shift allowance [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Personeelsgids Houtzagerij Eik",
+          "language": "nl",
+          "text": "Toeslag. Een zager krijgt een ploegentoeslag, mits hij in de nachtploeg werkt en ten minste 3 jaar in dienst is. De toeslag is 20%."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "condition/language-free-conjunct-num-admit-3 (invented domain, no glossary)",
+      "answer": "A warehouse worker over 55 who is employed on 1 January gets an extra day of leave [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Cao Pakhuis Noordkade",
+          "language": "nl",
+          "text": "Verlof. Een magazijnmedewerker krijgt een extra verlofdag, mits hij op 1 januari in dienst is en ouder is dan 55 jaar. De dag wordt in maart toegekend."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "condition/language-free-conjunct-plain-admit-1 (invented domain, no glossary)",
+      "answer": "The shelter protects the volunteer who carefully and honestly reports neglect [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Reglement Vogelopvang Kiekendief",
+          "language": "nl",
+          "text": "Melden. De opvang beschermt de vrijwilliger die zorgvuldig en eerlijk een verwaarlozing meldt. Meldingen gaan naar het bestuur."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
     }
   ]
 }
