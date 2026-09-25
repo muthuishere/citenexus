@@ -10031,6 +10031,398 @@
           }
         ]
       }
+    },
+    {
+      "name": "conjunct-presence/gj11-shape: good faith kept, 'naar behoren' dropped (option on, invented)",
+      "must_refuse": true,
+      "answer": "Management protects an employee who reports an incident in good faith. [eu:a]",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "conjunct_presence": true,
+      "glossary": [
+        [
+          "directie",
+          "management"
+        ],
+        [
+          "beschermt",
+          "protects"
+        ],
+        [
+          "medewerker",
+          "employee"
+        ],
+        [
+          "incident",
+          "incident"
+        ],
+        [
+          "goeder",
+          "good"
+        ],
+        [
+          "trouw",
+          "faith"
+        ],
+        [
+          "meldt",
+          "reports"
+        ]
+      ],
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "d",
+          "language": "nl",
+          "text": "Veiligheid. De directie beschermt een medewerker die een incident te goeder trouw en naar behoren meldt. Meldingen gaan naar de veiligheidskundige."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "condition guard: the passage attaches 2 conditions"
+          }
+        ]
+      }
+    },
+    {
+      "name": "conjunct-presence/gj11-shape: both conjuncts stated (option on, invented)",
+      "answer": "Management protects an employee who reports an incident in good faith and properly. [eu:a]",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "conjunct_presence": true,
+      "glossary": [
+        [
+          "directie",
+          "management"
+        ],
+        [
+          "beschermt",
+          "protects"
+        ],
+        [
+          "medewerker",
+          "employee"
+        ],
+        [
+          "incident",
+          "incident"
+        ],
+        [
+          "goeder",
+          "good"
+        ],
+        [
+          "trouw",
+          "faith"
+        ],
+        [
+          "meldt",
+          "reports"
+        ]
+      ],
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "d",
+          "language": "nl",
+          "text": "Veiligheid. De directie beschermt een medewerker die een incident te goeder trouw en naar behoren meldt. Meldingen gaan naar de veiligheidskundige."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "conjunct-presence/dropped 'tijdig' (no glossary sense), 'schriftelijk' kept (option on, invented)",
+      "must_refuse": true,
+      "answer": "The tenant may end the lease if he gives notice in writing. [eu:a]",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "conjunct_presence": true,
+      "glossary": [
+        [
+          "huurder",
+          "tenant"
+        ],
+        [
+          "huurovereenkomst",
+          "lease"
+        ],
+        [
+          "beëindigen",
+          "end"
+        ],
+        [
+          "schriftelijk",
+          "in writing"
+        ],
+        [
+          "opzegt",
+          "gives notice"
+        ],
+        [
+          "mag",
+          "may"
+        ]
+      ],
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "d",
+          "language": "nl",
+          "text": "Opzegging. De huurder mag de huurovereenkomst beëindigen, mits hij tijdig en schriftelijk opzegt. De borg wordt binnen een maand terugbetaald."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "condition guard: the passage attaches 2 conditions"
+          }
+        ]
+      }
+    },
+    {
+      "name": "conjunct-presence/'tijdig en schriftelijk' both stated (option on, invented)",
+      "answer": "The tenant may end the lease if he gives notice on time and in writing. [eu:a]",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "conjunct_presence": true,
+      "glossary": [
+        [
+          "huurder",
+          "tenant"
+        ],
+        [
+          "huurovereenkomst",
+          "lease"
+        ],
+        [
+          "beëindigen",
+          "end"
+        ],
+        [
+          "schriftelijk",
+          "in writing"
+        ],
+        [
+          "opzegt",
+          "gives notice"
+        ],
+        [
+          "mag",
+          "may"
+        ]
+      ],
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "d",
+          "language": "nl",
+          "text": "Opzegging. De huurder mag de huurovereenkomst beëindigen, mits hij tijdig en schriftelijk opzegt. De borg wordt binnen een maand terugbetaald."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "conjunct-presence/number conjunct dropped: one refusal, from the presence check (option on, invented)",
+      "must_refuse": true,
+      "answer": "A volunteer gets a key if he performs properly. [eu:a]",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "conjunct_presence": true,
+      "glossary": [
+        [
+          "vrijwilliger",
+          "volunteer"
+        ],
+        [
+          "sleutel",
+          "key"
+        ],
+        [
+          "krijgt",
+          "gets"
+        ],
+        [
+          "jaar",
+          "years"
+        ],
+        [
+          "actief",
+          "active"
+        ]
+      ],
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "d",
+          "language": "nl",
+          "text": "Sleutels. Een vrijwilliger krijgt een sleutel van de loods, mits hij 3 jaar actief is en naar behoren functioneert. Sleutels worden jaarlijks gecontroleerd."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "condition guard: the passage attaches 2 conditions"
+          }
+        ]
+      }
+    },
+    {
+      "name": "conjunct-presence/number conjunct kept, unseen conjunct dropped (option on, invented)",
+      "must_refuse": true,
+      "answer": "A volunteer gets a key if he has been active for 3 years. [eu:a]",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "conjunct_presence": true,
+      "glossary": [
+        [
+          "vrijwilliger",
+          "volunteer"
+        ],
+        [
+          "sleutel",
+          "key"
+        ],
+        [
+          "krijgt",
+          "gets"
+        ],
+        [
+          "jaar",
+          "years"
+        ],
+        [
+          "actief",
+          "active"
+        ]
+      ],
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "d",
+          "language": "nl",
+          "text": "Sleutels. Een vrijwilliger krijgt een sleutel van de loods, mits hij 3 jaar actief is en naar behoren functioneert. Sleutels worden jaarlijks gecontroleerd."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "condition guard: the passage attaches 2 conditions"
+          }
+        ]
+      }
+    },
+    {
+      "name": "conjunct-presence/single condition in other words: no verdict, admitted (option on, invented)",
+      "answer": "An employee may work from home with the consent of the manager. [eu:a]",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "conjunct_presence": true,
+      "glossary": [
+        [
+          "leidinggevende",
+          "manager"
+        ],
+        [
+          "medewerker",
+          "employee"
+        ],
+        [
+          "thuiswerken",
+          "work from home"
+        ],
+        [
+          "mag",
+          "may"
+        ],
+        [
+          "toestemming",
+          "permission"
+        ]
+      ],
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "d",
+          "language": "nl",
+          "text": "Thuiswerken. Een medewerker mag thuiswerken, mits de leidinggevende toestemming geeft. De werkplek moet veilig zijn."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
     }
   ]
 }

@@ -441,6 +441,8 @@ type guardConfig struct {
 	// fragment: the text is a list lead-in checked on its own (union rule):
 	// it states no fact, so the hedge guard does not read it.
 	fragment bool
+	// conjunctPresence: VerifyOptions.ConjunctPresence.
+	conjunctPresence bool
 }
 
 func guards(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfig) string {

@@ -124,6 +124,9 @@ type carrier struct {
 	claim        map[string]bool
 	crossLang    bool
 	translations map[string][][]string
+	// satisfyOnly (VerifyOptions.ConjunctPresence only): the glossary may show
+	// a word carried, never missing (verify_conjunct_presence.go).
+	satisfyOnly bool
 }
 
 func (c carrier) carried(w string) (has, known bool) {
@@ -162,6 +165,9 @@ func (c carrier) carried(w string) (has, known bool) {
 			return true, true
 		}
 	}
+	if c.satisfyOnly {
+		return false, false
+	}
 	return false, true
 }
 
@@ -193,6 +199,8 @@ func conditionGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfi
 	for _, t := range claimTokens {
 		c.claim[t] = true
 	}
+	// ConjunctPresence: the no-verdict branch (verify_conjunct_presence.go).
+	c.satisfyOnly = cfg.conjunctPresence && cross && hasAny(claimTokens, crossConditionMarkers) != ""
 	claimBounds := boundDirections(claimTokens)
 	shared := func(t string) bool {
 		has, _ := c.carried(t)
@@ -315,6 +323,17 @@ func conditionGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfi
 		return fmt.Sprintf("condition guard: the passage restricts it (%s %q) and the claim drops it", kind, word)
 	}
 
+	// ConjunctPresence: the no-verdict branch must not pass a PARTIAL
+	// condition — every conjunct positively present, or refused.
+	if c.satisfyOnly {
+		strict := c
+		strict.satisfyOnly = false
+		for _, bestText := range ties {
+			if w, n := droppedConjunct(claim, bestText, eu.Language, strict); w != "" {
+				return fmt.Sprintf("condition guard: the passage attaches %d conditions and the claim carries only part of them (%q missing)", n, w)
+			}
+		}
+	}
 	claimConcedes := hasAny(claimTokens, concessives) != ""
 	for _, bestText := range ties {
 		best := tokenize.TokenizeV2(bestText)

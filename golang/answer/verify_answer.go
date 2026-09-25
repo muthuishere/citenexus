@@ -177,6 +177,18 @@ type VerifyOptions struct {
 	// ContradictThreshold is the contradiction score at which the checker vetoes,
 	// and above which it may not admit. Zero means DefaultContradictThreshold.
 	ContradictThreshold float64
+	// ConjunctPresence turns on the cross-language condition reading of
+	// verify_conjunct_presence.go. For a claim in another language that states
+	// a condition of its own, the glossary may only satisfy a condition word
+	// (no verdict on a word it cannot confirm), and a conjunctive condition
+	// must be carried conjunct by conjunct: when the claim's condition has
+	// fewer parts than the unit's, a conjunct not positively present —
+	// including one the glossary has no sense for — refuses the claim ("te
+	// goeder trouw en naar behoren" under a claim that keeps only good
+	// faith). Off by default: it refuses a compressed claim whose conjunct
+	// the glossary cannot see, and its no-verdict branch gives up refusals
+	// the glossary would otherwise make.
+	ConjunctPresence bool
 }
 
 // Facet is one part of the question an answer must cover.
@@ -684,7 +696,7 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 	}
 	cfg := guardConfig{aliases: opts.NameAliases, actors: actors, pairs: pairs, verbs: verbs,
 		gloss: preparedFor(opts), noDefinitions: opts.DisableDefinitions,
-		docDefs: documentDefinitions(evidence), subtypes: subtypes}
+		docDefs: documentDefinitions(evidence), subtypes: subtypes, conjunctPresence: opts.ConjunctPresence}
 	frames := opts.LeadInFrames
 	if frames == nil {
 		frames = DefaultLeadInFrames
