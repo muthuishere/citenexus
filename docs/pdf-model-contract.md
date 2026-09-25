@@ -223,6 +223,7 @@ check failed in `provenance.failed_check`:
 | rows or columns out of place (e.g. amounts swapped between rows, a word moved to another row, values swapped across columns) | — | `geometry_rows` / `geometry_columns` / `geometry_span`. Leader words are outside this test |
 | a text-layer word inside the grid's box left out (a dropped cell). Markers and pure leaders excepted | — | `grid_coverage` |
 | a grid taking part of a unit, leaving out a word that is not a marker or leader | — | `partial_unit` |
+| a grid over prose: sentence cells (6+ words ending in `.` `;` `!` `?`, or holding a sentence break) carry at least half its words, e.g. numbered clauses "2.1 \| De werknemer is …" or a bulleted list of conditions. The sentences stay whole in the base units | — | `prose_grid` |
 | vision: empty or looping output | — | `empty` / `repetition` |
 | vision on a page with an OCR layer: an invented digit, a changed or dropped amount, "I.3"→"1.3", low coverage, too much new text | — | `digit_bag` / `value_novel` / `coverage` / `novelty` |
 

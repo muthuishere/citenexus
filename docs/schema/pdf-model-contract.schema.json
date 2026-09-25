@@ -386,7 +386,8 @@
         "digit_bag",
         "value_novel",
         "coverage",
-        "novelty"
+        "novelty",
+        "prose_grid"
       ]
     },
     "Provenance": {

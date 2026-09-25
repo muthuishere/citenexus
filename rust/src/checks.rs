@@ -63,6 +63,9 @@ pub enum Failure {
     ValueNovel,
     Coverage,
     Novelty,
+    /// A grid whose cells are mostly running sentences: prose (a numbered or
+    /// bulleted list of clauses) that a model laid out as a table.
+    ProseGrid,
 }
 
 impl Failure {
@@ -86,11 +89,57 @@ impl Failure {
             Failure::ValueNovel => "value_novel",
             Failure::Coverage => "coverage",
             Failure::Novelty => "novelty",
+            Failure::ProseGrid => "prose_grid",
         }
     }
 }
 
 // ------------------------------------------------------------- guards ----
+
+/// A cell is a SENTENCE when it has at least this many words and ends with
+/// sentence punctuation (`.` `;` `!` `?`) or holds a sentence break inside
+/// (". " before a capital).
+pub const PROSE_CELL_WORDS: usize = 6;
+/// A grid is PROSE when sentence cells hold at least this share of its words.
+/// Measured on Lex5 (the host's gpt-oss grids, 2026-09-25): the three prose
+/// regions accepted as tables score 0.91-0.96, a definition list 0.85, and
+/// every real table (the 7 ground-truth tables, model or deterministic) 0.0.
+pub const PROSE_WORD_SHARE: f64 = 0.5;
+
+fn is_sentence(cell: &str) -> bool {
+    let words = cell.split_whitespace().count();
+    if words < PROSE_CELL_WORDS {
+        return false;
+    }
+    let t = cell.trim_end();
+    let ends = t.ends_with(['.', ';', '!', '?']);
+    let inner = t
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .windows(2)
+        .any(|w| {
+            w[0].ends_with(['.', '!', '?'])
+                && w[0].chars().filter(|c| c.is_alphabetic()).count() > 1
+                && w[1].chars().next().is_some_and(char::is_uppercase)
+        });
+    ends || inner
+}
+
+/// Is this grid prose laid out as a table? `rows` are cell texts in reading
+/// order. A grid of short labels, amounts and phrases never is; a grid whose
+/// words sit mostly in whole sentences ("2.1 | De werknemer is ...") is a
+/// list of clauses, and accepting it would turn quotable prose into cells.
+pub fn prose_grid(rows: &[Vec<String>]) -> bool {
+    let (mut all, mut prose) = (0usize, 0usize);
+    for cell in rows.iter().flatten() {
+        let n = cell.split_whitespace().count();
+        all += n;
+        if is_sentence(cell) {
+            prose += n;
+        }
+    }
+    all > 0 && prose as f64 >= PROSE_WORD_SHARE * all as f64
+}
 
 /// Finish reasons that mean "the model stopped on its own".
 const STOP_REASONS: &[&str] = &["stop", "end_turn", "stop_sequence", "eos", "complete"];
@@ -497,6 +546,62 @@ pub fn geometry_gate(
         }
     }
     Ok(placement)
+}
+
+#[cfg(test)]
+mod prose_tests {
+    use super::*;
+
+    fn g(rows: &[&[&str]]) -> Vec<Vec<String>> {
+        rows.iter()
+            .map(|r| r.iter().map(|c| c.to_string()).collect())
+            .collect()
+    }
+
+    #[test]
+    fn numbered_clauses_are_prose() {
+        assert!(prose_grid(&g(&[
+            &[
+                "2.1",
+                "De werknemer is werkzaam op basis van een arbeidsovereenkomst."
+            ],
+            &[
+                "2.2",
+                "De werknemer dient minimaal een jaar in dienst te zijn."
+            ],
+            &["Artikel 3. Aanvraag", ""],
+        ])));
+        assert!(prose_grid(&g(&[
+            &["-", "Er is sprake van ziekte of ongeval;"],
+            &["-", "Deze stoornissen zijn door een arts vastgesteld;"],
+        ])));
+    }
+
+    #[test]
+    fn tables_of_labels_amounts_and_phrases_are_not() {
+        assert!(!prose_grid(&g(&[
+            &["Prestatiematen:", "", ""],
+            &["praktijkomzet:", "€ 270.000", "2 winstpunten"],
+            &["", "€ 380.000", "3 winstpunten"],
+            &[
+                "- mate van efficiency: indicatie gemiddeld uurtarief en afgeboekte uren",
+                "",
+                ""
+            ],
+        ])));
+        // one sentence among short cells (a note row) is still a table
+        assert!(!prose_grid(&g(&[
+            &["Reiskosten", "Vergoed per kilometer"],
+            &["Hotel", "Vergoed per nacht"],
+            &["Dit geldt voor alle medewerkers van de organisatie.", ""],
+            &["Diner", "Vergoed tot een maximum bedrag"],
+        ])));
+        assert!(!prose_grid(&g(&[
+            &["1.", "Wie doet mee?"],
+            &["2.", "Wie doet niet mee?"],
+        ])));
+        assert!(!prose_grid(&g(&[])));
+    }
 }
 
 #[cfg(test)]

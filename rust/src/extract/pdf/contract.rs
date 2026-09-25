@@ -571,6 +571,26 @@ fn apply_table(
             }
         }
         let placement = checks::geometry_gate(&gate_cells, &boxes)?;
+        // A grid over prose is a list of clauses, not a table: refuse it, so
+        // the sentences stay whole and quotable in the base units.
+        let texts: Vec<Vec<String>> = cells
+            .iter()
+            .map(|r| {
+                r.iter()
+                    .map(|c| {
+                        let mut ws: Vec<&String> = c.words.iter().collect();
+                        ws.sort_by_key(|w| order.get(w.as_str()).map(|x| x.0));
+                        ws.iter()
+                            .map(|w| order.get(w.as_str()).map(|x| x.1).unwrap_or(""))
+                            .collect::<Vec<_>>()
+                            .join(" ")
+                    })
+                    .collect()
+            })
+            .collect();
+        if checks::prose_grid(&texts) {
+            return Err(Failure::ProseGrid);
+        }
         let ids: BTreeSet<String> = cells
             .iter()
             .flatten()
