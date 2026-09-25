@@ -70,6 +70,9 @@ func TestGlossaryPerCallAllocation(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds a 100k-row glossary")
 	}
+	if raceEnabled {
+		t.Skip("the race detector inflates allocations (~+400 KB per call); the bound holds without it")
+	}
 	perCall := func(o VerifyOptions) uint64 {
 		ev, opts := benchSetup(o)
 		if _, err := VerifyAnswer(context.Background(), benchAnswer, ev, opts); err != nil {
