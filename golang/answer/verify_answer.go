@@ -759,6 +759,11 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 					reason = conditionGuard(text, declared, eu, cfg)
 				}
 				if reason == "" {
+					// The gate's alignment may skip a hedge inside a gap: "The
+					// observatory opens on clear nights" over "… in principle opens …".
+					reason = hedgeGuard(text, declared, eu, cfg)
+				}
+				if reason == "" {
 					// The gate matches tokens, not who does what: "De werkgever
 					// betaalt 4,5%" can align across two clauses of the unit.
 					reason = roleGuard(text, declared, eu, actors)

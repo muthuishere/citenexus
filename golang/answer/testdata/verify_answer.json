@@ -9038,6 +9038,882 @@
           }
         ]
       }
+    },
+    {
+      "name": "overrefusal/cond-restated-admit-1 (invented domain)",
+      "answer": "Leden die de hygiënecursus hebben afgerond, mogen de slingerruimte gebruiken [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Imkervereniging De Korf",
+          "language": "nl",
+          "text": "Slingerruimte. Leden mogen de slingerruimte gebruiken, mits zij de hygiënecursus hebben voltooid. De sleutel ligt bij de secretaris."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "overrefusal/cond-restated-admit-3 (invented domain)",
+      "answer": "Een tuinder mag een kas bouwen als het bestuur daar eerst schriftelijk mee heeft ingestemd [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Volkstuinpark Het Broek",
+          "language": "nl",
+          "text": "Kassen. Een tuinder mag een kas bouwen, mits het bestuur vooraf schriftelijke toestemming heeft gegeven. Kassen zijn maximaal twee meter hoog."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "overrefusal/cond-restated-admit-5 (invented domain)",
+      "answer": "A member may take a skiff out on the water once they have obtained the steering certificate [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "glossary": [
+        [
+          "lid",
+          "member"
+        ],
+        [
+          "een lid",
+          "a member"
+        ],
+        [
+          "skiff",
+          "skiff"
+        ],
+        [
+          "meenemen",
+          "take"
+        ],
+        [
+          "water",
+          "water"
+        ],
+        [
+          "stuurbrevet",
+          "steering certificate"
+        ],
+        [
+          "behaald",
+          "obtained"
+        ],
+        [
+          "het water",
+          "the water"
+        ]
+      ],
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Roeivereniging Aegir",
+          "language": "nl",
+          "text": "Skiffs. Een lid mag een skiff meenemen op het water, mits het lid het stuurbrevet heeft behaald. Na zonsondergang is roeien verboden."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "overrefusal/cond-restated-refuse-1 (invented domain)",
+      "must_refuse": true,
+      "answer": "Leden mogen de slingerruimte gebruiken [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Imkervereniging De Korf",
+          "language": "nl",
+          "text": "Slingerruimte. Leden mogen de slingerruimte gebruiken, mits zij de hygiënecursus hebben voltooid. De sleutel ligt bij de secretaris."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "condition guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "overrefusal/cond-restated-refuse-3 (invented domain)",
+      "must_refuse": true,
+      "answer": "Volunteers may operate the large telescope [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Observatory access",
+          "language": "en",
+          "text": "Telescope. Volunteers may operate the large telescope only after they have completed the optics induction. The dome closes at midnight."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "truncation guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "overrefusal/cond-subclause-admit-1 (invented domain)",
+      "answer": "De dirigent mag een zanger van het concert uitsluiten wanneer die drie repetities op rij heeft gemist [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Koor Cantabile",
+          "language": "nl",
+          "text": "Aanwezigheid. Indien een zanger drie repetities op rij mist, mag de dirigent hem van het concert uitsluiten. Afmelden gaat via de app."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "overrefusal/cond-subclause-admit-3 (invented domain)",
+      "answer": "Kinderen die ouder dan tien jaar zijn, mogen zonder ouder in de gondel [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Skischool Alpenhof",
+          "language": "nl",
+          "text": "Gondel. Kinderen mogen zonder ouder in de gondel, mits zij ouder dan tien jaar zijn. Helmen zijn verplicht."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "overrefusal/cond-subclause-admit-5 (invented domain)",
+      "answer": "The assistant may give an injection only if the vet is present in the building [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "glossary": [
+        [
+          "assistent",
+          "assistant"
+        ],
+        [
+          "injectie",
+          "injection"
+        ],
+        [
+          "geven",
+          "give"
+        ],
+        [
+          "dierenarts",
+          "vet"
+        ],
+        [
+          "gebouw",
+          "building"
+        ],
+        [
+          "aanwezig",
+          "present"
+        ],
+        [
+          "alleen",
+          "only"
+        ],
+        [
+          "mag",
+          "may"
+        ]
+      ],
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Dierenpraktijk Dierenhoek",
+          "language": "nl",
+          "text": "Injecties. De assistent mag alleen een injectie geven als de dierenarts in het gebouw aanwezig is. Medicatie wordt gelogd."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "overrefusal/cond-subclause-refuse-1 (invented domain)",
+      "must_refuse": true,
+      "answer": "De dirigent mag een zanger van het concert uitsluiten [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Koor Cantabile",
+          "language": "nl",
+          "text": "Aanwezigheid. Indien een zanger drie repetities op rij mist, mag de dirigent hem van het concert uitsluiten. Afmelden gaat via de app."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "condition guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "overrefusal/cond-subclause-refuse-3 (invented domain)",
+      "must_refuse": true,
+      "answer": "Kinderen mogen zonder ouder in de gondel [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Skischool Alpenhof",
+          "language": "nl",
+          "text": "Gondel. Kinderen mogen zonder ouder in de gondel, mits zij ouder dan tien jaar zijn. Helmen zijn verplicht."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "condition guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "overrefusal/cond-subclause-refuse-5 (invented domain)",
+      "must_refuse": true,
+      "answer": "Members who have flown for a year may fly above 50 metres [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Drone club rules",
+          "language": "en",
+          "text": "Altitude. Members may fly above 50 metres only if they hold an A2 certificate. Night flights need a spotter."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "condition guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "overrefusal/hedge-other-admit-1 (invented domain)",
+      "answer": "Normaal gesproken betaalt een lid geen materiaalkosten voor de lasersnijder [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Makerspace De Vonk",
+          "language": "nl",
+          "text": "Lasersnijder. In principe betaalt een lid geen materiaalkosten voor de lasersnijder. Hout wordt per plaat afgerekend."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "overrefusal/hedge-other-admit-3 (invented domain)",
+      "answer": "Normally the franchisor replaces a broken oven within five working days [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Bakery franchise manual",
+          "language": "en",
+          "text": "Equipment. In principle, the franchisor replaces a broken oven within five working days. Mixers are the franchisee's own."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "overrefusal/hedge-other-admit-5 (invented domain)",
+      "answer": "Visitors are allowed to borrow a tripod at the front desk [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Photo club guide",
+          "language": "en",
+          "text": "Equipment. Visitors can borrow a tripod at the front desk. Lenses stay in the cabinet."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "overrefusal/hedge-other-admit-7 (invented domain)",
+      "answer": "Members may not borrow more than three books at a time [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Village library rules",
+          "language": "en",
+          "text": "Lending. Each member may borrow at most three books at a time. Films are lent for one week."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "overrefusal/hedge-other-refuse-1 (invented domain)",
+      "must_refuse": true,
+      "answer": "Een lid betaalt geen materiaalkosten voor de lasersnijder [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Makerspace De Vonk",
+          "language": "nl",
+          "text": "Lasersnijder. In principe betaalt een lid geen materiaalkosten voor de lasersnijder. Hout wordt per plaat afgerekend."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "hedge guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "overrefusal/hedge-other-refuse-3 (invented domain)",
+      "must_refuse": true,
+      "answer": "Een kas is twee meter hoog [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Volkstuinpark Het Broek",
+          "language": "nl",
+          "text": "Kassen. Een kas mag maximaal twee meter hoog zijn. Het bestuur controleert dit jaarlijks."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "hedge guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "overrefusal/hedge-scope-admit-1 (invented domain)",
+      "answer": "Het is mogelijk dat de roeivereniging de reiskosten voor wedstrijden vergoedt [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Roeivereniging Aegir",
+          "language": "nl",
+          "text": "Wedstrijden. De roeivereniging kan de reiskosten voor wedstrijden vergoeden. Inschrijfgeld betaalt het lid zelf."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "overrefusal/hedge-scope-admit-3 (invented domain)",
+      "answer": "Generally speaking, the observatory opens on clear nights [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Observatory access",
+          "language": "en",
+          "text": "Opening. The observatory in principle opens on clear nights. Groups book online."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "overrefusal/hedge-scope-admit-5 (invented domain)",
+      "answer": "It is possible that the museum refuses a loan [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "glossary": [
+        [
+          "museum",
+          "museum"
+        ],
+        [
+          "bruikleen",
+          "loan"
+        ],
+        [
+          "weigeren",
+          "refuse"
+        ],
+        [
+          "kan",
+          "can"
+        ]
+      ],
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Museum Het Pakhuis",
+          "language": "nl",
+          "text": "Bruiklenen. Het museum kan een bruikleen weigeren. Aanvragen gaan naar de conservator."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "overrefusal/hedge-scope-refuse-1 (invented domain)",
+      "must_refuse": true,
+      "answer": "De roeivereniging vergoedt de reiskosten voor wedstrijden [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Roeivereniging Aegir",
+          "language": "nl",
+          "text": "Wedstrijden. De roeivereniging kan de reiskosten voor wedstrijden vergoeden. Inschrijfgeld betaalt het lid zelf."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "hedge guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "overrefusal/hedge-scope-refuse-3 (invented domain)",
+      "must_refuse": true,
+      "answer": "The observatory opens on clear nights [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Observatory access",
+          "language": "en",
+          "text": "Opening. The observatory in principle opens on clear nights. Groups book online."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "hedge guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "overrefusal/hedge-more-admit-1 (invented domain)",
+      "answer": "De secretaris stuurt de agenda in de regel een week voor de vergadering [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Schaakclub Loper",
+          "language": "nl",
+          "text": "Vergaderingen. De secretaris stuurt de agenda een week voor de vergadering. Notulen volgen later."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "overrefusal/hedge-more-admit-3 (invented domain)",
+      "answer": "The bakery may deliver bread to members up to twice a week [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Bakery cooperative",
+          "language": "en",
+          "text": "Deliveries. The bakery delivers bread to members at most twice a week. Orders close on Friday."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "overrefusal/hedge-more-admit-5 (invented domain)",
+      "answer": "The ski instructor as a rule checks the bindings before the lesson [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "glossary": [
+        [
+          "skileraar",
+          "ski instructor"
+        ],
+        [
+          "controleert",
+          "checks"
+        ],
+        [
+          "bindingen",
+          "bindings"
+        ],
+        [
+          "altijd",
+          "always"
+        ],
+        [
+          "les",
+          "lesson"
+        ],
+        [
+          "voor",
+          "before"
+        ]
+      ],
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Skischool Alpenhof",
+          "language": "nl",
+          "text": "Veiligheid. De skileraar controleert de bindingen altijd voor de les. Kinderen dragen een hesje."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "overrefusal/hedge-more-refuse-1 (invented domain)",
+      "must_refuse": true,
+      "answer": "De secretaris stuurt de agenda altijd een week voor de vergadering [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "Schaakclub Loper",
+          "language": "nl",
+          "text": "Vergaderingen. De secretaris stuurt de agenda een week voor de vergadering. Notulen volgen later."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "hedge guard"
+          }
+        ]
+      }
     }
   ]
 }

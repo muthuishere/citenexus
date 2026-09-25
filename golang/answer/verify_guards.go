@@ -693,6 +693,52 @@ var boundPhrases = []struct {
 	{[]string{"tenminste"}, boundLower}, {[]string{"minimum"}, boundLower},
 }
 
+// splitComparatives: a polarity marker a few words before one of these, then
+// "than"/"dan", is a bound split around its verb — "mag niet hoger zijn dan
+// twee meter", "may not borrow more than three books" — the same limit as
+// "maximaal", "at most". "exceed" needs no "than": "may not exceed 40 hours".
+var splitComparatives = map[string]string{
+	"meer": boundUpper, "more": boundUpper, "hoger": boundUpper, "higher": boundUpper,
+	"langer": boundUpper, "longer": boundUpper, "later": boundUpper, "groter": boundUpper,
+	"larger": boundUpper, "bigger": boundUpper, "zwaarder": boundUpper, "heavier": boundUpper,
+	"minder": boundLower, "less": boundLower, "fewer": boundLower, "lager": boundLower,
+	"lower": boundLower, "korter": boundLower, "shorter": boundLower, "eerder": boundLower,
+	"earlier": boundLower, "kleiner": boundLower, "smaller": boundLower,
+}
+
+var exceedVerbs = map[string]struct{}{
+	"exceed": {}, "exceeds": {}, "overschrijden": {}, "overschrijdt": {},
+}
+
+type splitBound struct {
+	marker    int // the polarity marker's position
+	direction string
+}
+
+// splitBounds: the split bounds in tokens (see splitComparatives). Contiguous
+// "niet meer dan" is in boundPhrases already and is found here too.
+func splitBounds(tokens []string) []splitBound {
+	markers := gate.PolarityMarkers()
+	var out []splitBound
+	for i, t := range tokens {
+		if _, neg := markers[t]; !neg {
+			continue
+		}
+		for j := i + 1; j < len(tokens) && j <= i+4; j++ {
+			if _, ok := exceedVerbs[tokens[j]]; ok {
+				out = append(out, splitBound{marker: i, direction: boundUpper})
+				break
+			}
+			if d, ok := splitComparatives[tokens[j]]; ok && j+1 < len(tokens) &&
+				(tokens[j+1] == "than" || tokens[j+1] == "dan") {
+				out = append(out, splitBound{marker: i, direction: d})
+				break
+			}
+		}
+	}
+	return out
+}
+
 // boundDirections are the bound directions present in tokens.
 func boundDirections(tokens []string) map[string]bool {
 	out := map[string]bool{}
@@ -700,6 +746,9 @@ func boundDirections(tokens []string) map[string]bool {
 		if len(findSpans(tokens, b.words)) > 0 {
 			out[b.direction] = true
 		}
+	}
+	for _, b := range splitBounds(tokens) {
+		out[b.direction] = true
 	}
 	return out
 }
@@ -716,6 +765,11 @@ func boundMarkerPositions(tokens []string, passage map[string]bool) map[int]bool
 			for i := sp.start; i < sp.end; i++ {
 				out[i] = true
 			}
+		}
+	}
+	for _, b := range splitBounds(tokens) {
+		if passage[b.direction] {
+			out[b.marker] = true
 		}
 	}
 	return out

@@ -22,7 +22,11 @@
 //     either, no verdict.
 //
 // A claim that keeps the hedge, or hedges equally in another language ("may"
-// for "kan", "at most" for "maximaal"), is not refused. Can only refuse.
+// for "kan", "at most" for "maximaal") or another construction ("normaal
+// gesproken" for "in principe", "it is possible that" for "kan", "may not …
+// more than" for "at most"), is not refused. The guard also runs after every
+// gate admission: the gate's alignment may skip a hedge inside a gap. Can only
+// refuse.
 
 package answer
 
@@ -81,6 +85,17 @@ func hedgesIn(tokens []string, text string) map[string]string {
 			break
 		}
 	}
+	// A negation that opens a split bound ("mag niet hoger zijn dan", "may not
+	// borrow more than") limits an amount; it does not negate the modal.
+	boundMarker := map[int]bool{}
+	for _, b := range splitBounds(tokens) {
+		boundMarker[b.marker] = true
+		if b.direction == boundUpper {
+			if _, seen := out[hedgeUpper]; !seen {
+				out[hedgeUpper] = tokens[b.marker] + " … " + "than"
+			}
+		}
+	}
 	for _, h := range hedgePhrases {
 		for _, sp := range findSpans(tokens, h.words) {
 			// A negated modal is a PROHIBITION, like "mogen geen", not a hedge:
@@ -89,7 +104,7 @@ func hedgesIn(tokens []string, text string) map[string]string {
 			if h.class == hedgePermission {
 				negated := false
 				for k := sp.end; k < len(tokens) && k <= sp.end+4; k++ {
-					if _, neg := markers[tokens[k]]; neg {
+					if _, neg := markers[tokens[k]]; neg && !boundMarker[k] {
 						negated = true
 					}
 				}
@@ -115,6 +130,95 @@ var claimRange = regexp.MustCompile(`\b[0-9][0-9.,]*\s*(?:tot|to|t/m|-|–)\s*[0
 var toSameAmount = regexp.MustCompile(`\b(?:to|tot)\s*(?:€|eur\b)?\s*[0-9]`)
 
 var totAmount = regexp.MustCompile(`\btot\s*(?:€|eur\b|[0-9][0-9.,]*\s*(?:%|euro\b|procent\b))`)
+
+// hedgeEquivalents hedge a CLAIM the way the tabled phrases do, in other
+// constructions: "normaal gesproken" / "usually" for "in principe"; "het is
+// toegestaan" / "is allowed to" / "it is possible that" for "mag" / "kan",
+// where the hedge sits on the whole sentence rather than on the verb. They are
+// read on the claim side only: a claim that keeps the hedge in other words
+// has not dropped it. The unit side stays on the tabled phrases, so these can
+// never make the guard refuse more.
+var hedgeEquivalents = []struct {
+	words []string
+	class string
+}{
+	{[]string{"normaal", "gesproken"}, hedgeSoftener}, {[]string{"normaliter"}, hedgeSoftener},
+	{[]string{"gewoonlijk"}, hedgeSoftener}, {[]string{"doorgaans"}, hedgeSoftener},
+	{[]string{"meestal"}, hedgeSoftener}, {[]string{"in", "het", "algemeen"}, hedgeSoftener},
+	{[]string{"over", "het", "algemeen"}, hedgeSoftener}, {[]string{"als", "regel"}, hedgeSoftener},
+	{[]string{"in", "de", "meeste", "gevallen"}, hedgeSoftener}, {[]string{"in", "beginsel"}, hedgeSoftener},
+	{[]string{"normally"}, hedgeSoftener}, {[]string{"usually"}, hedgeSoftener},
+	{[]string{"generally"}, hedgeSoftener}, {[]string{"in", "general"}, hedgeSoftener},
+	{[]string{"typically"}, hedgeSoftener}, {[]string{"ordinarily"}, hedgeSoftener},
+	{[]string{"in", "most", "cases"}, hedgeSoftener}, {[]string{"as", "a", "general", "rule"}, hedgeSoftener},
+	{[]string{"toegestaan"}, hedgePermission}, {[]string{"mogelijk"}, hedgePermission},
+	{[]string{"mogelijkheid"}, hedgePermission}, {[]string{"allowed"}, hedgePermission},
+	{[]string{"permitted"}, hedgePermission}, {[]string{"possible"}, hedgePermission},
+	{[]string{"option"}, hedgePermission}, {[]string{"optional"}, hedgePermission},
+}
+
+// claimHedgeEquivalents: the classes hedgeEquivalents give the claim. A
+// negated one ("niet toegestaan", "is not allowed", "no option") is a
+// prohibition and gives none.
+func claimHedgeEquivalents(tokens []string) map[string]bool {
+	markers := gate.PolarityMarkers()
+	out := map[string]bool{}
+	for _, h := range hedgeEquivalents {
+		for _, sp := range findSpans(tokens, h.words) {
+			// "zo snel mogelijk", "as soon as possible", "zoveel mogelijk":
+			// a degree, not a permission.
+			if sp.start >= 1 && (tokens[sp.start-1] == "zoveel" || tokens[sp.start-1] == "zo") {
+				continue
+			}
+			if sp.start >= 2 && (tokens[sp.start-2] == "zo" || tokens[sp.start-2] == "as") {
+				continue
+			}
+			// A permission word hedges the claim only as a predicate ("het is
+			// toegestaan", "are allowed to", "it is possible that", "has the
+			// option to"), never as an adjective on a noun ("possible next
+			// steps are discussed" states the discussion as a fact).
+			if h.class == hedgePermission && !predicative(tokens, sp) {
+				continue
+			}
+			negated := false
+			for k := sp.start - 3; k < len(tokens) && k <= sp.end+2; k++ {
+				if k < 0 || (k >= sp.start && k < sp.end) {
+					continue
+				}
+				if _, neg := markers[tokens[k]]; neg {
+					negated = true
+				}
+			}
+			if !negated {
+				out[h.class] = true
+			}
+		}
+	}
+	return out
+}
+
+var permissionCopulas = map[string]struct{}{
+	"is": {}, "are": {}, "be": {}, "was": {}, "were": {}, "been": {}, "zijn": {}, "wordt": {}, "worden": {},
+	"has": {}, "have": {}, "had": {}, "heeft": {}, "hebben": {}, "biedt": {}, "bieden": {},
+}
+
+var permissionComplements = map[string]struct{}{"to": {}, "that": {}, "for": {}, "om": {}, "dat": {}, "te": {}}
+
+func predicative(tokens []string, sp span) bool {
+	for k := sp.start - 3; k < sp.start; k++ {
+		if k >= 0 {
+			if _, ok := permissionCopulas[tokens[k]]; ok {
+				return true
+			}
+		}
+	}
+	if sp.end < len(tokens) {
+		if _, ok := permissionComplements[tokens[sp.end]]; ok {
+			return true
+		}
+	}
+	return false
+}
 
 func hasAny(tokens []string, phrases [][]string) string {
 	for _, p := range phrases {
@@ -175,6 +279,9 @@ func hedgeGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfig) s
 	}
 	unitHedges := hedgesIn(tokenize.TokenizeV2(best), best)
 	claimHedges := hedgesIn(claimTokens, claim)
+	for class := range claimHedgeEquivalents(claimTokens) {
+		claimHedges[class] = class
+	}
 	for _, class := range []string{hedgePermission, hedgeUpper, hedgeSoftener} {
 		word, ok := unitHedges[class]
 		if !ok {

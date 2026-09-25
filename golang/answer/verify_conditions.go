@@ -29,7 +29,13 @@
 //
 // A restrictor whose content words the claim lacks — all of them for a
 // qualifier or a coordinated word, at least half for an opener's segment —
-// refuses the claim. Can only refuse.
+// refuses the claim. A subordinating opener (mits, indien, tenzij, provided,
+// unless, once) opens a segment that runs to its clause end. A claim that
+// states a condition of its own (als, if, who, as long as, …) may be
+// restating the source's in other words, so there an opener's segment
+// refuses only when MOST of it is missing. A claim that holds the rule "even
+// if" / "zelfs als" over a unit that makes it conditional or excepted turns
+// the exception over and is refused. Can only refuse.
 //
 // SAME LANGUAGE, OR THROUGH THE CALLER'S GLOSSARY. "The claim lacks the word"
 // is only testable in the unit's language. For a claim in another language the
@@ -58,6 +64,31 @@ var conditionOpeners = map[string]struct{}{
 // conditionPhrases are two-word openers.
 var conditionPhrases = [][2]string{
 	{"ten", "minste"}, {"met", "toestemming"}, {"at", "least"}, {"with", "permission"},
+}
+
+// subordinatingOpeners open a whole conditional clause (see conditionGuard).
+var subordinatingOpeners = map[string]struct{}{
+	"mits": {}, "indien": {}, "tenzij": {}, "zolang": {}, "voorwaarde": {},
+	"provided": {}, "unless": {}, "once": {},
+}
+
+// concessives hold a rule "even if": the opposite of a condition.
+var concessives = [][]string{
+	{"even", "if"}, {"even", "when"}, {"even", "though"}, {"regardless", "of", "whether"},
+	{"zelfs", "als"}, {"zelfs", "wanneer"}, {"zelfs", "indien"}, {"ook", "als"}, {"ook", "wanneer"},
+	{"ongeacht", "of"},
+}
+
+// exceptionOpeners make a rule conditional or excepted.
+var exceptionOpeners = [][]string{
+	{"tenzij"}, {"mits"}, {"indien"}, {"behalve"}, {"uitgezonderd"}, {"alleen", "als"}, {"alleen", "wanneer"},
+	{"unless"}, {"provided"}, {"except"}, {"only", "if"}, {"only", "when"},
+}
+
+// claimConditionMarkers: words by which a claim states a condition of its own.
+var claimConditionMarkers = map[string]struct{}{
+	"als": {}, "wanneer": {}, "zodra": {}, "indien": {}, "die": {}, "wie": {},
+	"if": {}, "when": {}, "who": {}, "whoever": {},
 }
 
 // partyRestrictors open a restriction only right after a party: "Werknemers
@@ -248,12 +279,53 @@ func conditionGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfi
 		}
 		return missing == content, first
 	}
+	// A claim that states a condition of its own ("als …", "who …", "once …")
+	// may be restating the source's in other words: an opener's segment is
+	// then refused only when MOST of it is missing, not half.
+	claimConditioned := false
+	for i, t := range claimTokens {
+		if _, ok := claimConditionMarkers[t]; ok {
+			claimConditioned = true
+		}
+		if t == "as" && i+2 < len(claimTokens) && claimTokens[i+1] == "long" && claimTokens[i+2] == "as" {
+			claimConditioned = true
+		}
+		if _, ok := conditionOpeners[t]; ok && !(i > 0 && (claimTokens[i-1] == "niet" || claimTokens[i-1] == "not")) {
+			claimConditioned = true
+		}
+	}
+	lacksSegment := func(words []string) (bool, string) {
+		ok, w := lacks(words, true)
+		if !ok || c.crossLang || !claimConditioned {
+			return ok, w
+		}
+		content, missing := 0, 0
+		for _, x := range words {
+			if !conditionContent(x) {
+				continue
+			}
+			content++
+			if has, _ := c.carried(x); !has {
+				missing++
+			}
+		}
+		return 2*missing > content, w
+	}
 	refuse := func(kind, word string) string {
 		return fmt.Sprintf("condition guard: the passage restricts it (%s %q) and the claim drops it", kind, word)
 	}
 
+	claimConcedes := hasAny(claimTokens, concessives) != ""
 	for _, bestText := range ties {
 		best := tokenize.TokenizeV2(bestText)
+		// A claim that holds the rule "even if" the thing the source makes its
+		// exception or condition ("tenzij de bedrijfsarts … heeft ingestemd" →
+		// "even if the physician has agreed") turns the exception over.
+		if claimConcedes && hasAny(best, concessives) == "" {
+			if w := hasAny(best, exceptionOpeners); w != "" {
+				return fmt.Sprintf("condition guard: the passage makes it conditional (%q) and the claim holds it regardless (%q)", w, hasAny(claimTokens, concessives))
+			}
+		}
 		// A consequent sentence ("Dan kun je …", "In dat geval …") holds only
 		// under the sentence before it: that sentence is its condition.
 		if len(best) > 1 && (best[0] == "dan" || best[0] == "then" ||
@@ -336,10 +408,35 @@ func conditionGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfi
 				for end < len(toks) && !shared(toks[end]) {
 					end++
 				}
+				// A subordinating opener ("mits", "indien", "provided") opens a whole
+				// clause: the condition runs to the clause end, whatever words it
+				// shares with the claim ("mits zij ouder dan tien jaar zijn" under a
+				// claim that says "ouder" for a parent). A focus word ("alleen",
+				// "ten minste") restricts only what follows up to the claim's text.
+				// Unless the claim states the condition itself ("De werkgever heeft
+				// de werknemer tijdig gewaarschuwd" over "Ontslag is mogelijk mits de
+				// werkgever … tijdig gewaarschuwd en …"): then no word it shares
+				// lies outside the clause, and the clause restricts nothing it says.
+				if _, sub := subordinatingOpeners[toks[i]]; sub {
+					inClause, inSentence := 0, 0
+					for _, t := range toks[start:] {
+						if shared(t) {
+							inClause++
+						}
+					}
+					for _, t := range best {
+						if shared(t) {
+							inSentence++
+						}
+					}
+					if inSentence > inClause {
+						end = len(toks)
+					}
+				}
 				if _, alreadyOpener := conditionOpeners[toks[i]]; !alreadyOpener && end == start {
 					continue
 				}
-				if ok, w := lacks(toks[start:end], true); ok {
+				if ok, w := lacksSegment(toks[start:end]); ok {
 					return refuse("condition", toks[i]+" … "+w)
 				}
 			}
