@@ -154,7 +154,7 @@ func excludedGroups(tokens []string) [][]string {
 func exclusionGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfig) string {
 	cross := claimLanguage != "" && eu.Language != "" && primaryLanguage(claimLanguage) != primaryLanguage(eu.Language)
 	claimTokens := tokenize.TokenizeV2(claim)
-	c := carrier{claim: map[string]bool{}, crossLang: cross, translations: glossaryIndex(cfg.glossary)}
+	c := carrier{claim: map[string]bool{}, crossLang: cross, translations: cfg.gloss.idx()}
 	for _, t := range claimTokens {
 		c.claim[t] = true
 	}

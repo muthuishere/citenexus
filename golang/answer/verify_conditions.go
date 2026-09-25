@@ -150,14 +150,14 @@ func glossaryIndex(glossary [][2]string) map[string][][]string {
 // conditionGuard: see the file comment.
 func conditionGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfig) string {
 	cross := claimLanguage != "" && eu.Language != "" && primaryLanguage(claimLanguage) != primaryLanguage(eu.Language)
-	if cross && len(cfg.glossary) == 0 {
+	if cross && cfg.gloss.empty() {
 		return ""
 	}
 	// Dates and clock times are compared as one token each ("01-06-2026" and
 	// "1 juni 2026" are the same condition word).
 	claim = canonicalDates(claim, claimLanguage)
 	eu.Text = canonicalDates(eu.Text, eu.Language)
-	c := carrier{claim: map[string]bool{}, crossLang: cross, translations: glossaryIndex(cfg.glossary)}
+	c := carrier{claim: map[string]bool{}, crossLang: cross, translations: cfg.gloss.idx()}
 	claimTokens := tokenize.TokenizeV2(claim)
 	for _, t := range claimTokens {
 		c.claim[t] = true

@@ -82,10 +82,10 @@ func definitionGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConf
 		return ""
 	}
 	cross := claimLanguage != "" && eu.Language != "" && primaryLanguage(claimLanguage) != primaryLanguage(eu.Language)
-	if cross && len(cfg.glossary) == 0 {
+	if cross && cfg.gloss.empty() {
 		return ""
 	}
-	c := carrier{claim: map[string]bool{}, crossLang: cross, translations: glossaryIndex(cfg.glossary)}
+	c := carrier{claim: map[string]bool{}, crossLang: cross, translations: cfg.gloss.idx()}
 	for _, t := range tokenize.TokenizeV2(claim) {
 		c.claim[t] = true
 	}

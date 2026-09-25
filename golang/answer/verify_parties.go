@@ -326,10 +326,10 @@ func subjectSwapGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardCon
 	// near-verbatim party swap (partySwapGuard) is the sound check, and a
 	// "noun + next word" pair read in the same language binds too loosely.
 	cross := claimLanguage != "" && eu.Language != "" && primaryLanguage(claimLanguage) != primaryLanguage(eu.Language)
-	if !cross || len(cfg.glossary) == 0 {
+	if !cross || cfg.gloss.empty() {
 		return ""
 	}
-	gloss := glossaryIndex(cfg.glossary)
+	gloss := cfg.gloss.idx()
 	forms := func(w string) [][]string { return gloss[w] }
 	var sentences [][]string
 	for _, s := range sentenceBreak.Split(softJoin(eu.Text), -1) {
@@ -377,7 +377,7 @@ func subjectSwapGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardCon
 	for p := range subjects {
 		// A noun the glossary classes as something else ("de uitkering": other)
 		// is no party; an unclassed noun keeps its place.
-		if c, known := cfg.classOf[p]; known && c != "party" && c != "group" && !actorTerm(p, cfg.actors) {
+		if c, known := cfg.gloss.class()[p]; known && c != "party" && c != "group" && !actorTerm(p, cfg.actors) {
 			continue
 		}
 		parties = append(parties, []string{p})
@@ -393,7 +393,7 @@ func subjectSwapGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardCon
 		}
 		// A split separable form ("sluit", "keert") is that verb only with its
 		// particle later in the sentence.
-		if p := cfg.sepOf[t]; p != "" {
+		if p := cfg.gloss.sep()[t]; p != "" {
 			found := false
 			for k := j + 1; k < len(toks); k++ {
 				if toks[k] == p {
@@ -414,11 +414,11 @@ func subjectSwapGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardCon
 				continue
 			}
 			stem := strings.TrimSuffix(strings.TrimSuffix(t, "t"), "en")
-			for key, trs := range gloss {
-				if !strings.HasPrefix(key, toks[k]) || !strings.HasPrefix(key[len(toks[k]):], stem) || len(stem) < 3 {
+			for _, sk := range cfg.gloss.seps()[toks[k]] {
+				if !strings.HasPrefix(sk.rest, stem) || len(stem) < 3 {
 					continue
 				}
-				for _, vf := range trs {
+				for _, vf := range sk.trs {
 					if len(vf) == 1 && vf[0] == claimVerb {
 						return true
 					}
@@ -522,6 +522,6 @@ var readerSubjects = map[string]struct{}{"you": {}, "je": {}, "jij": {}, "u": {}
 // isParty: the glossary classes the noun as a party or a group. Without
 // classes nothing is known to be a third party.
 func isParty(noun string, cfg guardConfig) bool {
-	c := cfg.classOf[noun]
+	c := cfg.gloss.class()[noun]
 	return c == "party" || c == "group"
 }

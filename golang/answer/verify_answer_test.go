@@ -453,7 +453,7 @@ func TestExclusionGuardHasNoVerdictAcrossLanguagesWithoutAGlossary(t *testing.T)
 	if reason := exclusionGuard(claim, "en", unit, guardConfig{actors: DefaultActorLexicon}); reason != "" {
 		t.Fatalf("no glossary: want no verdict, got %q", reason)
 	}
-	cfg := guardConfig{actors: DefaultActorLexicon, glossary: [][2]string{{"leraren", "teachers"}, {"leraar", "teacher"}}}
+	cfg := guardConfig{actors: DefaultActorLexicon, gloss: PrepareGlossary([][2]string{{"leraren", "teachers"}, {"leraar", "teacher"}}, nil)}
 	if reason := exclusionGuard(claim, "en", unit, cfg); !strings.HasPrefix(reason, "exclusion guard") {
 		t.Fatalf("with a glossary: want the exclusion refused, got %q", reason)
 	}
@@ -467,7 +467,7 @@ func TestVerbPairGuardHasNoVerdictAcrossLanguagesWithoutAGlossary(t *testing.T) 
 	if reason := verbPairGuard(claim, "en", unit, DefaultVerbPairs, guardConfig{actors: DefaultActorLexicon}); reason != "" {
 		t.Fatalf("no glossary: want no verdict, got %q", reason)
 	}
-	cfg := guardConfig{actors: DefaultActorLexicon, glossary: [][2]string{{"verlof", "leave"}, {"aanvullend", "additional"}}}
+	cfg := guardConfig{actors: DefaultActorLexicon, gloss: PrepareGlossary([][2]string{{"verlof", "leave"}, {"aanvullend", "additional"}}, nil)}
 	if reason := verbPairGuard(claim, "en", unit, DefaultVerbPairs, cfg); !strings.HasPrefix(reason, "verb guard") {
 		t.Fatalf("with a glossary: want refused, got %q", reason)
 	}

@@ -153,6 +153,13 @@ type VerifyOptions struct {
 	// verb only with its particle, and the reader is compared with a third
 	// party only when a party's class says it is one.
 	GlossaryEntries []GlossaryEntry
+	// GlossaryPrepared is Glossary + GlossaryEntries indexed ONCE by
+	// PrepareGlossary; safe to share across calls and goroutines. When set it
+	// is used instead of the two slices. Without it the slices are prepared
+	// once per distinct slice (backing array + length) and cached, so editing a
+	// slice IN PLACE after its first use is not seen: pass a new slice, or
+	// prefer PrepareGlossary.
+	GlossaryPrepared *PreparedGlossary
 	// AdmitParaphrase lets the checker admit SAME-language claims the gate
 	// rejected (a paraphrase), still behind the deterministic guards. Off by
 	// default: it trades the gate's guarantee for coverage, and the caller should
@@ -671,14 +678,12 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 	if opts.VerbPairs != nil {
 		verbs = opts.VerbPairs
 	}
-	entryPairs, sepOf, classOf := expandGlossary(opts.GlossaryEntries)
 	subtypes := DefaultSubtypeHeads
 	if opts.SubtypeHeads != nil {
 		subtypes = opts.SubtypeHeads
 	}
 	cfg := guardConfig{aliases: opts.NameAliases, actors: actors, pairs: pairs, verbs: verbs,
-		glossary: append(append([][2]string{}, opts.Glossary...), entryPairs...),
-		sepOf:    sepOf, classOf: classOf, noDefinitions: opts.DisableDefinitions,
+		gloss: preparedFor(opts), noDefinitions: opts.DisableDefinitions,
 		docDefs: documentDefinitions(evidence), subtypes: subtypes}
 	frames := opts.LeadInFrames
 	if frames == nil {

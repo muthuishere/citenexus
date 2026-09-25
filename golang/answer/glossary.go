@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 )
 
 // GlossaryEntry is one NL/EN surface pair with its lemmas, particle and class.
@@ -110,4 +111,106 @@ func expandGlossary(entries []GlossaryEntry) (pairs [][2]string, sep, class map[
 		}
 	}
 	return pairs, sep, class
+}
+
+// PreparedGlossary is a glossary indexed once: built by PrepareGlossary,
+// immutable, safe for concurrent use. Pass it in VerifyOptions.Glossary-
+// Prepared; expanding a 100k-row glossary on every VerifyAnswer call cost
+// the consumer 81 ms and 49 MB per call.
+type PreparedGlossary struct {
+	index   map[string][][]string // a single-token term -> its translations
+	sepOf   map[string]string     // a split separable form -> its particle
+	classOf map[string]string     // an NL form or lemma -> its class
+	sepKeys map[string][]sepKey   // particle -> joined separable forms under it
+}
+
+type sepKey struct {
+	rest string // the key after the particle: "sluiten" in "afsluiten"
+	trs  [][]string
+}
+
+// PrepareGlossary indexes term pairs and glossary entries once.
+func PrepareGlossary(pairs [][2]string, entries []GlossaryEntry) *PreparedGlossary {
+	entryPairs, sep, class := expandGlossary(entries)
+	all := append(append([][2]string{}, pairs...), entryPairs...)
+	g := &PreparedGlossary{index: glossaryIndex(all), sepOf: sep, classOf: class, sepKeys: map[string][]sepKey{}}
+	for key, trs := range g.index {
+		for p := range separableParticles {
+			if strings.HasPrefix(key, p) && len(key) > len(p)+2 {
+				g.sepKeys[p] = append(g.sepKeys[p], sepKey{rest: key[len(p):], trs: trs})
+			}
+		}
+	}
+	return g
+}
+
+func (g *PreparedGlossary) empty() bool { return g == nil || len(g.index) == 0 }
+
+// Nil-safe readers: a nil *PreparedGlossary is the empty glossary.
+func (g *PreparedGlossary) idx() map[string][][]string {
+	if g == nil {
+		return nil
+	}
+	return g.index
+}
+func (g *PreparedGlossary) sep() map[string]string {
+	if g == nil {
+		return nil
+	}
+	return g.sepOf
+}
+func (g *PreparedGlossary) class() map[string]string {
+	if g == nil {
+		return nil
+	}
+	return g.classOf
+}
+func (g *PreparedGlossary) seps() map[string][]sepKey {
+	if g == nil {
+		return nil
+	}
+	return g.sepKeys
+}
+
+var (
+	preparedMu    sync.Mutex
+	preparedCache = map[preparedKey]*PreparedGlossary{}
+)
+
+type preparedKey struct {
+	pairs   *[2]string
+	nPairs  int
+	entries *GlossaryEntry
+	nEntr   int
+}
+
+// preparedFor returns opts' prepared glossary: GlossaryPrepared when given,
+// else the Glossary and GlossaryEntries slices prepared once and cached by
+// their identity (backing array and length), so a host that passes the same
+// slices on every call pays for the index once.
+func preparedFor(opts VerifyOptions) *PreparedGlossary {
+	if opts.GlossaryPrepared != nil {
+		return opts.GlossaryPrepared
+	}
+	if len(opts.Glossary) == 0 && len(opts.GlossaryEntries) == 0 {
+		return &PreparedGlossary{}
+	}
+	key := preparedKey{nPairs: len(opts.Glossary), nEntr: len(opts.GlossaryEntries)}
+	if len(opts.Glossary) > 0 {
+		key.pairs = &opts.Glossary[0]
+	}
+	if len(opts.GlossaryEntries) > 0 {
+		key.entries = &opts.GlossaryEntries[0]
+	}
+	preparedMu.Lock()
+	defer preparedMu.Unlock()
+	if g, ok := preparedCache[key]; ok {
+		return g
+	}
+	if len(preparedCache) >= 16 {
+		preparedCache = map[preparedKey]*PreparedGlossary{}
+	}
+	g := PrepareGlossary(opts.Glossary, opts.GlossaryEntries)
+	preparedCache[key] = g
+	return g
 }

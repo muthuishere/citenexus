@@ -136,7 +136,7 @@ func hedgeGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfig) s
 		return fmt.Sprintf("hedge guard: the claim says %q; the source states no such absolute", a)
 	}
 	cross := claimLanguage != "" && eu.Language != "" && primaryLanguage(claimLanguage) != primaryLanguage(eu.Language)
-	c := carrier{claim: map[string]bool{}, crossLang: cross, translations: glossaryIndex(cfg.glossary)}
+	c := carrier{claim: map[string]bool{}, crossLang: cross, translations: cfg.gloss.idx()}
 	for _, t := range claimTokens {
 		c.claim[t] = true
 	}

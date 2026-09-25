@@ -77,7 +77,7 @@ func sideIn(tokens []string, pair VerbPair) (int, map[int]bool) {
 // verbPairGuard: see the file comment.
 func verbPairGuard(claim, claimLanguage string, eu EvidenceUnit, pairs []VerbPair, cfg guardConfig) string {
 	cross := claimLanguage != "" && eu.Language != "" && primaryLanguage(claimLanguage) != primaryLanguage(eu.Language)
-	if cross && len(cfg.glossary) == 0 {
+	if cross && cfg.gloss.empty() {
 		return ""
 	}
 	for _, pair := range pairs {
@@ -87,7 +87,7 @@ func verbPairGuard(claim, claimLanguage string, eu EvidenceUnit, pairs []VerbPai
 			if side < 0 {
 				continue
 			}
-			c := carrier{claim: map[string]bool{}, crossLang: cross, translations: glossaryIndex(cfg.glossary)}
+			c := carrier{claim: map[string]bool{}, crossLang: cross, translations: cfg.gloss.idx()}
 			for i, t := range ct {
 				if !verbAt[i] {
 					c.claim[t] = true

@@ -427,13 +427,12 @@ var calendarFold = func() map[string]string {
 // guards runs every deterministic guard and returns the first refusal, or "".
 // guardConfig is the caller's configuration the guards read.
 type guardConfig struct {
-	aliases  map[string][]string
-	actors   ActorLexicon
-	pairs    []QualifierPair
-	verbs    []VerbPair
-	glossary [][2]string
-	// sepOf / classOf: from VerifyOptions.GlossaryEntries (glossary.go).
-	sepOf, classOf map[string]string
+	aliases map[string][]string
+	actors  ActorLexicon
+	pairs   []QualifierPair
+	verbs   []VerbPair
+	// gloss: the prepared glossary (glossary.go); nil reads as empty.
+	gloss *PreparedGlossary
 	// noDefinitions: VerifyOptions.DisableDefinitions. docDefs: every
 	// explicit definition in the evidence, by DocumentID.
 	noDefinitions bool
