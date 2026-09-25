@@ -30,14 +30,80 @@ pub fn r2(v: f64) -> f64 {
     }
 }
 
-static PDFIUM: OnceLock<Result<Pdfium, String>> = OnceLock::new();
+/// Why libpdfium could not be bound.
+#[derive(Debug, Clone, PartialEq)]
+pub enum PdfiumLoadError {
+    /// No libpdfium was found in any of the places `pdfium()` looks.
+    NotFound(String),
+    /// Another pdfium-render user in this process created its `Pdfium`
+    /// first. pdfium-render 0.9.4 then refuses a second binding, and the core
+    /// needs its own raw bindings (`FPDFText_*`), so it stops rather than
+    /// guess: bind the PDF core before any other pdfium-render user.
+    InitializedElsewhere,
+}
+
+impl std::fmt::Display for PdfiumLoadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PdfiumLoadError::NotFound(tried) => write!(
+                f,
+                "libpdfium not found (set PDFIUM_DYNAMIC_LIB_PATH): {tried}"
+            ),
+            PdfiumLoadError::InitializedElsewhere => f.write_str(
+                "pdfium was initialized by another pdfium-render user in this process \
+                 before the PDF core: the core cannot obtain its own raw bindings",
+            ),
+        }
+    }
+}
+
+impl std::error::Error for PdfiumLoadError {}
+
+/// The high-level `Pdfium` plus the core's own raw bindings to the same
+/// library. pdfium-render 0.9.4 keeps its accessor crate-private, so the core
+/// binds the library twice BEFORE `Pdfium::new`: one binding goes to
+/// `Pdfium::new` (which runs `FPDF_InitLibrary` once), the other is kept here
+/// for the `FPDFText_*` / `FPDF_*` calls. Both are handles to the same loaded
+/// library.
+pub struct Bound {
+    pub pdfium: Pdfium,
+    pub raw: Box<dyn PdfiumLibraryBindings>,
+}
+
+static PDFIUM: OnceLock<Result<Bound, PdfiumLoadError>> = OnceLock::new();
 static PDFIUM_LOCK: Mutex<()> = Mutex::new(());
 
+enum Attempt {
+    Bound(Bound),
+    Elsewhere,
+    Failed(String),
+}
+
+fn bind_twice(bind: impl Fn() -> Result<Box<dyn PdfiumLibraryBindings>, PdfiumError>) -> Attempt {
+    match (bind(), bind()) {
+        (Ok(raw), Ok(b)) => Attempt::Bound(Bound {
+            pdfium: Pdfium::new(b),
+            raw,
+        }),
+        (Err(PdfiumError::PdfiumLibraryBindingsAlreadyInitialized), _)
+        | (_, Err(PdfiumError::PdfiumLibraryBindingsAlreadyInitialized)) => Attempt::Elsewhere,
+        (Err(e), _) | (_, Err(e)) => Attempt::Failed(e.to_string()),
+    }
+}
+
 /// The process-wide pdfium binding, or why it could not be loaded.
-pub fn pdfium() -> Result<&'static Pdfium, String> {
+pub fn pdfium() -> Result<&'static Bound, PdfiumLoadError> {
     PDFIUM
         .get_or_init(|| {
             let mut tried = Vec::new();
+            let mut attempt = |label: String, a: Attempt| match a {
+                Attempt::Bound(b) => Some(Ok(b)),
+                Attempt::Elsewhere => Some(Err(PdfiumLoadError::InitializedElsewhere)),
+                Attempt::Failed(e) => {
+                    tried.push(format!("{label}: {e}"));
+                    None
+                }
+            };
             if let Ok(p) = std::env::var("PDFIUM_DYNAMIC_LIB_PATH") {
                 let path = std::path::PathBuf::from(&p);
                 let file = if path.is_dir() {
@@ -45,42 +111,29 @@ pub fn pdfium() -> Result<&'static Pdfium, String> {
                 } else {
                     path
                 };
-                match Pdfium::bind_to_library(&file) {
-                    Ok(b) => return Ok(Pdfium::new(b)),
-                    Err(PdfiumError::PdfiumLibraryBindingsAlreadyInitialized) => {
-                        return Ok(Pdfium::default())
-                    }
-                    Err(e) => tried.push(format!("{}: {e}", file.display())),
+                let a = bind_twice(|| Pdfium::bind_to_library(&file));
+                if let Some(r) = attempt(file.display().to_string(), a) {
+                    return r;
                 }
             }
-            match Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_path("./")) {
-                Ok(b) => return Ok(Pdfium::new(b)),
-                Err(PdfiumError::PdfiumLibraryBindingsAlreadyInitialized) => {
-                    return Ok(Pdfium::default())
-                }
-                Err(e) => tried.push(format!("./: {e}")),
+            let here = Pdfium::pdfium_platform_library_name_at_path("./");
+            if let Some(r) = attempt("./".into(), bind_twice(|| Pdfium::bind_to_library(&here))) {
+                return r;
             }
-            match Pdfium::bind_to_system_library() {
-                Ok(b) => Ok(Pdfium::new(b)),
-                Err(PdfiumError::PdfiumLibraryBindingsAlreadyInitialized) => Ok(Pdfium::default()),
-                Err(e) => {
-                    tried.push(format!("system: {e}"));
-                    Err(format!(
-                        "libpdfium not found (set PDFIUM_DYNAMIC_LIB_PATH): {}",
-                        tried.join("; ")
-                    ))
-                }
+            if let Some(r) = attempt("system".into(), bind_twice(Pdfium::bind_to_system_library)) {
+                return r;
             }
+            Err(PdfiumLoadError::NotFound(tried.join("; ")))
         })
         .as_ref()
         .map_err(|e| e.clone())
 }
 
 /// Run `f` with exclusive access to pdfium.
-pub fn with_pdfium<T>(f: impl FnOnce(&'static Pdfium) -> Result<T, String>) -> Result<T, String> {
-    let pdfium = pdfium()?;
+pub fn with_pdfium<T>(f: impl FnOnce(&'static Bound) -> Result<T, String>) -> Result<T, String> {
+    let bound = pdfium().map_err(|e| e.to_string())?;
     let _guard = PDFIUM_LOCK.lock().unwrap_or_else(|p| p.into_inner());
-    f(pdfium)
+    f(bound)
 }
 
 /// Ascent and descent of the stated box, as a fraction of the font size
@@ -187,8 +240,8 @@ const MAX_STRUCT_NODES: usize = 100_000;
 
 /// Read `bytes` into a `RawDoc`.
 pub fn read(bytes: &[u8]) -> Result<RawDoc, String> {
-    with_pdfium(|pdfium| {
-        let b = pdfium.bindings();
+    with_pdfium(|bound| {
+        let b = bound.raw.as_ref();
         unsafe {
             let doc = b.FPDF_LoadMemDocument64(bytes, None);
             if doc.is_null() {

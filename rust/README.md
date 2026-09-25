@@ -104,6 +104,12 @@ The core looks for it in this order (`src/extract/pdf/raw.rs`, `pdfium()`):
 2. the current directory;
 3. the system loader path.
 
+The core binds libpdfium itself (twice: one handle for pdfium-render's
+`Pdfium`, one for its raw `FPDFText_*` calls). If another pdfium-render user
+in the same process creates its `Pdfium` first, every PDF call fails with
+`PdfiumLoadError::InitializedElsewhere` rather than degrading: bind the core
+first.
+
 Production: ship a pinned `libpdfium.so` from bblanchon/pdfium-binaries next
 to the cdylib (ADR-0017 §Runtime). Locally, any pdfium build works. For
 example, the one inside a pypdfium2 wheel (the binary only, via uv's cache):

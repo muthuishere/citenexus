@@ -30,7 +30,7 @@ pub fn extract(
     document_id: &str,
     source_uri: Option<String>,
 ) -> Result<ExtractedDoc, String> {
-    raw::with_pdfium(|pdfium| extract_with(pdfium, bytes, document_id, source_uri))
+    raw::with_pdfium(|bound| extract_with(&bound.pdfium, bytes, document_id, source_uri))
 }
 
 fn extract_with(
