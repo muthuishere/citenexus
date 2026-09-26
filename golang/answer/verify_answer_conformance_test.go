@@ -75,7 +75,7 @@ func TestVerifyAnswerConformance(t *testing.T) {
 	// Go-owned until VerifyAnswer has a Python reference: conformance/ holds only
 	// fixtures the Python generator produces (tests/test_conformance_fixtures.py).
 	// Promote this file there when the Python port lands.
-	raw, err := os.ReadFile("testdata/verify_answer.json")
+	raw, err := os.ReadFile("../../conformance/cases/verify_answer.json")
 	if err != nil {
 		t.Fatal(err)
 	}

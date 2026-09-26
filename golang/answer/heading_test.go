@@ -33,7 +33,7 @@ func TestHeadingCheckVectors(t *testing.T) {
 			} `json:"expect"`
 		} `json:"cases"`
 	}
-	raw, err := os.ReadFile("testdata/heading_check.json")
+	raw, err := os.ReadFile("../../conformance/cases/heading_check.json")
 	if err != nil {
 		t.Fatal(err)
 	}

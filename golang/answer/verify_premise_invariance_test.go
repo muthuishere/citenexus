@@ -97,7 +97,7 @@ func TestLazyScoringMatchesEager(t *testing.T) {
 	var file struct {
 		Cases []verifyVector `json:"cases"`
 	}
-	raw, err := os.ReadFile("testdata/verify_answer.json")
+	raw, err := os.ReadFile("../../conformance/cases/verify_answer.json")
 	if err != nil {
 		t.Fatal(err)
 	}
