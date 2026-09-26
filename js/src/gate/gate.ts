@@ -11,6 +11,11 @@ import { STOPWORDS_TABLE } from "../gen/tables.js";
 
 const STOPWORDS: ReadonlySet<string> = new Set(STOPWORDS_TABLE);
 
+/** True when token is in the pinned stopword list (golang gate.IsStopword). */
+export function isStopword(token: string): boolean {
+  return STOPWORDS.has(token);
+}
+
 /** Meaning-bearing tokens used by the relevance gate: tokens minus stopwords. */
 export function contentTokens(text: string): Set<string> {
   const out = new Set<string>();
