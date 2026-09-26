@@ -293,12 +293,14 @@ function joinListItems(claims: CitedClaim[], frames: readonly string[]): CitedCl
         i + 1 < merged.length &&
         matches(LIST_ITEM_PREFIX, (merged[i + 1] as CitedClaim).text)
       ) {
-        leadIn = { ...c };
+        // golang copies the struct (`lead := c`): the lead-in's citations are a
+        // value, never the array the exclusive lead-in's own claim grows below.
+        leadIn = { ...c, cited: [...c.cited], facets: [...c.facets] };
         const bare = goTrimSpace(c.text).slice(0, -1);
         const [stripped, marked] = stripListQualifiers(bare);
         joinText = stripped;
         if (!marked && contentFreeLeadIn(bare, frames)) {
-          leadIn = { ...newClaim(""), cited: c.cited, facets: c.facets };
+          leadIn = { ...newClaim(""), cited: [...c.cited], facets: [...c.facets] };
           joinText = "";
           continue;
         }

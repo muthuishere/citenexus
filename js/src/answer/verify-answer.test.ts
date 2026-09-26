@@ -476,6 +476,48 @@ describe("verifyAnswer (golang verify_answer_test.go)", () => {
   });
 });
 
+describe("found by differential fuzzing against Go", () => {
+  it("an exclusive lead-in's citations are a value: a later item does not inherit an earlier item's", async () => {
+    const ev: EvidenceUnit[] = [
+      {
+        id: "a",
+        documentId: "a",
+        language: "nl",
+        text: "De werkgever mag alleen de volgende gegevens vragen: naam, adres, geboortedatum, BSN, IBAN en telefoonnummer.",
+      },
+    ];
+    const res = await verify("De werkgever mag alleen de volgende gegevens vragen:\n- naam [eu:a]\n- adres", ev, {
+      answerLanguage: "nl",
+      requireCitations: true,
+    });
+    expect(res.claims.map((c) => [c.claim, c.supported, c.reason ?? ""])).toEqual([
+      ["De werkgever mag alleen de volgende gegevens vragen:", true, ""],
+      ["De werkgever mag de volgende gegevens vragen naam", true, ""],
+      ["De werkgever mag de volgende gegevens vragen adres", false, REASON_UNCITED],
+    ]);
+  });
+
+  it("a digit-led word token (\"4al\") reads as Go reads it, not as a thrown BigInt", async () => {
+    const ev: EvidenceUnit[] = [
+      {
+        id: "a",
+        documentId: "a",
+        language: "nl",
+        text: "Aanvullend geboorteverlof. De werknemer vraagt het aanvullend verlof ten minste vier weken van tevoren aan bij de leidinggevende.",
+      },
+    ];
+    const res = await verify("You take the addition3/4al leave at least four weeks in advance [eu:a].", ev, {
+      answerLanguage: "en",
+      admitParaphrase: true,
+      checker: admitAll,
+      checkerName: "fake",
+    });
+    expect(res.claims[0]?.reason).toBe(
+      'subtype guard: the claim says "leave"; the passage only speaks of "aanvullend verlof"',
+    );
+  });
+});
+
 describe("number forms in running text (golang verify_number_forms_test.go)", () => {
   const nlUnit = (f: string) =>
     "Huur. De maandhuur van de bedrijfsruimte bedraagt " + f + " per maand. De huur wordt jaarlijks geïndexeerd.";

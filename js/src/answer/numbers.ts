@@ -102,6 +102,22 @@ function known(value: DecimalValue): NumberReading {
   return { key: canonical(value), value };
 }
 
+const DIGITS = /^[0-9]*$/;
+
+/**
+ * `known` over integer groups and decimal digits. A token that is not digits
+ * ("4al" — verifyAnswer's guards read tokenizer tokens) gets Go's reading
+ * (golang numbers.go `known`): the key trimmed of leading/trailing zeros, and
+ * no value, where BigInt would throw.
+ */
+function knownOf(integerGroups: readonly string[], decimals: string): NumberReading {
+  const whole = integerGroups.join("");
+  if (DIGITS.test(whole) && DIGITS.test(decimals)) return known(valueOf(integerGroups, decimals));
+  const w = whole.replace(/^0+/, "") || "0";
+  const d = decimals.replace(/0+$/, "");
+  return { key: d === "" ? w : w + "." + d, value: null };
+}
+
 function unread(raw: string): NumberReading {
   return { key: "?" + raw, value: null };
 }
@@ -125,12 +141,12 @@ export function readNumber(
     if (raw.includes(",")) return unread(raw + ",-"); // "25,50,-" is not a form
     const groups = raw.split(".");
     if (groups.length > 1 && !isThousands(groups)) return unread(raw + ",-");
-    return known(valueOf(groups, ""));
+    return knownOf(groups, "");
   }
 
   const hasDot = raw.includes(".");
   const hasComma = raw.includes(",");
-  if (!hasDot && !hasComma) return known(valueOf([raw], ""));
+  if (!hasDot && !hasComma) return knownOf([raw], "");
 
   if (hasDot && hasComma) {
     const decimalMark = raw.lastIndexOf(".") > raw.lastIndexOf(",") ? "." : ",";
@@ -141,19 +157,19 @@ export function readNumber(
     if (whole.includes(decimalMark)) return unread(raw);
     const groups = whole.split(thousandsMark);
     if (!isThousands(groups)) return unread(raw);
-    return known(valueOf(groups, decimals));
+    return knownOf(groups, decimals);
   }
 
   const mark = hasDot ? "." : ",";
   const parts = raw.split(mark);
   if (parts.length > 2) {
-    return isThousands(parts) ? known(valueOf(parts, "")) : unread(raw);
+    return isThousands(parts) ? knownOf(parts, "") : unread(raw);
   }
 
   const whole = parts[0] as string;
   const tail = parts[1] as string;
   if (tail.length !== 3 || !isThousands(parts)) {
-    return known(valueOf([whole], tail)); // a decimal mark in every locale
+    return knownOf([whole], tail); // a decimal mark in every locale
   }
 
   const languageCode = primary(options.language);
@@ -165,7 +181,7 @@ export function readNumber(
   } else {
     return unread(raw); // 1.500 / 1,500 with no declared locale
   }
-  return thousands ? known(valueOf([whole, tail], "")) : known(valueOf([whole], tail));
+  return thousands ? knownOf([whole, tail], "") : knownOf([whole], tail);
 }
 
 /** `|a - b| <= tolerance`, exactly, over scaled integers. */
