@@ -104,7 +104,7 @@ func TestToMarkdown(t *testing.T) {
 		t.Fatalf("to_markdown returned error: %s", payload.Error)
 	}
 	if !strings.Contains(payload.Markdown, "# People") ||
-		!strings.Contains(payload.Markdown, "name: ada, age: 36, active: true") {
+		!strings.Contains(payload.Markdown, "| ada | 36 | true |") {
 		t.Fatalf("unexpected markdown: %q", payload.Markdown)
 	}
 
