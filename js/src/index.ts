@@ -42,6 +42,55 @@ export {
   readNumber,
 } from "./answer/numbers.js";
 export type { DecimalValue, NumberReading } from "./answer/numbers.js";
+// ADR-0016 verifyAnswer: cite-or-abstain for a caller-generated answer (port of
+// golang/answer VerifyAnswer), the heading check, the glossary and the
+// host-extensible guard tables. Explicit, not `export *`: the guards are
+// internals. The evidence type is re-exported as VerifyEvidenceUnit because the
+// root already exports vision's EvidenceUnit.
+export {
+  verifyAnswer,
+  InvalidEvidenceError,
+  DEFAULT_ENTAIL_THRESHOLD,
+  DEFAULT_CONTRADICT_THRESHOLD,
+  DEFAULT_LEAD_IN_FRAMES,
+  REASON_UNCITED,
+  REASON_UNKNOWN_CITATION,
+  REASON_BELOW_FLOOR,
+  REASON_NOT_SUPPORTED,
+  REASON_CONTRADICTED,
+  REASON_OUTRANKED,
+  REASON_UNRESOLVED_CLAIMS,
+} from "./answer/verify-answer.js";
+export type { EvidenceUnit as VerifyEvidenceUnit, Facet, VerifyOptions } from "./answer/verify-answer.js";
+export { MIN_QUOTE_TOKENS } from "./answer/verify-guards.js";
+export {
+  DEFAULT_ACTOR_LEXICON,
+  EMPTY_ACTOR_LEXICON,
+  withActorTerms,
+  SLOT_SOURCE,
+  SLOT_RECIPIENT,
+  SLOT_DUTY,
+  SLOT_PERMISSION,
+} from "./answer/verify-roles.js";
+export type { ActorLexicon } from "./answer/verify-roles.js";
+export { DEFAULT_QUALIFIER_PAIRS } from "./answer/verify-qualifier-pairs.js";
+export type { QualifierPair } from "./answer/verify-qualifier-pairs.js";
+export { DEFAULT_VERB_PAIRS } from "./answer/verify-verbpairs.js";
+export type { VerbPair } from "./answer/verify-verbpairs.js";
+export { DEFAULT_SUBTYPE_HEADS } from "./answer/verify-subtypes.js";
+export type { SubtypeHead } from "./answer/verify-subtypes.js";
+export { prepareGlossary, parseGlossaryTSV } from "./answer/glossary.js";
+export type { GlossaryEntry, PreparedGlossary } from "./answer/glossary.js";
+export {
+  headingNeedsCheck,
+  headingNeedsCheckWith,
+  headingNameUnsupported,
+  DEFAULT_HEADING_RULES,
+  DEFAULT_HEADING_VERB_WORDS,
+} from "./answer/heading.js";
+export type { HeadingRules } from "./answer/heading.js";
+// ADR-0004 authority: the ordered policy and strict-mode selection verifyAnswer reads.
+export * from "./authority/authority.js";
 export * from "./graph/graph.js";
 export * from "./structure/structure.js";
 export * from "./fakes/fakes.js";
