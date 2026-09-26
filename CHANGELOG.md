@@ -10,7 +10,39 @@ Dist name on PyPI is **`citenexus`** (the import package is `citenexus`; see
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-09-26
+
+Not yet published to any registry: the version is set in all four manifests,
+but no tag has been pushed.
+
 ### Added
+
+- **`VerifyAnswer` in all three ports: cite-or-abstain for an answer the caller
+  generated** (ADR-0016, ADR-0018). The writer cites each claim with
+  `[eu:<id>]`. The verb admits it by the deterministic gate, a verbatim quote, or an
+  injected `SupportChecker`, and deterministic guards the model cannot override
+  can refuse it: number, unit, negation, polarity-swap, name, condition,
+  exclusion, hedge, definition/subtype, role/relation/argument, party/value-row,
+  qualifier and verb pairs, conjunct presence, and the list-union rule. Plus the heading check
+  and a prepared glossary.
+  - Go `answer.VerifyAnswer` (`golang/answer/verify_answer.go:610`); Python
+    `citenexus.verify_answer` (`python/src/citenexus/answer/verify_answer.py:578`);
+    JS `verifyAnswer` (`js/src/answer/verify-answer.ts:497`, evidence type
+    `VerifyEvidenceUnit`).
+  - `SupportChecker` contract: `golang/contracts/support.go:23`,
+    `python/src/citenexus/contracts.py:178`, `js/src/contracts.ts:122`.
+  - Pinned by `conformance/cases/verify_answer.json` (325 cases) and
+    `conformance/cases/heading_check.json` (14 cases), run by every port.
+  - `Claim.verified_by` / `Claim.reason` and `EvidenceSignals.model_verified_claims`
+    / `missing_facets` are left out of the JSON when empty, so existing Results
+    serialize byte-identically.
+- **JS authority selection** (`js/src/authority/authority.ts`), ported from
+  `golang/authority/`.
+- **ADR-0015: locale-aware numbers and the inclusion conflict rule, all ports.**
+  `"€ 1.500"` in Dutch is 1500 and `"€ 25,00"` is 25. Running text also reads dates,
+  clock times, money rates, cents (`"23 cent"` = `"€ 0,23"`), Dutch compound
+  number words, and space-grouped money thousands (plain, U+00A0 and U+202F
+  spaces).
 
 - **Dutch (`nl`) is a claimed language for the ADR-0009 polarity table and the
   ADR-0007 conflict tables**, each backed by golden fixtures that all three ports
@@ -41,13 +73,26 @@ Dist name on PyPI is **`citenexus`** (the import package is `citenexus`; see
   `jl` and `z.s.m` are left out because they routinely end a sentence; 17 vectors
   in `conformance/cases/segmentation.json` pin both decisions.
 
-### Known gaps (measured, not closed)
+### Changed
 
-- A clause-final Dutch `niet` ("De werkgever vergoedt de parkeerkosten niet.")
-  sits outside the span the gate inspects, so dropping it is **accepted**
-  (`python/tests/answer/test_verify_v2.py:362`).
-- Dutch number formatting is not normalised: `€ 1.500` vs `€ 1500` and
-  `€ 25,00` vs `€ 25` are **false value conflicts** (`test_conflict.py:744`).
+- **Conflict detection reads numbers through the running-text reader** in every
+  port, so `"€ 4 000"` is 4000 there too. `conflict.json` is unchanged.
+- **The `VerifyAnswer` gate path runs the number guard.** Before, `"€ 23"` was
+  admitted by the gate over `"€ 0,23"`, because the tokenizer splits `"0,23"`
+  into 0 and 23.
+
+### Known gaps
+
+- A clause-final Dutch `niet` dropped from a claim is still **accepted by the
+  shared ADR-0009 gate** (`python/tests/answer/test_verify_v2.py:400`).
+  `VerifyAnswer` refuses it with its clause-negation guard; the gate alone does
+  not.
+- ADR-0015 reads each side in its declared language, so an English claim
+  writing the Dutch `"€ 4.000"` is 4.0 and is refused. An amendment is pending
+  with the owner.
+- In Go, some tables are read in map order, which can vary between runs. A term
+  registered under two actor ids can bind to either one, and that can change a
+  verdict. Python and JS pick one fixed order (ADR-0018, Consequences).
 
 ## [0.12.0] - 2026-08-17
 

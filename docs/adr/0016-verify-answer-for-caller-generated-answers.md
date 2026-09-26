@@ -1,7 +1,8 @@
 # 0016 — VerifyAnswer: cite-or-abstain for caller-generated answers
 
-Status: accepted · 2026-09-24 · **Go-only** (confirmed by the rag_go consumer on
-its Dutch goldens; the Python/JS ports are deferred, see Consequences)
+Status: accepted · 2026-09-24 · Go-first, confirmed by the rag_go consumer on its Dutch
+goldens; **ported to Python and JS by ADR-0018** (the "Go-only" consequence
+below is superseded)
 
 All references are to `golang/` at `c7b8de9` unless stated.
 
