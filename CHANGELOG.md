@@ -36,6 +36,22 @@ but no tag has been pushed.
   - `Claim.verified_by` / `Claim.reason` and `EvidenceSignals.model_verified_claims`
     / `missing_facets` are left out of the JSON when empty, so existing Results
     serialize byte-identically.
+- **PDF → markdown in the Rust core (ADR-0017).** The model proposes structure,
+  and the PDF supplies the text. It runs in three phases so the host makes the
+  model call: `pdf_prepare` emits vision/table requests, the host fulfils them,
+  and `pdf_assemble` keeps only what two transcriptions agree on. Disputed text
+  is never citable. Deterministic tables come from the struct tree, ruled grids
+  and column tracks. DOCX/PPTX headings, lists and tables come from OOXML
+  structure. The host contract is `docs/pdf-model-contract.md`.
+  - Go `core.PdfUnits` / `PdfPrepare` / `PdfAssemble` / `OoxmlUnits` /
+    `CitableText` (`golang/core/core.go:310,413,428,459`, `golang/core/ooxml.go:62`).
+  - Python `citenexus.core.pdf_units` / `pdf_prepare` / `pdf_assemble` /
+    `ooxml_units` (`python/src/citenexus/core.py:319,324,329,340`).
+  - JS `pdfUnits` / `pdfPrepare` / `pdfAssemble` / `ooxmlUnits`
+    (`js/src/core/core.ts:514,519,525,534`).
+  - It needs the `pdf` feature and a libpdfium the host provides
+    (`rust/README.md`, "libpdfium"). Nothing is bundled.
+  - As accepted by rag_go at `pdf-accepted/2026-09-25` (78ad060).
 - **JS authority selection** (`js/src/authority/authority.ts`), ported from
   `golang/authority/`.
 - **ADR-0015: locale-aware numbers and the inclusion conflict rule, all ports.**
