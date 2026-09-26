@@ -10,6 +10,12 @@ typed plugin protocols so nothing in the pipeline is hardwired.
 # works, and a caller writing their own provider has a surface to match. They
 # lived behind deep module paths until now, which made the uniformity invisible.
 from citenexus.answer.generator import OpenAICompatibleGenerator
+
+# Cite-or-abstain for an answer the CALLER generated (ADR-0016): the
+# retrieval-free half of ``ask``. Its evidence type is
+# ``citenexus.answer.EvidenceUnit`` (distinct from the ingested
+# ``citenexus.evidence.EvidenceUnit``).
+from citenexus.answer.verify_answer import VerifyOptions, verify_answer
 from citenexus.client import CiteNexus
 
 # The published contracts those clients implement (ADR-0014). A provider author
@@ -22,6 +28,7 @@ from citenexus.contracts import (
     RerankerProvider,
     SequenceEmbedder,
     SingleTextEmbedder,
+    SupportChecker,
     Vector,
     VisionProvider,
 )
@@ -90,8 +97,11 @@ __all__ = [
     "ScriptCode",
     "SequenceEmbedder",
     "SingleTextEmbedder",
+    "SupportChecker",
     "UnsupportedSearchLanguageError",
     "Vector",
+    "VerifyOptions",
     "VisionProvider",
     "__version__",
+    "verify_answer",
 ]

@@ -41,8 +41,20 @@ def test_committed_fixtures_match_regeneration() -> None:
         )
 
 
+# Hand-authored contracts: written as data (Go-first, ADR-0016), not derived
+# from Python internals, so the generator cannot produce them. Each is instead
+# read as opaque data and asserted as BINDING by a Python test — which is what
+# this drift guard exists to guarantee for a generated fixture.
+_HAND_AUTHORED = {
+    # tests/conformance/test_verify_answer_vectors.py
+    "cases/verify_answer.json",
+    "cases/heading_check.json",
+}
+
+
 def test_no_orphan_fixture_files() -> None:
-    """Every committed JSON fixture must be produced by the generator."""
+    """Every committed JSON fixture must be produced by the generator, or be a
+    hand-authored contract a Python test asserts."""
     generated = set(_regenerate())
     committed = {str(p.relative_to(_CONFORMANCE)) for p in _CONFORMANCE.rglob("*.json")}
-    assert committed == generated
+    assert committed == generated | _HAND_AUTHORED
