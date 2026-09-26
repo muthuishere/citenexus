@@ -13,15 +13,23 @@ from citenexus.answer.result import (
     SourceRef,
 )
 
+# verify_answer's evidence and options (ADR-0016). The function itself is
+# exported top-level as ``citenexus.verify_answer``; it is NOT re-bound here,
+# where the name is the submodule the guards import.
+from citenexus.answer.verify_answer import EvidenceUnit, Facet, VerifyOptions
+
 __all__ = [
     "AnthropicGenerator",
     "Claim",
     "Decision",
     "EvidenceSignals",
+    "EvidenceUnit",
+    "Facet",
     "LoopSignals",
     "LoopStopReason",
     "OpenAICompatibleGenerator",
     "ProvenanceEntry",
     "Result",
     "SourceRef",
+    "VerifyOptions",
 ]

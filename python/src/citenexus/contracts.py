@@ -4,13 +4,14 @@ CiteNexus bundles no models. What it *does* owe anyone who wants to supply one i
 an interface they can implement without reading our call sites. That is this
 module: the single, obvious place a provider author looks.
 
-Five contracts, one per model seam::
+Six contracts, one per model seam::
 
     EmbeddingProvider   embed_many(texts)              -> list[Vector]
     GeneratorProvider   answer(question, passage, ...) -> str
     CompletionProvider  complete(prompt)               -> str
     VisionProvider      describe(image_region)         -> Mapping[str, Any]
     RerankerProvider    rerank(query, candidates)      -> list[Candidate]
+    SupportChecker      check(claim, passage)          -> (entailed, contradicted)
 
 **They are ``Protocol``s, not ABCs, on purpose.** The ``Plugin`` ABCs in
 ``plugins/base.py`` exist so the *registry* can reject a non-conforming object at
@@ -63,6 +64,7 @@ __all__ = [
     "RerankerProvider",
     "SequenceEmbedder",
     "SingleTextEmbedder",
+    "SupportChecker",
     "Vector",
     "VisionProvider",
     "check_batch",
@@ -169,6 +171,32 @@ class RerankerProvider(Protocol):
 
     def rerank(self, query: str, candidates: Sequence[Candidate]) -> list[Candidate]:
         """Return ``candidates`` most-relevant-first. Raise on failure."""
+        ...
+
+
+@runtime_checkable
+class SupportChecker(Protocol):
+    """Judge whether a passage supports a claim — typically an NLI classifier.
+
+    It exists for the one case the deterministic gate cannot handle at all: a
+    claim in one language and its evidence in another (token containment cannot
+    verify an English sentence against a Dutch passage). It is NOT trusted the
+    way the gate is, so :func:`citenexus.verify_answer` uses it ASYMMETRICALLY
+    (ADR-0016; Go ``contracts.SupportChecker``):
+
+    - ``contradicted`` is a VETO everywhere: a claim the gate accepted is still
+      dropped when the checker says its passage contradicts it. A veto can only
+      add abstention, so it cannot admit an ungrounded claim.
+    - ``entailed`` may ADMIT a claim only across languages (or under
+      ``admit_paraphrase``), behind the deterministic guards, and every such
+      claim is labelled (``Claim.verified_by``).
+
+    Both scores are probabilities in [0, 1]. Failure is raised, never a score:
+    ``(0.0, 0.0)`` is a finding ("neither"), not "I could not run".
+    """
+
+    def check(self, claim: str, passage: str) -> tuple[float, float]:
+        """Return ``(entailed, contradicted)`` for ``claim`` given ``passage``."""
         ...
 
 

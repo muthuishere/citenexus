@@ -11,11 +11,20 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, SerializerFunctionWrapHandler, model_serializer
 
 from citenexus.domain.trust import TrustMode
 from citenexus.evidence.unit import BBox
 from citenexus.lang.codes import LanguageLike, ScriptLike
+
+
+def _omit_empty(data: Any, keys: tuple[str, ...]) -> Any:
+    """Drop the named keys when their value is empty (Go's ``omitempty``)."""
+    if isinstance(data, dict):
+        for key in keys:
+            if key in data and not data[key]:
+                del data[key]
+    return data
 
 
 class Decision(StrEnum):
@@ -87,6 +96,16 @@ class EvidenceSignals(BaseModel):
     # Present only for the agentic deep strategy; ``None`` on the strict flow so
     # existing Results are byte-identical.
     loop: LoopSignals | None = None
+    # verify_answer only (ADR-0016): how many surviving claims a SupportChecker
+    # admitted, and the declared facets no verified claim answers. Omitted from
+    # the serialized form when empty, so every other Result is byte-identical
+    # (Go: ``omitempty``).
+    model_verified_claims: int = 0
+    missing_facets: tuple[str, ...] = ()
+
+    @model_serializer(mode="wrap")
+    def _omit_empty_verify_fields(self, handler: SerializerFunctionWrapHandler) -> Any:
+        return _omit_empty(handler(self), ("model_verified_claims", "missing_facets"))
 
 
 class SourceRef(BaseModel):
@@ -113,6 +132,15 @@ class Claim(BaseModel):
     claim: str
     supported: bool
     sources: tuple[str, ...] = ()
+    # verify_answer only (ADR-0016): what admitted the claim ("gate",
+    # "model:<name>", "quote+model:<name>") and, for a dropped claim, why.
+    # Omitted from the serialized form when empty (Go: ``omitempty``).
+    verified_by: str = ""
+    reason: str = ""
+
+    @model_serializer(mode="wrap")
+    def _omit_empty_verify_fields(self, handler: SerializerFunctionWrapHandler) -> Any:
+        return _omit_empty(handler(self), ("verified_by", "reason"))
 
 
 class ProvenanceEntry(BaseModel):

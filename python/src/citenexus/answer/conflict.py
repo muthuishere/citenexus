@@ -32,7 +32,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from fractions import Fraction
 
-from citenexus.answer.numbers import NUMBER_RE, read_number
+from citenexus.answer.numbers import numbers_in
 from citenexus.answer.tables import (
     CONFLICT_ANTONYMS,
     CONFLICT_INCLUSION_PAIRS,
@@ -141,7 +141,7 @@ def _is_tokenizer_digit_artifact(token: str) -> bool:
 # letter-boundary check that RE2 would need lookbehind for is done in code below,
 # precisely so this pattern ports unchanged.
 
-# The letter-boundary guard applied to those matches (in ``_features``) is
+# The letter-boundary guard applied to those matches (``numbers.numbers_in``) is
 # LATIN-ONLY, deliberately, and this is the one place the two facts have to be
 # held together:
 #
@@ -162,7 +162,7 @@ def _is_tokenizer_digit_artifact(token: str) -> bool:
 # and lets CJK numbers parse. It also widens the value rule to any other script
 # that writes a letter flush against a digit; that is the intended direction —
 # the guard exists to protect ASCII identifiers, not to suppress non-Latin text.
-_IDENTIFIER_PREFIX = frozenset("abcdefghijklmnopqrstuvwxyz_")
+# (``numbers.is_identifier_prefix``; shared with the VerifyAnswer guards.)
 
 _ANTONYMS: frozenset[tuple[str, str]] = frozenset(
     pair for a, b in CONFLICT_ANTONYMS for pair in ((a, b), (b, a))
@@ -248,13 +248,10 @@ def _features(text: str, language: str | None = None) -> _Features:
     tokens = tuple(tokenize_v2(lowered))
     values: dict[str, Fraction | None] = {}
     units: set[str] = set()
-    for match in NUMBER_RE.finditer(lowered):
-        start = match.start(1)
-        if start > 0 and lowered[start - 1] in _IDENTIFIER_PREFIX:
-            continue  # "p50", "ipv4": an identifier, not a measured value
-        reading = read_number(match.group(1), dash=match.group(2) is not None, language=language)
-        values[reading.key] = reading.value
-        unit = match.group(3)
+    # "p50", "ipv4" are identifiers, not measured values; "€ 4 000" is 4000.
+    for match in numbers_in(lowered, language):
+        values[match.reading.key] = match.reading.value
+        unit = match.unit
         if unit == "%":
             units.add("%")
         elif unit and unit in MEASUREMENT_UNITS:

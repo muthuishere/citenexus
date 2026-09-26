@@ -63,6 +63,11 @@ _STOPWORDS = frozenset(
 )
 
 
+def is_stopword(token: str) -> bool:
+    """Membership in the pinned 44-word stopword set (Go ``gate.IsStopword``)."""
+    return token in _STOPWORDS
+
+
 def content_tokens(text: str) -> set[str]:
     """Meaning-bearing tokens used by relevance and faithfulness gates."""
     return set(tokenize(text)) - _STOPWORDS
