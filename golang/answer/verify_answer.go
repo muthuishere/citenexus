@@ -760,7 +760,13 @@ func VerifyAnswer(ctx context.Context, answer string, evidence []EvidenceUnit, o
 		deferred := map[string]EvidenceUnit{}
 		for _, eu := range candidates {
 			if gate.IsSupportedV2(text, eu.Text) {
-				reason := clauseNegationGuard(text, eu.Text)
+				// The gate aligns tokens, and the tokenizer splits "0,23" into
+				// 0 and 23: "€ 23" aligns inside "€ 0,23" with a one-token gap.
+				// Numbers are compared as values, as on the model path.
+				reason := numberGuard(text, declared, eu.Text, eu.Language)
+				if reason == "" {
+					reason = clauseNegationGuard(text, eu.Text)
+				}
 				if reason == "" {
 					reason = truncationGuard(text, eu.Text)
 				}

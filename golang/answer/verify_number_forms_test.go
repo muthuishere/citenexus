@@ -42,6 +42,22 @@ func TestNumberFormsInRunningText(t *testing.T) {
 			tc{"en claim " + f, "en", "en", enUnit("€ 4,000"), enClaim(f), false},
 			tc{"en unit " + f, "en", "en", enUnit(f), enClaim("€ 4,000"), false})
 	}
+	// Narrow no-break (U+202F) and no-break (U+00A0) space grouping, as
+	// French-style and typeset Dutch documents write it: "€ 1 012".
+	for _, sp := range []string{"\u202f", "\u00a0", " "} {
+		cases = append(cases,
+			tc{"nl claim € 1" + sp + "012", "nl", "nl", nlUnit("€ 1.012"), nlClaim("€" + sp + "1" + sp + "012"), false},
+			tc{"nl unit € 1" + sp + "012", "nl", "nl", nlUnit("€" + sp + "1" + sp + "012"), nlClaim("€ 1.012"), false},
+			tc{"nl € 1" + sp + "012 is not 1.021", "nl", "nl", nlUnit("€ 1.021"), nlClaim("€ 1" + sp + "012"), true})
+	}
+	// The decimal comma: "€ 0,23" = "0,23 euro" = "23 cent"; never 23 or 0,32.
+	cases = append(cases,
+		tc{"nl € 0,23 = 0,23 euro", "nl", "nl", nlUnit("€ 0,23"), nlClaim("0,23 euro"), false},
+		tc{"nl € 0,23 = 23 cent", "nl", "nl", nlUnit("€ 0,23"), nlClaim("23 cent"), false},
+		tc{"en € 0.23 = nl € 0,23", "nl", "en", nlUnit("€ 0,23"), enClaim("€ 0.23"), false},
+		tc{"nl € 0,23 is not € 23", "nl", "nl", nlUnit("€ 0,23"), nlClaim("€ 23"), true},
+		tc{"nl € 0,23 is not € 0,32", "nl", "nl", nlUnit("€ 0,23"), nlClaim("€ 0,32"), true},
+	)
 	cases = append(cases,
 		// L-R20: a claim writing the amount in the OTHER language's format.
 		// ADR-0015, documented: each side read in its declared language, so

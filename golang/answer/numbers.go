@@ -280,10 +280,11 @@ func moneyRates(text, language string) (map[[2]string]struct{}, string) {
 }
 
 // spacedThousands is a money amount grouped by spaces — a plain, no-break or
-// narrow no-break space — "€ 4 000" = "€ 4.000" = 4000. Only after a currency
+// narrow no-break space — "€ 4 000" = "€ 4.000" = 4000, including between
+// the sign and the amount (Go's \s is ASCII-only). Only after a currency
 // sign or code, and only with exact three-digit groups: elsewhere "4 000" may
 // be two numbers.
-var spacedThousands = regexp.MustCompile(`((?:€|\beur\b|\$|£)\s*)([1-9][0-9]*)[ \x{00A0}\x{202F}]([0-9]{3})\b`)
+var spacedThousands = regexp.MustCompile(`((?:€|\beur\b|\$|£)[\s\x{00A0}\x{202F}]*)([1-9][0-9]*)[ \x{00A0}\x{202F}]([0-9]{3})\b`)
 
 func joinSpacedThousands(text string) string {
 	for i := 0; i < 4; i++ { // "€ 1 250 000": one group per pass
