@@ -29,7 +29,11 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 csv = "1"
 # pdf is feature-gated: pdfium-render binds libpdfium dynamically at runtime,
 # so the crate always compiles; enabling the feature adds the binding code.
-pdfium-render = { version = "0.9", optional = true }
+# 0.9.4: double-free fixes in font and page-object handling. 0.9.3 is the
+# first release that compiles where c_char is unsigned (linux/aarch64). 0.9.4
+# keeps PdfiumLibraryBindingsAccessor crate-private, so raw.rs binds the
+# library twice before Pdfium::new and keeps one binding for FPDFText_*.
+pdfium-render = { version = "=0.9.4", optional = true }
 # store: LanceDB (async Rust API — a small tokio runtime lives inside LanceStore;
 # the C ABI stays synchronous). arrow-* pinned to lancedb's arrow major (58).
 lancedb = "0.30"
@@ -43,6 +47,9 @@ arrow-json = "58"
 # Python.
 fasttext = "0.8"
 tree-sitter = "0.26"
+# checks: NFKC before comparing model text with a text layer (already in the
+# lock via lance).
+unicode-normalization = "0.1"
 tree-sitter-python = "0.25"
 tree-sitter-go = "0.25"
 
@@ -54,5 +61,33 @@ pdf = ["dep:pdfium-render"]
 lto = true
 strip = true
 
+# Fast optimised builds for the counts-only measurement examples.
+[profile.measure]
+inherits = "release"
+lto = false
+codegen-units = 16
+
 [dev-dependencies]
 tempfile = "3.27.0"
+# tests/pdf_contract_schema_test.rs: validates the committed contract fixtures
+# against docs/schema/pdf-model-contract.schema.json (draft 2020-12).
+# MIT OR Apache-2.0; test-only, never in the shipped library.
+boon = "0.6"
+# tests/pdf_bind_order_test.rs: another pdfium-render user binding first.
+pdfium-render = "=0.9.4"
+
+[[example]]
+name = "pdf_measure"
+required-features = ["pdf"]
+
+[[example]]
+name = "pdf_headings"
+required-features = ["pdf"]
+
+[[example]]
+name = "pdf_tables"
+required-features = ["pdf"]
+
+[[example]]
+name = "pdf_furniture"
+required-features = ["pdf"]

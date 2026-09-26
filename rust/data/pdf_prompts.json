@@ -1,0 +1,27 @@
+{
+  "_about": "Default prompts for the ADR-0017 model contract. DATA, not code: the core never reads this file or calls a model. A host maps PdfRequest.prompt to one of these, fills {words_json} / renders PdfRequest.bbox, calls its own model, and sends the answer back as a PdfResponse. Override freely; the response SHAPE is the contract, the wording is not.",
+  "table_structure": {
+    "input": "PdfRequest.chunks (id, text, bbox: phrases, one id each) and PdfRequest.words (id, text, bbox in PDF points, top-left origin, chunk); optionally a render of PdfRequest.bbox",
+    "prompt": "You are given the phrases of one PDF page region, each with an id, its text and its box (a phrase is words of one line that sit close together, e.g. \"€ 1.500\" or \"12 punten\"). A table has ≥2 columns whose phrases line up vertically on several consecutive lines; a bulleted or numbered list, headings and running text are not tables. Find the table(s) among them and return their STRUCTURE only: JSON {\"tables\": [{\"rows\": [[[\"<phrase id>\", ...], ...], ...]}]}. Each row is a list of cells left to right; rows go top to bottom; each cell is a list of phrase ids in reading order, or {\"words\": [...], \"colspan\": n, \"rowspan\": n} for a spanning cell; an empty cell is []. Assign whole phrases. Only if one phrase clearly spans two columns, use its word ids (listed under Words) instead. Use every phrase inside a table exactly once and never write any text yourself: only ids from the lists. Phrases outside tables are not part of the answer.\n\nPhrases:\n{chunks_json}\n\nWords:\n{words_json}",
+    "response": "PdfResponse.tables; text written by the model on a text-layer page is rejected (model_text_on_text_layer)"
+  },
+  "vision_page": {
+    "input": "a render of the whole page (PdfRequest.bbox = the page box)",
+    "prompt": "Transcribe this scanned page to GitHub-flavoured markdown. Copy every number, date and amount exactly as printed, in the same place; do not correct, round, reformat or complete anything. Keep headings, lists and tables. Output only the markdown.",
+    "response": "PdfResponse.markdown; checked against any OCR layer (digit bag, values, coverage 0.90 / novelty 0.08) and labelled vision_transcribed"
+  },
+  "vision_page_spanning_headers": {
+    "opt_in": "Not a default: a host selects it per model (PdfRequest.prompt stays \"vision_page\"). Measured: it made mistral-small write a digits token in place of the printed row label in every body row of a scanned table (T6), so every row was disputed and citable T6 fell from 30 cells to 0.",
+    "input": "a render of the whole page (PdfRequest.bbox = the page box)",
+    "prompt": "Transcribe this scanned page to GitHub-flavoured markdown. Copy every number, date and amount exactly as printed, in the same place; do not correct, round, reformat or complete anything. Keep headings, lists and tables. For a header cell that spans several columns, repeat its text as a prefix in each spanned column's header, e.g. '<axis> <range>' (\"Ervaringsjaren 0-2\", \"Ervaringsjaren 3-5\"): markdown tables cannot span. Output only the markdown.",
+    "response": "PdfResponse.markdown; checked against any OCR layer (digit bag, values, coverage 0.90 / novelty 0.08) and labelled vision_transcribed"
+  },
+  "vision_region": {
+    "input": "a render of PdfRequest.bbox (an image region with no text layer inside)",
+    "prompt": "This image region comes from a PDF page. Decide first: does it contain printed text (words, numbers, a table)? Answer with JSON only: {\"mode\": \"transcription\", \"markdown\": \"<the text as GitHub-flavoured markdown, exactly as printed>\"} when it does, or {\"mode\": \"description\", \"markdown\": \"<one short sentence describing it>\"} when it does not (a logo, photo, signature, chart without text). When transcribing, copy every number, date and amount exactly as printed; do not correct, round, reformat or complete anything; keep tables as markdown tables. For a header cell that spans several columns, repeat its text as a prefix in each spanned column's header, e.g. '<axis> <range>' (\"Ervaringsjaren 0-2\", \"Ervaringsjaren 3-5\"): markdown tables cannot span.",
+    "response_format": {
+      "type": "json_object"
+    },
+    "response": "Parse the JSON into PdfResponse.mode + PdfResponse.markdown. If the reply is not that JSON (a model without JSON mode), send the raw reply as markdown with mode \"transcription\": a transcription is held to dual agreement, a description is not citable. Transcriptions fill the image unit, labelled vision_transcribed, never merged into text-layer content; two descriptions become one image_description unit."
+  }
+}

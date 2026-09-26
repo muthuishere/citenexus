@@ -130,3 +130,94 @@ describe("citenexus-core FFI", () => {
     expect(fr.language).toBe("fr");
   });
 });
+
+// ---- the PDF model contract (ADR-0017; docs/pdf-model-contract.md) ---------
+
+import {
+  pdfUnits,
+  pdfUnitsJson,
+  pdfPrepare,
+  pdfAssemble,
+  pdfAssembleJson,
+  ooxmlUnits,
+  citableText,
+  type PdfResponse,
+} from "./core.js";
+
+const PDF_DATA = resolve(HERE, "..", "..", "..", "rust", "tests", "data");
+const PDF_OPTS = { language: "nl", model_tables: true };
+
+/** The PDF tests need the core built with --features pdf and libpdfium
+ *  loadable (PDFIUM_DYNAMIC_LIB_PATH); skip with a message otherwise. */
+function pdfReady(pdf: Uint8Array): boolean {
+  try {
+    pdfUnits(pdf, { language: "nl" });
+    return true;
+  } catch (err) {
+    const msg = String(err);
+    if (msg.includes("`pdf` feature") || msg.includes("libpdfium")) {
+      console.warn(`skipping PDF core tests: ${msg.slice(0, 120)}`);
+      return false;
+    }
+    throw err;
+  }
+}
+
+describe("citenexus-core PDF contract", () => {
+  const pdf = new Uint8Array(readFileSync(join(PDF_DATA, "pdf", "assemble-mixed.pdf")));
+  const responsesJson = readFileSync(join(PDF_DATA, "pdf", "assemble-mixed.responses.json"), "utf8");
+  const golden = readFileSync(join(PDF_DATA, "pdf", "assemble-mixed.golden.json"), "utf8");
+
+  it("assemble reproduces the Rust golden byte for byte", () => {
+    if (!pdfReady(pdf)) return;
+    expect(pdfAssembleJson(pdf, responsesJson, PDF_OPTS)).toBe(golden);
+  });
+
+  it("prepare -> fulfil -> assemble, typed", () => {
+    if (!pdfReady(pdf)) return;
+    const prep = pdfPrepare(pdf, PDF_OPTS);
+    expect(prep.requests.map((r) => r.id)).toEqual([
+      "p1:table0",
+      "p2:page:v1",
+      "p2:page:v2",
+      "p3:img0:v1",
+      "p3:img0:v2",
+    ]);
+    expect(prep.requests[0]!.variant).toBeNull();
+    expect(prep.requests.slice(1, 3).map((r) => r.variant)).toEqual([1, 2]);
+    const answers = JSON.parse(responsesJson) as PdfResponse[];
+    const out = pdfAssemble(pdf, answers, PDF_OPTS);
+    expect(out.document.responses_applied).toBe(5);
+    const tables = out.units.filter((u) => u.kind === "table");
+    expect(tables).toHaveLength(1);
+    expect(tables[0]!.provenance.table_source).toBe("ruled");
+    const scan = out.units.filter((u) => u.page === 2 && u.provenance.vision_transcribed);
+    expect(scan).toHaveLength(1);
+    expect(scan[0]!.provenance.vision_disputed).toBe(true);
+    const cite = citableText(scan[0]!.markdown);
+    expect(cite).toContain("Diner 1.250,00 vooraf betaald");
+    expect(cite).not.toContain("geen");
+  });
+
+  it("units is assemble without responses, byte for byte", () => {
+    if (!pdfReady(pdf)) return;
+    expect(pdfAssembleJson(pdf, "[]", PDF_OPTS)).toBe(pdfUnitsJson(pdf, PDF_OPTS));
+  });
+
+  it("ooxmlUnits reads a DOCX heading and table", () => {
+    const docx = new Uint8Array(readFileSync(join(PDF_DATA, "ooxml", "sample.docx")));
+    const units = ooxmlUnits(docx, "docx");
+    expect(units[0]!.kind).toBe("heading");
+    expect(units[0]!.markdown).toBe("# Vergoedingen");
+    const table = units.find((u) => u.kind === "table");
+    expect(table?.markdown).toContain("| Reiskosten | 7.000,00 |");
+    expect(table?.provenance.route).toBe("ooxml");
+  });
+
+  it("citableText strips disputed text and image descriptions", () => {
+    const md =
+      "Diner 1.250,00 vooraf betaald.\n<!-- vision_disputed\nv1: Hotel 5.100,00 per jaar.\nv2: Hotel 5.100,00 geen per jaar.\n-->\nArtikel I.3.";
+    expect(citableText(md)).toBe("Diner 1.250,00 vooraf betaald.\nArtikel I.3.");
+    expect(citableText("<!-- image_description\nEen logo\n-->")).toBe("");
+  });
+});

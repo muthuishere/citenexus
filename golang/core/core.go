@@ -17,6 +17,9 @@ package core
 char* citenexus_extract(const uint8_t* bytes, size_t len, const char* source_type, const char* document_id);
 char* citenexus_to_markdown(const uint8_t* bytes, size_t len, const char* source_type);
 char* citenexus_rrf(const char* lists_json, int64_t k);
+char* citenexus_pdf_units(const uint8_t* bytes, size_t len, const char* opts_json);
+char* citenexus_pdf_prepare(const uint8_t* bytes, size_t len, const char* opts_json);
+char* citenexus_pdf_assemble(const uint8_t* bytes, size_t len, const char* opts_json, const char* responses_json);
 void citenexus_free_string(char* s);
 const char* citenexus_core_version();
 
@@ -39,6 +42,7 @@ import "C"
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"unsafe"
 )
 
@@ -212,4 +216,274 @@ func (s *Store) Close() {
 		C.citenexus_store_close(s.handle)
 		s.handle = nil
 	}
+}
+
+// PdfOptions configures the PDF calls. Language ("nl", "en", …) drives the
+// hyphen rules and number reading; LayoutText adds each page's
+// pdftotext -layout-style text to PdfResult.Pages.
+type PdfOptions struct {
+	Language   string `json:"language,omitempty"`
+	LayoutText bool   `json:"layout_text,omitempty"`
+	// ModelTables makes PdfPrepare also request a model grid for tables the
+	// deterministic path already accepted (review mode); assemble then lets
+	// the two grids compete (GriTS + position check). Off by default: only
+	// uncertain table regions cost a model call.
+	ModelTables bool `json:"model_tables,omitempty"`
+}
+
+// PdfUnit and PdfProvenance are the PDF names for the one shared unit shape
+// (DocUnit / Provenance, ooxml.go) — PDF, DOCX and PPTX return the same type.
+type (
+	PdfUnit       = DocUnit
+	PdfProvenance = Provenance
+)
+
+// PdfResult is the full base-extractor output: the units, each page's route
+// with the signals behind it, and document-level signals (heading agreement,
+// hyphen and furniture counts). Pages and Document are kept as raw JSON so the
+// binding does not freeze a signal set that is still growing.
+type PdfResult struct {
+	Units    []PdfUnit       `json:"units"`
+	Pages    json.RawMessage `json:"pages"`
+	Document json.RawMessage `json:"document"`
+}
+
+// pdfCall runs one of the three PDF entry points and returns the raw JSON, or
+// the core's {"error":...} as a Go error. responses is nil except for assemble.
+func pdfCall(which string, pdf []byte, opts PdfOptions, responses []byte) ([]byte, error) {
+	if len(pdf) == 0 {
+		return nil, errors.New("citenexus: empty pdf")
+	}
+	payload, err := json.Marshal(opts)
+	if err != nil {
+		return nil, err
+	}
+	bp := (*C.uint8_t)(unsafe.Pointer(&pdf[0]))
+	cOpts := C.CString(string(payload))
+	defer C.free(unsafe.Pointer(cOpts))
+
+	var out *C.char
+	switch which {
+	case "units":
+		out = C.citenexus_pdf_units(bp, C.size_t(len(pdf)), cOpts)
+	case "prepare":
+		out = C.citenexus_pdf_prepare(bp, C.size_t(len(pdf)), cOpts)
+	default:
+		var cResp *C.char
+		if responses != nil {
+			cResp = C.CString(string(responses))
+			defer C.free(unsafe.Pointer(cResp))
+		}
+		out = C.citenexus_pdf_assemble(bp, C.size_t(len(pdf)), cOpts, cResp)
+	}
+	defer C.citenexus_free_string(out)
+
+	raw := []byte(C.GoString(out))
+	var failure struct {
+		Error string `json:"error"`
+	}
+	if json.Unmarshal(raw, &failure) == nil && failure.Error != "" {
+		return nil, errors.New("citenexus: " + failure.Error)
+	}
+	return raw, nil
+}
+
+// PdfAnalyze runs the shared Rust base PDF extractor (no model, ADR-0017) and
+// returns units, per-page routes and signals. It fails when the core was built
+// without the `pdf` cargo feature, when libpdfium cannot be loaded (set
+// PDFIUM_DYNAMIC_LIB_PATH), or when the bytes are not a PDF.
+func PdfAnalyze(pdf []byte, opts PdfOptions) (*PdfResult, error) {
+	raw, err := pdfCall("units", pdf, opts, nil)
+	if err != nil {
+		return nil, err
+	}
+	var res PdfResult
+	if err := json.Unmarshal(raw, &res); err != nil {
+		return nil, errors.New("citenexus: unexpected pdf_units response: " + err.Error())
+	}
+	return &res, nil
+}
+
+// PdfUnits is the base-only surface rag_go uses (ADR-0017 decision 10): no
+// model, never fails for lack of a provider. It is exactly PdfAssemble with no
+// responses.
+func PdfUnits(pdf []byte, opts PdfOptions) ([]PdfUnit, error) {
+	res, err := PdfAnalyze(pdf, opts)
+	if err != nil {
+		return nil, err
+	}
+	return res.Units, nil
+}
+
+// PdfWord is one text-layer word a table grid may reference by ID.
+type PdfWord struct {
+	ID   string     `json:"id"`
+	Text string     `json:"text"`
+	BBox [4]float64 `json:"bbox"`
+	// Marker: a list-marker glyph opening a line (•, -, 1., a) …). A grid may
+	// include it or leave it out; leaving it out is not a partial unit.
+	Marker bool `json:"marker"`
+	// Chunk is the phrase chunk (PdfRequest.Chunks) this word belongs to; nil
+	// for list markers and pure leaders.
+	Chunk *string `json:"chunk"`
+}
+
+// PdfChunk is a phrase chunk: the words of one line closer than the
+// column-gap threshold (minus a leading marker and leaders). A grid cell may
+// name a chunk ID instead of its words; the core expands it to exactly those
+// words, so an amount like "€ 1.500" cannot be split across columns.
+type PdfChunk struct {
+	ID    string     `json:"id"`
+	Text  string     `json:"text"`
+	BBox  [4]float64 `json:"bbox"`
+	Words []string   `json:"words"`
+}
+
+// PdfRequest asks the host for one model call. Kind is table_structure (answer
+// with Tables over Words' IDs; model-written text is never used on a
+// text-layer page), vision_page or vision_region (answer with Markdown).
+// Prompt is a key into the host's prompt config (default:
+// rust/data/pdf_prompts.json).
+type PdfRequest struct {
+	ID     string     `json:"id"`
+	Page   int        `json:"page"`
+	Kind   string     `json:"kind"`
+	Prompt string     `json:"prompt"`
+	BBox   [4]float64 `json:"bbox"`
+	Words  []PdfWord  `json:"words"`
+	// Chunks (table_structure only): the phrase chunks over Words.
+	Chunks []PdfChunk `json:"chunks"`
+	// Variant is 1 or 2 for vision requests (nil for table_structure): every
+	// vision region is asked TWICE, independently. Hint says how the host
+	// should make the two independent (a different model or sampling seed).
+	Variant *int    `json:"variant"`
+	Hint    *string `json:"hint"`
+}
+
+// PdfPrepared is phase one: the base result plus the requests.
+type PdfPrepared struct {
+	PdfResult
+	Requests []PdfRequest `json:"requests"`
+}
+
+// PdfCell is one grid cell: word IDs, with optional spans (HTML rules).
+type PdfCell struct {
+	Words   []string `json:"words"`
+	Colspan int      `json:"colspan,omitempty"`
+	Rowspan int      `json:"rowspan,omitempty"`
+}
+
+// UnmarshalJSON accepts both cell forms the core speaks: a bare array of word
+// IDs, or an object with words and spans.
+func (c *PdfCell) UnmarshalJSON(b []byte) error {
+	var ids []string
+	if err := json.Unmarshal(b, &ids); err == nil {
+		*c = PdfCell{Words: ids}
+		return nil
+	}
+	type plain PdfCell
+	var p plain
+	if err := json.Unmarshal(b, &p); err != nil {
+		return err
+	}
+	*c = PdfCell(p)
+	return nil
+}
+
+// PdfGrid is one table: rows top to bottom, cells left to right.
+type PdfGrid struct {
+	Rows [][]PdfCell `json:"rows"`
+}
+
+// PdfResponse is the host's answer to the request with ID RequestID.
+type PdfResponse struct {
+	RequestID    string    `json:"request_id"`
+	FinishReason string    `json:"finish_reason,omitempty"`
+	Tables       []PdfGrid `json:"tables,omitempty"`
+	Markdown     *string   `json:"markdown,omitempty"`
+	// Mode is for vision_region only: "transcription" (default) when Markdown
+	// copies text visible in the region; "description" when the region has no
+	// meaningful text (a logo, a photo) and Markdown describes it. A
+	// description becomes an image_description unit: never citable, no dual
+	// agreement.
+	Mode string `json:"mode,omitempty"`
+}
+
+// PdfPrepare is phase one of the model contract (ADR-0017 decision 4).
+func PdfPrepare(pdf []byte, opts PdfOptions) (*PdfPrepared, error) {
+	raw, err := pdfCall("prepare", pdf, opts, nil)
+	if err != nil {
+		return nil, err
+	}
+	var res PdfPrepared
+	if err := json.Unmarshal(raw, &res); err != nil {
+		return nil, errors.New("citenexus: unexpected pdf_prepare response: " + err.Error())
+	}
+	return &res, nil
+}
+
+// PdfAssemble is phase two: the PDF is re-parsed and every response that
+// passes the deterministic checks is applied. A missing response is base
+// output; a failed one is base output with Provenance.FailedCheck set.
+func PdfAssemble(pdf []byte, opts PdfOptions, responses []PdfResponse) (*PdfResult, error) {
+	if responses == nil {
+		responses = []PdfResponse{}
+	}
+	payload, err := json.Marshal(responses)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := PdfAssembleJSON(pdf, opts, payload)
+	if err != nil {
+		return nil, err
+	}
+	var res PdfResult
+	if err := json.Unmarshal(raw, &res); err != nil {
+		return nil, errors.New("citenexus: unexpected pdf_assemble response: " + err.Error())
+	}
+	return &res, nil
+}
+
+// PdfAssembleJSON is PdfAssemble over raw JSON, returning the core's bytes
+// untouched (for byte-level determinism checks and pass-through hosts).
+func PdfAssembleJSON(pdf []byte, opts PdfOptions, responsesJSON []byte) ([]byte, error) {
+	if responsesJSON == nil {
+		responsesJSON = []byte("[]")
+	}
+	return pdfCall("assemble", pdf, opts, responsesJSON)
+}
+
+// CitableText returns markdown with every <!-- vision_disputed … --> and
+// <!-- image_description … --> block removed: the only text a host may cite or quote-match (ADR-0017 decision 4).
+// Mirrors the Rust core's vision::citable_text.
+func CitableText(markdown string) string {
+	const closing = "-->"
+	var b strings.Builder
+	rest := markdown
+	for {
+		i := -1
+		for _, open := range []string{"<!-- vision_disputed", "<!-- image_description"} {
+			if j := strings.Index(rest, open); j >= 0 && (i < 0 || j < i) {
+				i = j
+			}
+		}
+		if i < 0 {
+			b.WriteString(rest)
+			break
+		}
+		b.WriteString(rest[:i])
+		j := strings.Index(rest[i:], closing)
+		if j < 0 {
+			break
+		}
+		rest = rest[i+j+len(closing):]
+	}
+	var lines []string
+	for _, l := range strings.Split(b.String(), "\n") {
+		l = strings.TrimRight(l, " \t\r")
+		if strings.TrimSpace(l) != "" {
+			lines = append(lines, l)
+		}
+	}
+	return strings.Join(lines, "\n")
 }

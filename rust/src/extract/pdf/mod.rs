@@ -10,12 +10,35 @@ use pdfium_render::prelude::*;
 
 use crate::types::*;
 
+pub mod build;
+pub mod contract;
+pub mod diag;
+pub mod furniture;
+pub mod headings;
+pub mod hyphen;
+pub mod layout;
+pub mod order;
+pub mod raw;
+pub mod route;
+pub mod tables;
+
+pub use build::analyze;
+pub use contract::{pdf_assemble, pdf_prepare, pdf_units};
+
 pub fn extract(
     bytes: &[u8],
     document_id: &str,
     source_uri: Option<String>,
 ) -> Result<ExtractedDoc, String> {
-    let pdfium = Pdfium::default();
+    raw::with_pdfium(|bound| extract_with(&bound.pdfium, bytes, document_id, source_uri))
+}
+
+fn extract_with(
+    pdfium: &Pdfium,
+    bytes: &[u8],
+    document_id: &str,
+    source_uri: Option<String>,
+) -> Result<ExtractedDoc, String> {
     let document = pdfium
         .load_pdf_from_byte_slice(bytes, None)
         .map_err(|e| format!("pdfium: {e}"))?;

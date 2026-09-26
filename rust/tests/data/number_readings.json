@@ -1,0 +1,185 @@
+{
+ "_source": "conformance/cases/conflict.json bucket number_readings at 6f7cee0 (ADR-0015). Copied verbatim so the Rust reader is pinned to the Python reference before that branch lands; switch the test to the conformance file once it does.",
+ "number_readings": [
+  {
+   "raw": "1500",
+   "dash": false,
+   "language": null,
+   "key": "1500"
+  },
+  {
+   "raw": "1.500",
+   "dash": false,
+   "language": null,
+   "key": "?1.500"
+  },
+  {
+   "raw": "1,500",
+   "dash": false,
+   "language": null,
+   "key": "?1,500"
+  },
+  {
+   "raw": "1.500",
+   "dash": false,
+   "language": "nl",
+   "key": "1500"
+  },
+  {
+   "raw": "1.500",
+   "dash": false,
+   "language": "nl-NL",
+   "key": "1500"
+  },
+  {
+   "raw": "1,500",
+   "dash": false,
+   "language": "nl",
+   "key": "1.5"
+  },
+  {
+   "raw": "1.500",
+   "dash": false,
+   "language": "en",
+   "key": "1.5"
+  },
+  {
+   "raw": "1,500",
+   "dash": false,
+   "language": "en-GB",
+   "key": "1500"
+  },
+  {
+   "raw": "1.500",
+   "dash": false,
+   "language": "de",
+   "key": "?1.500"
+  },
+  {
+   "raw": "25,00",
+   "dash": false,
+   "language": null,
+   "key": "25"
+  },
+  {
+   "raw": "25,50",
+   "dash": false,
+   "language": null,
+   "key": "25.5"
+  },
+  {
+   "raw": "25.50",
+   "dash": false,
+   "language": null,
+   "key": "25.5"
+  },
+  {
+   "raw": "1,5",
+   "dash": false,
+   "language": null,
+   "key": "1.5"
+  },
+  {
+   "raw": "1.5",
+   "dash": false,
+   "language": null,
+   "key": "1.5"
+  },
+  {
+   "raw": "0,05",
+   "dash": false,
+   "language": null,
+   "key": "0.05"
+  },
+  {
+   "raw": "4.20",
+   "dash": false,
+   "language": null,
+   "key": "4.2"
+  },
+  {
+   "raw": "25",
+   "dash": true,
+   "language": null,
+   "key": "25"
+  },
+  {
+   "raw": "1.500",
+   "dash": true,
+   "language": null,
+   "key": "1500"
+  },
+  {
+   "raw": "25,50",
+   "dash": true,
+   "language": null,
+   "key": "?25,50,-"
+  },
+  {
+   "raw": "1.500,50",
+   "dash": false,
+   "language": null,
+   "key": "1500.5"
+  },
+  {
+   "raw": "1,500.50",
+   "dash": false,
+   "language": null,
+   "key": "1500.5"
+  },
+  {
+   "raw": "1.500.000",
+   "dash": false,
+   "language": null,
+   "key": "1500000"
+  },
+  {
+   "raw": "1,500,000",
+   "dash": false,
+   "language": null,
+   "key": "1500000"
+  },
+  {
+   "raw": "1234.567",
+   "dash": false,
+   "language": null,
+   "key": "1234.567"
+  },
+  {
+   "raw": "0.500",
+   "dash": false,
+   "language": null,
+   "key": "0.5"
+  },
+  {
+   "raw": "12.500",
+   "dash": false,
+   "language": "nl",
+   "key": "12500"
+  },
+  {
+   "raw": "1.50.000",
+   "dash": false,
+   "language": null,
+   "key": "?1.50.000"
+  },
+  {
+   "raw": "0.500.000",
+   "dash": false,
+   "language": null,
+   "key": "?0.500.000"
+  },
+  {
+   "raw": "01.02.2024",
+   "dash": false,
+   "language": null,
+   "key": "?01.02.2024"
+  },
+  {
+   "raw": "007",
+   "dash": false,
+   "language": null,
+   "key": "7"
+  }
+ ]
+}

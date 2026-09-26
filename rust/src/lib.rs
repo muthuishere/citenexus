@@ -5,19 +5,25 @@
 //! orchestration, cite-or-abstain, hooks, and model IO stay in each host
 //! language. Boundary: JSON in/out, no callbacks.
 
+pub mod checks;
 pub mod detect;
 pub mod emit;
 pub mod extract;
+pub mod numbers;
 pub mod rrf;
 pub mod store;
 pub mod types;
+pub mod units;
+pub mod vision;
 
 // Public so integration tests can exercise the exact C surface bindings use.
 pub mod ffi;
 
 pub use detect::{Detection, Detector};
 pub use emit::markdown::to_markdown;
+pub use extract::ooxml_units::ooxml_units;
 pub use extract::{extract, source_type_for_extension};
 pub use rrf::rrf;
 pub use store::LanceStore;
 pub use types::*;
+pub use units::*;
