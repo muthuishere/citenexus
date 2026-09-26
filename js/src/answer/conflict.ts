@@ -58,12 +58,11 @@ import {
 import { STOPWORDS_TABLE } from "../gen/tables.js";
 import { tokenizeV2 } from "../tokenize/tokenize-v2.js";
 import {
-  NUMBER_RE,
   type DecimalValue,
   decimalMul,
   decimalWithin,
+  numbersIn,
   parseDecimal,
-  readNumber,
 } from "./numbers.js";
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -173,8 +172,8 @@ function isTokenizerDigitArtifact(token: string): boolean {
 // the guard exists to protect ASCII identifiers, not to suppress non-Latin text.
 // As a bonus it removes a JS-only hazard: `lowered[start - 1]` is a UTF-16 code
 // UNIT, so for a non-BMP letter it was a lone surrogate that `\p{L}` failed
-// anyway — the three ports were not in fact identical there.
-const IDENTIFIER_PREFIX = /[a-z_]/;
+// anyway — the three ports were not in fact identical there. The guard itself
+// lives in numbers.ts (`numbersIn`), shared with verifyAnswer.
 
 const STOPWORDS: ReadonlySet<string> = new Set(STOPWORDS_TABLE);
 const NEGATIONS: ReadonlySet<string> = new Set(CONFLICT_NEGATIONS_TABLE);
@@ -321,24 +320,15 @@ function features(text: string, language: string | null = null): Features {
   const values = new Map<string, DecimalValue | null>();
   const units = new Set<string>();
 
-  NUMBER_RE.lastIndex = 0;
-  for (const match of lowered.matchAll(NUMBER_RE)) {
-    // Group 1 begins at offset 0 of the match, so `match.index` IS `start(1)`.
-    const start = match.index;
-    const prev = start > 0 ? (lowered[start - 1] as string) : "";
-    if (start > 0 && IDENTIFIER_PREFIX.test(prev)) {
-      continue; // "p50", "ipv4": an identifier, not a measured value
-    }
-    const reading = readNumber(match[1] as string, {
-      dash: match[2] !== undefined,
-      language,
-    });
-    values.set(reading.key, reading.value);
-    const unit = match[3];
-    if (unit === "%") {
+  // numbersIn (numbers.ts) applies the letter-boundary guard below and reads
+  // space-grouped money thousands ("€ 4 000"), exactly as Go's
+  // conflictFeaturesOf does through its numbersIn.
+  for (const m of numbersIn(lowered, language)) {
+    values.set(m.reading.key, m.reading.value);
+    if (m.unit === "%") {
       units.add("%");
-    } else if (unit !== undefined && unit !== "" && MEASUREMENT_UNITS.has(unit)) {
-      units.add(unit);
+    } else if (m.unit !== "" && MEASUREMENT_UNITS.has(m.unit)) {
+      units.add(m.unit);
     }
   }
 

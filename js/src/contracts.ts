@@ -15,6 +15,9 @@
 //     EmbeddingProvider   embed(texts)                      -> Vector[]
 //     GeneratorProvider   answer(question, passage, langISO) -> string
 //
+// plus the `SupportChecker` that `verifyAnswer` (answer/verify-answer.ts)
+// consumes: check(claim, passage) -> { entailed, contradicted }.
+//
 // Completion, vision and reranking are absent ON PURPOSE. The JS port has no
 // deep-ask decision loop (`result.ts` says so outright: "Deep-ask is Python-only
 // today"), no conditional-vision path, and no rerank symbol anywhere — not even
@@ -93,6 +96,31 @@ export interface EmbeddingProvider {
  */
 export interface GeneratorProvider {
   answer(question: string, passage: string, answerLanguage?: string): Awaitable<string>;
+}
+
+/** A support checker's verdict: probabilities in [0, 1]. `{0, 0}` is a finding
+ * ("neither"), not "I could not run" — failure is a rejection. */
+export interface SupportScores {
+  entailed: number;
+  contradicted: number;
+}
+
+/**
+ * An injected judge of whether a passage supports a claim — typically an NLI
+ * classifier (golang/contracts/support.go). It exists for the one case the
+ * deterministic gate cannot handle at all: a claim in one language and its
+ * evidence in another.
+ *
+ * It is NOT trusted the way the gate is, so `verifyAnswer` uses it
+ * ASYMMETRICALLY: `contradicted` is a veto everywhere (it can only add
+ * abstention); `entailed` may ADMIT a claim only across languages (or under
+ * `admitParaphrase`), behind the deterministic guards, and every such claim is
+ * labelled (`Claim.verified_by`).
+ *
+ * Implementations MUST reject rather than return a placeholder on failure.
+ */
+export interface SupportChecker {
+  check(claim: string, passage: string): Awaitable<SupportScores>;
 }
 
 /**

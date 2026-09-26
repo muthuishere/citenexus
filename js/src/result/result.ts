@@ -65,6 +65,15 @@ export interface EvidenceSignals {
    */
   authority_tier: string;
   authority_floor_applied: boolean;
+  /**
+   * The answered claims admitted by an injected SupportChecker rather than the
+   * deterministic gate (verifyAnswer only). Omitted when zero — Go's
+   * `omitempty` — so every existing Result serializes unchanged.
+   */
+  model_verified_claims?: number;
+  /** The caller-declared facets (VerifyOptions.facets) no verified claim
+   * answers (verifyAnswer only). Omitted when empty. */
+  missing_facets?: string[];
   /** null on the strict flow (deep-ask is Python-only) — present for wire parity. */
   loop: LoopSignals | null;
 }
@@ -83,6 +92,14 @@ export interface Claim {
   claim: string;
   supported: boolean;
   sources: string[];
+  /**
+   * What admitted a supported claim: "gate" (the ADR-0009 predicate),
+   * "quote+model:<name>" or "model:<name>" (an injected SupportChecker).
+   * verifyAnswer only; omitted when empty, so existing Results are unchanged.
+   */
+  verified_by?: string;
+  /** Why an unsupported claim was dropped (verifyAnswer only; omitted when empty). */
+  reason?: string;
 }
 
 export interface ProvenanceEntry {

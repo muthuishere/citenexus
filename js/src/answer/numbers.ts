@@ -37,6 +37,8 @@ import {
   DECIMAL_COMMA_LANGUAGES_TABLE,
   DECIMAL_POINT_LANGUAGES_TABLE,
 } from "../gen/conflict_tables.js";
+import { GS, findAll, goLower, pad2, replaceAll } from "./gotext.js";
+import { unitOf } from "./verify-guards-model.js";
 
 /** Languages whose decimal mark is the comma (ADR-0010 tier 2). */
 export const DECIMAL_COMMA_LANGUAGES: ReadonlySet<string> = new Set(DECIMAL_COMMA_LANGUAGES_TABLE);
@@ -100,6 +102,22 @@ function known(value: DecimalValue): NumberReading {
   return { key: canonical(value), value };
 }
 
+const DIGITS = /^[0-9]*$/;
+
+/**
+ * `known` over integer groups and decimal digits. A token that is not digits
+ * ("4al" — verifyAnswer's guards read tokenizer tokens) gets Go's reading
+ * (golang numbers.go `known`): the key trimmed of leading/trailing zeros, and
+ * no value, where BigInt would throw.
+ */
+function knownOf(integerGroups: readonly string[], decimals: string): NumberReading {
+  const whole = integerGroups.join("");
+  if (DIGITS.test(whole) && DIGITS.test(decimals)) return known(valueOf(integerGroups, decimals));
+  const w = whole.replace(/^0+/, "") || "0";
+  const d = decimals.replace(/0+$/, "");
+  return { key: d === "" ? w : w + "." + d, value: null };
+}
+
 function unread(raw: string): NumberReading {
   return { key: "?" + raw, value: null };
 }
@@ -123,12 +141,12 @@ export function readNumber(
     if (raw.includes(",")) return unread(raw + ",-"); // "25,50,-" is not a form
     const groups = raw.split(".");
     if (groups.length > 1 && !isThousands(groups)) return unread(raw + ",-");
-    return known(valueOf(groups, ""));
+    return knownOf(groups, "");
   }
 
   const hasDot = raw.includes(".");
   const hasComma = raw.includes(",");
-  if (!hasDot && !hasComma) return known(valueOf([raw], ""));
+  if (!hasDot && !hasComma) return knownOf([raw], "");
 
   if (hasDot && hasComma) {
     const decimalMark = raw.lastIndexOf(".") > raw.lastIndexOf(",") ? "." : ",";
@@ -139,19 +157,19 @@ export function readNumber(
     if (whole.includes(decimalMark)) return unread(raw);
     const groups = whole.split(thousandsMark);
     if (!isThousands(groups)) return unread(raw);
-    return known(valueOf(groups, decimals));
+    return knownOf(groups, decimals);
   }
 
   const mark = hasDot ? "." : ",";
   const parts = raw.split(mark);
   if (parts.length > 2) {
-    return isThousands(parts) ? known(valueOf(parts, "")) : unread(raw);
+    return isThousands(parts) ? knownOf(parts, "") : unread(raw);
   }
 
   const whole = parts[0] as string;
   const tail = parts[1] as string;
   if (tail.length !== 3 || !isThousands(parts)) {
-    return known(valueOf([whole], tail)); // a decimal mark in every locale
+    return knownOf([whole], tail); // a decimal mark in every locale
   }
 
   const languageCode = primary(options.language);
@@ -163,7 +181,7 @@ export function readNumber(
   } else {
     return unread(raw); // 1.500 / 1,500 with no declared locale
   }
-  return thousands ? known(valueOf([whole, tail], "")) : known(valueOf([whole], tail));
+  return thousands ? knownOf([whole, tail], "") : knownOf([whole], tail);
 }
 
 /** `|a - b| <= tolerance`, exactly, over scaled integers. */
@@ -186,4 +204,249 @@ export function parseDecimal(text: string): DecimalValue {
   const decimals = match[3] ?? "";
   const units = BigInt((match[2] as string) + decimals);
   return { units: match[1] === "-" ? -units : units, scale: decimals.length };
+}
+
+// ─── Beyond the Python reference: the Go port's numbers.go (VerifyAnswer) ─────
+//
+// Everything below mirrors golang/answer/numbers.go byte for byte in behaviour:
+// numbers found in running text (with space-grouped money thousands), clock
+// times, money rates and dates. The conflict detector reads numbers through
+// `numbersIn` too, exactly as Go's conflictFeaturesOf does.
+
+
+/** One number found in lowered text, with its unit (if any). */
+export interface NumberMatch {
+  /** the matched digits and separators, as written */
+  raw: string;
+  reading: NumberReading;
+  unit: string;
+  /** the unit follows the digits with no space ("1st", "2de") */
+  attached: boolean;
+}
+
+const NUMBER_RE_GO = new RegExp(`([0-9]+(?:[.,][0-9]+)*)(,-)?[${PY_SPACE}]*([a-z]+|%)?`, "gd");
+
+/** The letter-boundary guard is LATIN-ONLY (golang isIdentifierPrefix). */
+function isIdentifierPrefix(ch: string): boolean {
+  return (ch >= "a" && ch <= "z") || ch === "_";
+}
+
+/** Every measured number in text, skipping identifiers such as "p50" / "ipv4". */
+export function numbersIn(text: string, language: string | null | undefined): NumberMatch[] {
+  const lowered = joinSpacedThousands(goLower(text));
+  const out: NumberMatch[] = [];
+  for (const m of findAll(NUMBER_RE_GO, lowered)) {
+    const g1 = m.groups[0] as readonly [number, number];
+    const start = g1[0];
+    if (start > 0 && isIdentifierPrefix(lowered[start - 1] as string)) continue;
+    const raw = lowered.slice(g1[0], g1[1]);
+    const unitAt = m.groups[2];
+    out.push({
+      raw,
+      reading: readNumber(raw, { dash: m.groups[1] !== null, language: language ?? "" }),
+      unit: unitAt === null || unitAt === undefined ? "" : lowered.slice(unitAt[0], unitAt[1]),
+      attached: unitAt !== null && unitAt !== undefined && unitAt[0] === g1[1],
+    });
+  }
+  return out;
+}
+
+// Clock times are times of day, never durations or amounts: "09:00" = "9:00" =
+// "9.00 uur" = "9am".
+const CLOCK_COLON = /\b([01]?[0-9]|2[0-3]):([0-5][0-9])\b/dg;
+const CLOCK_DOT = new RegExp(`\\b([01]?[0-9]|2[0-3])\\.([0-5][0-9])([${GS}]*(?:uur|u)\\b)`, "dg");
+const CLOCK_AMPM = new RegExp(
+  `\\b(1[0-2]|0?[1-9])(?:[:.]([0-5][0-9]))?[${GS}]*(am|pm|a\\.m\\.|p\\.m\\.)`,
+  "dg",
+);
+
+function blankRange(s: string, start: number, end: number): string {
+  return s.slice(0, start) + " ".repeat(end - start) + s.slice(end);
+}
+
+/** The clock-time keys ("clock:9:00", 24-hour) in text, and the text lowered
+ * with them blanked out. */
+export function clockTimes(text: string): [Set<string>, string] {
+  const keys = new Set<string>();
+  const lowered = goLower(text);
+  let blank = lowered;
+  const mark = (start: number, end: number, hour: string, minute: string): void => {
+    let h = hour.replace(/^0+/, "");
+    if (h === "") h = "0";
+    if (minute === "") minute = "00";
+    keys.add(`clock:${h}:${minute}`);
+    blank = blankRange(blank, start, end);
+  };
+  for (const m of findAll(CLOCK_AMPM, lowered)) {
+    const hour = m.group(1) as string;
+    const minute = m.group(2) ?? "";
+    let h = 0;
+    for (const r of hour) h = h * 10 + (r.charCodeAt(0) - 48);
+    const pm = (m.group(3) as string).startsWith("p");
+    if (pm && h < 12) h += 12;
+    else if (!pm && h === 12) h = 0;
+    mark(m.start, m.end, String(h), minute);
+  }
+  for (const re of [CLOCK_COLON, CLOCK_DOT]) {
+    const snapshot = blank;
+    for (const m of findAll(re, snapshot)) {
+      const g2 = m.groups[1] as readonly [number, number];
+      mark(m.start, g2[1], m.group(1) as string, m.group(2) as string);
+    }
+  }
+  return [keys, blank];
+}
+
+// Money is never a duration: "€ 150 per maand" is a price with a period.
+const MONEY_BEFORE = new RegExp(`(?:€|\\beur\\b|\\$|£)[${GS}]*([0-9][0-9.,]*)(?:,-)?`, "dgu");
+const MONEY_AFTER = new RegExp(`\\b([0-9][0-9.,]*)[${GS}]*(?:euro|eur)\\b`, "dgu");
+const RATE_PERIOD = new RegExp(
+  `^(?:[${GS}]+\\p{L}+)?[${GS}]*(?:per|a|an|each|/)[${GS}]*(\\p{L}+)`,
+  "dgu",
+);
+
+/** The money rates in text — "amount key\u0000period class" — and the text
+ * lowered with every money amount blanked. */
+export function moneyRates(text: string, language: string): [Set<string>, string] {
+  const rates = new Set<string>();
+  const lowered = goLower(text);
+  let blank = lowered;
+  for (const re of [MONEY_BEFORE, MONEY_AFTER]) {
+    for (const m of findAll(re, lowered)) {
+      const g1 = m.groups[0] as readonly [number, number];
+      const raw = (m.group(1) as string).replace(/[.,]+$/, "");
+      if (raw === "") continue;
+      const key = readNumber(raw, { dash: false, language }).key;
+      const p = findAll(RATE_PERIOD, lowered.slice(m.end))[0];
+      if (p !== undefined) {
+        const [cls, , ok] = unitOf(p.group(1) as string);
+        if (ok) rates.add(`${key}\u0000${cls}`);
+      }
+      blank = blankRange(blank, g1[0], g1[1]);
+    }
+  }
+  return [rates, blank];
+}
+
+// A money amount grouped by spaces — plain, no-break or narrow no-break —
+// "€ 4 000" = "€ 4.000" = 4000; only after a currency sign or code, and only
+// with exact three-digit groups.
+const SPACED_THOUSANDS = new RegExp(
+  `((?:€|\\beur\\b|\\$|£)[${GS}\\u00a0\\u202f]*)([1-9][0-9]*)[ \\u00a0\\u202f]([0-9]{3})\\b`,
+  "dgu",
+);
+
+export function joinSpacedThousands(text: string): string {
+  for (let i = 0; i < 4; i++) {
+    const next = replaceAll(SPACED_THOUSANDS, text, "$1$2$3");
+    if (next === text) break;
+    text = next;
+  }
+  return text;
+}
+
+// Dates, numeric or written, read as (day, month, year?) and compared as dates.
+const MONTH_NUMBER: ReadonlyMap<string, number> = new Map([
+  ["januari", 1], ["februari", 2], ["maart", 3], ["april", 4], ["mei", 5], ["juni", 6],
+  ["juli", 7], ["augustus", 8], ["september", 9], ["oktober", 10], ["november", 11],
+  ["december", 12], ["january", 1], ["february", 2], ["march", 3], ["may", 5], ["june", 6],
+  ["july", 7], ["august", 8], ["october", 10],
+]);
+const MONTH_NAMES = [...MONTH_NUMBER.keys()].sort((a, b) => b.length - a.length).join("|");
+const NUMERIC_DATE = /\b([0-3]?[0-9])[-/.]([01]?[0-9])(?:[-/.]((?:19|20)[0-9]{2}))?\b/dg;
+const DAY_MONTH = new RegExp(
+  `\\b([0-3]?[0-9])(?:st|nd|rd|th|e|ste|de)?[${GS}]+(${MONTH_NAMES})\\b(?:[${GS}]+((?:19|20)[0-9]{2}))?`,
+  "dg",
+);
+const MONTH_DAY = new RegExp(
+  `\\b(${MONTH_NAMES})[${GS}]+([0-3]?[0-9])(?:st|nd|rd|th)?\\b(?:,?[${GS}]+((?:19|20)[0-9]{2}))?`,
+  "dg",
+);
+
+/** A date: day, month, year (0 = not stated), or an ambiguous spelling. */
+export interface DateKey {
+  day: number;
+  month: number;
+  year: number;
+  ambiguous: string;
+}
+
+export function dateKeyString(d: DateKey): string {
+  if (d.ambiguous !== "") return d.ambiguous;
+  if (d.year === 0) return `${pad2(d.day)}-${pad2(d.month)}`;
+  return `${pad2(d.day)}-${pad2(d.month)}-${d.year}`;
+}
+
+/** Equal day and month, and equal years when both state one. */
+export function sameDate(a: DateKey, b: DateKey): boolean {
+  if (a.ambiguous !== "" || b.ambiguous !== "") return a.ambiguous !== "" && a.ambiguous === b.ambiguous;
+  return a.day === b.day && a.month === b.month && (a.year === 0 || b.year === 0 || a.year === b.year);
+}
+
+function atoi(s: string): number {
+  let n = 0;
+  for (const r of s) n = n * 10 + (r.charCodeAt(0) - 48);
+  return n;
+}
+
+export interface DateSpan {
+  start: number;
+  end: number;
+  key: DateKey;
+}
+
+/** The dates in text, and the text lowered with them blanked. */
+export function datesIn(text: string, language: string): [DateKey[], string] {
+  const lowered = goLower(text);
+  let blank = lowered;
+  const out: DateKey[] = [];
+  for (const sp of dateSpans(lowered, language)) {
+    out.push(sp.key);
+    blank = blankRange(blank, sp.start, sp.end);
+  }
+  return [out, blank];
+}
+
+/** The dates in lowered text, in text order. */
+export function dateSpans(lowered: string, language: string): DateSpan[] {
+  let blank = lowered;
+  const spans: DateSpan[] = [];
+  const valid = (d: number, m: number): boolean => d >= 1 && d <= 31 && m >= 1 && m <= 12;
+  const mark = (start: number, end: number, k: DateKey): void => {
+    spans.push({ start, end, key: k });
+    blank = blankRange(blank, start, end);
+  };
+  for (const m of findAll(DAY_MONTH, lowered)) {
+    const d = atoi(m.group(1) as string);
+    const mo = MONTH_NUMBER.get(m.group(2) as string) ?? 0;
+    if (!valid(d, mo)) continue;
+    const y = m.group(3);
+    mark(m.start, m.end, { day: d, month: mo, year: y === undefined ? 0 : atoi(y), ambiguous: "" });
+  }
+  for (const m of findAll(MONTH_DAY, blank)) {
+    const mo = MONTH_NUMBER.get(m.group(1) as string) ?? 0;
+    const d = atoi(m.group(2) as string);
+    if (!valid(d, mo)) continue;
+    const y = m.group(3);
+    mark(m.start, m.end, { day: d, month: mo, year: y === undefined ? 0 : atoi(y), ambiguous: "" });
+  }
+  const dutch = primary(language) === "nl";
+  for (const m of findAll(NUMERIC_DATE, blank)) {
+    const raw = m.text;
+    const a = atoi(m.group(1) as string);
+    const b = atoi(m.group(2) as string);
+    let year = 0;
+    const y = m.group(3);
+    if (y !== undefined) year = atoi(y);
+    else if (!raw.includes("-")) continue; // "1.5" or "3/4" without a year
+    let k: DateKey;
+    if (dutch && valid(a, b)) k = { day: a, month: b, year, ambiguous: "" };
+    else if (!dutch && valid(a, b) && valid(b, a) && a !== b) k = { day: 0, month: 0, year: 0, ambiguous: "date?" + raw };
+    else if (valid(a, b)) k = { day: a, month: b, year, ambiguous: "" };
+    else if (valid(b, a)) k = { day: b, month: a, year, ambiguous: "" }; // month-first, unambiguous
+    else continue;
+    mark(m.start, m.end, k);
+  }
+  spans.sort((x, y) => x.start - y.start);
+  return spans;
 }
