@@ -50,6 +50,18 @@ def test_empty_request_is_refused() -> None:
         resolve_search_languages(())
 
 
+def test_none_is_a_type_error_outside_the_capability_channel() -> None:
+    """``search_languages=None`` is a programming error, not a capability refusal.
+
+    The for-loop iterates ``codes`` with no guard, so the most common "the value
+    was not supplied" mistake leaves the module's error channel entirely: a call
+    site's ``except UnsupportedSearchLanguageError`` (or ``except ValueError``)
+    does not catch it. Pinned so adding a guard later is a decision, not drift.
+    """
+    with pytest.raises(TypeError, match="'NoneType' object is not iterable"):
+        resolve_search_languages(None)  # type: ignore[arg-type]
+
+
 # --------------------------------------------------------------------------- #
 # The refusals — the whole point of the module
 # --------------------------------------------------------------------------- #
@@ -140,3 +152,23 @@ def test_tamil_is_supported_kannada_is_not() -> None:
     assert SEARCH_LANGUAGES["ta"].is_supported
     assert not SEARCH_LANGUAGES["kn"].is_supported
     assert SEARCH_LANGUAGES["kn"].unsupported == ("kannada",)
+
+
+def test_telugu_is_claimed_and_searchable_not_refused() -> None:
+    """ADR-0013's table row and decision 5 are stale: Telugu ships.
+
+    `tokenize.py:130` maps the U+0C00-U+0C7F range to ``telugu``, ``SUPPORTED_SCRIPTS``
+    claims it, ``conformance/cases/tokenize_v2.json`` carries its golden fixture,
+    and this table therefore serves it. Re-refusing `te` (or dropping the range)
+    would take a claimed, fixture-backed language dark for every caller.
+    """
+    (telugu,) = resolve_search_languages(("te",))
+
+    assert telugu.code == "te"
+    assert telugu.name == "Telugu"
+    assert telugu.scripts == ("telugu",)
+    assert telugu.unsupported == ()
+    assert telugu.is_supported is True
+    assert "telugu" in SUPPORTED_SCRIPTS
+    # The script really is recognized in text, so `te` is not merely untabled.
+    assert scripts_in("\u0c09\u0c26\u0c4d\u0c2f\u0c4b\u0c17\u0c41\u0c32\u0c41") == ("telugu",)

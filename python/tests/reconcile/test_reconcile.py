@@ -10,19 +10,30 @@ removes orphans — through the one existing revoke path.
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from citenexus import CiteNexus, CorpusEntry, CorpusManifest
-from citenexus.reconcile import ReconcileReport, enumerate_index, read_audit
+from citenexus.answer.result import Decision
+from citenexus.ingest.pipeline import IngestPipeline
+from citenexus.reconcile import (
+    DriftedDocument,
+    ReconcileReport,
+    audit_key,
+    enumerate_index,
+    read_audit,
+)
+from citenexus.reconcile.audit import append_audit
 from citenexus.storage.paths import Layer, layer_prefix
 from citenexus.testing import FakeEmbedding, FakeLLM
 
 _LEASE = "The tenant shall indemnify the landlord for damage to the premises."
 _POLICY = "The employee shall not disclose confidential information."
 _GHOST = "This memo was never part of the agreed corpus at all."
+_GHOST_REVISED = "This memo was never part of the agreed corpus at all. Revised."
 _V2 = "The tenant shall indemnify the landlord for damage, subject to clause nine."
 
 
@@ -48,6 +59,16 @@ def _assert_disjoint(report: ReconcileReport) -> None:
     assert not (orphans & missing)
     assert not (orphans & drifted)
     assert not (missing & drifted)
+
+
+def _report(**sets: Any) -> ReconcileReport:
+    """A minimal, well-formed report with only the sets under test overridden."""
+    return ReconcileReport(
+        partition="workspace=default",
+        manifest_version="2026-08-16",
+        checked_at="2026-09-27T00:00:00+00:00",
+        **sets,
+    )
 
 
 def _snapshot(rag: CiteNexus) -> dict[str, Any]:
@@ -87,6 +108,32 @@ def test_manifest_allows_one_current_plus_superseded_versions() -> None:
     assert set(manifest.current()) == {"lease"}
     assert manifest.declares("lease")
     assert not manifest.declares("ghost")
+
+
+def test_a_declared_entry_carries_its_source_uri_and_effective_date() -> None:
+    """ADR-0008: a manifest entry names where the document came from and as of when.
+
+    The diff reads neither field — it compares ``document_id`` and ``sha256`` — so
+    both are pure caller-facing knobs: a flipped default or a dropped field would
+    break every declaring caller with nothing in the suite to say so.
+    """
+    entry = CorpusEntry(
+        document_id="policy",
+        sha256=_sha(_POLICY),
+        source_uri="s3://bucket/policy.pdf",
+        effective_date="2026-01-01",
+    )
+
+    assert entry.source_uri == "s3://bucket/policy.pdf"
+    assert entry.effective_date == "2026-01-01"
+    assert entry.model_dump()["source_uri"] == "s3://bucket/policy.pdf"
+    assert entry.model_dump()["effective_date"] == "2026-01-01"
+    # and they survive the manifest the diff actually consumes
+    assert _manifest(entry).current()["policy"].source_uri == "s3://bucket/policy.pdf"
+
+    bare = CorpusEntry(document_id="policy", sha256=_sha(_POLICY))
+    assert bare.source_uri == ""
+    assert bare.effective_date is None
 
 
 # -- enumeration -------------------------------------------------------------
@@ -136,6 +183,50 @@ def test_enumeration_works_without_vector_rows(tmp_path: Path) -> None:
 
     assert enumerate_index(rag._backend, rag.partition, rag._store) == {"lease": _sha(_LEASE)}
     assert rag.reconcile(_manifest(_declared("lease", _LEASE))).clean
+
+
+class _ScanOnlyStore:
+    """Just enough VectorStore for ``enumerate_index``: ``scan()`` is its seam."""
+
+    def __init__(self, rows: list[dict[str, Any]]) -> None:
+        self._rows = rows
+
+    def upsert(self, rows: Any) -> None:  # pragma: no cover - fake
+        ...
+
+    def search(self, vector: Any, limit: int = 10) -> list[dict[str, Any]]:  # pragma: no cover
+        return []
+
+    def scan(self, limit: int | None = None) -> list[dict[str, Any]]:
+        return self._rows
+
+    def delete_document(self, document_id: str) -> None:  # pragma: no cover - fake
+        return None
+
+
+def test_rows_without_an_identity_contribute_nothing(tmp_path: Path) -> None:
+    """The scan is the physical record, and it can carry half-written rows.
+
+    A row with no ``document_id`` has neither a name to diff nor a target to
+    remediate, so it is skipped; a row WITH an id and no checksum is still
+    indexed — as the empty string, which is what makes it drift rather than
+    disappear from the diff.
+    """
+    rag = _rag(tmp_path)
+    rag.ingest(text=_LEASE, document_id="lease")
+    store = _ScanOnlyStore(
+        [
+            {"eu_id": "e1", "document_id": "", "checksum": "c1"},
+            {"eu_id": "e2", "checksum": "c2"},
+            {"eu_id": "e3", "document_id": "z", "checksum": "c"},
+            {"eu_id": "e4", "document_id": "y"},
+        ]
+    )
+
+    indexed = enumerate_index(rag._backend, rag.partition, store)
+
+    expected = {"lease": _sha(_LEASE), "z": "c", "y": ""}
+    assert indexed == expected, f"half-written rows leaked into the diff: {indexed}"
 
 
 # -- the three sets ----------------------------------------------------------
@@ -233,6 +324,24 @@ def test_a_declared_document_indexed_at_an_unknown_hash_is_content_mismatch(
 
     assert report.drifted[0].reason == "content_mismatch"
     assert report.drifted[0].indexed_version is None
+
+
+def test_a_single_non_empty_set_is_never_clean() -> None:
+    """`clean` is a three-way OR over the sets, not an AND.
+
+    The suite pins all-empty (clean) and all-three-non-empty (not clean), so a
+    rewrite to ``and`` passes both while calling a lone orphan — a document
+    nobody agreed belongs in the corpus — "clean". That is the silence the
+    report exists to break.
+    """
+    drift = DriftedDocument(
+        document_id="lease", indexed_sha256="a", declared_sha256="b", reason="content_mismatch"
+    )
+
+    assert _report(orphans=("ghost",)).clean is False
+    assert _report(missing=("crashed",)).clean is False
+    assert _report(drifted=(drift,)).clean is False
+    assert _report().clean is True
 
 
 def test_all_three_drift_shapes_at_once_stay_disjoint(tmp_path: Path) -> None:
@@ -347,6 +456,43 @@ def test_remediation_removes_orphans_through_the_revoke_path(tmp_path: Path) -> 
     assert not rag._backend.exists(f"{layer_prefix(Layer.raw, rag.partition)}/{_sha(_GHOST)}")
 
 
+def test_remediating_a_reingested_orphan_leaves_no_bytes_behind(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR-0008: reconcile → remediate → reconcile must not re-certify a dirty bucket.
+
+    The orphan was ingested twice, so its FIRST checksum is retired rather than
+    current. The purge that reclaims a retired blob is a separate, restartable
+    step after ingest's commit point, so a crash between the two leaves exactly
+    this state: the retired checksum recorded, its bytes still on disk. Only
+    ``delete``'s sweep over every checksum the document ever wrote can reach
+    them — remediation that came back "clean" while those bytes remained would be
+    evidence of nothing.
+    """
+    rag = _rag(tmp_path)
+    rag.ingest(text=_LEASE, document_id="lease")
+    rag.ingest(text=_GHOST, document_id="ghost")
+    # Crash after the ingest commit point, before the retired blob was purged.
+    monkeypatch.setattr(IngestPipeline, "_purge_superseded", lambda *a, **k: None)
+    rag.ingest(text=_GHOST_REVISED, document_id="ghost")
+    monkeypatch.undo()
+
+    raw = layer_prefix(Layer.raw, rag.partition)
+    assert rag._backend.exists(f"{raw}/{_sha(_GHOST)}"), "the retired blob is not on disk"
+
+    manifest = _manifest(_declared("lease", _LEASE))
+    first = rag.reconcile(manifest)
+    assert first.orphans == ("ghost",)
+
+    rag.remediate(first)
+    second = rag.reconcile(manifest)
+
+    assert second.clean
+    surviving = rag._backend.list_prefix(raw)
+    assert [key for key in surviving if key.endswith(_sha(_GHOST))] == []
+    assert [key for key in surviving if key.endswith(_sha(_GHOST_REVISED))] == []
+
+
 def test_remediation_leaves_missing_and_drifted_alone(tmp_path: Path) -> None:
     rag = _rag(tmp_path)
     rag.ingest(text=_LEASE, document_id="lease")
@@ -429,3 +575,106 @@ def test_audit_lives_outside_every_evidence_layer(tmp_path: Path) -> None:
 
     assert audit_key(rag.partition).startswith("eval/")
     assert rag._backend.exists(audit_key(rag.partition))
+
+
+@pytest.mark.parametrize(
+    "record",
+    [
+        pytest.param(object(), id="object"),
+        pytest.param({1, 2}, id="set"),
+        pytest.param(b"b", id="bytes"),
+    ],
+)
+def test_an_unserialisable_record_raises_before_anything_is_written(
+    record: Any, tmp_path: Path
+) -> None:
+    """``append_audit`` has no fallback: ``json.dumps`` raises and nothing lands.
+
+    The read of the existing log happens first, so the log survives the failed
+    append byte-for-byte — no truncation, no ``default=str`` coercion of a record
+    the stream would then be lying about.
+    """
+    rag = _rag(tmp_path)
+    rag.ingest(text=_LEASE, document_id="lease")
+    rag.reconcile(_manifest(_declared("lease", _LEASE)))
+    before = rag._backend.get_bytes(audit_key(rag.partition))
+
+    with pytest.raises(TypeError):
+        append_audit(rag._backend, rag.partition, {"event": "remedy", "payload": record})
+
+    assert rag._backend.get_bytes(audit_key(rag.partition)) == before
+    assert len(read_audit(rag._backend, rag.partition)) == 1
+
+
+def test_a_torn_line_makes_the_whole_log_unreadable(tmp_path: Path) -> None:
+    """A crash mid-append leaves a partial line, and nothing repairs it.
+
+    Pinned as a known failure mode rather than endorsed: one torn line raises for
+    every record in the file — the intact ones before it become unreachable — and
+    the next append is concatenated onto the torn bytes, so the new record is
+    glued to the corrupt one instead of starting a fresh line.
+    """
+    rag = _rag(tmp_path)
+    key = audit_key(rag.partition)
+    rag._backend.put_bytes(key, b'{"event": "reconcile"}\n{"event": "reconcile", "chec')
+
+    with pytest.raises(json.JSONDecodeError):
+        read_audit(rag._backend, rag.partition)
+
+    before = rag._backend.get_bytes(key)
+    append_audit(rag._backend, rag.partition, {"event": "remedy"})
+    after = rag._backend.get_bytes(key)
+
+    assert after.startswith(before)
+    assert len(after.splitlines()) == len(before.splitlines()), "the append started a new line"
+    with pytest.raises(json.JSONDecodeError):
+        read_audit(rag._backend, rag.partition)
+
+
+def test_blank_lines_are_skipped_and_a_record_comes_back_as_written(tmp_path: Path) -> None:
+    """``read_audit`` filters whitespace-only lines and validates nothing else.
+
+    ``list[dict[str, Any]]`` is an annotation, not a check: whatever JSON type
+    was appended comes back as that type. The filter is the only leniency, and
+    it is what keeps a trailing newline from turning into a phantom record.
+    """
+    rag = _rag(tmp_path)
+    key = audit_key(rag.partition)
+    rag._backend.put_bytes(key, b'{"event": "reconcile"}\n\n   \n{"event": "remedy"}\n')
+
+    assert read_audit(rag._backend, rag.partition) == [
+        {"event": "reconcile"},
+        {"event": "remedy"},
+    ]
+
+    append_audit(rag._backend, rag.partition, "hello")
+
+    assert read_audit(rag._backend, rag.partition) == [
+        {"event": "reconcile"},
+        {"event": "remedy"},
+        "hello",
+    ]
+
+
+# -- opt-in ------------------------------------------------------------------
+
+
+def test_callers_who_never_supply_a_manifest_lose_nothing(tmp_path: Path) -> None:
+    """ADR-0008: "reconciliation is opt-in and every existing flow is untouched".
+
+    A client nobody ever handed a manifest to still ingests, retrieves and
+    answers, and the one prefix reconciliation writes to stays empty — while
+    ``reconcile`` keeps DEMANDING a manifest. A manifest is deliberately not
+    derived from anything CiteNexus knows: one derived from the index could never
+    disagree with it, and disagreement is the entire product.
+    """
+    rag = _rag(tmp_path)
+    rag.ingest(text=_LEASE, document_id="lease")
+
+    assert [hit.document_id for hit in rag.retrieve("indemnify the landlord")] == ["lease"]
+    assert rag.ask("Who must indemnify the landlord?").evidence.decision is Decision.answered
+    assert read_audit(rag._backend, rag.partition) == []
+    assert rag._backend.list_prefix(layer_prefix(Layer.eval, rag.partition)) == []
+
+    with pytest.raises(TypeError):  # a manifest is required, never inferred
+        rag.reconcile()  # type: ignore[call-arg]
