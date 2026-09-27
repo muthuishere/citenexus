@@ -50,6 +50,17 @@ class RecordingReformulator:
         return rewritten if rewritten and rewritten != query else None
 
 
+class RecordingGenerator:
+    """Echoes the passage (so the per-claim gate passes) and records the question."""
+
+    def __init__(self) -> None:
+        self.questions: list[str] = []
+
+    def answer(self, question: str, passage: str, answer_language: str = "en") -> str:
+        self.questions.append(question)
+        return passage
+
+
 def _rag(tmp_path: Path, reformulator: RecordingReformulator | None) -> CiteNexus:
     return CiteNexus(
         tmp_path,
@@ -318,6 +329,32 @@ def test_the_reformulation_never_becomes_the_citation(tmp_path: Path) -> None:
     for source in result.sources:
         assert source.passage != _Q_TA
         assert _Q_TA not in (source.passage or "")
+
+
+def test_the_generator_sees_the_original_question_not_the_reformulation(
+    tmp_path: Path,
+) -> None:
+    """Fan-out widens RELEVANCE matching only — and the generator must not see it.
+
+    A reformulation is a retrieval artifact, never the question the caller asked:
+    handing the widened query (the English question plus its Tamil rewrite) to the
+    generator would ask it to answer a sentence nobody typed, in the wrong
+    language, from a passage it does not match.
+    """
+    generator = RecordingGenerator()
+    rag = CiteNexus(
+        tmp_path,
+        embedder=FakeEmbedding(),
+        generator=generator,
+        reformulator=RecordingReformulator(),
+    )
+    rag.ingest(text=_TA_DOC, document_id="policy-ta")
+
+    result = rag.ask(_Q, search_languages=("ta",))
+
+    assert result.evidence.decision is Decision.answered
+    assert generator.questions == [_Q]
+    assert all(_Q_TA not in question for question in generator.questions)
 
 
 def test_fanout_that_finds_nothing_still_abstains(tmp_path: Path) -> None:
