@@ -9,12 +9,13 @@ at request time. The key value SHALL NOT be hardcoded, logged, or stored on the
 instance. When no `headers` are configured, the request SHALL be sent without an
 `Authorization` header.
 
-#### Scenario: Configured key flows only through the Authorization header
+#### Scenario: Configured header template flows only through the Authorization header
 
-- **WHEN** `api_key_env="CITENEXUS_EMBED_API_KEY"` is configured, that variable is
-  set, and `embed(...)` is called
-- **THEN** the headers passed to the transport include
-  `Authorization: Bearer <value>` and the key value appears nowhere else
+- **WHEN** `headers={"Authorization": "Bearer ${CITENEXUS_EMBED_API_KEY}"}` is
+  configured and `embed(...)` is called
+- **THEN** the headers passed to the transport carry the unexpanded
+  `Bearer ${...}` template, and the resolved `Bearer <value>` appears only in the
+  request the `HttpClient` sends
 
 #### Scenario: No key configured sends no Authorization header
 
