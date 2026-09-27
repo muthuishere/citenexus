@@ -11,6 +11,7 @@ add it later.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Protocol
 
 from citenexus.retrieve.fusion import rrf_fuse
@@ -18,6 +19,15 @@ from citenexus.retrieve.types import Candidate
 
 if TYPE_CHECKING:
     from citenexus.plugins.base import RetrieverPlugin
+
+
+#: Ceiling on the concurrent fan-out of retrieval calls. The N x R retrievals are
+#: independent (ADR-0013 §Cost), so they are dispatched together and the latency
+#: floor is one retrieval round, not N. The bound is set above any shipped
+#: configuration (R = 3 retrievers x a handful of search languages), and keeps a
+#: pathological fan-out (e.g. 10 languages x 6 retrievers) from spawning a thread
+#: per call.
+_FANOUT_WORKERS = 16
 
 
 class Reranker(Protocol):
@@ -55,9 +65,14 @@ class RetrievalEngine:
         RRF fusion, so an EU found by either phrasing surfaces — the researched
         fix for cross-lingual misses. The reranker always scores against the
         ORIGINAL query (the user's true intent), never a reformulation.
+
+        The N x R retrievals are independent, so they are dispatched CONCURRENTLY
+        (bounded) and reassembled in declared order: one retrieval round of
+        latency, not N, and a fused list identical to the serial one.
         """
         queries = [query, *extra_queries]
-        lists = [r.retrieve(q, k) for q in queries for r in self._retrievers]
+        retrievals = [(r, q) for q in queries for r in self._retrievers]
+        lists = self._fan_out(retrievals, k)
         fused = rrf_fuse(lists, k=self._rrf_k)
 
         head = fused[: self._rerank_top_n]
@@ -65,3 +80,20 @@ class RetrievalEngine:
         reranked = list(self._reranker.rerank(query, head))
 
         return (reranked + tail)[:k]
+
+    def _fan_out(
+        self, retrievals: Sequence[tuple[RetrieverPlugin, str]], k: int
+    ) -> list[list[Candidate]]:
+        """Run every ``(retriever, query)`` retrieval, concurrent but ordered.
+
+        ``ThreadPoolExecutor.map`` yields in submission order, so the lists come
+        back exactly as the serial comprehension produced them and ``rrf_fuse``
+        sees unchanged input (ADR-0013 §Cost: the N x R retrievals are independent,
+        so the latency floor is one retrieval round, not N). A lone retrieval
+        skips the pool — one call has nothing to overlap.
+        """
+        if len(retrievals) < 2:
+            return [r.retrieve(q, k) for r, q in retrievals]
+        workers = min(len(retrievals), _FANOUT_WORKERS)
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            return list(pool.map(lambda call: call[0].retrieve(call[1], k), retrievals))
