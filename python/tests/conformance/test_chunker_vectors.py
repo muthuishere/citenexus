@@ -23,9 +23,7 @@ def test_vector_count() -> None:
     "case", [pytest.param(c, id=f"chunker-{i}") for i, c in enumerate(VECTORS)]
 )
 def test_chunker_vector(case: dict[str, Any]) -> None:
-    chunks = chunk_text(
-        case["text"], max_tokens=case["max_tokens"], overlap=case["overlap"]
-    )
+    chunks = chunk_text(case["text"], max_tokens=case["max_tokens"], overlap=case["overlap"])
     assert chunks == case["chunks"], (
         f"max_tokens={case['max_tokens']} overlap={case['overlap']} text={case['text']!r}"
     )

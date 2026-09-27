@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 
 from citenexus.answer import _gostr as go
 from citenexus.answer import verify_answer as _va
-from citenexus.answer.numbers import numbers_in
+from citenexus.answer.numbers import VerbatimNumbers, numbers_in, verbatim_in
 from citenexus.answer.verify import is_stopword
 from citenexus.answer.verify_guards_model import CONTEXT_STOP, soft_join
 from citenexus.tokenize import tokenize_v2
@@ -62,7 +62,9 @@ class ActorLexicon:
             share_tails=self.share_tails,
         )
 
-    def classify(self, clause: str, language: str | None) -> list[RoleWord]:
+    def classify(
+        self, clause: str, language: str | None, verbatim: VerbatimNumbers | None = None
+    ) -> list[RoleWord]:
         terms: dict[str, str] = {}
         for actor_id, ts in self.actors.items():
             for t in ts:
@@ -74,7 +76,7 @@ class ActorLexicon:
             norm = go.lower(w.strip(ROLE_TRIM))
             norm = norm.removesuffix("'s").removesuffix("’s")  # noqa: RUF001 — "employer's"
             rw = RoleWord(norm=norm, position=i)
-            rw.numbers = [m.reading.key for m in numbers_in(w, language)]
+            rw.numbers = [m.reading.key for m in numbers_in(w, language, verbatim)]
             if norm in terms:
                 rw.actor = terms[norm]
             elif norm in second and self.second_person != "":
@@ -311,7 +313,7 @@ def role_guard(
         return ""
     unit = [lexicon.classify(c, eu.language) for c in role_clauses(eu.text)]
     for c in role_clauses(claim):
-        ws = lexicon.classify(c, claim_language)
+        ws = lexicon.classify(c, claim_language, verbatim_in(eu.text, eu.language))
         content: set[str] = set()
         for w in ws:
             if w.content:

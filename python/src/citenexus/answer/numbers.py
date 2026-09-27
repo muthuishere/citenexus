@@ -26,8 +26,13 @@ Forms (``.`` and ``,`` are the only separators read):
   is 1500 or 1.5 depending on the locale. Read only when the language is
   declared (``DECIMAL_COMMA_LANGUAGES`` / ``DECIMAL_POINT_LANGUAGES``);
   ambiguous otherwise.
+* Indian lakh grouping (``1,00,000``, ``12,34,567.89``) — read only in a
+  language that writes it (``LAKH_GROUPING_LANGUAGES``).
 * anything else (``1.50.000``, dates ``01.02.2024``) — unreadable, kept by
   spelling.
+
+A declared region tag in the tables (``de-ch``, ``es-mx``) wins over its
+language, per CLDR (ADR-0015 amendment 2026-09-27).
 """
 
 from __future__ import annotations
@@ -36,26 +41,35 @@ import re
 from dataclasses import dataclass
 from fractions import Fraction
 
-from citenexus.answer.tables import DECIMAL_COMMA_LANGUAGES, DECIMAL_POINT_LANGUAGES
+from citenexus.answer.tables import (
+    DECIMAL_COMMA_LANGUAGES,
+    DECIMAL_POINT_LANGUAGES,
+    LAKH_GROUPING_LANGUAGES,
+)
 
 __all__ = [
     "DECIMAL_COMMA_LANGUAGES",
     "DECIMAL_POINT_LANGUAGES",
+    "LAKH_GROUPING_LANGUAGES",
     "MONTH_NUMBER",
     "NUMBER_RE",
     "DateKey",
     "DateSpan",
     "NumberMatch",
     "NumberReading",
+    "VerbatimNumbers",
     "clock_times",
     "date_spans",
     "dates_in",
+    "decimal_mark_of",
     "is_identifier_prefix",
     "join_spaced_thousands",
     "money_rates",
     "numbers_in",
     "read_number",
+    "read_with",
     "same_date",
+    "verbatim_in",
 ]
 
 # Which languages fix the decimal mark — canonical in conformance/conflict.json
@@ -81,6 +95,34 @@ def _primary(language: str | None) -> str:
     if not language:
         return ""
     return re.split(r"[-_]", language.strip().lower(), maxsplit=1)[0]
+
+
+#: 1-2 leading digits, two-digit groups, a final three-digit group, an
+#: optional point decimal.
+_LAKH = re.compile(r"^([1-9][0-9]?(?:,[0-9]{2})+,[0-9]{3})(?:\.([0-9]+))?$")
+
+
+def _locale_tags(language: str | None) -> tuple[str, str]:
+    full = (language or "").strip().lower().replace("_", "-")
+    return full, _primary(full)
+
+
+def decimal_mark_of(language: str | None) -> str:
+    """The declared language's decimal mark: ``","``, ``"."``, or ``""`` if unknown."""
+    full, primary = _locale_tags(language)
+    for code in (full, primary):
+        if not code:
+            continue
+        if code in DECIMAL_COMMA_LANGUAGES:
+            return ","
+        if code in DECIMAL_POINT_LANGUAGES:
+            return "."
+    return ""
+
+
+def _reads_lakh(language: str | None) -> bool:
+    full, primary = _locale_tags(language)
+    return bool(full) and (full in LAKH_GROUPING_LANGUAGES or primary in LAKH_GROUPING_LANGUAGES)
 
 
 def _canonical(value: Fraction) -> str:
@@ -133,6 +175,11 @@ def read_number(raw: str, *, dash: bool = False, language: str | None = None) ->
     has_dot, has_comma = "." in raw, "," in raw
     if not has_dot and not has_comma:
         return _known(Fraction(int(raw)))
+    # Indian lakh grouping: a two-digit group can be nothing else, but only a
+    # language that writes it reads it.
+    lakh = _LAKH.match(raw)
+    if lakh and _reads_lakh(language):
+        return _known(_value([lakh.group(1).replace(",", "")], lakh.group(2) or ""))
 
     if has_dot and has_comma:
         decimal_mark = "." if raw.rfind(".") > raw.rfind(",") else ","
@@ -154,10 +201,10 @@ def read_number(raw: str, *, dash: bool = False, language: str | None = None) ->
     if len(tail) != 3 or not _thousands(parts):
         return _known(_value([whole], tail))  # a decimal mark in every locale
 
-    language_code = _primary(language)
-    if language_code in DECIMAL_COMMA_LANGUAGES:
+    decimal_mark = decimal_mark_of(language)
+    if decimal_mark == ",":
         thousands = mark == "."
-    elif language_code in DECIMAL_POINT_LANGUAGES:
+    elif decimal_mark == ".":
         thousands = mark == ","
     else:
         return _unread(raw)  # 1.500 / 1,500 with no declared locale
@@ -202,27 +249,116 @@ _SPACED_THOUSANDS = re.compile(
 )
 
 
-def join_spaced_thousands(text: str) -> str:
-    """Join space-grouped money amounts: "€ 1 250 000" -> "€ 1250000"."""
+# Digits grouped by a space (plain, no-break, narrow no-break: "1 234,56") or
+# an apostrophe (Swiss "1'234.50", or U+2019): 1-3 leading digits, then exact
+# three-digit groups.
+_SPACE_GROUPED = re.compile("[1-9][0-9]{0,2}(?:[ \u00a0\u202f][0-9]{3})+")
+_APOSTROPHE_GROUPED = re.compile("[1-9][0-9]{0,2}(?:['\u2019][0-9]{3})+")
+_GROUP_SEPARATORS = re.compile("[ \u00a0\u202f'\u2019]")
+
+
+def _join_grouped(text: str, pattern: re.Pattern[str]) -> str:
+    """Remove the separators of each whole grouped run.
+
+    A run touching another digit, letter or number mark on either side, or
+    followed by another separator and a digit ("1 234 56"), stays as written:
+    it may be several numbers, and ambiguity is never guessed.
+    """
+    out: list[str] = []
+    last = 0
+    for m in pattern.finditer(text):
+        start, end = m.span()
+        if start > 0:
+            prev = text[start - 1]
+            if prev.isdecimal() or prev.isalpha() or prev in ".,'\u2019":
+                continue
+        if end < len(text):
+            nxt = text[end]
+            if nxt.isdecimal() or nxt.isalpha():
+                continue
+            if _GROUP_SEPARATORS.match(nxt) and end + 1 < len(text) and text[end + 1].isdecimal():
+                continue
+        out.append(text[last:start])
+        out.append(_GROUP_SEPARATORS.sub("", m.group(0)))
+        last = end
+    out.append(text[last:])
+    return "".join(out)
+
+
+def join_spaced_thousands(text: str, language: str | None = None) -> str:
+    """Join grouped digits before numbers are read.
+
+    A money amount grouped by spaces in every language ("€ 1 250 000"); any
+    space-grouped run only in a decimal-comma language ("1 234,56", CLDR fr,
+    de, …); apostrophe grouping in every language — an apostrophe is a decimal
+    mark nowhere.
+    """
     for _ in range(4):  # one group per pass
         joined = _SPACED_THOUSANDS.sub(r"\1\2\3", text)
         if joined == text:
             break
         text = joined
-    return text
+    if decimal_mark_of(language) == ",":
+        text = _join_grouped(text, _SPACE_GROUPED)
+    return _join_grouped(text, _APOSTROPHE_GROUPED)
 
 
-def numbers_in(text: str, language: str | None = None) -> list[NumberMatch]:
-    """Every measured number in ``text``, skipping identifiers ("p50", "ipv4")."""
+#: A number's spelling (``NumberMatch.raw``) in a cited unit -> the unit's own
+#: reading of it. ADR-0015 amendment 2026-09-27: a number the claim copies
+#: VERBATIM from its unit keeps the unit's locale — an English claim writing
+#: the Dutch "€ 4.000" is 4000 over that unit. The match is on the whole
+#: matched number (NUMBER_RE takes every digit group), so "12" never takes the
+#: reading of "12.75" or "0,12". A spelling the unit reads two ways is
+#: dropped: ambiguity falls back to the claim's own language.
+VerbatimNumbers = dict[str, NumberReading]
+
+
+def verbatim_in(text: str, language: str | None = None) -> VerbatimNumbers:
+    """The unit's verbatim readings, for the claim side of a guard."""
+    out: VerbatimNumbers = {}
+    clash: set[str] = set()
+    for m in numbers_in(text, language):
+        seen = out.get(m.raw)
+        if seen is not None and seen.key != m.reading.key:
+            clash.add(m.raw)
+        out[m.raw] = m.reading
+    for raw in clash:
+        del out[raw]
+    return out
+
+
+def read_with(
+    raw: str, *, dash: bool = False, language: str | None, verbatim: VerbatimNumbers | None
+) -> NumberReading:
+    """A claim number: the unit's reading when copied verbatim, else its own.
+
+    A dashed amount ("4.000,-") reads the same in every locale.
+    """
+    if not dash and verbatim is not None:
+        hit = verbatim.get(raw)
+        if hit is not None:
+            return hit
+    return read_number(raw, dash=dash, language=language)
+
+
+def numbers_in(
+    text: str, language: str | None = None, verbatim: VerbatimNumbers | None = None
+) -> list[NumberMatch]:
+    """Every measured number in ``text``, skipping identifiers ("p50", "ipv4").
+
+    ``verbatim``, when given, is the cited unit's readings (claim side only).
+    """
     from citenexus.answer._gostr import lower
 
-    lowered = join_spaced_thousands(lower(text))
+    lowered = join_spaced_thousands(lower(text), language)
     out: list[NumberMatch] = []
     for m in NUMBER_RE.finditer(lowered):
         start = m.start(1)
         if start > 0 and is_identifier_prefix(lowered[start - 1]):
             continue  # "p50", "ipv4": an identifier, not a measured value
-        reading = read_number(m.group(1), dash=m.group(2) is not None, language=language)
+        reading = read_with(
+            m.group(1), dash=m.group(2) is not None, language=language, verbatim=verbatim
+        )
         unit = m.group(3)
         if unit is None:
             out.append(NumberMatch(raw=m.group(1), reading=reading))
@@ -282,7 +418,9 @@ _MONEY_BEFORE = re.compile(r"(?:€|\beur\b|\$|£)[\t\n\f\r ]*([0-9][0-9.,]*)(?:
 _MONEY_AFTER = re.compile(r"\b([0-9][0-9.,]*)[\t\n\f\r ]*(?:euro|eur)\b", re.ASCII)
 
 
-def money_rates(text: str, language: str | None = None) -> tuple[set[tuple[str, str]], str]:
+def money_rates(
+    text: str, language: str | None = None, verbatim: VerbatimNumbers | None = None
+) -> tuple[set[tuple[str, str]], str]:
     """The (amount key, period class) rates in ``text``, and the lowered text
     with every money amount blanked (so it is never read as a duration)."""
     from citenexus.answer._gostr import lower
@@ -296,7 +434,7 @@ def money_rates(text: str, language: str | None = None) -> tuple[set[tuple[str, 
             raw = m.group(1).rstrip(".,")
             if raw == "":
                 continue
-            key = read_number(raw, language=language).key
+            key = read_with(raw, language=language, verbatim=verbatim).key
             period = RATE_PERIOD.re.match(lowered, m.end())
             if period is not None:
                 unit = unit_of(period.group(1))

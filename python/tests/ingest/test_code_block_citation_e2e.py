@@ -19,8 +19,7 @@ from citenexus.testing import FakeEmbedding, FakeLLM
 def test_markdown_fenced_code_is_retrieved_and_cited(tmp_path: Path) -> None:
     md_path = tmp_path / "config.md"
     md_path.write_text(
-        "Unrelated narrative text about the service.\n\n"
-        "```python\nAPI_TIMEOUT_SECONDS = 42\n```\n"
+        "Unrelated narrative text about the service.\n\n```python\nAPI_TIMEOUT_SECONDS = 42\n```\n"
     )
     rag = CiteNexus(tmp_path / "store", embedder=FakeEmbedding(), generator=FakeLLM())
     result = rag.ingest(md_path, document_id="config-md")

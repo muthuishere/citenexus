@@ -29,9 +29,7 @@ def test_edge_confidence_defaults_to_none() -> None:
 
 
 def test_edge_carries_confidence() -> None:
-    edge = GraphEdge(
-        source="node:a", target="node:b", weight=1, confidence=EdgeConfidence.inferred
-    )
+    edge = GraphEdge(source="node:a", target="node:b", weight=1, confidence=EdgeConfidence.inferred)
     assert edge.confidence is EdgeConfidence.inferred
 
 

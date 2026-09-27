@@ -41,9 +41,7 @@ def build_pdf_with_table(
         for col_index, cell in enumerate(row):
             x = col_x[col_index] + 8
             ops.append(
-                f"BT /F1 10 Tf {x} {baseline} Td (".encode()
-                + _pdf_escape(cell)
-                + b") Tj ET"
+                f"BT /F1 10 Tf {x} {baseline} Td (".encode() + _pdf_escape(cell) + b") Tj ET"
             )
 
     ops.insert(
@@ -64,9 +62,7 @@ def build_pdf_with_table(
         b"/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>"
     )
     objects.append(
-        f"<< /Length {len(content_stream)} >>\nstream\n".encode()
-        + content_stream
-        + b"\nendstream"
+        f"<< /Length {len(content_stream)} >>\nstream\n".encode() + content_stream + b"\nendstream"
     )
     objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
 
@@ -85,7 +81,5 @@ def build_pdf_with_table(
     out.write(b"0000000000 65535 f \n")
     for off in offsets[1:]:
         out.write(f"{off:010d} 00000 n \n".encode())
-    out.write(
-        (f"trailer\n<< /Size {n} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF").encode()
-    )
+    out.write((f"trailer\n<< /Size {n} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF").encode())
     return out.getvalue()

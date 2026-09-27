@@ -1,4 +1,4 @@
-""""I answered, but there is material here I cannot read."
+""" "I answered, but there is material here I cannot read."
 
 The most damaging measured failure (2026-08-16, `examples/multilingual/`): a
 Hyderabad employee asking about leave carry-forward got *"a maximum of 10 days"* —
@@ -54,9 +54,7 @@ def _handbook() -> Candidate:
     return _candidate(_HANDBOOK, eu_id="handbook::3", document_id="handbook-en")
 
 
-def _annexure(
-    text: str = _ANNEXURE_KM, language: str = "km", *, score: float = 0.9
-) -> Candidate:
+def _annexure(text: str = _ANNEXURE_KM, language: str = "km", *, score: float = 0.9) -> Candidate:
     return _candidate(
         text, eu_id="annexure::1", document_id="annexure-local", language=language, score=score
     )

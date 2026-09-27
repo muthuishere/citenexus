@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING
 from citenexus.answer import _gostr as go
 from citenexus.answer import verify_answer as _va
 from citenexus.answer import verify_conditions, verify_guards, verify_parties
-from citenexus.answer.numbers import numbers_in
+from citenexus.answer.numbers import numbers_in, verbatim_in
 from citenexus.answer.tables import POLARITY_MARKERS
 from citenexus.answer.verify_guards_model import soft_join
 from citenexus.tokenize import tokenize_v2
@@ -247,7 +247,9 @@ def hedge_guard(claim: str, claim_language: str, eu: EvidenceUnit, cfg: GuardCon
         )
     cross = _va.cross_language(claim_language, eu.language)
     c = verify_conditions.Carrier(set(claim_tokens), cross, verify_conditions.gloss_idx(cfg.gloss))
-    claim_numbers = {m.reading.key for m in numbers_in(claim, claim_language)}
+    claim_numbers = {
+        m.reading.key for m in numbers_in(claim, claim_language, verbatim_in(eu.text, eu.language))
+    }
     best, best_n, tie = "", 0, False
     for s in go.split(verify_parties.SENTENCE_BREAK, soft_join(eu.text)):
         n = 0

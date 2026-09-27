@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 from citenexus.answer import _gostr as go
 from citenexus.answer import verify_answer as _va
 from citenexus.answer import verify_roles
-from citenexus.answer.numbers import numbers_in
+from citenexus.answer.numbers import VerbatimNumbers, numbers_in, verbatim_in
 from citenexus.answer.verify_guards_model import any_form
 
 if TYPE_CHECKING:
@@ -67,11 +67,13 @@ def lower_words(clause: str) -> list[str]:
     return [go.lower(w.strip(verify_roles.ROLE_TRIM)) for w in _va.LIST_LEAD_TOKEN.findall(clause)]
 
 
-def number_word_keys(clause: str, language: str) -> dict[int, list[str]]:
+def number_word_keys(
+    clause: str, language: str, verbatim: VerbatimNumbers | None = None
+) -> dict[int, list[str]]:
     """Per word index, the ADR-0015 keys of its numbers."""
     out: dict[int, list[str]] = {}
     for i, w in enumerate(_va.LIST_LEAD_TOKEN.findall(clause)):
-        for m in numbers_in(w, language):
+        for m in numbers_in(w, language, verbatim):
             out.setdefault(i, []).append(m.reading.key)
     return out
 
@@ -80,13 +82,14 @@ def qualifier_pair_guard(
     claim: str, claim_language: str, eu: EvidenceUnit, pairs: Sequence[QualifierPair]
 ) -> str:
     """See the module docstring."""
+    verbatim = verbatim_in(eu.text, eu.language)
     unit = [
         (lower_words(c), number_word_keys(c, eu.language))
         for c in verify_roles.role_clauses(eu.text)
     ]
     for c in verify_roles.role_clauses(claim):
         words = lower_words(c)
-        for i, keys in sorted(number_word_keys(c, claim_language).items()):
+        for i, keys in sorted(number_word_keys(c, claim_language, verbatim).items()):
             for pair in pairs:
                 side, form = side_near(words, i, pair)
                 if side < 0:

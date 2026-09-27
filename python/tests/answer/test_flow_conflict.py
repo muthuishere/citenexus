@@ -86,9 +86,7 @@ def test_normal_answers_and_surfaces_the_conflict() -> None:
 
 
 def test_exploratory_records_the_count_only() -> None:
-    result = _flow().ask(
-        "What is the notice period?", _conflicting(), mode=TrustMode.exploratory
-    )
+    result = _flow().ask("What is the notice period?", _conflicting(), mode=TrustMode.exploratory)
     assert result.evidence.decision is Decision.answered
     assert result.evidence.conflicts_detected == 1
     assert result.conflicts == ()

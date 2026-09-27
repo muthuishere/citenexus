@@ -38,7 +38,7 @@ def test_who_calls_resolves_to_cited_symbol_eus(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
     (repo / "tokenize.go").write_text(
-        "package repo\n\nimport \"strings\"\n\n"
+        'package repo\n\nimport "strings"\n\n'
         "func Tokenize(s string) []string {\n\treturn strings.Fields(s)\n}\n"
     )
     (repo / "asker.go").write_text(
@@ -87,11 +87,9 @@ def test_name_collision_wrong_inferred_edge_surfaces_confidence(tmp_path: Path) 
     (repo / "a.go").write_text(
         "package a\n\n"
         "func Tokenize(s string) int {\n\treturn len(s)\n}\n\n"
-        "func CallerA() int {\n\treturn Tokenize(\"x\")\n}\n"
+        'func CallerA() int {\n\treturn Tokenize("x")\n}\n'
     )
-    (repo / "b.go").write_text(
-        "package b\n\nfunc Tokenize(s string) bool {\n\treturn s == \"\"\n}\n"
-    )
+    (repo / "b.go").write_text('package b\n\nfunc Tokenize(s string) bool {\n\treturn s == ""\n}\n')
     export = {
         "nodes": [
             {"id": "tok_a", "label": "Tokenize", "source": "a.go", "decl": "func Tokenize"},

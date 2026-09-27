@@ -66,9 +66,7 @@ def test_ordered_list_is_numbered_and_empty_items_dropped() -> None:
 
 
 def test_list_items_carry_links_and_are_not_duplicated_as_paragraphs() -> None:
-    doc = HtmlExtractor().extract(
-        '<ul><li><p>wrapped <a href="/x">link</a></p></li></ul>'
-    )
+    doc = HtmlExtractor().extract('<ul><li><p>wrapped <a href="/x">link</a></p></li></ul>')
     # One block for the list; the <p> inside <li> is not emitted separately.
     assert [b.kind for b in doc.blocks] == [BlockKind.paragraph]
     assert doc.blocks[0].text == "- wrapped[link](/x)"

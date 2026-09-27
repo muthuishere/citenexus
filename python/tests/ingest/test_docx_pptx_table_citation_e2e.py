@@ -41,9 +41,7 @@ def _pptx_with_table() -> bytes:
         Inches(1), Inches(0.5), Inches(5), Inches(1)
     ).text_frame.text = "Unrelated slide narrative text."
     rows, cols = 3, 2
-    graphic_frame = slide.shapes.add_table(
-        rows, cols, Inches(1), Inches(2), Inches(4), Inches(2)
-    )
+    graphic_frame = slide.shapes.add_table(rows, cols, Inches(1), Inches(2), Inches(4), Inches(2))
     table = graphic_frame.table
     table.cell(0, 0).text = "Employee"
     table.cell(0, 1).text = "NoticeDays"

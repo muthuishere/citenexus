@@ -11,7 +11,13 @@ from __future__ import annotations
 from fractions import Fraction
 
 from citenexus.answer import _gostr as go
-from citenexus.answer.numbers import clock_times, money_rates, read_number
+from citenexus.answer.numbers import (
+    VerbatimNumbers,
+    clock_times,
+    money_rates,
+    read_with,
+    verbatim_in,
+)
 from citenexus.answer.verify import align, is_stopword
 from citenexus.tokenize import tokenize_v2
 
@@ -252,12 +258,14 @@ RATE_PERIOD = go.LazyPattern(
 )
 
 
-def number_value(token: str, language: str | None) -> str | None:
+def number_value(
+    token: str, language: str | None, verbatim: VerbatimNumbers | None = None
+) -> str | None:
     """A token's value key: "½", digits (ADR-0015), or a number word."""
     if token == "½":
         return "0.5"
     if "0" <= token[0] <= "9":
-        return read_number(token, language=language).key
+        return read_with(token, language=language, verbatim=verbatim).key
     return number_word_value(token)
 
 
@@ -286,10 +294,12 @@ def rat_key(r: Fraction) -> str:
     return s.rstrip("0").rstrip(".")
 
 
-def quantities(text: str, language: str | None) -> set[tuple[str, str]]:
+def quantities(
+    text: str, language: str | None, verbatim: VerbatimNumbers | None = None
+) -> set[tuple[str, str]]:
     """The (value key, unit class) pairs in ``text`` (see the Go comment)."""
     _, text = clock_times(text)  # "7.30 uur" is a time of day, not 7.3 hours
-    _, text = money_rates(text, language)  # "€ 150 per maand" is a price
+    _, text = money_rates(text, language, verbatim)  # "€ 150 per maand" is a price
     tokens = unit_scan(go.lower(text))
     out: set[tuple[str, str]] = set()
     n = len(tokens)
@@ -311,11 +321,11 @@ def quantities(text: str, language: str | None) -> set[tuple[str, str]]:
             if unit is not None and unit[1] and unit[0] == "year":
                 out.add((ordinal, "year"))
             continue
-        value = number_value(t, language)
+        value = number_value(t, language, verbatim)
         if value is None:
             continue
         j = i + 1
-        if j < n and number_value(tokens[j], language) == value:
+        if j < n and number_value(tokens[j], language, verbatim) == value:
             j += 1
         while j + 1 < n and j - i <= 6:
             if tokens[j] not in QUANTITY_LINKS:
@@ -323,11 +333,11 @@ def quantities(text: str, language: str | None) -> set[tuple[str, str]]:
             skip = 0
             if tokens[j + 1] in RANGE_BOUND_WORDS and j + 2 < n:
                 skip = 1
-            linked = number_value(tokens[j + 1 + skip], language)
+            linked = number_value(tokens[j + 1 + skip], language, verbatim)
             if linked is None:
                 break
             j += 2 + skip
-            if j < n and number_value(tokens[j], language) == linked:
+            if j < n and number_value(tokens[j], language, verbatim) == linked:
                 j += 1  # "drie (3)" after the link
         if j >= n:
             continue
@@ -338,7 +348,7 @@ def quantities(text: str, language: str | None) -> set[tuple[str, str]]:
             next_unit = unit_of(tokens[j + 1])
             if next_unit is not None and next_unit[0] == "day":
                 cls, ok = mod, True
-        if not ok and j + 1 < n and number_value(tokens[j], language) is None:
+        if not ok and j + 1 < n and number_value(tokens[j], language, verbatim) is None:
             found = TIME_UNITS.get(tokens[j + 1])
             if found is not None:
                 cls, ok = found, True
@@ -370,7 +380,10 @@ def unit_guard(
     """Refuse a SWAP of a quantity (see the Go comment)."""
     _, claim = clock_times(claim)  # a clock time is never a duration
     _, passage = clock_times(passage)
-    claim_rates, _ = money_rates(claim, claim_language)
+    # A number the claim copies from the passage keeps the passage's reading
+    # (ADR-0015 amendment).
+    verbatim = verbatim_in(passage, passage_language)
+    claim_rates, _ = money_rates(claim, claim_language, verbatim)
     passage_rates, _ = money_rates(passage, passage_language)
     for r in sorted(claim_rates):
         if r in passage_rates:
@@ -379,7 +392,7 @@ def unit_guard(
             if p[0] == r[0] and p[1] != r[1] and not same_period_family(p[1], r[1]):
                 return f"unit guard: {r[0]} per {r[1]} where the passage says {p[0]} per {p[1]}"
     have = quantities(passage, passage_language)
-    for q in sorted(quantities(claim, claim_language)):
+    for q in sorted(quantities(claim, claim_language, verbatim)):
         if q in have or same_quantity_in(q, have):
             continue
         same_value = sorted({p[1] for p in have if p[0] == q[0]})

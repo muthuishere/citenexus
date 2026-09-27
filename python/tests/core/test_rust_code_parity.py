@@ -153,7 +153,7 @@ def test_preamble_is_preserved(core: ctypes.CDLL) -> None:
 
 def test_unsupported_language_falls_back_to_plain(core: ctypes.CDLL) -> None:
     """A language the extractor can't parse degrades to plain text, never raises."""
-    rust_source = "fn main() { println!(\"hi\"); }\n"  # Rust: not Python, not Go
+    rust_source = 'fn main() { println!("hi"); }\n'  # Rust: not Python, not Go
     python_doc = CodeExtractor(document_id="doc").extract(rust_source)
     rust_doc = rust_extract(core, rust_source.encode("utf-8"), "code")
 

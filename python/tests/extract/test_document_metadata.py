@@ -77,7 +77,7 @@ def test_pptx_metadata_is_extracted() -> None:
 
 def test_html_metadata_is_extracted() -> None:
     html = (
-        '<html><head><title>Employment Policy</title>'
+        "<html><head><title>Employment Policy</title>"
         '<meta name="author" content="HR Dept"></head>'
         "<body><p>Body text.</p></body></html>"
     )

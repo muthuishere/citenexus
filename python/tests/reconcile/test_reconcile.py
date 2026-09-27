@@ -344,9 +344,7 @@ def test_remediation_removes_orphans_through_the_revoke_path(tmp_path: Path) -> 
     assert rag.reconcile(manifest).clean
     # Revoke's guarantees come along: no rows, and no raw blob left behind.
     assert all(row["document_id"] != "ghost" for row in rag._store.scan())
-    assert not rag._backend.exists(
-        f"{layer_prefix(Layer.raw, rag.partition)}/{_sha(_GHOST)}"
-    )
+    assert not rag._backend.exists(f"{layer_prefix(Layer.raw, rag.partition)}/{_sha(_GHOST)}")
 
 
 def test_remediation_leaves_missing_and_drifted_alone(tmp_path: Path) -> None:

@@ -30,94 +30,227 @@ Pair = tuple[str, str, str, str]
 
 TRUE_CONFLICTS: list[Pair] = [
     # ── legal ──
-    ("legal", "negation", "The employee shall disclose confidential information to third parties.",
-     "The employee shall not disclose confidential information to third parties."),
+    (
+        "legal",
+        "negation",
+        "The employee shall disclose confidential information to third parties.",
+        "The employee shall not disclose confidential information to third parties.",
+    ),
     ("legal", "value", "The notice period is 30 days.", "The notice period is 60 days."),
-    ("legal", "comparator", "The zoning variance was approved by the council.",
-     "The zoning variance was rejected by the council."),
-    ("legal", "superseded", "The confidentiality policy took effect in 2019.",
-     "The confidentiality policy took effect in 2026."),
-    ("legal", "negation", "Arbitration is required for contract matters under this agreement.",
-     "Arbitration is not required for contract matters under this agreement."),
-    ("legal", "comparator", "The injunction was upheld on appeal.",
-     "The injunction was overturned on appeal."),
-    ("legal", "negation-in-claim-language",
-     "The claim for indemnity is valid under section four.",
-     "The claim for indemnity is not valid under section four."),
+    (
+        "legal",
+        "comparator",
+        "The zoning variance was approved by the council.",
+        "The zoning variance was rejected by the council.",
+    ),
+    (
+        "legal",
+        "superseded",
+        "The confidentiality policy took effect in 2019.",
+        "The confidentiality policy took effect in 2026.",
+    ),
+    (
+        "legal",
+        "negation",
+        "Arbitration is required for contract matters under this agreement.",
+        "Arbitration is not required for contract matters under this agreement.",
+    ),
+    (
+        "legal",
+        "comparator",
+        "The injunction was upheld on appeal.",
+        "The injunction was overturned on appeal.",
+    ),
+    (
+        "legal",
+        "negation-in-claim-language",
+        "The claim for indemnity is valid under section four.",
+        "The claim for indemnity is not valid under section four.",
+    ),
     # ── finance ──
-    ("finance", "comparator", "Revenue increased by 12 percent in the third quarter.",
-     "Revenue decreased by 12 percent in the third quarter."),
-    ("finance", "value", "The restated filing reports net income of 4.2 million.",
-     "The restated filing reports net income of 6.8 million."),
-    ("finance", "comparator", "The covenant requires the leverage ratio to stay above 2.5.",
-     "The covenant requires the leverage ratio to stay below 2.5."),
-    ("finance", "superseded", "The special dividend was paid in 2024.",
-     "The special dividend was paid in 2025."),
-    ("finance", "comparator", "The fund is eligible for the withholding exemption.",
-     "The fund is ineligible for the withholding exemption."),
+    (
+        "finance",
+        "comparator",
+        "Revenue increased by 12 percent in the third quarter.",
+        "Revenue decreased by 12 percent in the third quarter.",
+    ),
+    (
+        "finance",
+        "value",
+        "The restated filing reports net income of 4.2 million.",
+        "The restated filing reports net income of 6.8 million.",
+    ),
+    (
+        "finance",
+        "comparator",
+        "The covenant requires the leverage ratio to stay above 2.5.",
+        "The covenant requires the leverage ratio to stay below 2.5.",
+    ),
+    (
+        "finance",
+        "superseded",
+        "The special dividend was paid in 2024.",
+        "The special dividend was paid in 2025.",
+    ),
+    (
+        "finance",
+        "comparator",
+        "The fund is eligible for the withholding exemption.",
+        "The fund is ineligible for the withholding exemption.",
+    ),
     # ── medical ──
-    ("medical", "negation", "The vaccine is recommended for pregnant patients.",
-     "The vaccine is not recommended for pregnant patients."),
-    ("medical", "value", "The maximum daily dose is 4000 mg.",
-     "The maximum daily dose is 3000 mg."),
-    ("medical", "comparator", "Treatment increased survival in the trial cohort.",
-     "Treatment decreased survival in the trial cohort."),
-    ("medical", "superseded", "The prescribing guideline was withdrawn in 2021.",
-     "The prescribing guideline was withdrawn in 2023."),
-    ("medical", "negation", "Renal impairment is a contraindication for this drug.",
-     "Renal impairment is not a contraindication for this drug."),
+    (
+        "medical",
+        "negation",
+        "The vaccine is recommended for pregnant patients.",
+        "The vaccine is not recommended for pregnant patients.",
+    ),
+    (
+        "medical",
+        "value",
+        "The maximum daily dose is 4000 mg.",
+        "The maximum daily dose is 3000 mg.",
+    ),
+    (
+        "medical",
+        "comparator",
+        "Treatment increased survival in the trial cohort.",
+        "Treatment decreased survival in the trial cohort.",
+    ),
+    (
+        "medical",
+        "superseded",
+        "The prescribing guideline was withdrawn in 2021.",
+        "The prescribing guideline was withdrawn in 2023.",
+    ),
+    (
+        "medical",
+        "negation",
+        "Renal impairment is a contraindication for this drug.",
+        "Renal impairment is not a contraindication for this drug.",
+    ),
     # ── operations ──
-    ("operations", "value", "The escalation threshold is 15 minutes.",
-     "The escalation threshold is 45 minutes."),
-    ("operations", "value", "Database backups are retained for 90 days.",
-     "Database backups are retained for 30 days."),
-    ("operations", "comparator", "Request tracing is enabled in the production cluster.",
-     "Request tracing is disabled in the production cluster."),
-    ("operations", "comparator", "Change requests are permitted during the freeze window.",
-     "Change requests are prohibited during the freeze window."),
-    ("operations", "comparator", "The rollback rehearsal is mandatory before deployment.",
-     "The rollback rehearsal is optional before deployment."),
+    (
+        "operations",
+        "value",
+        "The escalation threshold is 15 minutes.",
+        "The escalation threshold is 45 minutes.",
+    ),
+    (
+        "operations",
+        "value",
+        "Database backups are retained for 90 days.",
+        "Database backups are retained for 30 days.",
+    ),
+    (
+        "operations",
+        "comparator",
+        "Request tracing is enabled in the production cluster.",
+        "Request tracing is disabled in the production cluster.",
+    ),
+    (
+        "operations",
+        "comparator",
+        "Change requests are permitted during the freeze window.",
+        "Change requests are prohibited during the freeze window.",
+    ),
+    (
+        "operations",
+        "comparator",
+        "The rollback rehearsal is mandatory before deployment.",
+        "The rollback rehearsal is optional before deployment.",
+    ),
     # ── physics ──
-    ("physics", "comparator", "Like charges attract each other.",
-     "Like charges repel each other."),
-    ("physics", "value", "The measured half life is 12 hours.",
-     "The measured half life is 20 hours."),
-    ("physics", "value", "Pure water boils at 100 degrees at sea level.",
-     "Pure water boils at 90 degrees at sea level."),
-    ("physics", "comparator", "The aluminium sample expands when heated.",
-     "The aluminium sample contracts when heated."),
-    ("physics", "negation-morphology", "The reaction conserves momentum in this frame.",
-     "The reaction does not conserve momentum in this frame."),
+    ("physics", "comparator", "Like charges attract each other.", "Like charges repel each other."),
+    (
+        "physics",
+        "value",
+        "The measured half life is 12 hours.",
+        "The measured half life is 20 hours.",
+    ),
+    (
+        "physics",
+        "value",
+        "Pure water boils at 100 degrees at sea level.",
+        "Pure water boils at 90 degrees at sea level.",
+    ),
+    (
+        "physics",
+        "comparator",
+        "The aluminium sample expands when heated.",
+        "The aluminium sample contracts when heated.",
+    ),
+    (
+        "physics",
+        "negation-morphology",
+        "The reaction conserves momentum in this frame.",
+        "The reaction does not conserve momentum in this frame.",
+    ),
     # ── Dutch (nl): the golden fixture that lets conformance/conflict.json claim
     #    "nl". HR/policy register, because that is the consuming corpus. ──
-    ("hr-nl", "negation (niet)", "De werkgever vergoedt de reiskosten voor woon-werkverkeer.",
-     "De werkgever vergoedt de reiskosten voor woon-werkverkeer niet."),
-    ("hr-nl", "negation (geen)", "Een uitzendkracht heeft recht op de eindejaarsuitkering.",
-     "Een uitzendkracht heeft geen recht op de eindejaarsuitkering."),
-    ("hr-nl", "negation (geen replaces een)",
-     "De medewerker ontvangt een vergoeding voor thuiswerken.",
-     "De medewerker ontvangt geen vergoeding voor thuiswerken."),
-    ("hr-nl", "negation (nooit)", "Overuren worden uitbetaald in de volgende salarisperiode.",
-     "Overuren worden nooit uitbetaald in de volgende salarisperiode."),
-    ("hr-nl", "negation (verboden)",
-     "Het gebruik van privelaptops is toegestaan voor zakelijk werk.",
-     "Het gebruik van privelaptops is verboden voor zakelijk werk."),
-    ("hr-nl", "negation (niet toegestaan)", "Thuiswerken is toegestaan tijdens de proeftijd.",
-     "Thuiswerken is niet toegestaan tijdens de proeftijd."),
-    ("hr-nl", "comparator (verplicht/optioneel)",
-     "Deelname aan de jaarlijkse beoordeling is verplicht voor alle medewerkers.",
-     "Deelname aan de jaarlijkse beoordeling is optioneel voor alle medewerkers."),
-    ("hr-nl", "comparator (goedgekeurd/afgewezen)",
-     "Het verzoek om ouderschapsverlof is goedgekeurd door de afdeling HR.",
-     "Het verzoek om ouderschapsverlof is afgewezen door de afdeling HR."),
+    (
+        "hr-nl",
+        "negation (niet)",
+        "De werkgever vergoedt de reiskosten voor woon-werkverkeer.",
+        "De werkgever vergoedt de reiskosten voor woon-werkverkeer niet.",
+    ),
+    (
+        "hr-nl",
+        "negation (geen)",
+        "Een uitzendkracht heeft recht op de eindejaarsuitkering.",
+        "Een uitzendkracht heeft geen recht op de eindejaarsuitkering.",
+    ),
+    (
+        "hr-nl",
+        "negation (geen replaces een)",
+        "De medewerker ontvangt een vergoeding voor thuiswerken.",
+        "De medewerker ontvangt geen vergoeding voor thuiswerken.",
+    ),
+    (
+        "hr-nl",
+        "negation (nooit)",
+        "Overuren worden uitbetaald in de volgende salarisperiode.",
+        "Overuren worden nooit uitbetaald in de volgende salarisperiode.",
+    ),
+    (
+        "hr-nl",
+        "negation (verboden)",
+        "Het gebruik van privelaptops is toegestaan voor zakelijk werk.",
+        "Het gebruik van privelaptops is verboden voor zakelijk werk.",
+    ),
+    (
+        "hr-nl",
+        "negation (niet toegestaan)",
+        "Thuiswerken is toegestaan tijdens de proeftijd.",
+        "Thuiswerken is niet toegestaan tijdens de proeftijd.",
+    ),
+    (
+        "hr-nl",
+        "comparator (verplicht/optioneel)",
+        "Deelname aan de jaarlijkse beoordeling is verplicht voor alle medewerkers.",
+        "Deelname aan de jaarlijkse beoordeling is optioneel voor alle medewerkers.",
+    ),
+    (
+        "hr-nl",
+        "comparator (goedgekeurd/afgewezen)",
+        "Het verzoek om ouderschapsverlof is goedgekeurd door de afdeling HR.",
+        "Het verzoek om ouderschapsverlof is afgewezen door de afdeling HR.",
+    ),
     ("hr-nl", "value", "De opzegtermijn bedraagt 30 dagen.", "De opzegtermijn bedraagt 60 dagen."),
-    ("finance-nl", "value (euro)", "De thuiswerkvergoeding is € 2 per dag.",
-     "De thuiswerkvergoeding is € 3 per dag."),
-    ("legal-nl", "negation in a long policy sentence",
-     "Een medewerker die langer dan twee jaar in dienst is, heeft bij ontslag op initiatief "
-     "van de werkgever recht op een transitievergoeding.",
-     "Een medewerker die langer dan twee jaar in dienst is, heeft bij ontslag op initiatief "
-     "van de werkgever geen recht op een transitievergoeding."),
+    (
+        "finance-nl",
+        "value (euro)",
+        "De thuiswerkvergoeding is € 2 per dag.",
+        "De thuiswerkvergoeding is € 3 per dag.",
+    ),
+    (
+        "legal-nl",
+        "negation in a long policy sentence",
+        "Een medewerker die langer dan twee jaar in dienst is, heeft bij ontslag op initiatief "
+        "van de werkgever recht op een transitievergoeding.",
+        "Een medewerker die langer dan twee jaar in dienst is, heeft bij ontslag op initiatief "
+        "van de werkgever geen recht op een transitievergoeding.",
+    ),
 ]
 
 #: Pairs that LOOK like contradictions and are not. Each differs by one further
@@ -125,207 +258,493 @@ TRUE_CONFLICTS: list[Pair] = [
 #: word is exactly what makes the two passages complementary.
 HARD_NEGATIVES: list[Pair] = [
     # ── medical ──
-    ("medical", "different-aspect (scope word)", "The recommended dose for adults is 500 mg.",
-     "The recommended dose for children is 200 mg."),
-    ("medical", "different-aspect (no scope word)", "The oral dose is 500 mg.",
-     "The intravenous dose is 200 mg."),
+    (
+        "medical",
+        "different-aspect (scope word)",
+        "The recommended dose for adults is 500 mg.",
+        "The recommended dose for children is 200 mg.",
+    ),
+    (
+        "medical",
+        "different-aspect (no scope word)",
+        "The oral dose is 500 mg.",
+        "The intravenous dose is 200 mg.",
+    ),
     ("medical", "unit variant", "The single dose is 1 g.", "The single dose is 1000 mg."),
-    ("medical", "range elaboration", "The maintenance dose is 500 mg.",
-     "The maintenance dose is between 250 mg and 500 mg."),
-    ("medical", "different-scope negation", "The vaccine is not recommended for pregnant patients.",
-     "The vaccine is recommended for elderly patients."),
-    ("medical", "complementary", "The drug is metabolised in the liver.",
-     "The drug is excreted by the kidneys."),
+    (
+        "medical",
+        "range elaboration",
+        "The maintenance dose is 500 mg.",
+        "The maintenance dose is between 250 mg and 500 mg.",
+    ),
+    (
+        "medical",
+        "different-scope negation",
+        "The vaccine is not recommended for pregnant patients.",
+        "The vaccine is recommended for elderly patients.",
+    ),
+    (
+        "medical",
+        "complementary",
+        "The drug is metabolised in the liver.",
+        "The drug is excreted by the kidneys.",
+    ),
     # ── legal ──
-    ("legal", "strict elaboration", "The notice period is 30 days.",
-     "The notice period is 30 days, calculated from the date of service."),
-    ("legal", "quoted negation", "The claim that the device is not compliant was rejected.",
-     "The device is compliant."),
-    ("legal", "different aspect + date", "The confidentiality policy took effect in 2019.",
-     "The confidentiality policy was amended in 2026."),
-    ("legal", "scope-qualified", "The residential lease requires 30 days notice.",
-     "The commercial lease requires 90 days notice."),
-    ("legal", "double negation restatement",
-     "The clause is not inapplicable to subcontractors.",
-     "The clause is applicable to subcontractors."),
-    ("legal", "restrictor not negation", "All employees except contractors receive the allowance.",
-     "All employees receive the allowance."),
-    ("legal", "negation different object",
-     "The employee shall not disclose confidential information.",
-     "The employee shall disclose conflicts of interest."),
+    (
+        "legal",
+        "strict elaboration",
+        "The notice period is 30 days.",
+        "The notice period is 30 days, calculated from the date of service.",
+    ),
+    (
+        "legal",
+        "quoted negation",
+        "The claim that the device is not compliant was rejected.",
+        "The device is compliant.",
+    ),
+    (
+        "legal",
+        "different aspect + date",
+        "The confidentiality policy took effect in 2019.",
+        "The confidentiality policy was amended in 2026.",
+    ),
+    (
+        "legal",
+        "scope-qualified",
+        "The residential lease requires 30 days notice.",
+        "The commercial lease requires 90 days notice.",
+    ),
+    (
+        "legal",
+        "double negation restatement",
+        "The clause is not inapplicable to subcontractors.",
+        "The clause is applicable to subcontractors.",
+    ),
+    (
+        "legal",
+        "restrictor not negation",
+        "All employees except contractors receive the allowance.",
+        "All employees receive the allowance.",
+    ),
+    (
+        "legal",
+        "negation different object",
+        "The employee shall not disclose confidential information.",
+        "The employee shall disclose conflicts of interest.",
+    ),
     # ── finance ──
-    ("finance", "elaboration with extra figure", "Net income was 4.2 million.",
-     "Net income was 4.2 million, up from 3.1 million."),
-    ("finance", "different subject same verb",
-     "Revenue increased by 12 percent in the third quarter.",
-     "Costs increased by 12 percent in the third quarter."),
-    ("finance", "antonym across scopes", "Domestic revenue increased in the third quarter.",
-     "International revenue decreased in the third quarter."),
-    ("finance", "antonym across measures", "Gross margin increased in 2024.",
-     "Net margin decreased in 2024."),
-    ("finance", "antonym different quantity", "Unit sales increased in the third quarter.",
-     "Unit prices decreased in the third quarter."),
-    ("finance", "quoted negation", "The allegation that revenue was not restated proved false.",
-     "Revenue was restated."),
-    ("finance", "complementary", "The fee is payable in advance.",
-     "The fee is refundable on cancellation."),
+    (
+        "finance",
+        "elaboration with extra figure",
+        "Net income was 4.2 million.",
+        "Net income was 4.2 million, up from 3.1 million.",
+    ),
+    (
+        "finance",
+        "different subject same verb",
+        "Revenue increased by 12 percent in the third quarter.",
+        "Costs increased by 12 percent in the third quarter.",
+    ),
+    (
+        "finance",
+        "antonym across scopes",
+        "Domestic revenue increased in the third quarter.",
+        "International revenue decreased in the third quarter.",
+    ),
+    (
+        "finance",
+        "antonym across measures",
+        "Gross margin increased in 2024.",
+        "Net margin decreased in 2024.",
+    ),
+    (
+        "finance",
+        "antonym different quantity",
+        "Unit sales increased in the third quarter.",
+        "Unit prices decreased in the third quarter.",
+    ),
+    (
+        "finance",
+        "quoted negation",
+        "The allegation that revenue was not restated proved false.",
+        "Revenue was restated.",
+    ),
+    (
+        "finance",
+        "complementary",
+        "The fee is payable in advance.",
+        "The fee is refundable on cancellation.",
+    ),
     # ── operations ──
-    ("operations", "different artefact", "Database backups are retained for 90 days.",
-     "Database snapshots are retained for 7 days."),
-    ("operations", "different environment", "Request tracing is enabled in the staging cluster.",
-     "Request tracing is disabled in the production cluster."),
-    ("operations", "unit variant", "The escalation threshold is 2 hours.",
-     "The escalation threshold is 120 minutes."),
-    ("operations", "different metric", "The p50 latency budget is 200 ms.",
-     "The p99 latency budget is 900 ms."),
+    (
+        "operations",
+        "different artefact",
+        "Database backups are retained for 90 days.",
+        "Database snapshots are retained for 7 days.",
+    ),
+    (
+        "operations",
+        "different environment",
+        "Request tracing is enabled in the staging cluster.",
+        "Request tracing is disabled in the production cluster.",
+    ),
+    (
+        "operations",
+        "unit variant",
+        "The escalation threshold is 2 hours.",
+        "The escalation threshold is 120 minutes.",
+    ),
+    (
+        "operations",
+        "different metric",
+        "The p50 latency budget is 200 ms.",
+        "The p99 latency budget is 900 ms.",
+    ),
     # ── physics ──
-    ("physics", "different condition", "The aluminium sample expands when heated.",
-     "The aluminium sample contracts when cooled."),
+    (
+        "physics",
+        "different condition",
+        "The aluminium sample expands when heated.",
+        "The aluminium sample contracts when cooled.",
+    ),
     ("physics", "unit variant", "The half life is 2 hours.", "The half life is 120 minutes."),
-    ("physics", "different medium", "Sound travels at 343 metres per second in air.",
-     "Sound travels at 1480 metres per second in water."),
+    (
+        "physics",
+        "different medium",
+        "Sound travels at 343 metres per second in air.",
+        "Sound travels at 1480 metres per second in water.",
+    ),
     # ── Dutch (nl) ──
     # Scope restrictors, the Dutch "except"/"unless": in POLARITY_MARKERS, never
     # in the conflict negations.
-    ("hr-nl", "restrictor not negation (behalve)",
-     "Alle medewerkers behalve stagiairs ontvangen een laptop.",
-     "Alle medewerkers ontvangen een laptop."),
-    ("hr-nl", "restrictor not negation (uitgezonderd)",
-     "Alle functies uitgezonderd de directie vallen onder de cao.",
-     "Alle functies vallen onder de cao."),
-    ("hr-nl", "restrictor not negation (tenzij)",
-     "Vakantiedagen vervallen na vijf jaar tenzij anders is afgesproken.",
-     "Vakantiedagen vervallen na vijf jaar."),
+    (
+        "hr-nl",
+        "restrictor not negation (behalve)",
+        "Alle medewerkers behalve stagiairs ontvangen een laptop.",
+        "Alle medewerkers ontvangen een laptop.",
+    ),
+    (
+        "hr-nl",
+        "restrictor not negation (uitgezonderd)",
+        "Alle functies uitgezonderd de directie vallen onder de cao.",
+        "Alle functies vallen onder de cao.",
+    ),
+    (
+        "hr-nl",
+        "restrictor not negation (tenzij)",
+        "Vakantiedagen vervallen na vijf jaar tenzij anders is afgesproken.",
+        "Vakantiedagen vervallen na vijf jaar.",
+    ),
     # "zonder" scopes a POPULATION here, exactly like a restrictor. As a
     # negation it turns this pair — both true — into a false conflict, which is
     # why zonder is a polarity marker but not a conflict negation.
-    ("hr-nl", "zonder scopes a population",
-     "Medewerkers zonder vast contract krijgen de eindejaarsuitkering.",
-     "Medewerkers met vast contract krijgen de eindejaarsuitkering."),
-    ("hr-nl", "negation different population",
-     "Stagiairs hebben geen recht op een leaseauto.",
-     "Managers hebben recht op een leaseauto."),
+    (
+        "hr-nl",
+        "zonder scopes a population",
+        "Medewerkers zonder vast contract krijgen de eindejaarsuitkering.",
+        "Medewerkers met vast contract krijgen de eindejaarsuitkering.",
+    ),
+    (
+        "hr-nl",
+        "negation different population",
+        "Stagiairs hebben geen recht op een leaseauto.",
+        "Managers hebben recht op een leaseauto.",
+    ),
     # Threshold comparatives partition a population: both sides are true. This
     # pair is why meer/minder is NOT a Dutch antonym.
-    ("hr-nl", "threshold comparative (meer/minder)",
-     "Medewerkers met meer dan 10 dienstjaren krijgen 25 vakantiedagen.",
-     "Medewerkers met minder dan 10 dienstjaren krijgen 20 vakantiedagen."),
+    (
+        "hr-nl",
+        "threshold comparative (meer/minder)",
+        "Medewerkers met meer dan 10 dienstjaren krijgen 25 vakantiedagen.",
+        "Medewerkers met minder dan 10 dienstjaren krijgen 20 vakantiedagen.",
+    ),
     # ...and why hoger/lager is not one either.
-    ("finance-nl", "threshold comparative (hoger/lager)",
-     "Bij een jaarsalaris hoger dan 50000 euro geldt een bijdrage van 6 procent.",
-     "Bij een jaarsalaris lager dan 50000 euro geldt een bijdrage van 4 procent."),
+    (
+        "finance-nl",
+        "threshold comparative (hoger/lager)",
+        "Bij een jaarsalaris hoger dan 50000 euro geldt een bijdrage van 6 procent.",
+        "Bij een jaarsalaris lager dan 50000 euro geldt een bijdrage van 4 procent.",
+    ),
     # The same amount quoted both ways is the NORMAL case in Dutch price and
     # allowance text. This pair is why inclusief/exclusief is not an antonym.
-    ("finance-nl", "same price quoted excl and incl btw",
-     "De vergoeding bedraagt € 100 exclusief btw.",
-     "De vergoeding bedraagt € 121 inclusief btw."),
-    ("finance-nl", "same price quoted excl. and incl. btw (abbreviated)",
-     "De cursus kost € 500 excl. btw.", "De cursus kost € 605 incl. btw."),
-    ("hr-nl", "different subject same verb", "De reiskosten worden maandelijks vergoed.",
-     "De studiekosten worden maandelijks vergoed."),
+    (
+        "finance-nl",
+        "same price quoted excl and incl btw",
+        "De vergoeding bedraagt € 100 exclusief btw.",
+        "De vergoeding bedraagt € 121 inclusief btw.",
+    ),
+    (
+        "finance-nl",
+        "same price quoted excl. and incl. btw (abbreviated)",
+        "De cursus kost € 500 excl. btw.",
+        "De cursus kost € 605 incl. btw.",
+    ),
+    (
+        "hr-nl",
+        "different subject same verb",
+        "De reiskosten worden maandelijks vergoed.",
+        "De studiekosten worden maandelijks vergoed.",
+    ),
     # No Dutch reported-speech bigram exists; the residual guard declines this
     # on its own (three divergent tokens after the negation).
-    ("legal-nl", "quoted negation", "De bewering dat de medewerker niet verzekerd is, is onjuist.",
-     "De medewerker is verzekerd."),
-    ("legal-nl", "double negation restatement", "Het beding is niet ongeldig.",
-     "Het beding is geldig."),
+    (
+        "legal-nl",
+        "quoted negation",
+        "De bewering dat de medewerker niet verzekerd is, is onjuist.",
+        "De medewerker is verzekerd.",
+    ),
+    (
+        "legal-nl",
+        "double negation restatement",
+        "Het beding is niet ongeldig.",
+        "Het beding is geldig.",
+    ),
 ]
 
 #: Pairs sharing one polysemous word and nothing else.
 UNRELATED: list[Pair] = [
-    ("legal", "shared 'policy'", "The retention policy applies to archived correspondence.",
-     "The reactor purge policy requires a 30 second hold."),
-    ("finance", "shared 'interest'", "Interest accrues monthly on the outstanding balance.",
-     "The employee must declare any conflict of interest."),
-    ("medical", "shared 'dose'", "The dose is measured in milligrams.",
-     "A dose of radiation is measured in sieverts."),
-    ("operations", "shared 'cluster'", "The cluster runs three availability zones.",
-     "The galaxy cluster spans four megaparsecs."),
-    ("physics", "shared 'charge'", "The charge on an electron is negative.",
-     "A late payment charge is applied after 30 days."),
-    ("legal", "shared 'period'", "The notice period is 30 days.",
-     "The orbital period is 30 days."),
-    ("finance", "shared 'margin'", "Gross margin improved in the third quarter.",
-     "The margin of error is two percent."),
-    ("medical", "shared 'trial'", "The trial enrolled 400 patients.",
-     "The trial court dismissed the motion."),
-    ("operations", "shared 'window'", "The freeze window closes on Friday.",
-     "The transmission window is 30 minutes wide."),
-    ("physics", "shared 'mass'", "The mass of the sample is 40 grams.",
-     "A mass tort claim was filed in 2019."),
-    ("legal", "shared 'service'", "Service of process must be personal.",
-     "The service restarts nightly at midnight."),
-    ("finance", "shared 'return'", "The annual return was 12 percent.",
-     "The tax return is filed in April."),
-    ("medical", "shared 'pressure'", "Blood pressure is measured twice daily.",
-     "The vessel pressure is 4 bar."),
-    ("operations", "shared 'load'", "The load balancer drains connections gracefully.",
-     "The beam load is 400 newtons."),
-    ("physics", "shared 'current'", "The current through the coil is 2 amps.",
-     "The current policy took effect in 2026."),
-    ("legal", "shared 'agreement'", "The agreement is governed by Dutch law.",
-     "There is broad agreement on the measurement technique."),
-    ("finance", "shared 'capital'", "Tier one capital exceeds 12 percent.",
-     "The capital city hosts the registry office."),
-    ("medical", "shared 'resistance'", "Antibiotic resistance rose after 2019.",
-     "The resistance of the wire is 4 ohms."),
-    ("operations", "shared 'incident'", "The incident was resolved in 45 minutes.",
-     "An incident report must be filed within 30 days."),
-    ("physics", "shared 'decay'", "The isotope decay constant is 0.05.",
-     "Urban decay was cited in the zoning report."),
-    ("legal", "shared 'term'", "The term of the lease is 60 months.",
-     "The term is defined in the physics glossary."),
-    ("finance", "shared 'exposure'", "Net exposure fell to 4.2 million.",
-     "Radiation exposure is limited to 20 millisieverts."),
+    (
+        "legal",
+        "shared 'policy'",
+        "The retention policy applies to archived correspondence.",
+        "The reactor purge policy requires a 30 second hold.",
+    ),
+    (
+        "finance",
+        "shared 'interest'",
+        "Interest accrues monthly on the outstanding balance.",
+        "The employee must declare any conflict of interest.",
+    ),
+    (
+        "medical",
+        "shared 'dose'",
+        "The dose is measured in milligrams.",
+        "A dose of radiation is measured in sieverts.",
+    ),
+    (
+        "operations",
+        "shared 'cluster'",
+        "The cluster runs three availability zones.",
+        "The galaxy cluster spans four megaparsecs.",
+    ),
+    (
+        "physics",
+        "shared 'charge'",
+        "The charge on an electron is negative.",
+        "A late payment charge is applied after 30 days.",
+    ),
+    ("legal", "shared 'period'", "The notice period is 30 days.", "The orbital period is 30 days."),
+    (
+        "finance",
+        "shared 'margin'",
+        "Gross margin improved in the third quarter.",
+        "The margin of error is two percent.",
+    ),
+    (
+        "medical",
+        "shared 'trial'",
+        "The trial enrolled 400 patients.",
+        "The trial court dismissed the motion.",
+    ),
+    (
+        "operations",
+        "shared 'window'",
+        "The freeze window closes on Friday.",
+        "The transmission window is 30 minutes wide.",
+    ),
+    (
+        "physics",
+        "shared 'mass'",
+        "The mass of the sample is 40 grams.",
+        "A mass tort claim was filed in 2019.",
+    ),
+    (
+        "legal",
+        "shared 'service'",
+        "Service of process must be personal.",
+        "The service restarts nightly at midnight.",
+    ),
+    (
+        "finance",
+        "shared 'return'",
+        "The annual return was 12 percent.",
+        "The tax return is filed in April.",
+    ),
+    (
+        "medical",
+        "shared 'pressure'",
+        "Blood pressure is measured twice daily.",
+        "The vessel pressure is 4 bar.",
+    ),
+    (
+        "operations",
+        "shared 'load'",
+        "The load balancer drains connections gracefully.",
+        "The beam load is 400 newtons.",
+    ),
+    (
+        "physics",
+        "shared 'current'",
+        "The current through the coil is 2 amps.",
+        "The current policy took effect in 2026.",
+    ),
+    (
+        "legal",
+        "shared 'agreement'",
+        "The agreement is governed by Dutch law.",
+        "There is broad agreement on the measurement technique.",
+    ),
+    (
+        "finance",
+        "shared 'capital'",
+        "Tier one capital exceeds 12 percent.",
+        "The capital city hosts the registry office.",
+    ),
+    (
+        "medical",
+        "shared 'resistance'",
+        "Antibiotic resistance rose after 2019.",
+        "The resistance of the wire is 4 ohms.",
+    ),
+    (
+        "operations",
+        "shared 'incident'",
+        "The incident was resolved in 45 minutes.",
+        "An incident report must be filed within 30 days.",
+    ),
+    (
+        "physics",
+        "shared 'decay'",
+        "The isotope decay constant is 0.05.",
+        "Urban decay was cited in the zoning report.",
+    ),
+    (
+        "legal",
+        "shared 'term'",
+        "The term of the lease is 60 months.",
+        "The term is defined in the physics glossary.",
+    ),
+    (
+        "finance",
+        "shared 'exposure'",
+        "Net exposure fell to 4.2 million.",
+        "Radiation exposure is limited to 20 millisieverts.",
+    ),
     # ── Dutch (nl): Dutch articles and prepositions are NOT stopwords, so these
     #    also probe whether shared function words alone manufacture a subject. ──
-    ("legal-nl", "shared 'termijn'", "De termijn voor betaling is 30 dagen.",
-     "De termijn van de huurovereenkomst is 5 jaar."),
-    ("hr-nl", "shared 'recht'", "De medewerker heeft recht op ouderschapsverlof.",
-     "Het Nederlands recht is van toepassing op deze overeenkomst."),
-    ("finance-nl", "shared 'vergoeding'", "De vergoeding voor thuiswerken is 2 euro per dag.",
-     "De rechter kende de eiser een vergoeding van 5000 euro toe."),
-    ("hr-nl", "shared 'contract'", "Het contract wordt niet stilzwijgend verlengd.",
-     "Het contract met de leverancier loopt tot 2027."),
-    ("hr-nl", "shared function words only",
-     "De werkgever betaalt de premie van de verzekering.",
-     "De medewerker leest de tekst van de regeling niet."),
+    (
+        "legal-nl",
+        "shared 'termijn'",
+        "De termijn voor betaling is 30 dagen.",
+        "De termijn van de huurovereenkomst is 5 jaar.",
+    ),
+    (
+        "hr-nl",
+        "shared 'recht'",
+        "De medewerker heeft recht op ouderschapsverlof.",
+        "Het Nederlands recht is van toepassing op deze overeenkomst.",
+    ),
+    (
+        "finance-nl",
+        "shared 'vergoeding'",
+        "De vergoeding voor thuiswerken is 2 euro per dag.",
+        "De rechter kende de eiser een vergoeding van 5000 euro toe.",
+    ),
+    (
+        "hr-nl",
+        "shared 'contract'",
+        "Het contract wordt niet stilzwijgend verlengd.",
+        "Het contract met de leverancier loopt tot 2027.",
+    ),
+    (
+        "hr-nl",
+        "shared function words only",
+        "De werkgever betaalt de premie van de verzekering.",
+        "De medewerker leest de tekst van de regeling niet.",
+    ),
 ]
 
 #: Written after the spike's thresholds were frozen and never tuned against.
 #: The main sets above are training data; this one is the generalisation check.
 HELDOUT_NEGATIVES: list[Pair] = [
-    ("legal", "different party same duty", "The supplier shall maintain insurance of 5 million.",
-     "The contractor shall maintain insurance of 2 million."),
-    ("legal", "condition vs base rule", "Late fees apply after 30 days.",
-     "Late fees apply after 30 days unless waived by the registrar."),
-    ("finance", "different period", "Operating cash flow was 18 million in the first half.",
-     "Operating cash flow was 24 million in the second half."),
+    (
+        "legal",
+        "different party same duty",
+        "The supplier shall maintain insurance of 5 million.",
+        "The contractor shall maintain insurance of 2 million.",
+    ),
+    (
+        "legal",
+        "condition vs base rule",
+        "Late fees apply after 30 days.",
+        "Late fees apply after 30 days unless waived by the registrar.",
+    ),
+    (
+        "finance",
+        "different period",
+        "Operating cash flow was 18 million in the first half.",
+        "Operating cash flow was 24 million in the second half.",
+    ),
     ("finance", "currency variant", "The penalty is 500 usd.", "The penalty is 460 eur."),
-    ("medical", "different route timing", "The infusion runs over 30 minutes.",
-     "The infusion runs over 30 minutes in a monitored setting."),
-    ("medical", "different population", "Screening starts at 45 years for average risk.",
-     "Screening starts at 40 years for high risk."),
-    ("operations", "different tier", "The bronze tier response target is 8 hours.",
-     "The gold tier response target is 1 hour."),
-    ("operations", "negated different object", "The queue does not retry poison messages.",
-     "The queue retries transient failures."),
-    ("physics", "different material", "The rod conducts heat at 400 watts per metre kelvin.",
-     "The rod conducts heat at 80 watts per metre kelvin in the alloy form."),
-    ("physics", "reported hypothesis",
-     "The hypothesis that the field is not conservative was refuted.",
-     "The field is conservative."),
+    (
+        "medical",
+        "different route timing",
+        "The infusion runs over 30 minutes.",
+        "The infusion runs over 30 minutes in a monitored setting.",
+    ),
+    (
+        "medical",
+        "different population",
+        "Screening starts at 45 years for average risk.",
+        "Screening starts at 40 years for high risk.",
+    ),
+    (
+        "operations",
+        "different tier",
+        "The bronze tier response target is 8 hours.",
+        "The gold tier response target is 1 hour.",
+    ),
+    (
+        "operations",
+        "negated different object",
+        "The queue does not retry poison messages.",
+        "The queue retries transient failures.",
+    ),
+    (
+        "physics",
+        "different material",
+        "The rod conducts heat at 400 watts per metre kelvin.",
+        "The rod conducts heat at 80 watts per metre kelvin in the alloy form.",
+    ),
+    (
+        "physics",
+        "reported hypothesis",
+        "The hypothesis that the field is not conservative was refuted.",
+        "The field is conservative.",
+    ),
 ]
 
 HELDOUT_CONFLICTS: list[Pair] = [
     ("legal", "value", "The liability cap is 5 million.", "The liability cap is 2 million."),
-    ("finance", "negation", "The instrument is subject to withholding tax.",
-     "The instrument is not subject to withholding tax."),
+    (
+        "finance",
+        "negation",
+        "The instrument is subject to withholding tax.",
+        "The instrument is not subject to withholding tax.",
+    ),
     ("medical", "superseded", "The recall was issued in 2022.", "The recall was issued in 2024."),
-    ("operations", "comparator", "The failover drill is mandatory each quarter.",
-     "The failover drill is optional each quarter."),
-    ("physics", "value", "The lattice constant is 5.4 angstroms.",
-     "The lattice constant is 4.1 angstroms."),
+    (
+        "operations",
+        "comparator",
+        "The failover drill is mandatory each quarter.",
+        "The failover drill is optional each quarter.",
+    ),
+    (
+        "physics",
+        "value",
+        "The lattice constant is 5.4 angstroms.",
+        "The lattice constant is 4.1 angstroms.",
+    ),
 ]
 
 _CLONE_BASE = "The vendor shall notify the customer within 30 days of a breach."
@@ -333,25 +752,53 @@ _CLONE_BASE = "The vendor shall notify the customer within 30 days of a breach."
 #: (label, a, b, collapses?)
 DUPLICATE_CASES: list[tuple[str, str, str, bool]] = [
     ("exact duplicate", _CLONE_BASE, _CLONE_BASE, True),
-    ("whitespace variant", _CLONE_BASE,
-     "The vendor shall notify the customer  within 30 days of a breach.", True),
-    ("punctuation variant", _CLONE_BASE,
-     "The vendor shall notify the customer, within 30 days, of a breach!", True),
+    (
+        "whitespace variant",
+        _CLONE_BASE,
+        "The vendor shall notify the customer  within 30 days of a breach.",
+        True,
+    ),
+    (
+        "punctuation variant",
+        _CLONE_BASE,
+        "The vendor shall notify the customer, within 30 days, of a breach!",
+        True,
+    ),
     ("case variant", _CLONE_BASE, _CLONE_BASE.upper(), True),
-    ("one word changed (synonym)", _CLONE_BASE,
-     "The vendor must notify the customer within 30 days of a breach.", True),
-    ("one word changed (VALUE)", _CLONE_BASE,
-     "The vendor shall notify the customer within 60 days of a breach.", False),
-    ("one word changed (NEGATION)", _CLONE_BASE,
-     "The vendor shall not notify the customer within 30 days of a breach.", False),
-    ("genuine independent restatement", _CLONE_BASE,
-     "Breach notification to the affected customer is due inside one month.", False),
+    (
+        "one word changed (synonym)",
+        _CLONE_BASE,
+        "The vendor must notify the customer within 30 days of a breach.",
+        True,
+    ),
+    (
+        "one word changed (VALUE)",
+        _CLONE_BASE,
+        "The vendor shall notify the customer within 60 days of a breach.",
+        False,
+    ),
+    (
+        "one word changed (NEGATION)",
+        _CLONE_BASE,
+        "The vendor shall not notify the customer within 30 days of a breach.",
+        False,
+    ),
+    (
+        "genuine independent restatement",
+        _CLONE_BASE,
+        "Breach notification to the affected customer is due inside one month.",
+        False,
+    ),
     # Known miss, recorded rather than chased: "the same source paraphrased" and
     # "the same fact independently restated" are indistinguishable to any textual
     # detector. Under-collapsing leaves distinct_documents as inflated as it is
     # today; over-collapsing would under-report real corroboration.
-    ("paraphrase of the same source", _CLONE_BASE,
-     "Within 30 days of a breach, the customer shall be notified by the vendor.", False),
+    (
+        "paraphrase of the same source",
+        _CLONE_BASE,
+        "Within 30 days of a breach, the customer shall be notified by the vendor.",
+        False,
+    ),
 ]
 
 
@@ -398,43 +845,74 @@ NonLatinCase = tuple[str, str, str, str, str | None]
 
 NON_LATIN: list[NonLatinCase] = [
     # ── Tamil ──
-    ("legal-ta", "value",
-     "அறிவிப்பு காலம் 30 நாட்கள் ஆகும்.",
-     "அறிவிப்பு காலம் 60 நாட்கள் ஆகும்.", "value"),
-    ("finance-ta", "value percent",
-     "வட்டி விகிதம் 5 சதவீதம் ஆகும்.",
-     "வட்டி விகிதம் 9 சதவீதம் ஆகும்.", "value"),
-    ("legal-ta", "english-table: negation does not fire in tamil",
-     "ஊழியர் ரகசியத் தகவலை வெளியிடலாம்.",
-     "ஊழியர் ரகசியத் தகவலை வெளியிடக் கூடாது.", None),
-    ("legal-ta", "english-table: antonym does not fire in tamil",
-     "மண்டல விலக்கு சபையால் அங்கீகரிக்கப்பட்டது.",
-     "மண்டல விலக்கு சபையால் நிராகரிக்கப்பட்டது.", None),
-    ("legal-ta", "hard negative: different subject, same shape",
-     "அறிவிப்பு காலம் 30 நாட்கள் ஆகும்.",
-     "வாடகை தொகை 60 ரூபாய் ஆகும்.", None),
-    ("legal-ta", "hard negative: added scope qualifier",
-     "அறிவிப்பு காலம் 30 நாட்கள் ஆகும்.",
-     "முதல் ஆண்டில் அறிவிப்பு காலம் 60 நாட்கள் ஆகும்.", None),
+    ("legal-ta", "value", "அறிவிப்பு காலம் 30 நாட்கள் ஆகும்.", "அறிவிப்பு காலம் 60 நாட்கள் ஆகும்.", "value"),
+    (
+        "finance-ta",
+        "value percent",
+        "வட்டி விகிதம் 5 சதவீதம் ஆகும்.",
+        "வட்டி விகிதம் 9 சதவீதம் ஆகும்.",
+        "value",
+    ),
+    (
+        "legal-ta",
+        "english-table: negation does not fire in tamil",
+        "ஊழியர் ரகசியத் தகவலை வெளியிடலாம்.",
+        "ஊழியர் ரகசியத் தகவலை வெளியிடக் கூடாது.",
+        None,
+    ),
+    (
+        "legal-ta",
+        "english-table: antonym does not fire in tamil",
+        "மண்டல விலக்கு சபையால் அங்கீகரிக்கப்பட்டது.",
+        "மண்டல விலக்கு சபையால் நிராகரிக்கப்பட்டது.",
+        None,
+    ),
+    (
+        "legal-ta",
+        "hard negative: different subject, same shape",
+        "அறிவிப்பு காலம் 30 நாட்கள் ஆகும்.",
+        "வாடகை தொகை 60 ரூபாய் ஆகும்.",
+        None,
+    ),
+    (
+        "legal-ta",
+        "hard negative: added scope qualifier",
+        "அறிவிப்பு காலம் 30 நாட்கள் ஆகும்.",
+        "முதல் ஆண்டில் அறிவிப்பு காலம் 60 நாட்கள் ஆகும்.",
+        None,
+    ),
     # ── Telugu ──
-    ("legal-te", "value",
-     "నోటీసు వ్యవధి 30 రోజులు ఉంటుంది.",
-     "నోటీసు వ్యవధి 60 రోజులు ఉంటుంది.", "value"),
-    ("finance-te", "value millions",
-     "బాధ్యత పరిమితి 5 మిలియన్లు.",
-     "బాధ్యత పరిమితి 2 మిలియన్లు.", "value"),
-    ("legal-te", "english-table: negation does not fire in telugu",
-     "మధ్యవర్తిత్వం అవసరం.",
-     "మధ్యవర్తిత్వం అవసరం లేదు.", None),
-    ("legal-te", "hard negative: different subject, same shape",
-     "నోటీసు వ్యవధి 30 రోజులు ఉంటుంది.",
-     "అద్దె మొత్తం 60 రూపాయలు ఉంటుంది.", None),
-    ("legal-te", "hard negative: added scope qualifier",
-     "నోటీసు వ్యవధి 30 రోజులు ఉంటుంది.",
-     "మొదటి సంవత్సరంలో నోటీసు వ్యవధి 60 రోజులు ఉంటుంది.", None),
+    ("legal-te", "value", "నోటీసు వ్యవధి 30 రోజులు ఉంటుంది.", "నోటీసు వ్యవధి 60 రోజులు ఉంటుంది.", "value"),
+    ("finance-te", "value millions", "బాధ్యత పరిమితి 5 మిలియన్లు.", "బాధ్యత పరిమితి 2 మిలియన్లు.", "value"),
+    (
+        "legal-te",
+        "english-table: negation does not fire in telugu",
+        "మధ్యవర్తిత్వం అవసరం.",
+        "మధ్యవర్తిత్వం అవసరం లేదు.",
+        None,
+    ),
+    (
+        "legal-te",
+        "hard negative: different subject, same shape",
+        "నోటీసు వ్యవధి 30 రోజులు ఉంటుంది.",
+        "అద్దె మొత్తం 60 రూపాయలు ఉంటుంది.",
+        None,
+    ),
+    (
+        "legal-te",
+        "hard negative: added scope qualifier",
+        "నోటీసు వ్యవధి 30 రోజులు ఉంటుంది.",
+        "మొదటి సంవత్సరంలో నోటీసు వ్యవధి 60 రోజులు ఉంటుంది.",
+        None,
+    ),
     # ── Japanese (spaceless: bigram-segmented, digit adjacency matters) ──
-    ("legal-ja", "value, number separated by punctuation",
-     "通知期間: 30日", "通知期間: 60日", "value"),
+    (
+        "legal-ja",
+        "value, number separated by punctuation",
+        "通知期間: 30日",
+        "通知期間: 60日",
+        "value",
+    ),
     # The flush-digit case, and the reason this bucket exists at all. Japanese
     # does not put spaces around numbers, so the kana は sits directly against
     # the 3. TWO Unicode-blind guards conspired to make that inert, and both are
@@ -442,53 +920,135 @@ NON_LATIN: list[NonLatinCase] = [
     # "identifier" (は is `\p{L}`), and the identifier exception in the content
     # filter kept the bigrams は3 and は6 as two divergent content tokens
     # manufactured out of one number. Recorded as a KNOWN MISS until then.
-    ("legal-ja", "value, kana flush against the digit",
-     "通知期間は30日です。", "通知期間は60日です。", "value"),
-    ("legal-ja", "hard negative: flush digit, different subject",
-     "通知期間は30日です。", "賃料は60円です。", None),
-    ("legal-ja", "hard negative: flush digit, added scope qualifier",
-     "通知期間は30日です。", "初年度の通知期間は60日です。", None),
+    (
+        "legal-ja",
+        "value, kana flush against the digit",
+        "通知期間は30日です。",
+        "通知期間は60日です。",
+        "value",
+    ),
+    (
+        "legal-ja",
+        "hard negative: flush digit, different subject",
+        "通知期間は30日です。",
+        "賃料は60円です。",
+        None,
+    ),
+    (
+        "legal-ja",
+        "hard negative: flush digit, added scope qualifier",
+        "通知期間は30日です。",
+        "初年度の通知期間は60日です。",
+        None,
+    ),
     # Full-width digits remain a KNOWN MISS, pinned both flush and separated.
     # `_NUMBER_RE` runs on the RAW lowercased string and matches ASCII [0-9],
     # while tokenize_v2 NFKC-normalises internally — so a full-width 30 reaches the token
     # stream as "30" but never reaches `numbers` at all. Fixing it means folding
     # the number path too; NFKC in general is not offset-preserving and turns
     # ² into 2 and ㎎ into mg, so it is a separate, separately-measured change.
-    ("legal-ja", "KNOWN MISS: full-width digits are not matched by the number pattern",
-     "通知期間: ３０日", "通知期間: ６０日", None),
-    ("legal-ja", "KNOWN MISS: full-width digits, kana flush against the digit",
-     "通知期間は３０日です。", "通知期間は６０日です。", None),
-    ("legal-ja", "hard negative: different subject, same shape",
-     "通知期間: 30日", "賃料: 60円", None),
-    ("legal-ja", "hard negative: added scope qualifier",
-     "通知期間: 30日", "初年度の通知期間: 60日", None),
+    (
+        "legal-ja",
+        "KNOWN MISS: full-width digits are not matched by the number pattern",
+        "通知期間: ３０日",
+        "通知期間: ６０日",
+        None,
+    ),
+    (
+        "legal-ja",
+        "KNOWN MISS: full-width digits, kana flush against the digit",
+        "通知期間は３０日です。",
+        "通知期間は６０日です。",
+        None,
+    ),
+    (
+        "legal-ja",
+        "hard negative: different subject, same shape",
+        "通知期間: 30日",
+        "賃料: 60円",
+        None,
+    ),
+    (
+        "legal-ja",
+        "hard negative: added scope qualifier",
+        "通知期間: 30日",
+        "初年度の通知期間: 60日",
+        None,
+    ),
     # ── Chinese (spaceless, no kana: every character is `\p{L}` Han) ──
-    ("legal-zh", "value, character flush against the digit",
-     "通知期限是30天。", "通知期限是60天。", "value"),
-    ("finance-zh", "value percent, flush against the digit",
-     "年利率是5%。", "年利率是9%。", "value"),
-    ("legal-zh", "hard negative: different subject, same shape",
-     "通知期限是30天。", "租金是60元。", None),
-    ("legal-zh", "hard negative: added scope qualifier",
-     "通知期限是30天。", "第一年的通知期限是60天。", None),
-    ("legal-zh", "KNOWN MISS: full-width digits are not matched by the number pattern",
-     "通知期限是３０天。", "通知期限是６０天。", None),
+    (
+        "legal-zh",
+        "value, character flush against the digit",
+        "通知期限是30天。",
+        "通知期限是60天。",
+        "value",
+    ),
+    (
+        "finance-zh",
+        "value percent, flush against the digit",
+        "年利率是5%。",
+        "年利率是9%。",
+        "value",
+    ),
+    (
+        "legal-zh",
+        "hard negative: different subject, same shape",
+        "通知期限是30天。",
+        "租金是60元。",
+        None,
+    ),
+    (
+        "legal-zh",
+        "hard negative: added scope qualifier",
+        "通知期限是30天。",
+        "第一年的通知期限是60天。",
+        None,
+    ),
+    (
+        "legal-zh",
+        "KNOWN MISS: full-width digits are not matched by the number pattern",
+        "通知期限是３０天。",
+        "通知期限是６０天。",
+        None,
+    ),
     # ── Arabic (right-to-left, Latin digits) ──
-    ("legal-ar", "value",
-     "مدة الإشعار هي 30 يوما.", "مدة الإشعار هي 60 يوما.", "value"),
-    ("finance-ar", "value millions",
-     "حد المسؤولية هو 5 ملايين.", "حد المسؤولية هو 2 ملايين.", "value"),
-    ("legal-ar", "english-table: negation does not fire in arabic",
-     "التحكيم مطلوب في هذه الاتفاقية.",
-     "التحكيم غير مطلوب في هذه الاتفاقية.", None),
-    ("legal-ar", "hard negative: different subject, same shape",
-     "مدة الإشعار هي 30 يوما.", "مبلغ الإيجار هو 60 جنيها.", None),
-    ("legal-ar", "hard negative: added scope qualifier",
-     "مدة الإشعار هي 30 يوما.", "في السنة الأولى مدة الإشعار هي 60 يوما.", None),
+    ("legal-ar", "value", "مدة الإشعار هي 30 يوما.", "مدة الإشعار هي 60 يوما.", "value"),
+    (
+        "finance-ar",
+        "value millions",
+        "حد المسؤولية هو 5 ملايين.",
+        "حد المسؤولية هو 2 ملايين.",
+        "value",
+    ),
+    (
+        "legal-ar",
+        "english-table: negation does not fire in arabic",
+        "التحكيم مطلوب في هذه الاتفاقية.",
+        "التحكيم غير مطلوب في هذه الاتفاقية.",
+        None,
+    ),
+    (
+        "legal-ar",
+        "hard negative: different subject, same shape",
+        "مدة الإشعار هي 30 يوما.",
+        "مبلغ الإيجار هو 60 جنيها.",
+        None,
+    ),
+    (
+        "legal-ar",
+        "hard negative: added scope qualifier",
+        "مدة الإشعار هي 30 يوما.",
+        "في السنة الأولى مدة الإشعار هي 60 يوما.",
+        None,
+    ),
     # ── Latin script, non-ASCII whitespace: the case no vector covered ──
-    ("medical", "non-breaking space between value and unit",
-     "The maximum daily dose for adult patients is 12\u00a0mg.",
-     "The maximum daily dose for adult patients is 30\u00a0mg.", "value"),
+    (
+        "medical",
+        "non-breaking space between value and unit",
+        "The maximum daily dose for adult patients is 12\u00a0mg.",
+        "The maximum daily dose for adult patients is 30\u00a0mg.",
+        "value",
+    ),
 ]
 
 
@@ -498,9 +1058,7 @@ NON_LATIN: list[NonLatinCase] = [
 
 
 @pytest.mark.parametrize(("domain", "label", "left", "right"), HARD_NEGATIVES)
-def test_hard_negatives_produce_no_conflict(
-    domain: str, label: str, left: str, right: str
-) -> None:
+def test_hard_negatives_produce_no_conflict(domain: str, label: str, left: str, right: str) -> None:
     """Zero false conflicts, because a false conflict is a false refusal."""
     assert detect_conflict(left, right) is None, f"{domain}/{label}"
 
@@ -520,9 +1078,7 @@ def test_heldout_negatives_produce_no_conflict(
 
 
 @pytest.mark.parametrize(("domain", "label", "left", "right"), TRUE_CONFLICTS)
-def test_true_conflicts_are_detected(
-    domain: str, label: str, left: str, right: str
-) -> None:
+def test_true_conflicts_are_detected(domain: str, label: str, left: str, right: str) -> None:
     assert detect_conflict(left, right) is not None, f"{domain}/{label}"
 
 
@@ -608,37 +1164,48 @@ def test_identifiers_containing_digits_stay_in_the_content_set() -> None:
     number removes the only word distinguishing two passages — which produced the
     spike's single false conflict.
     """
-    assert detect_conflict(
-        "The p50 latency budget is 200 ms.", "The p99 latency budget is 900 ms."
-    ) is None
+    assert (
+        detect_conflict("The p50 latency budget is 200 ms.", "The p99 latency budget is 900 ms.")
+        is None
+    )
     # Same shape, same subject, no distinguishing identifier: a real conflict.
-    assert detect_conflict(
-        "The latency budget is 200 ms.", "The latency budget is 900 ms."
-    ) is not None
+    assert (
+        detect_conflict("The latency budget is 200 ms.", "The latency budget is 900 ms.")
+        is not None
+    )
 
 
 def test_report_markers_are_bigram_scoped() -> None:
-    """"claim that" suppresses; a bare "claim" must not.
+    """ "claim that" suppresses; a bare "claim" must not.
 
     As a unigram this guard silently disables conflict detection across most
     legal text, where "claim" is a noun of art.
     """
-    assert detect_conflict(
-        "The claim that the device is not compliant was rejected.",
-        "The device is compliant.",
-    ) is None
-    assert detect_conflict(
-        "The claim for indemnity is valid under section four.",
-        "The claim for indemnity is not valid under section four.",
-    ) is not None
+    assert (
+        detect_conflict(
+            "The claim that the device is not compliant was rejected.",
+            "The device is compliant.",
+        )
+        is None
+    )
+    assert (
+        detect_conflict(
+            "The claim for indemnity is valid under section four.",
+            "The claim for indemnity is not valid under section four.",
+        )
+        is not None
+    )
 
 
 def test_scope_restrictors_are_not_negations() -> None:
-    """"except" restricts scope; treating it as polarity costs false refusals."""
-    assert detect_conflict(
-        "All employees except contractors receive the allowance.",
-        "All employees receive the allowance.",
-    ) is None
+    """ "except" restricts scope; treating it as polarity costs false refusals."""
+    assert (
+        detect_conflict(
+            "All employees except contractors receive the allowance.",
+            "All employees receive the allowance.",
+        )
+        is None
+    )
 
 
 def test_equal_units_are_required_for_a_value_conflict() -> None:

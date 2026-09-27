@@ -61,7 +61,6 @@ def test_etag_manifest_persists_via_backend(tmp_path: Path) -> None:
     assert not loaded.is_changed("doc1", "sha256:abc")
 
 
-
 def test_record_retires_the_previous_checksum() -> None:
     m = EtagManifest()
     m.record("doc1", "shaA")

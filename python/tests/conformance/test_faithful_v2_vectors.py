@@ -32,9 +32,7 @@ def test_bucket_names_and_sizes() -> None:
     assert {k: len(v) for k, v in VECTORS.items()} == EXPECTED_COUNTS
 
 
-@pytest.mark.parametrize(
-    "case", [pytest.param(c, id=c["name"]) for c in VECTORS["attacks"]]
-)
+@pytest.mark.parametrize("case", [pytest.param(c, id=c["name"]) for c in VECTORS["attacks"]])
 def test_attack_vector(case: dict[str, Any]) -> None:
     """Every attack answer is FALSE w.r.t. its passage; the v2 gate must reject it."""
     assert is_supported_v2(case["answer"], case["passage"]) is case["supported"], (
@@ -42,9 +40,7 @@ def test_attack_vector(case: dict[str, Any]) -> None:
     )
 
 
-@pytest.mark.parametrize(
-    "case", [pytest.param(c, id=c["name"]) for c in VECTORS["controls"]]
-)
+@pytest.mark.parametrize("case", [pytest.param(c, id=c["name"]) for c in VECTORS["controls"]])
 def test_control_vector(case: dict[str, Any]) -> None:
     assert is_supported_v2(case["answer"], case["passage"]) is case["supported"], (
         f"{case['name']}\nanswer={case['answer']!r}\npassage={case['passage']!r}"

@@ -17,7 +17,7 @@ def _rag(tmp_path: Path, *, signals: list[str]) -> CiteNexus:
 def _write_repo(root: Path) -> None:
     (root / "pkg").mkdir(parents=True)
     (root / "pkg" / "tokenize.go").write_text(
-        "package pkg\n\nimport \"strings\"\n\n"
+        'package pkg\n\nimport "strings"\n\n'
         "func Tokenize(s string) []string {\n\treturn strings.Fields(s)\n}\n"
     )
     (root / "lexer.py").write_text(

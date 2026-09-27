@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 from citenexus.answer import _gostr as go
 from citenexus.answer import verify_answer as _va
 from citenexus.answer import verify_conditions, verify_parties
-from citenexus.answer.numbers import numbers_in
+from citenexus.answer.numbers import VerbatimNumbers, numbers_in, verbatim_in
 from citenexus.answer.verify_guards_model import number_word_value, soft_join
 from citenexus.tokenize import tokenize_v2
 
@@ -33,9 +33,9 @@ CONJUNCT_COORDINATOR = go.compile_go(r"\b(?:en|and)\b", ignore_case=True)
 TOT_EN_MET_WORDS = go.compile_go(r"\btot en met\b|\bup to and including\b", ignore_case=True)
 
 
-def language_free(text: str, language: str) -> set[str]:
+def language_free(text: str, language: str, verbatim: VerbatimNumbers | None = None) -> set[str]:
     """The number keys ("#…") and proper names ("@…") of a text."""
-    out = {"#" + m.reading.key for m in numbers_in(text, language)}
+    out = {"#" + m.reading.key for m in numbers_in(text, language, verbatim)}
     words = go.fields(text)
     for i, raw in enumerate(words):
         w = raw.strip(".,;:()\"'!?")
@@ -87,7 +87,7 @@ def conjunct_token_guard(
         return ""
     sentences = go.split(verify_parties.SENTENCE_BREAK, soft_join(eu.text))
     claim_tokens = tokenize_v2(claim)
-    claim_free = language_free(claim, claim_language)
+    claim_free = language_free(claim, claim_language, verbatim_in(eu.text, eu.language))
 
     # Which sentence the claim follows. Language-free first.
     free = [language_free(s, eu.language) for s in sentences]

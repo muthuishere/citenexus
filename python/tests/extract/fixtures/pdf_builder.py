@@ -101,9 +101,7 @@ def build_pdf_with_metadata(
         b"/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>"
     )
     objects.append(
-        f"<< /Length {len(content_stream)} >>\nstream\n".encode()
-        + content_stream
-        + b"\nendstream"
+        f"<< /Length {len(content_stream)} >>\nstream\n".encode() + content_stream + b"\nendstream"
     )
     objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
     objects.append(f"<< /Title ({title}) /Author ({author}) /CreationDate ({created}) >>".encode())

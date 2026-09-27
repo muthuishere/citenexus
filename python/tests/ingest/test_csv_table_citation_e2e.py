@@ -17,18 +17,11 @@ from citenexus.testing import FakeEmbedding, FakeLLM
 
 
 def test_csv_row_is_retrieved_and_cited_verbatim(tmp_path: Path) -> None:
-    csv_text = (
-        "Employee,YearsOfService,NoticeDays\n"
-        "A. Rao,2,30\n"
-        "B. Singh,5,45\n"
-        "C. Fernandes,9,60\n"
-    )
+    csv_text = "Employee,YearsOfService,NoticeDays\nA. Rao,2,30\nB. Singh,5,45\nC. Fernandes,9,60\n"
     csv_path = tmp_path / "notice-periods.csv"
     csv_path.write_text(csv_text)
 
-    rag = CiteNexus(
-        tmp_path / "store", embedder=FakeEmbedding(), generator=FakeLLM()
-    )
+    rag = CiteNexus(tmp_path / "store", embedder=FakeEmbedding(), generator=FakeLLM())
     result = rag.ingest(csv_path, document_id="notice-periods")
     assert result.status == "ingested"
     # Three data rows -> three table EUs, one per row (order = row index).

@@ -149,9 +149,10 @@ def test_antonym_pairs_are_unchanged_as_unordered_pairs() -> None:
     """
     expected = FROZEN_ANTONYMS | DUTCH_ANTONYMS
     assert {frozenset(p) for p in CONFLICT_ANTONYMS} == {frozenset(p) for p in expected}
-    assert frozenset(
-        pair for a, b in expected for pair in ((a, b), (b, a))
-    ) == conflict_module._ANTONYMS
+    assert (
+        frozenset(pair for a, b in expected for pair in ((a, b), (b, a)))
+        == conflict_module._ANTONYMS
+    )
     # No pair is degenerate, so 32 unordered pairs symmetrise to exactly 64.
     assert len(conflict_module._ANTONYMS) == 64
 

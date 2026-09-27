@@ -134,7 +134,7 @@ def test_an_unreadable_question_is_unchanged() -> None:
 
 
 def test_the_two_unreadable_refusals_stay_distinguishable() -> None:
-    """"I cannot read your question" is not "I cannot read the corpus"."""
+    """ "I cannot read your question" is not "I cannot read the corpus"."""
     flow = AnswerFlow(generator=_Echo())
     question_gap = flow.ask(_KHMER, [_candidate(_KHMER, language="km")])
     corpus_gap = flow.ask(_Q_EN, [_candidate(_KHMER, language="km")])
@@ -148,9 +148,7 @@ def test_the_two_unreadable_refusals_stay_distinguishable() -> None:
 
 def test_a_gate_failure_is_blamed_on_the_gate() -> None:
     flow = AnswerFlow(generator=_Fabricator())
-    result = flow.ask(
-        "Can the employee disclose confidential information?", [_candidate(_ENGLISH)]
-    )
+    result = flow.ask("Can the employee disclose confidential information?", [_candidate(_ENGLISH)])
     assert result.evidence.decision is Decision.refused
     assert result.missing_evidence == ("generated answer failed the faithfulness gate",)
 

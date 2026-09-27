@@ -72,11 +72,7 @@ def test_e2e_vector(pipeline: SmokePipeline, case: dict[str, Any]) -> None:
 
     got_document = result.sources[0].document if result.sources else None
     got_passage = result.sources[0].passage if result.sources else None
-    got_eu_id = (
-        result.claims[0].sources[0]
-        if result.claims and result.claims[0].sources
-        else None
-    )
+    got_eu_id = result.claims[0].sources[0] if result.claims and result.claims[0].sources else None
 
     assert got_document == expected["document"], case["question"]
     assert got_passage == expected["passage"], case["question"]

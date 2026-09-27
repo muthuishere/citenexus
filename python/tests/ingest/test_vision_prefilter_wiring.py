@@ -32,9 +32,7 @@ class _CountingVision(FakeVision):
 
 def test_meaningful_figure_clears_prefilter_and_is_cited(tmp_path: Path) -> None:
     pdf_path = tmp_path / "figure.pdf"
-    pdf_path.write_bytes(
-        build_pdf_with_image(text="Unrelated narrative.", display_size=(220, 220))
-    )
+    pdf_path.write_bytes(build_pdf_with_image(text="Unrelated narrative.", display_size=(220, 220)))
     vision = _CountingVision()
     rag = CiteNexus(
         tmp_path / "store", embedder=FakeEmbedding(), generator=FakeLLM(), vision=vision
@@ -50,9 +48,7 @@ def test_decoration_sized_image_is_skipped_before_vision(tmp_path: Path) -> None
     pdf_path = tmp_path / "decoration.pdf"
     # 40x40pt on a 612x792pt page -> area_ratio ~0.0033, well under the 0.05
     # default min_area_ratio -> the §9 pre-filter must route this to `skip`.
-    pdf_path.write_bytes(
-        build_pdf_with_image(text="Unrelated narrative.", display_size=(40, 40))
-    )
+    pdf_path.write_bytes(build_pdf_with_image(text="Unrelated narrative.", display_size=(40, 40)))
     vision = _CountingVision()
     rag = CiteNexus(
         tmp_path / "store", embedder=FakeEmbedding(), generator=FakeLLM(), vision=vision

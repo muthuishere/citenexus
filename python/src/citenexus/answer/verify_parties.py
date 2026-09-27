@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING
 from citenexus.answer import _gostr as go
 from citenexus.answer import verify_answer as _va
 from citenexus.answer import verify_conditions, verify_qualifier_pairs, verify_roles
-from citenexus.answer.numbers import clock_times, numbers_in
+from citenexus.answer.numbers import VerbatimNumbers, clock_times, numbers_in, verbatim_in
 from citenexus.answer.verify import align, is_stopword
 from citenexus.answer.verify_guards_model import (
     CONTEXT_STOP,
@@ -224,8 +224,11 @@ def bind_value(
 ) -> int:
     """Which of two words the unit binds each of the claim's numbers to."""
     claim_keys: list[list[str]] = []
+    verbatim = verbatim_in(unit, unit_language)
     for c in verify_roles.role_clauses(claim):
-        claim_keys.extend(verify_qualifier_pairs.number_word_keys(c, claim_language).values())
+        claim_keys.extend(
+            verify_qualifier_pairs.number_word_keys(c, claim_language, verbatim).values()
+        )
     if not claim_keys:
         return BIND_NO_NUMBER
     to_other = False
@@ -307,17 +310,23 @@ def counterpart_of(o: Sequence[str], p: Sequence[str], sentences: Sequence[Seque
 def value_row_guard(claim: str, claim_language: str, eu: EvidenceUnit) -> str:
     """A number stated for one period moved to another."""
 
-    def periods(clause: str, language: str, own: str) -> set[tuple[str, str]]:
-        return {q for q in quantities(clause, language) if q[0] != own}
+    verbatim = verbatim_in(
+        eu.text, eu.language
+    )  # the claim's copied numbers keep the unit's reading
+
+    def periods(
+        clause: str, language: str, own: str, vb: VerbatimNumbers | None = None
+    ) -> set[tuple[str, str]]:
+        return {q for q in quantities(clause, language, vb) if q[0] != own}
 
     # Sentences, not clauses: a period is often a fronted adverbial.
     _, unit_text = clock_times(eu.text)
     _, claim_text = clock_times(claim)
     unit_clauses = go.split(SENTENCE_BREAK, soft_join(unit_text))
     for c in go.split(SENTENCE_BREAK, soft_join(claim_text)):
-        for m in numbers_in(c, claim_language):
+        for m in numbers_in(c, claim_language, verbatim):
             key = m.reading.key
-            mine = periods(c, claim_language, key)
+            mine = periods(c, claim_language, key, verbatim)
             if not mine:
                 continue
             matched = agrees = False

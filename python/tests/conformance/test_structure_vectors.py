@@ -27,7 +27,7 @@ def test_vector_count() -> None:
 
 
 def test_the_no_structure_case_is_present() -> None:
-    """"No structure → empty, not failure" is the invariant; it needs a vector."""
+    """ "No structure → empty, not failure" is the invariant; it needs a vector."""
     assert "none" in {c["structure_type"] for c in CASES}
 
 

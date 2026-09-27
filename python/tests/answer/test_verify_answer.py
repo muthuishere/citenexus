@@ -294,7 +294,10 @@ def test_guards_cannot_be_overridden_by_the_model(guard: str, claim: str) -> Non
         ("The budget is €1,500.", "en", "Het budget is € 1.500.", "nl", True),
         ("De vergoeding is € 25,-.", "nl", "De vergoeding is € 25,00.", "nl", True),
         ("The fee is €25.05.", "en", "De vergoeding is € 25,50.", "nl", False),
-        ("The budget is €1.500.", "en", "Het budget is € 1.500.", "nl", False),  # 1.5 vs 1500
+        # ADR-0015 amendment 2026-09-27: copied verbatim, the claim's "1.500"
+        # keeps the passage's (Dutch) reading — this was a refusal.
+        ("The budget is €1.500.", "en", "Het budget is € 1.500.", "nl", True),
+        ("The budget is €1.500.", "en", "Het budget is € 1500.", "nl", False),  # not copied
         ("Het budget is € 1.500.", "", "Het budget is € 1500.", "nl", False),  # ambiguous
     ],
 )
@@ -631,24 +634,56 @@ def _number_form_cases() -> list[tuple[str, str, str, str, str, bool]]:
         ("en € 0.23 = nl € 0,23", "nl", "en", _nl_unit("€ 0,23"), _en_claim("€ 0.23"), False),
         ("nl € 0,23 is not € 23", "nl", "nl", _nl_unit("€ 0,23"), _nl_claim("€ 23"), True),
         ("nl € 0,23 is not € 0,32", "nl", "nl", _nl_unit("€ 0,23"), _nl_claim("€ 0,32"), True),
-        # ADR-0015: each side read in its declared language.
-        ("en writes the dutch amount", "nl", "en", _nl_unit("€ 4.000"), _en_claim("€ 4.000"), True),
+        # ADR-0015 amendment 2026-09-27: a number copied verbatim from the unit
+        # keeps the unit's locale — admitted (these were refusals).
         (
-            "en writes the dutch amount before euro",
+            "en copies the dutch amount",
+            "nl",
+            "en",
+            _nl_unit("€ 4.000"),
+            _en_claim("€ 4.000"),
+            False,
+        ),
+        (
+            "en copies the dutch amount before euro",
             "nl",
             "en",
             _nl_unit("€ 4.000"),
             _en_claim("4.000 euro"),
-            True,
+            False,
         ),
         (
-            "nl writes the english amount",
+            "en copies 4.000,00",
+            "nl",
+            "en",
+            _nl_unit("€ 4.000,00"),
+            _en_claim("€ 4.000,00"),
+            False,
+        ),
+        ("en copies €4.000,-", "nl", "en", _nl_unit("€4.000,-"), _en_claim("€4.000,-"), False),
+        (
+            "nl copies the english amount",
             "en",
             "nl",
             _en_unit("€ 4,000"),
             _nl_claim("€ 4,000"),
+            False,
+        ),
+        # A number the writer formats itself follows the claim's language.
+        ("en 4.000 not in the unit", "nl", "en", _nl_unit("€ 4000"), _en_claim("€ 4.000"), True),
+        (
+            "en 4.000 over 4.000,50",
+            "nl",
+            "en",
+            _nl_unit("€ 4.000,50"),
+            _en_claim("€ 4.000"),
             True,
         ),
+        ("en 4.000 over 14.000", "nl", "en", _nl_unit("€ 14.000"), _en_claim("€ 4.000"), True),
+        # The whole-number bound.
+        ("en € 23 over nl € 0,23", "nl", "en", _nl_unit("€ 0,23"), _en_claim("€ 23"), True),
+        ("en 12 over en 12.75", "en", "en", _en_unit("€ 12.75"), _en_claim("€ 12"), True),
+        ("en 12 over nl 0,12", "nl", "en", _nl_unit("€ 0,12"), _en_claim("€ 12"), True),
         (
             "en format over the dutch unit",
             "nl",
@@ -677,11 +712,22 @@ def _number_form_cases() -> list[tuple[str, str, str, str, str, bool]]:
             "De huurder krijgt 4.000 parkeerplaatsen bij de bedrijfsruimte.",
             True,
         ),
+        # ADR-0015 amendment: copied verbatim outside money too, "4.000" keeps
+        # the Dutch unit's reading (4000) — admitted; this was a refusal.
         (
-            "en-declared 4.000 outside money stays ambiguous",
+            "en-declared 4.000 copied from a dutch unit outside money",
             "nl",
             "en",
             "Personeel. Het bedrijf heeft 4.000 medewerkers in dienst. "
+            "Zij werken in drie vestigingen.",
+            "The company employs 4.000 staff.",
+            False,
+        ),
+        (
+            "en-declared 4.000 outside money not in the unit",
+            "nl",
+            "en",
+            "Personeel. Het bedrijf heeft 4000 medewerkers in dienst. "
             "Zij werken in drie vestigingen.",
             "The company employs 4.000 staff.",
             True,

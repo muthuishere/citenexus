@@ -29,7 +29,14 @@ from citenexus.answer import (
     verify_subtypes,
     verify_verbpairs,
 )
-from citenexus.answer.numbers import NumberMatch, clock_times, dates_in, numbers_in, same_date
+from citenexus.answer.numbers import (
+    NumberMatch,
+    clock_times,
+    dates_in,
+    numbers_in,
+    same_date,
+    verbatim_in,
+)
 from citenexus.answer.tables import POLARITY_MARKERS
 from citenexus.answer.verify import MAX_SINGLE_GAP, align
 from citenexus.answer.verify_guards_model import (
@@ -85,7 +92,11 @@ def number_guard(
         ordinal = ORDINAL_WORDS.get(word)
         if ordinal is not None:
             have.add("ord:" + ordinal)
-    for m in numbers_in(claim, claim_language):
+    # A number the claim copies verbatim from the passage keeps the passage's
+    # reading (ADR-0015 amendment 2026-09-27); any other follows the claim's
+    # language.
+    verbatim = verbatim_in(passage, passage_language)
+    for m in numbers_in(claim, claim_language, verbatim):
         key = cents_as_euros(m)
         if m.unit in ORDINAL_SUFFIXES and m.attached:
             key = "ord:" + key

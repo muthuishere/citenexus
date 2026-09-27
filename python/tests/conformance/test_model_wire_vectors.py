@@ -88,9 +88,9 @@ def test_response_parse_vector(case: dict[str, Any]) -> None:
 
     got: object
     if case["client"] == "openai_embed":
-        got = OpenAICompatibleEmbedding(
-            base_url="https://x", model="m", transport=transport
-        ).embed(["a", "b"])
+        got = OpenAICompatibleEmbedding(base_url="https://x", model="m", transport=transport).embed(
+            ["a", "b"]
+        )
     elif case["client"] == "openai_chat":
         got = OpenAICompatibleGenerator(
             base_url="https://x", model="m", transport=transport

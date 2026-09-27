@@ -220,9 +220,7 @@ def test_the_default_is_configurable() -> None:
 
 
 def test_ingest_call_shape_still_uses_a_reliable_detection() -> None:
-    assert (
-        resolve_answer_language(detection=_RELIABLE_TA, default_answer_language="en") == "ta"
-    )
+    assert resolve_answer_language(detection=_RELIABLE_TA, default_answer_language="en") == "ta"
 
 
 def test_ingest_call_shape_falls_to_default_on_an_unreliable_detection() -> None:
