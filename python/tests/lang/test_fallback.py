@@ -10,10 +10,14 @@ retrieved evidence stamped 8 English questions `te` and 7 more `ta` out of 22.
 
 from __future__ import annotations
 
+import pytest
+
 from citenexus.lang import (
+    HeuristicDetector,
     LanguageResult,
     flag_code_mixing,
     resolve_answer_language,
+    resolve_requested_answer_language,
 )
 
 _RELIABLE_DE = LanguageResult(language="de", confidence=0.95, is_reliable=True)
@@ -247,3 +251,40 @@ def test_code_mixing_unsorted_input_is_handled() -> None:
 
 def test_code_mixing_single_candidate_not_flagged() -> None:
     assert flag_code_mixing([("en", 0.99)], strong=0.40) is False
+
+
+# --------------------------------------------------------------------------- #
+# ADR-0013: "answer_language=None behaves exactly as before" — NOT SHIPPED
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "BUG: ADR-0013 says an unspecified answer_language keeps working identically "
+        "to 'auto' (lines 94-100: '\"auto\" is normalized to None at the boundary', "
+        "line 234: 'answer_language=None behaves exactly as before'), but "
+        "fallback.py:93 runs the detector ONLY for the sentinel — so `None` returns "
+        "the fixed default and `'auto'` returns the detected language"
+    ),
+)
+def test_unspecified_answer_language_behaves_like_auto_as_the_adr_promises() -> None:
+    """The ADR's parity claim, measured against the shipped chain.
+
+    The two front doors are the only place the sentinel is meaningful, and the
+    ADR promises callers cannot tell them apart. Either the code or the ADR is
+    wrong; today the ADR is. Retire the marker by implementing the parity OR
+    amending the ADR — a passing XPASS is the alarm, by design.
+    """
+    question = "Привет мир как дела сегодня"  # reliably Cyrillic script
+    detector = HeuristicDetector()
+
+    auto = resolve_requested_answer_language(
+        question, "auto", detector=detector, default_answer_language="en"
+    )
+    unspecified = resolve_requested_answer_language(
+        question, None, detector=detector, default_answer_language="en"
+    )
+
+    assert auto == "ru"
+    assert unspecified == auto
