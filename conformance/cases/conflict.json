@@ -1590,7 +1590,103 @@
       "raw": "1.500",
       "dash": false,
       "language": "de",
+      "key": "1500"
+    },
+    {
+      "raw": "1.500",
+      "dash": false,
+      "language": "xx",
       "key": "?1.500"
+    },
+    {
+      "raw": "1,500",
+      "dash": false,
+      "language": "fr",
+      "key": "1.5"
+    },
+    {
+      "raw": "1.500",
+      "dash": false,
+      "language": "pt-BR",
+      "key": "1500"
+    },
+    {
+      "raw": "1.500",
+      "dash": false,
+      "language": "es",
+      "key": "1500"
+    },
+    {
+      "raw": "1,500",
+      "dash": false,
+      "language": "ja",
+      "key": "1500"
+    },
+    {
+      "raw": "1.500",
+      "dash": false,
+      "language": "hi",
+      "key": "1.5"
+    },
+    {
+      "raw": "1.500",
+      "dash": false,
+      "language": "de-CH",
+      "key": "1.5"
+    },
+    {
+      "raw": "1.500",
+      "dash": false,
+      "language": "de_CH",
+      "key": "1.5"
+    },
+    {
+      "raw": "1,500",
+      "dash": false,
+      "language": "es-MX",
+      "key": "1500"
+    },
+    {
+      "raw": "1,500",
+      "dash": false,
+      "language": "en-ZA",
+      "key": "1.5"
+    },
+    {
+      "raw": "1,00,000",
+      "dash": false,
+      "language": "en-IN",
+      "key": "100000"
+    },
+    {
+      "raw": "1,00,000",
+      "dash": false,
+      "language": "ta",
+      "key": "100000"
+    },
+    {
+      "raw": "12,34,567.89",
+      "dash": false,
+      "language": "hi",
+      "key": "1234567.89"
+    },
+    {
+      "raw": "1,00,000",
+      "dash": false,
+      "language": null,
+      "key": "?1,00,000"
+    },
+    {
+      "raw": "1,00,000",
+      "dash": false,
+      "language": "nl",
+      "key": "?1,00,000"
+    },
+    {
+      "raw": "12,34,567.89",
+      "dash": false,
+      "language": "de",
+      "key": "?12,34,567.89"
     },
     {
       "raw": "25,00",

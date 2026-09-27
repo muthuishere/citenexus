@@ -245,7 +245,7 @@ func hedgeGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardConfig) s
 		c.claim[t] = true
 	}
 	claimNumbers := map[string]bool{}
-	for _, m := range numbersIn(claim, claimLanguage) {
+	for _, m := range numbersIn(claim, claimLanguage, verbatimIn(eu.Text, eu.Language)) {
 		claimNumbers[m.reading.Key] = true
 	}
 	// The unit sentence the claim follows: shared content words (through the

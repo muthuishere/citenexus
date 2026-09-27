@@ -298,8 +298,9 @@ const (
 // when none does and at least one binds one to other.
 func bindValue(claim, claimLanguage, unit, unitLanguage string, own, other []string) int {
 	var claimKeys [][]string
+	vb := verbatimIn(unit, unitLanguage)
 	for _, c := range roleClauses(claim) {
-		for _, keys := range numberWordKeys(c, claimLanguage) {
+		for _, keys := range numberWordKeys(c, claimLanguage, vb) {
 			claimKeys = append(claimKeys, keys)
 		}
 	}
@@ -438,9 +439,10 @@ func counterpartOf(o, p []string, sentences [][]string) bool {
 
 // valueRowGuard: see the file comment.
 func valueRowGuard(claim, claimLanguage string, eu EvidenceUnit) string {
-	periods := func(clause, language string, own string) map[[2]string]struct{} {
+	vb := verbatimIn(eu.Text, eu.Language) // the claim's copied numbers keep the unit's reading
+	periods := func(clause, language string, own string, vb ...verbatimNumbers) map[[2]string]struct{} {
 		out := map[[2]string]struct{}{}
-		for q := range quantities(clause, language) {
+		for q := range quantities(clause, language, vb...) {
 			if q[0] != own {
 				out[q] = struct{}{}
 			}
@@ -453,9 +455,9 @@ func valueRowGuard(claim, claimLanguage string, eu EvidenceUnit) string {
 	_, claimText := clockTimes(claim)
 	unitClauses := sentenceBreak.Split(softJoin(unitText), -1)
 	for _, c := range sentenceBreak.Split(softJoin(claimText), -1) {
-		for _, m := range numbersIn(c, claimLanguage) {
+		for _, m := range numbersIn(c, claimLanguage, vb) {
 			key := m.reading.Key
-			mine := periods(c, claimLanguage, key)
+			mine := periods(c, claimLanguage, key, vb)
 			if len(mine) == 0 {
 				continue
 			}

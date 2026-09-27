@@ -44,7 +44,7 @@ EXPECTED_COUNTS: dict[str, int] = {
     # ADR-0015
     "inclusion": 19,
     "number_formats": 14,
-    "number_readings": 30,
+    "number_readings": 46,
 }
 
 _PAIR_BUCKETS = (
@@ -70,7 +70,7 @@ def _pairs(bucket: str) -> list[Any]:
 def test_bucket_names_and_sizes() -> None:
     assert set(VECTORS) == set(EXPECTED_COUNTS)
     assert {k: len(v) for k, v in VECTORS.items()} == EXPECTED_COUNTS
-    assert sum(EXPECTED_COUNTS.values()) == 223
+    assert sum(EXPECTED_COUNTS.values()) == 239
 
 
 @pytest.mark.parametrize(

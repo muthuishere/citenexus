@@ -10423,6 +10423,626 @@
           }
         ]
       }
+    },
+    {
+      "name": "verbatim/en-claim-copies-the-dutch-amount",
+      "answer": "The training budget is € 4.000 a year [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Het opleidingsbudget bedraagt € 4.000 per jaar."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "verbatim/en-claim-copies-4-000-00",
+      "answer": "The training budget is 4.000,00 euro a year [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Het opleidingsbudget bedraagt € 4.000,00 per jaar."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "verbatim/en-claim-copies-the-dashed-amount",
+      "answer": "The training budget is €4.000,- a year [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Het opleidingsbudget bedraagt €4.000,- per jaar."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "verbatim/nl-claim-copies-the-english-amount",
+      "answer": "Het opleidingsbudget is € 4,000 per jaar [eu:a].",
+      "answer_language": "nl",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "en",
+          "text": "The training budget is € 4,000 a year."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "verbatim/writer-formatted-4-000-not-in-the-unit-refuses",
+      "must_refuse": true,
+      "answer": "The training budget is € 4.000 a year [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Het opleidingsbudget bedraagt € 4000 per jaar."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "verbatim/writer-formatted-english-4-000-over-dutch-4-000",
+      "answer": "The training budget is € 4,000 a year [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Het opleidingsbudget bedraagt € 4.000 per jaar."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "verbatim/en-23-over-nl-0-23-refuses",
+      "must_refuse": true,
+      "answer": "The allowance is € 23 per day [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De vergoeding bedraagt € 0,23 per dag."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "verbatim/en-12-over-en-12-75-refuses",
+      "must_refuse": true,
+      "answer": "The fee is € 12 per hour [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "en",
+          "text": "The fee is € 12.75 per hour."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "verbatim/en-12-over-nl-0-12-refuses",
+      "must_refuse": true,
+      "answer": "The allowance is € 12 per kilometre [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "De vergoeding bedraagt € 0,12 per kilometer."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "verbatim/en-4-000-over-nl-14-000-refuses",
+      "must_refuse": true,
+      "answer": "The training budget is € 4.000 a year [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Het opleidingsbudget bedraagt € 14.000 per jaar."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "verbatim/en-4-000-over-nl-4-000-50-refuses",
+      "must_refuse": true,
+      "answer": "The training budget is € 4.000 a year [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "nl",
+          "text": "Het opleidingsbudget bedraagt € 4.000,50 per jaar."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "locale/de-decimal-comma-admits",
+      "answer": "The allowance is €1,234.56 a month [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "de",
+          "text": "Die Zulage beträgt 1.234,56 € im Monat."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "locale/de-decimal-comma-other-value-refuses",
+      "must_refuse": true,
+      "answer": "The allowance is €1,234.65 a month [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "de",
+          "text": "Die Zulage beträgt 1.234,56 € im Monat."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "locale/fr-narrow-space-grouping-admits",
+      "answer": "The allowance is €1,234.56 a month [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "fr",
+          "text": "L’indemnité est de 1 234,56 € par mois."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "locale/fr-narrow-space-grouping-other-value-refuses",
+      "must_refuse": true,
+      "answer": "The allowance is €1,243.56 a month [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "fr",
+          "text": "L’indemnité est de 1 234,56 € par mois."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "locale/ch-apostrophe-grouping-admits",
+      "answer": "The fee is CHF 1,234.50 a month [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "de-CH",
+          "text": "Die Gebühr beträgt CHF 1'234.50 pro Monat."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "locale/ch-apostrophe-grouping-other-value-refuses",
+      "must_refuse": true,
+      "answer": "The fee is CHF 1,324.50 a month [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "de-CH",
+          "text": "Die Gebühr beträgt CHF 1'234.50 pro Monat."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "locale/en-in-lakh-grouping-admits",
+      "answer": "The bonus is ₹100,000 a year [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "en-IN",
+          "text": "The bonus is ₹1,00,000 a year."
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "locale/en-in-lakh-grouping-other-value-refuses",
+      "must_refuse": true,
+      "answer": "The bonus is ₹10,000 a year [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "en-IN",
+          "text": "The bonus is ₹1,00,000 a year."
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "locale/hi-lakh-grouping-admits",
+      "answer": "The bonus is ₹1,234,567.89 a year [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "hi",
+          "text": "बोनस ₹12,34,567.89 प्रति वर्ष है।"
+        }
+      ],
+      "expect": {
+        "decision": "answered",
+        "claims": [
+          {
+            "supported": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "locale/hi-lakh-grouping-other-value-refuses",
+      "must_refuse": true,
+      "answer": "The bonus is ₹1,234,576.89 a year [eu:a].",
+      "answer_language": "en",
+      "admit_paraphrase": true,
+      "checker": {
+        "a": [
+          0.999,
+          0.0
+        ]
+      },
+      "evidence": [
+        {
+          "id": "a",
+          "document_id": "a",
+          "language": "hi",
+          "text": "बोनस ₹12,34,567.89 प्रति वर्ष है।"
+        }
+      ],
+      "expect": {
+        "decision": "refused",
+        "claims": [
+          {
+            "supported": false,
+            "reason": "number guard"
+          }
+        ]
+      }
     }
   ]
 }

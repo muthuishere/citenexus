@@ -21,7 +21,10 @@ import (
 
 // numberGuard: every number in the claim is a number in the passage, compared
 // by ADR-0015 key (ReadNumber) — each side read in ITS OWN declared language, so
-// an English "1,500" over a Dutch "1.500" matches, and "25,00" matches "25".
+// an English "1,500" over a Dutch "1.500" matches, and "25,00" matches "25" —
+// except that a number the claim copies VERBATIM from the passage keeps the
+// passage's reading (amendment 2026-09-27): an English claim writing the Dutch
+// "€ 4.000" over that Dutch unit is 4000.
 // A number neither language can resolve ("1.500" undeclared) matches only the
 // same spelling: ambiguity refuses, it never guesses.
 //
@@ -70,7 +73,11 @@ func numberGuard(claim, claimLanguage, passage, passageLanguage string) string {
 			have["ord:"+value] = struct{}{}
 		}
 	}
-	for _, m := range numbersIn(claim, claimLanguage) {
+	// A number the claim copies verbatim from the passage keeps the passage's
+	// reading (ADR-0015 amendment 2026-09-27); any other follows the claim's
+	// language.
+	vb := verbatimIn(passage, passageLanguage)
+	for _, m := range numbersIn(claim, claimLanguage, vb) {
 		key := centsAsEuros(m)
 		if _, ordinal := ordinalSuffixes[m.unit]; ordinal && m.attached {
 			key = "ord:" + key

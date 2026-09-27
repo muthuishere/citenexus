@@ -359,11 +359,70 @@ export const VAT_RATES_TABLE: readonly string[] = [
 ];
 
 export const DECIMAL_COMMA_LANGUAGES_TABLE: readonly string[] = [
-  "nl"
+  "bg",
+  "cs",
+  "da",
+  "de",
+  "el",
+  "en-za",
+  "es",
+  "fi",
+  "fr",
+  "hr",
+  "hu",
+  "id",
+  "it",
+  "nb",
+  "nl",
+  "nn",
+  "no",
+  "pl",
+  "pt",
+  "ro",
+  "ru",
+  "sk",
+  "sl",
+  "sv",
+  "tr",
+  "uk",
+  "vi"
 ];
 
 export const DECIMAL_POINT_LANGUAGES_TABLE: readonly string[] = [
-  "en"
+  "bn",
+  "de-ch",
+  "de-li",
+  "en",
+  "es-419",
+  "es-mx",
+  "es-us",
+  "gu",
+  "he",
+  "hi",
+  "it-ch",
+  "ja",
+  "kn",
+  "ko",
+  "ml",
+  "mr",
+  "ms",
+  "ta",
+  "te",
+  "th",
+  "zh"
+];
+
+/** Languages that read Indian lakh grouping ("1,00,000") — ADR-0015 amendment. */
+export const LAKH_GROUPING_LANGUAGES_TABLE: readonly string[] = [
+  "bn",
+  "en",
+  "gu",
+  "hi",
+  "kn",
+  "ml",
+  "mr",
+  "ta",
+  "te"
 ];
 
 /** The pinned ADR-0007 thresholds, as data — a port may not quietly relax one. */

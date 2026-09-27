@@ -18,6 +18,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -78,6 +79,42 @@ func known(whole, decimals string) NumberReading {
 
 func unread(raw string) NumberReading { return NumberReading{Key: "?" + raw} }
 
+// lakhForm: 1-2 leading digits, one or more two-digit groups, a final
+// three-digit group, and an optional point decimal.
+var lakhForm = regexp.MustCompile(`^([1-9][0-9]?(?:,[0-9]{2})+,[0-9]{3})(?:\.([0-9]+))?$`)
+
+// localeTags: the declared tag normalised ("de_CH" -> "de-ch") and its primary
+// language subtag.
+func localeTags(language string) (string, string) {
+	full := strings.ReplaceAll(strings.ToLower(strings.TrimSpace(language)), "_", "-")
+	return full, primaryLanguageTag(full)
+}
+
+// decimalMarkOf is the decimal mark of a declared language: "," or ".", or ""
+// when the language is undeclared or unknown. A region tag in the tables
+// ("de-ch", "es-mx") wins over its language (CLDR, ADR-0015 amendment).
+func decimalMarkOf(language string) string {
+	tables := LoadConflictTables()
+	full, primary := localeTags(language)
+	for _, code := range []string{full, primary} {
+		switch {
+		case code == "":
+		case inTable(tables.DecimalCommaLanguages, code):
+			return ","
+		case inTable(tables.DecimalPointLanguages, code):
+			return "."
+		}
+	}
+	return ""
+}
+
+// readsLakh: the declared language writes Indian lakh grouping.
+func readsLakh(language string) bool {
+	tables := LoadConflictTables()
+	full, primary := localeTags(language)
+	return full != "" && (inTable(tables.LakhGroupingLanguages, full) || inTable(tables.LakhGroupingLanguages, primary))
+}
+
 func inTable(values []string, code string) bool {
 	for _, v := range values {
 		if v == code {
@@ -105,6 +142,11 @@ func ReadNumber(raw string, dash bool, language string) NumberReading {
 	hasDot, hasComma := strings.Contains(raw, "."), strings.Contains(raw, ",")
 	if !hasDot && !hasComma {
 		return known(raw, "")
+	}
+	// Indian lakh grouping ("1,00,000", "12,34,567.89"): a two-digit group
+	// can be nothing else, but only a language that writes it reads it.
+	if m := lakhForm.FindStringSubmatch(raw); m != nil && readsLakh(language) {
+		return known(strings.ReplaceAll(m[1], ",", ""), m[2])
 	}
 
 	if hasDot && hasComma {
@@ -141,12 +183,11 @@ func ReadNumber(raw string, dash bool, language string) NumberReading {
 		return known(whole, tail) // a decimal mark in every locale
 	}
 
-	tables := LoadConflictTables()
 	var isThousands bool
-	switch code := primaryLanguageTag(language); {
-	case inTable(tables.DecimalCommaLanguages, code):
+	switch decimalMarkOf(language) {
+	case ",":
 		isThousands = mark == "."
-	case inTable(tables.DecimalPointLanguages, code):
+	case ".":
 		isThousands = mark == ","
 	default:
 		return unread(raw) // 1.500 / 1,500 with no declared locale
@@ -168,10 +209,50 @@ type numberMatch struct {
 	attached bool
 }
 
+// verbatimNumbers maps a number's spelling (numberMatch.raw) in a cited unit to
+// the unit's own reading of it. ADR-0015 amendment (2026-09-27): a number the
+// claim copies VERBATIM from its unit keeps the unit's locale — an English
+// claim writing the Dutch "€ 4.000" is 4000 over that unit. The match is on
+// the whole matched number (numberRE takes every digit group), so "12" never
+// takes the reading of "12.75" or "0,12". A spelling the unit reads two ways
+// (a dashed and a plain "4.000" in an English unit) is dropped: ambiguity
+// falls back to the claim's own language.
+type verbatimNumbers map[string]NumberReading
+
+func verbatimIn(text, language string) verbatimNumbers {
+	out := verbatimNumbers{}
+	clash := map[string]bool{}
+	for _, m := range numbersIn(text, language) {
+		if r, seen := out[m.raw]; seen && r.Key != m.reading.Key {
+			clash[m.raw] = true
+		}
+		out[m.raw] = m.reading
+	}
+	for raw := range clash {
+		delete(out, raw)
+	}
+	return out
+}
+
+// readWith reads a claim number: the unit's reading when the claim copies the
+// unit's spelling, else ReadNumber in the claim's own language. A dashed
+// amount ("4.000,-") reads the same in every locale.
+func readWith(raw string, dash bool, language string, vb []verbatimNumbers) NumberReading {
+	if !dash {
+		for _, v := range vb {
+			if r, ok := v[raw]; ok {
+				return r
+			}
+		}
+	}
+	return ReadNumber(raw, dash, language)
+}
+
 // numbersIn finds every measured number in text, skipping identifiers such as
-// "p50" / "ipv4" (a digit run flush against an ASCII letter).
-func numbersIn(text, language string) []numberMatch {
-	lowered := joinSpacedThousands(strings.ToLower(text))
+// "p50" / "ipv4" (a digit run flush against an ASCII letter). vb, when given,
+// is the cited unit's verbatim readings (claim side only).
+func numbersIn(text, language string, vb ...verbatimNumbers) []numberMatch {
+	lowered := joinSpacedThousands(strings.ToLower(text), language)
 	out := []numberMatch{}
 	for _, m := range numberRE.FindAllStringSubmatchIndex(lowered, -1) {
 		start := m[2]
@@ -181,7 +262,7 @@ func numbersIn(text, language string) []numberMatch {
 				continue
 			}
 		}
-		match := numberMatch{raw: lowered[m[2]:m[3]], reading: ReadNumber(lowered[m[2]:m[3]], m[4] >= 0, language)}
+		match := numberMatch{raw: lowered[m[2]:m[3]], reading: readWith(lowered[m[2]:m[3]], m[4] >= 0, language, vb)}
 		if m[6] >= 0 {
 			match.unit = lowered[m[6]:m[7]]
 			match.attached = m[6] == m[3]
@@ -255,7 +336,7 @@ var (
 	ratePeriod  = regexp.MustCompile(`^(?:\s+\p{L}+)?\s*(?:per|a|an|each|/)\s*(\p{L}+)`)
 )
 
-func moneyRates(text, language string) (map[[2]string]struct{}, string) {
+func moneyRates(text, language string, vb ...verbatimNumbers) (map[[2]string]struct{}, string) {
 	rates := map[[2]string]struct{}{}
 	lowered := strings.ToLower(text)
 	blank := []byte(lowered)
@@ -265,7 +346,7 @@ func moneyRates(text, language string) (map[[2]string]struct{}, string) {
 			if raw == "" {
 				continue
 			}
-			key := ReadNumber(raw, false, language).Key
+			key := readWith(raw, false, language, vb).Key
 			if p := ratePeriod.FindStringSubmatch(lowered[m[1]:]); p != nil {
 				if class, _, ok := unitOf(p[1]); ok {
 					rates[[2]string{key, class}] = struct{}{}
@@ -286,7 +367,54 @@ func moneyRates(text, language string) (map[[2]string]struct{}, string) {
 // be two numbers.
 var spacedThousands = regexp.MustCompile(`((?:€|\beur\b|\$|£)[\s\x{00A0}\x{202F}]*)([1-9][0-9]*)[ \x{00A0}\x{202F}]([0-9]{3})\b`)
 
-func joinSpacedThousands(text string) string {
+// groupedDigits are digits grouped by a space (plain, no-break or narrow
+// no-break: "1 234,56") or an apostrophe (Swiss "1'234.50" / "1’234.50"):
+// 1-3 leading digits, then exact three-digit groups.
+var (
+	spaceGrouped      = regexp.MustCompile(`[1-9][0-9]{0,2}(?:[ \x{00A0}\x{202F}][0-9]{3})+`)
+	apostropheGrouped = regexp.MustCompile(`[1-9][0-9]{0,2}(?:['’][0-9]{3})+`)
+	groupSeparators   = regexp.MustCompile(`[ \x{00A0}\x{202F}'’]`)
+)
+
+// joinGrouped removes the separators of each whole grouped run. A run that
+// touches another digit, letter or number mark on either side, or is followed
+// by another separator and digit ("1 234 56"), is left as written: it may be
+// several numbers, and ambiguity is never guessed.
+func joinGrouped(text string, re *regexp.Regexp) string {
+	var b strings.Builder
+	last := 0
+	for _, m := range re.FindAllStringIndex(text, -1) {
+		if m[0] > 0 {
+			prev, _ := utf8.DecodeLastRuneInString(text[:m[0]])
+			if unicode.IsDigit(prev) || unicode.IsLetter(prev) || strings.ContainsRune(".,'’", prev) {
+				continue
+			}
+		}
+		if m[1] < len(text) {
+			next, size := utf8.DecodeRuneInString(text[m[1]:])
+			if unicode.IsDigit(next) || unicode.IsLetter(next) {
+				continue
+			}
+			if groupSeparators.MatchString(string(next)) && m[1]+size < len(text) {
+				if after, _ := utf8.DecodeRuneInString(text[m[1]+size:]); unicode.IsDigit(after) {
+					continue
+				}
+			}
+		}
+		b.WriteString(text[last:m[0]])
+		b.WriteString(groupSeparators.ReplaceAllString(text[m[0]:m[1]], ""))
+		last = m[1]
+	}
+	b.WriteString(text[last:])
+	return b.String()
+}
+
+// joinSpacedThousands joins grouped digits before numbers are read: a money
+// amount grouped by spaces in every language (a currency sign or code marks
+// it as one number); any space-grouped run only in a decimal-comma language,
+// which writes "1 234,56" (CLDR fr, de, …); and apostrophe grouping in every
+// language — an apostrophe is a decimal mark nowhere.
+func joinSpacedThousands(text, language string) string {
 	for i := 0; i < 4; i++ { // "€ 1 250 000": one group per pass
 		next := spacedThousands.ReplaceAllString(text, "$1$2$3")
 		if next == text {
@@ -294,7 +422,10 @@ func joinSpacedThousands(text string) string {
 		}
 		text = next
 	}
-	return text
+	if decimalMarkOf(language) == "," {
+		text = joinGrouped(text, spaceGrouped)
+	}
+	return joinGrouped(text, apostropheGrouped)
 }
 
 // Dates, numeric or written, are read as (day, month, year?) and compared as

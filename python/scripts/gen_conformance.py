@@ -1708,6 +1708,7 @@ def _conflict_table() -> dict[str, Any]:
         CONFLICT_SCOPE_MARKERS,
         DECIMAL_COMMA_LANGUAGES,
         DECIMAL_POINT_LANGUAGES,
+        LAKH_GROUPING_LANGUAGES,
         MEASUREMENT_UNITS,
         VAT_MARKERS,
         VAT_RATES,
@@ -1728,6 +1729,7 @@ def _conflict_table() -> dict[str, Any]:
         "vat_rates": list(VAT_RATES),
         "decimal_comma_languages": sorted(DECIMAL_COMMA_LANGUAGES),
         "decimal_point_languages": sorted(DECIMAL_POINT_LANGUAGES),
+        "lakh_grouping_languages": sorted(LAKH_GROUPING_LANGUAGES),
         "thresholds": {
             "subject_overlap": conflict_module.SUBJECT_OVERLAP,
             "max_symdiff": conflict_module.MAX_SYMDIFF,

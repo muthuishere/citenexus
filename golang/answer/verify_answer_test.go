@@ -268,8 +268,11 @@ func TestNumberGuardReadsEachSideInItsLanguage(t *testing.T) {
 		{"The budget is €1,500.", "en", "Het budget is € 1.500.", "nl", true},
 		{"De vergoeding is € 25,-.", "nl", "De vergoeding is € 25,00.", "nl", true},
 		{"The fee is €25.05.", "en", "De vergoeding is € 25,50.", "nl", false},
-		{"The budget is €1.500.", "en", "Het budget is € 1.500.", "nl", false}, // 1.5 vs 1500
-		{"Het budget is € 1.500.", "", "Het budget is € 1500.", "nl", false},   // undeclared claim: ambiguous
+		// ADR-0015 amendment 2026-09-27: copied verbatim, the claim's "1.500"
+		// keeps the passage's (Dutch) reading — this was a refusal.
+		{"The budget is €1.500.", "en", "Het budget is € 1.500.", "nl", true},
+		{"The budget is €1.500.", "en", "Het budget is € 1500.", "nl", false}, // not copied: 1.5 vs 1500
+		{"Het budget is € 1.500.", "", "Het budget is € 1500.", "nl", false},  // undeclared claim: ambiguous
 	}
 	for _, c := range cases {
 		got := numberGuard(c.claim, c.claimLang, c.passage, c.passageLang) == ""

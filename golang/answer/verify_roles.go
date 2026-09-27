@@ -152,7 +152,7 @@ type roleWord struct {
 
 var roleTrim = "\"'“”‘’()[]{}.,;:!?*_|€$£"
 
-func (l ActorLexicon) classify(clause, language string) []roleWord {
+func (l ActorLexicon) classify(clause, language string, vb ...verbatimNumbers) []roleWord {
 	terms := map[string]string{}
 	for id, ts := range l.Actors {
 		for _, t := range ts {
@@ -169,7 +169,7 @@ func (l ActorLexicon) classify(clause, language string) []roleWord {
 		norm := strings.ToLower(strings.Trim(w, roleTrim))
 		norm = strings.TrimSuffix(strings.TrimSuffix(norm, "'s"), "’s") // "employer's"
 		rw := roleWord{norm: norm, position: i}
-		for _, m := range numbersIn(w, language) {
+		for _, m := range numbersIn(w, language, vb...) {
 			rw.numbers = append(rw.numbers, m.reading.Key)
 		}
 		if id, ok := terms[rw.norm]; ok {
@@ -318,7 +318,7 @@ func roleGuard(claim, claimLanguage string, eu EvidenceUnit, lexicon ActorLexico
 		unit = append(unit, clause{lexicon.classify(c, eu.Language)})
 	}
 	for _, c := range roleClauses(claim) {
-		ws := lexicon.classify(c, claimLanguage)
+		ws := lexicon.classify(c, claimLanguage, verbatimIn(eu.Text, eu.Language))
 		content := map[string]bool{}
 		for _, w := range ws {
 			if w.content {

@@ -10,14 +10,12 @@ import (
 // running text ("€ 4 000" = "€ 4.000" since 38259a5).
 //
 // rag_go Lex5 L-R20 ("4 is not in the passage") is NOT a split separator: it
-// is an English-declared claim writing the Dutch "€ 4.000". ADR-0015 reads
-// "1.500" / "1,500" by each side's DECLARED language, so there it is 4.0 —
-// the same decision TestNumberGuardReadsEachSideInItsLanguage pins ("The
-// budget is €1.500." (en) over "Het budget is € 1.500." (nl): 1.5 vs 1500)
-// and the cross-port conflict vectors pin ("$1.500 is 1.5, not 1500").
-// Reading a money amount with three digits after one mark as thousands in
-// every locale would change that ADR in all three ports; the cases below pin
-// the current, documented refusal.
+// is an English-declared claim writing the Dutch "€ 4.000". Until the ADR-0015
+// amendment of 2026-09-27 each side was read only in its own declared
+// language, so that claim read 4.0 and was refused. The owner-approved
+// amendment: a number the claim copies VERBATIM from its cited unit keeps the
+// UNIT's locale (4000); a number the writer formats itself follows the claim's
+// language. The cases below pin both halves and the whole-number bound.
 func TestNumberFormsInRunningText(t *testing.T) {
 	nlUnit := func(f string) string {
 		return "Huur. De maandhuur van de bedrijfsruimte bedraagt " + f + " per maand. De huur wordt jaarlijks geïndexeerd."
@@ -59,15 +57,24 @@ func TestNumberFormsInRunningText(t *testing.T) {
 		tc{"nl € 0,23 is not € 0,32", "nl", "nl", nlUnit("€ 0,23"), nlClaim("€ 0,32"), true},
 	)
 	cases = append(cases,
-		// L-R20: a claim writing the amount in the OTHER language's format.
-		// ADR-0015, documented: each side read in its declared language, so
-		// "€ 4.000" in English is 4.0 — refused (see the comment above).
-		tc{"en claim writes the dutch amount (ADR-0015)", "nl", "en", nlUnit("€ 4.000"), enClaim("€ 4.000"), true},
-		tc{"en claim writes the dutch amount before euro (ADR-0015)", "nl", "en", nlUnit("€ 4.000"), enClaim("4.000 euro"), true},
-		tc{"nl claim writes the english amount (ADR-0015)", "en", "nl", enUnit("€ 4,000"), nlClaim("€ 4,000"), true},
-		// Each language's own format across languages is equal.
+		// L-R20, ADR-0015 amendment 2026-09-27: a number copied verbatim from
+		// the unit keeps the unit's locale — admitted (these were refusals).
+		tc{"en claim copies the dutch amount verbatim", "nl", "en", nlUnit("€ 4.000"), enClaim("€ 4.000"), false},
+		tc{"en claim copies the dutch amount before euro", "nl", "en", nlUnit("€ 4.000"), enClaim("4.000 euro"), false},
+		tc{"en claim copies 4.000,00 verbatim", "nl", "en", nlUnit("€ 4.000,00"), enClaim("€ 4.000,00"), false},
+		tc{"en claim copies €4.000,- verbatim", "nl", "en", nlUnit("€4.000,-"), enClaim("€4.000,-"), false},
+		tc{"nl claim copies the english amount verbatim", "en", "nl", enUnit("€ 4,000"), nlClaim("€ 4,000"), false},
+		// A number the writer formats itself follows the claim's language.
 		tc{"en claim in english format over the dutch unit", "nl", "en", nlUnit("€ 4.000"), enClaim("€ 4,000"), false},
 		tc{"nl claim in dutch format over the english unit", "en", "nl", enUnit("€ 4,000"), nlClaim("€ 4.000"), false},
+		tc{"en 4.000 not in the unit is 4", "nl", "en", nlUnit("€ 4000"), enClaim("€ 4.000"), true},
+		tc{"en 4.000 over a unit spelling 4.000,50", "nl", "en", nlUnit("€ 4.000,50"), enClaim("€ 4.000"), true},
+		tc{"en 4.000 over a unit spelling 14.000", "nl", "en", nlUnit("€ 14.000"), enClaim("€ 4.000"), true},
+		// The whole-number bound: a claim number never takes a reading from
+		// inside a longer unit number.
+		tc{"en € 23 over nl € 0,23", "nl", "en", nlUnit("€ 0,23"), enClaim("€ 23"), true},
+		tc{"en 12 over en 12.75", "en", "en", enUnit("€ 12.75"), enClaim("€ 12"), true},
+		tc{"en 12 over nl 0,12", "nl", "en", nlUnit("€ 0,12"), enClaim("€ 12"), true},
 		// Must refuse.
 		tc{"4.000 is not 40.000", "nl", "nl", nlUnit("€ 40.000"), nlClaim("€ 4.000"), true},
 		tc{"4.000 is not 4,5", "nl", "nl", nlUnit("€ 4,5"), nlClaim("€ 4.000"), true},
@@ -75,10 +82,14 @@ func TestNumberFormsInRunningText(t *testing.T) {
 		tc{"4.000 is not the count 4", "nl", "nl",
 			"Parkeren. De huurder krijgt 4 parkeerplaatsen bij de bedrijfsruimte. De huur wordt jaarlijks geïndexeerd.",
 			"De huurder krijgt 4.000 parkeerplaatsen bij de bedrijfsruimte.", true},
-		// Documented choice (ADR-0015): outside a money amount "4.000" in an
-		// EN-declared text is 4.0 — ambiguity refuses, it never guesses.
-		tc{"en-declared 4.000 outside money stays ambiguous", "nl", "en",
+		// ADR-0015 amendment: outside a money amount too, "4.000" copied
+		// verbatim from a Dutch unit keeps the unit's reading (4000) —
+		// admitted; this was a refusal. Not copied, it is English 4.0.
+		tc{"en-declared 4.000 copied from a dutch unit outside money", "nl", "en",
 			"Personeel. Het bedrijf heeft 4.000 medewerkers in dienst. Zij werken in drie vestigingen.",
+			"The company employs 4.000 staff.", false},
+		tc{"en-declared 4.000 outside money not in the unit", "nl", "en",
+			"Personeel. Het bedrijf heeft 4000 medewerkers in dienst. Zij werken in drie vestigingen.",
 			"The company employs 4.000 staff.", true},
 	)
 	for _, c := range cases {

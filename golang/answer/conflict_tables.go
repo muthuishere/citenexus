@@ -43,12 +43,14 @@ type ConflictTables struct {
 	MeasurementUnits []string   `json:"measurement_units"`
 	// ADR-0015: (inclusive, exclusive) marker pairs in ONE direction, the words
 	// that make an incl/excl difference a VAT question, the VAT multipliers as
-	// exact decimal strings, and which languages fix the decimal mark.
+	// exact decimal strings, which languages fix the decimal mark, and which
+	// read Indian lakh grouping ("1,00,000", 2026-09-27 amendment).
 	InclusionPairs        [][]string         `json:"inclusion_pairs"`
 	VATMarkers            []string           `json:"vat_markers"`
 	VATRates              []string           `json:"vat_rates"`
 	DecimalCommaLanguages []string           `json:"decimal_comma_languages"`
 	DecimalPointLanguages []string           `json:"decimal_point_languages"`
+	LakhGroupingLanguages []string           `json:"lakh_grouping_languages"`
 	Thresholds            ConflictThresholds `json:"thresholds"`
 }
 

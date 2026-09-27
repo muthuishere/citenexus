@@ -18,8 +18,8 @@ import type { EvidenceUnit } from "./verify-answer.js";
 const verifyFile = loadCase<{ cases: VerifyVector[] }>("verify_answer.json");
 
 describe("verify_answer.json", () => {
-  it("has 325 cases and at least 5 must-refuse controls", () => {
-    expect(verifyFile.cases.length).toBe(325);
+  it("has 346 cases and at least 5 must-refuse controls", () => {
+    expect(verifyFile.cases.length).toBe(346);
     expect(verifyFile.cases.filter((c) => c.must_refuse === true).length).toBeGreaterThanOrEqual(5);
   });
 

@@ -99,6 +99,7 @@ def render_python(table: dict[str, Any]) -> str:
         '    "CONFLICT_THRESHOLDS",\n'
         '    "DECIMAL_COMMA_LANGUAGES",\n'
         '    "DECIMAL_POINT_LANGUAGES",\n'
+        '    "LAKH_GROUPING_LANGUAGES",\n'
         '    "MEASUREMENT_UNITS",\n'
         '    "VAT_MARKERS",\n'
         '    "VAT_RATES",\n'
@@ -125,6 +126,9 @@ def render_python(table: dict[str, Any]) -> str:
         + _py_strs("DECIMAL_COMMA_LANGUAGES", table["decimal_comma_languages"])
         + "\n"
         + _py_strs("DECIMAL_POINT_LANGUAGES", table["decimal_point_languages"])
+        + "\n"
+        + "#: Languages that read Indian lakh grouping (1,00,000) — ADR-0015 amendment.\n"
+        + _py_strs("LAKH_GROUPING_LANGUAGES", table["lakh_grouping_languages"])
         + "\n"
         + "#: The pinned ADR-0007 thresholds, as data. The runtime constants live in\n"
         + "#: ``answer/conflict.py``; a test asserts the two agree, so a port cannot be\n"
@@ -182,12 +186,14 @@ type ConflictTables struct {{
 \tMeasurementUnits []string   `json:"measurement_units"`
 \t// ADR-0015: (inclusive, exclusive) marker pairs in ONE direction, the words
 \t// that make an incl/excl difference a VAT question, the VAT multipliers as
-\t// exact decimal strings, and which languages fix the decimal mark.
+\t// exact decimal strings, which languages fix the decimal mark, and which
+\t// read Indian lakh grouping ("1,00,000", 2026-09-27 amendment).
 \tInclusionPairs        [][]string         `json:"inclusion_pairs"`
 \tVATMarkers            []string           `json:"vat_markers"`
 \tVATRates              []string           `json:"vat_rates"`
 \tDecimalCommaLanguages []string           `json:"decimal_comma_languages"`
 \tDecimalPointLanguages []string           `json:"decimal_point_languages"`
+\tLakhGroupingLanguages []string           `json:"lakh_grouping_languages"`
 \tThresholds            ConflictThresholds `json:"thresholds"`
 }}
 
@@ -301,6 +307,10 @@ export const DECIMAL_COMMA_LANGUAGES_TABLE: readonly string[] = \
 
 export const DECIMAL_POINT_LANGUAGES_TABLE: readonly string[] = \
 {lit(table["decimal_point_languages"])};
+
+/** Languages that read Indian lakh grouping ("1,00,000") — ADR-0015 amendment. */
+export const LAKH_GROUPING_LANGUAGES_TABLE: readonly string[] = \
+{lit(table["lakh_grouping_languages"])};
 
 /** The pinned ADR-0007 thresholds, as data — a port may not quietly relax one. */
 export const CONFLICT_THRESHOLDS_TABLE: {{

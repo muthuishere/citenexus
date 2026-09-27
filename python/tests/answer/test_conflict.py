@@ -1069,7 +1069,27 @@ NUMBER_READINGS: list[tuple[str, bool, str | None, str]] = [
     ("1,500", False, "nl", "1.5"),
     ("1.500", False, "en", "1.5"),
     ("1,500", False, "en-GB", "1500"),
-    ("1.500", False, "de", "?1.500"),
+    # ADR-0015 amendment 2026-09-27: "de" is now a declared decimal-comma
+    # language (CLDR); an undeclared/unknown language still stays unread.
+    ("1.500", False, "de", "1500"),
+    ("1.500", False, "xx", "?1.500"),
+    ("1,500", False, "fr", "1.5"),
+    ("1.500", False, "pt-BR", "1500"),
+    ("1.500", False, "es", "1500"),
+    ("1,500", False, "ja", "1500"),
+    ("1.500", False, "hi", "1.5"),
+    # A region tag wins over its language where CLDR differs.
+    ("1.500", False, "de-CH", "1.5"),
+    ("1.500", False, "de_CH", "1.5"),
+    ("1,500", False, "es-MX", "1500"),
+    ("1,500", False, "en-ZA", "1.5"),
+    # Indian lakh grouping, only in a language that writes it.
+    ("1,00,000", False, "en-IN", "100000"),
+    ("1,00,000", False, "ta", "100000"),
+    ("12,34,567.89", False, "hi", "1234567.89"),
+    ("1,00,000", False, None, "?1,00,000"),
+    ("1,00,000", False, "nl", "?1,00,000"),
+    ("12,34,567.89", False, "de", "?12,34,567.89"),
     ("25,00", False, None, "25"),
     ("25,50", False, None, "25.5"),
     ("25.50", False, None, "25.5"),

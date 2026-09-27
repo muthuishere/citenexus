@@ -19,6 +19,7 @@ __all__ = [
     "CONFLICT_THRESHOLDS",
     "DECIMAL_COMMA_LANGUAGES",
     "DECIMAL_POINT_LANGUAGES",
+    "LAKH_GROUPING_LANGUAGES",
     "MEASUREMENT_UNITS",
     "VAT_MARKERS",
     "VAT_RATES",
@@ -242,13 +243,74 @@ VAT_RATES: tuple[str, ...] = ("1.09", "1.21")
 
 DECIMAL_COMMA_LANGUAGES: frozenset[str] = frozenset(
     {
+        "bg",
+        "cs",
+        "da",
+        "de",
+        "el",
+        "en-za",
+        "es",
+        "fi",
+        "fr",
+        "hr",
+        "hu",
+        "id",
+        "it",
+        "nb",
         "nl",
+        "nn",
+        "no",
+        "pl",
+        "pt",
+        "ro",
+        "ru",
+        "sk",
+        "sl",
+        "sv",
+        "tr",
+        "uk",
+        "vi",
     }
 )
 
 DECIMAL_POINT_LANGUAGES: frozenset[str] = frozenset(
     {
+        "bn",
+        "de-ch",
+        "de-li",
         "en",
+        "es-419",
+        "es-mx",
+        "es-us",
+        "gu",
+        "he",
+        "hi",
+        "it-ch",
+        "ja",
+        "kn",
+        "ko",
+        "ml",
+        "mr",
+        "ms",
+        "ta",
+        "te",
+        "th",
+        "zh",
+    }
+)
+
+#: Languages that read Indian lakh grouping (1,00,000) — ADR-0015 amendment.
+LAKH_GROUPING_LANGUAGES: frozenset[str] = frozenset(
+    {
+        "bn",
+        "en",
+        "gu",
+        "hi",
+        "kn",
+        "ml",
+        "mr",
+        "ta",
+        "te",
     }
 )
 

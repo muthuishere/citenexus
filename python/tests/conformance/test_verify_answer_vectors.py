@@ -117,7 +117,7 @@ def run_vector(case: dict[str, Any], *, eager: bool = False) -> tuple[Result, Id
 
 
 def test_vector_counts() -> None:
-    assert len(VECTORS) == 325
+    assert len(VECTORS) == 346
     assert sum(1 for c in VECTORS if c.get("must_refuse")) >= 5
     assert len(HEADINGS) == 14
     assert sum(1 for c in HEADINGS if c.get("must_refuse")) >= 3

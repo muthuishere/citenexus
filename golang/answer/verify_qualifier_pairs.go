@@ -69,10 +69,10 @@ func lowerWords(clause string) []string {
 }
 
 // numberWordKeys: per word index, the ADR-0015 keys of its numbers.
-func numberWordKeys(clause, language string) map[int][]string {
+func numberWordKeys(clause, language string, vb ...verbatimNumbers) map[int][]string {
 	out := map[int][]string{}
 	for i, w := range listLeadToken.FindAllString(clause, -1) {
-		for _, m := range numbersIn(w, language) {
+		for _, m := range numbersIn(w, language, vb...) {
 			out[i] = append(out[i], m.reading.Key)
 		}
 	}
@@ -86,12 +86,13 @@ func qualifierPairGuard(claim, claimLanguage string, eu EvidenceUnit, pairs []Qu
 		keys  map[int][]string
 	}
 	var unit []unitClause
+	vb := verbatimIn(eu.Text, eu.Language)
 	for _, c := range roleClauses(eu.Text) {
 		unit = append(unit, unitClause{lowerWords(c), numberWordKeys(c, eu.Language)})
 	}
 	for _, c := range roleClauses(claim) {
 		words := lowerWords(c)
-		for i, keys := range numberWordKeys(c, claimLanguage) {
+		for i, keys := range numberWordKeys(c, claimLanguage, vb) {
 			for _, pair := range pairs {
 				side, form := sideNear(words, i, pair)
 				if side < 0 {

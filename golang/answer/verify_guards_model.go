@@ -148,12 +148,12 @@ var quantityLinks = map[string]struct{}{
 	"and": {}, "or": {}, "to": {},
 }
 
-func numberValue(token, language string) (string, bool) {
+func numberValue(token, language string, vb ...verbatimNumbers) (string, bool) {
 	switch {
 	case token == "½":
 		return "0.5", true
 	case token[0] >= '0' && token[0] <= '9':
-		return ReadNumber(token, false, language).Key, true
+		return readWith(token, false, language, vb).Key, true
 	default:
 		return numberWordValue(token)
 	}
@@ -166,9 +166,9 @@ func numberValue(token, language string) (string, bool) {
 // sit in a compound ("dertig (30) vakantiedagen"). Also read: "half jaar" /
 // "halfjaar" / "half (a) year" as 6 months, and an ordinal before a year
 // compound ("eerste levensjaar") as 1 year.
-func quantities(text, language string) map[[2]string]struct{} {
-	_, text = clockTimes(text)           // "7.30 uur" is a time of day, not 7.3 hours
-	_, text = moneyRates(text, language) // "€ 150 per maand" is a price, not 150 months
+func quantities(text, language string, vb ...verbatimNumbers) map[[2]string]struct{} {
+	_, text = clockTimes(text)                  // "7.30 uur" is a time of day, not 7.3 hours
+	_, text = moneyRates(text, language, vb...) // "€ 150 per maand" is a price, not 150 months
 	tokens := unitScan.FindAllString(strings.ToLower(text), -1)
 	out := map[[2]string]struct{}{}
 	for i := 0; i < len(tokens); i++ {
@@ -193,7 +193,7 @@ func quantities(text, language string) map[[2]string]struct{} {
 			}
 			continue
 		}
-		value, isNumber := numberValue(t, language)
+		value, isNumber := numberValue(t, language, vb...)
 		if !isNumber {
 			continue
 		}
@@ -203,7 +203,7 @@ func quantities(text, language string) map[[2]string]struct{} {
 		// "12,5 ✓ 1 dag" the 1 belongs to "dag", the 12,5 does not.
 		j := i + 1
 		if j < len(tokens) {
-			if v, n := numberValue(tokens[j], language); n && v == value {
+			if v, n := numberValue(tokens[j], language, vb...); n && v == value {
 				j++
 			}
 		}
@@ -217,13 +217,13 @@ func quantities(text, language string) map[[2]string]struct{} {
 			if _, bound := rangeBoundWords[tokens[j+1]]; bound && j+2 < len(tokens) {
 				skip = 1
 			}
-			if _, n := numberValue(tokens[j+1+skip], language); !n {
+			if _, n := numberValue(tokens[j+1+skip], language, vb...); !n {
 				break
 			}
-			linked, _ := numberValue(tokens[j+1+skip], language)
+			linked, _ := numberValue(tokens[j+1+skip], language, vb...)
 			j += 2 + skip
 			if j < len(tokens) {
-				if v, n := numberValue(tokens[j], language); n && v == linked {
+				if v, n := numberValue(tokens[j], language, vb...); n && v == linked {
 					j++ // "drie (3)" after the link
 				}
 			}
@@ -242,7 +242,7 @@ func quantities(text, language string) map[[2]string]struct{} {
 		// never a compound, and only one modifier: "2 employees per day" is not a
 		// quantity of days.
 		if !ok && j+1 < len(tokens) {
-			if _, n := numberValue(tokens[j], language); !n {
+			if _, n := numberValue(tokens[j], language, vb...); !n {
 				if c, found := timeUnits[tokens[j+1]]; found {
 					class, ok = c, true
 					// "een halve maand" is half a month, not one month.
@@ -303,7 +303,10 @@ func unitGuard(claim, claimLanguage, passage, passageLanguage string) string {
 	_, passage = clockTimes(passage)
 	// A rate conflicts only with the SAME amount at another period: "€ 150 per
 	// jaar" over "€ 150 per maand". Another amount's period decides nothing.
-	claimRates, _ := moneyRates(claim, claimLanguage)
+	// A number the claim copies from the passage keeps the passage's reading
+	// (ADR-0015 amendment).
+	vb := verbatimIn(passage, passageLanguage)
+	claimRates, _ := moneyRates(claim, claimLanguage, vb)
 	passageRates, _ := moneyRates(passage, passageLanguage)
 	for _, r := range sortedPairs(claimRates) {
 		if _, ok := passageRates[r]; ok {
@@ -317,7 +320,7 @@ func unitGuard(claim, claimLanguage, passage, passageLanguage string) string {
 	}
 	have := quantities(passage, passageLanguage)
 	claimed := make([][2]string, 0)
-	for q := range quantities(claim, claimLanguage) {
+	for q := range quantities(claim, claimLanguage, vb) {
 		claimed = append(claimed, q)
 	}
 	// Sorted by (value, unit), so the reason names the same quantity on every run.

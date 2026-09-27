@@ -48,9 +48,9 @@ var totEnMetWords = regexp.MustCompile(`(?i)\btot en met\b|\bup to and including
 
 // languageFree: the number keys (ADR-0015, read in the text's language) and
 // the proper names (a capitalised word not opening the text) of a text.
-func languageFree(text, language string) map[string]bool {
+func languageFree(text, language string, vb ...verbatimNumbers) map[string]bool {
 	out := map[string]bool{}
-	for _, m := range numbersIn(text, language) {
+	for _, m := range numbersIn(text, language, vb...) {
 		out["#"+m.reading.Key] = true
 	}
 	words := strings.Fields(text)
@@ -128,7 +128,7 @@ func conjunctTokenGuard(claim, claimLanguage string, eu EvidenceUnit, cfg guardC
 	}
 	sentences := sentenceBreak.Split(softJoin(eu.Text), -1)
 	claimTokens := tokenize.TokenizeV2(claim)
-	claimFree := languageFree(claim, claimLanguage)
+	claimFree := languageFree(claim, claimLanguage, verbatimIn(eu.Text, eu.Language))
 
 	// Which sentence the claim follows. Language-free first.
 	best := -1

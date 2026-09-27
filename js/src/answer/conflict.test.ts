@@ -76,7 +76,7 @@ const EXPECTED_COUNTS: Record<string, number> = {
   // ADR-0015
   inclusion: 19,
   number_formats: 14,
-  number_readings: 30,
+  number_readings: 46,
 };
 
 const PAIR_BUCKETS = [
@@ -100,7 +100,7 @@ describe("conflict.json bucket shape", () => {
       Object.entries(VECTORS).map(([k, v]) => [k, (v as unknown[]).length]),
     );
     expect(sizes).toEqual(EXPECTED_COUNTS);
-    expect(Object.values(EXPECTED_COUNTS).reduce((a, b) => a + b, 0)).toBe(223);
+    expect(Object.values(EXPECTED_COUNTS).reduce((a, b) => a + b, 0)).toBe(239);
   });
 });
 

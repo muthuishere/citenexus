@@ -68,7 +68,7 @@ var expectedConflictCounts = map[string]int{
 	"identifier_tokenization": 2,
 	"inclusion":               19,
 	"number_formats":          14,
-	"number_readings":         30,
+	"number_readings":         46,
 }
 
 func loadConflictVectors(t *testing.T) map[string][]conflictVector {
@@ -94,8 +94,8 @@ func TestConflictVectorBucketNamesAndSizes(t *testing.T) {
 		}
 		total += want
 	}
-	if total != 223 {
-		t.Fatalf("pinned bucket sizes sum to %d, want 223", total)
+	if total != 239 {
+		t.Fatalf("pinned bucket sizes sum to %d, want 239", total)
 	}
 }
 
