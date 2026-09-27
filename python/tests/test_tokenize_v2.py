@@ -393,6 +393,41 @@ def test_tokenizer_version_is_recorded() -> None:
     assert TOKENIZER_VERSION == 2
 
 
+def test_no_stemming_surface_forms_stay_distinct() -> None:
+    """ADR-0011 puts stemming and lemmatization out of scope.
+
+    A tokenizer that stemmed would collapse "cats" into "cat", change every BM25
+    score and every stored vector, and silently invalidate the conformance
+    fixtures — so the surface form is the token, verbatim.
+    """
+    assert tokenize_v2("Running cats") == ["running", "cats"]
+    assert tokenize_v2("cats") != tokenize_v2("cat")
+    assert tokenize_v2("running") != tokenize_v2("run")
+
+
+def test_no_dictionary_the_bigrams_are_mechanical() -> None:
+    """Segmentation for spaceless scripts is character bigrams, not word breaks.
+
+    A dictionary segmenter would emit "東京" and "大学" as the two words it knows;
+    the mechanical overlap is what makes the index deterministic and
+    dictionary-free (and what the ports can reproduce).
+    """
+    assert tokenize_v2("東京大学") == ["東京", "京大", "大学"]
+
+
+def test_no_stopword_table_is_applied() -> None:
+    """Stopwords are the GATE's table (`answer/verify.py`), never the tokenizer's.
+
+    Dropping them here would change BM25's corpus statistics for every index and
+    make the tokenizer a second, divergent definition of what a content word is.
+    """
+    text = "The employee shall not disclose information"
+
+    assert tokenize_v2(text) == ["the", "employee", "shall", "not", "disclose", "information"]
+    assert "the" in tokenize_v2(text)
+    assert "not" in tokenize_v2(text)
+
+
 def test_tokenize_v2_is_deterministic() -> None:
     for text in [*SAMPLES.values(), *_ASCII_CASES]:
         assert tokenize_v2(text) == tokenize_v2(text)
