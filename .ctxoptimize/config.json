@@ -1,0 +1,27 @@
+{
+  "name": "citenexus",
+  "modules": [
+    {
+      "path": "golang"
+    },
+    {
+      "path": "js"
+    },
+    {
+      "path": "python"
+    },
+    {
+      "path": "rust"
+    },
+    {
+      "path": "site"
+    },
+    {
+      "path": "spikes/library-stress/ports/go"
+    },
+    {
+      "path": "spikes/model-seam-contract/go"
+    }
+  ],
+  "wiki": false
+}
