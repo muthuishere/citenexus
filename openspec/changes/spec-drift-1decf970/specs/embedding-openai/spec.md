@@ -19,5 +19,5 @@ instance. When no `headers` are configured, the request SHALL be sent without an
 
 #### Scenario: No key configured sends no Authorization header
 
-- **WHEN** no `api_key_env` is configured and `embed(...)` is called
+- **WHEN** no `headers` are configured and `embed(...)` is called
 - **THEN** the headers passed to the transport contain no `Authorization` key
