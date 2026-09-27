@@ -10,6 +10,36 @@ Dist name on PyPI is **`citenexus`** (the import package is `citenexus`; see
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-09-27
+
+### Changed
+
+- **ADR-0015 amendment (owner-approved): a number the claim copies verbatim
+  from its cited unit keeps the unit's locale.** An English claim writing the
+  Dutch "€ 4.000" over that Dutch unit is 4000 and is admitted; a number the
+  writer formats itself still follows the claim's language, and the match is
+  bounded as a whole number ("€ 23" over "€ 0,23" stays refused). Go
+  `golang/answer/numbers.go:220-249`, Python
+  `python/src/citenexus/answer/numbers.py:316-341`, JS
+  `js/src/answer/numbers.ts:282-307`; applied on the claim side of the number,
+  unit, hedge, value-row, pair-value, qualifier-pair, role and conjunct guards.
+  Previously-refused cases that now admit are listed in
+  `docs/adr/0015-inclusion-conflicts-and-locale-aware-numbers.md`.
+- `number_readings`: `"1.500"` declared `de` now reads 1500 (was ambiguous).
+
+### Added
+
+- **CLDR locale tables.** 26 decimal-comma and 15 decimal-point languages plus
+  region overrides (`de-ch`, `de-li`, `it-ch`, `es-mx`, `es-us`, `es-419`,
+  `en-za`) in `conformance/conflict.json:342-404`, generated into every port.
+  Also used by ADR-0007 conflict detection's number reading.
+- **Grouping forms:** space grouping ("1 234,56", incl. U+00A0/U+202F) in
+  decimal-comma languages, Swiss apostrophe grouping ("1'234.50"), and Indian
+  lakh grouping ("1,00,000") for `lakh_grouping_languages`
+  (`golang/answer/numbers.go:84,383-431`).
+- 21 `VerifyAnswer` vectors (`conformance/cases/verify_answer.json`, 346
+  cases) and 16 `number_readings` vectors (46).
+
 ## [0.13.0] - 2026-09-26
 
 Not yet published to any registry: the version is set in all four manifests,
