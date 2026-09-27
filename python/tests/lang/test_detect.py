@@ -55,6 +55,31 @@ def test_heuristic_detects_han_script() -> None:
     assert r.language == "zh"
 
 
+def test_an_unnamed_alphabetic_character_casts_no_vote() -> None:
+    """U+17000 TANGUT IDEOGRAPH is ``isalpha()`` but ``unicodedata.name`` raises.
+
+    The detector names a character's script from its Unicode name, so an
+    unnamed letter is DROPPED rather than guessed at — a script inferred from a
+    codepoint nobody put in the table would be a false capability claim. Alone
+    the text has nothing countable and falls to the default at confidence 0.0.
+    """
+    tangut = "\U00017000\U00017001"
+    assert tangut.isalpha()
+    det = HeuristicDetector()
+
+    alone = det.detect(tangut)
+
+    assert alone.language == "en"
+    assert alone.confidence == 0.0
+    assert alone.is_reliable is False
+
+    # Mixed with Latin, only the named letters count — and they count for all of it.
+    mixed = det.detect(f"{tangut} confidential information")
+    assert mixed.language == "en"
+    assert mixed.confidence == pytest.approx(1.0)
+    assert mixed.is_reliable is True
+
+
 def test_heuristic_threshold_makes_ambiguous_text_unreliable() -> None:
     # Mixed-script text yields a fractional dominant-script confidence; a
     # threshold above that fraction marks it unreliable — exactly the §11a
