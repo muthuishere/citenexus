@@ -5,7 +5,7 @@
 
 import { tokenizeV2 } from "../tokenize/tokenize-v2.js";
 import { cmpGo, findFirst, goFields, goLower, goQuote, goSplit, goTrim, goTrimLeft, goTrimSpace, isUpperRune, matches, replaceAll, runes } from "./gotext.js";
-import { numbersIn } from "./numbers.js";
+import { type VerbatimNumbers, numbersIn, verbatimIn } from "./numbers.js";
 import { primaryLanguage } from "./verify-answer.js";
 import type { EvidenceUnit } from "./verify-answer.js";
 import { Carrier, conditionContent } from "./verify-conditions.js";
@@ -22,9 +22,9 @@ const CONJUNCT_COORDINATOR = /\b(?:en|and)\b/dgi;
 const TOT_EN_MET_WORDS = /\btot en met\b|\bup to and including\b/dgi;
 
 /** The number keys and the proper names of a text. */
-export function languageFree(text: string, language: string): Set<string> {
+export function languageFree(text: string, language: string, verbatim?: VerbatimNumbers): Set<string> {
   const out = new Set<string>();
-  for (const m of numbersIn(text, language)) out.add("#" + m.reading.key);
+  for (const m of numbersIn(text, language, verbatim)) out.add("#" + m.reading.key);
   const words = goFields(text);
   for (let i = 0; i < words.length; i++) {
     const w = goTrim(words[i] as string, ".,;:()\"'!?");
@@ -75,7 +75,7 @@ export function conjunctTokenGuard(claim: string, claimLanguage: string, eu: Evi
   if (cfg.fragment) return "";
   const sentences = goSplit(sentenceBreak, softJoin(eu.text));
   const claimTokens = tokenizeV2(claim);
-  const claimFree = languageFree(claim, claimLanguage);
+  const claimFree = languageFree(claim, claimLanguage, verbatimIn(eu.text, eu.language));
   let best = -1;
   const frees = sentences.map((s) => languageFree(s, eu.language));
   for (let i = 0; i < sentences.length; i++) {

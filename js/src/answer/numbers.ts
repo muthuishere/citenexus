@@ -36,6 +36,7 @@
 import {
   DECIMAL_COMMA_LANGUAGES_TABLE,
   DECIMAL_POINT_LANGUAGES_TABLE,
+  LAKH_GROUPING_LANGUAGES_TABLE,
 } from "../gen/conflict_tables.js";
 import { GS, findAll, goLower, pad2, replaceAll } from "./gotext.js";
 import { unitOf } from "./verify-guards-model.js";
@@ -44,6 +45,8 @@ import { unitOf } from "./verify-guards-model.js";
 export const DECIMAL_COMMA_LANGUAGES: ReadonlySet<string> = new Set(DECIMAL_COMMA_LANGUAGES_TABLE);
 /** Languages whose decimal mark is the point (ADR-0010 tier 2). */
 export const DECIMAL_POINT_LANGUAGES: ReadonlySet<string> = new Set(DECIMAL_POINT_LANGUAGES_TABLE);
+/** Languages that read Indian lakh grouping, "1,00,000" (ADR-0015 amendment). */
+export const LAKH_GROUPING_LANGUAGES: ReadonlySet<string> = new Set(LAKH_GROUPING_LANGUAGES_TABLE);
 
 // Exactly the characters Python's `str.isspace()` accepts. Python's `\s` on a
 // `str` is neither JS's `\s` (which adds U+FEFF) nor RE2's (ASCII only), so it
@@ -79,6 +82,34 @@ export interface NumberReading {
 function primary(language: string | null | undefined): string {
   if (!language) return "";
   return (language.replace(PY_STRIP, "").toLowerCase().split(/[-_]/)[0] ?? "") as string;
+}
+
+/** 1-2 leading digits, two-digit groups, a final three-digit group, an
+ *  optional point decimal. */
+const LAKH = /^([1-9][0-9]?(?:,[0-9]{2})+,[0-9]{3})(?:\.([0-9]+))?$/;
+
+function localeTags(language: string | null | undefined): [string, string] {
+  const full = (language ?? "").replace(PY_STRIP, "").toLowerCase().replaceAll("_", "-");
+  return [full, primary(full)];
+}
+
+/**
+ * The declared language's decimal mark: `","`, `"."`, or `""` when unknown. A
+ * region tag in the tables ("de-ch", "es-mx") wins over its language (CLDR,
+ * ADR-0015 amendment 2026-09-27).
+ */
+export function decimalMarkOf(language: string | null | undefined): string {
+  for (const code of localeTags(language)) {
+    if (code === "") continue;
+    if (DECIMAL_COMMA_LANGUAGES.has(code)) return ",";
+    if (DECIMAL_POINT_LANGUAGES.has(code)) return ".";
+  }
+  return "";
+}
+
+function readsLakh(language: string | null | undefined): boolean {
+  const [full, prim] = localeTags(language);
+  return full !== "" && (LAKH_GROUPING_LANGUAGES.has(full) || LAKH_GROUPING_LANGUAGES.has(prim));
 }
 
 /** Decimal string with no trailing zeros: 1500, 25.5, 0.05. */
@@ -147,6 +178,12 @@ export function readNumber(
   const hasDot = raw.includes(".");
   const hasComma = raw.includes(",");
   if (!hasDot && !hasComma) return knownOf([raw], "");
+  // Indian lakh grouping: a two-digit group can be nothing else, but only a
+  // language that writes it reads it.
+  const lakh = LAKH.exec(raw);
+  if (lakh !== null && readsLakh(options.language)) {
+    return knownOf([(lakh[1] as string).replaceAll(",", "")], lakh[2] ?? "");
+  }
 
   if (hasDot && hasComma) {
     const decimalMark = raw.lastIndexOf(".") > raw.lastIndexOf(",") ? "." : ",";
@@ -172,11 +209,11 @@ export function readNumber(
     return knownOf([whole], tail); // a decimal mark in every locale
   }
 
-  const languageCode = primary(options.language);
+  const decimalMark = decimalMarkOf(options.language);
   let thousands: boolean;
-  if (DECIMAL_COMMA_LANGUAGES.has(languageCode)) {
+  if (decimalMark === ",") {
     thousands = mark === ".";
-  } else if (DECIMAL_POINT_LANGUAGES.has(languageCode)) {
+  } else if (decimalMark === ".") {
     thousands = mark === ",";
   } else {
     return unread(raw); // 1.500 / 1,500 with no declared locale
@@ -231,9 +268,52 @@ function isIdentifierPrefix(ch: string): boolean {
   return (ch >= "a" && ch <= "z") || ch === "_";
 }
 
-/** Every measured number in text, skipping identifiers such as "p50" / "ipv4". */
-export function numbersIn(text: string, language: string | null | undefined): NumberMatch[] {
-  const lowered = joinSpacedThousands(goLower(text));
+/**
+ * A number's spelling (`NumberMatch.raw`) in a cited unit -> the unit's own
+ * reading of it. ADR-0015 amendment 2026-09-27: a number the claim copies
+ * VERBATIM from its unit keeps the unit's locale — an English claim writing
+ * the Dutch "€ 4.000" is 4000 over that unit. The match is on the whole matched
+ * number, so "12" never takes the reading of "12.75" or "0,12". A spelling the
+ * unit reads two ways is dropped: ambiguity falls back to the claim's language.
+ */
+export type VerbatimNumbers = ReadonlyMap<string, NumberReading>;
+
+/** The unit's verbatim readings, for the claim side of a guard. */
+export function verbatimIn(text: string, language: string | null | undefined): VerbatimNumbers {
+  const out = new Map<string, NumberReading>();
+  const clash = new Set<string>();
+  for (const m of numbersIn(text, language)) {
+    const seen = out.get(m.raw);
+    if (seen !== undefined && seen.key !== m.reading.key) clash.add(m.raw);
+    out.set(m.raw, m.reading);
+  }
+  for (const raw of clash) out.delete(raw);
+  return out;
+}
+
+/** A claim number: the unit's reading when copied verbatim, else its own. A
+ *  dashed amount ("4.000,-") reads the same in every locale. */
+export function readWith(
+  raw: string,
+  dash: boolean,
+  language: string | null | undefined,
+  verbatim?: VerbatimNumbers,
+): NumberReading {
+  if (!dash && verbatim !== undefined) {
+    const hit = verbatim.get(raw);
+    if (hit !== undefined) return hit;
+  }
+  return readNumber(raw, { dash, language: language ?? "" });
+}
+
+/** Every measured number in text, skipping identifiers such as "p50" / "ipv4".
+ *  `verbatim`, when given, is the cited unit's readings (claim side only). */
+export function numbersIn(
+  text: string,
+  language: string | null | undefined,
+  verbatim?: VerbatimNumbers,
+): NumberMatch[] {
+  const lowered = joinSpacedThousands(goLower(text), language);
   const out: NumberMatch[] = [];
   for (const m of findAll(NUMBER_RE_GO, lowered)) {
     const g1 = m.groups[0] as readonly [number, number];
@@ -243,7 +323,7 @@ export function numbersIn(text: string, language: string | null | undefined): Nu
     const unitAt = m.groups[2];
     out.push({
       raw,
-      reading: readNumber(raw, { dash: m.groups[1] !== null, language: language ?? "" }),
+      reading: readWith(raw, m.groups[1] !== null, language, verbatim),
       unit: unitAt === null || unitAt === undefined ? "" : lowered.slice(unitAt[0], unitAt[1]),
       attached: unitAt !== null && unitAt !== undefined && unitAt[0] === g1[1],
     });
@@ -307,7 +387,11 @@ const RATE_PERIOD = new RegExp(
 
 /** The money rates in text — "amount key\u0000period class" — and the text
  * lowered with every money amount blanked. */
-export function moneyRates(text: string, language: string): [Set<string>, string] {
+export function moneyRates(
+  text: string,
+  language: string,
+  verbatim?: VerbatimNumbers,
+): [Set<string>, string] {
   const rates = new Set<string>();
   const lowered = goLower(text);
   let blank = lowered;
@@ -316,7 +400,7 @@ export function moneyRates(text: string, language: string): [Set<string>, string
       const g1 = m.groups[0] as readonly [number, number];
       const raw = (m.group(1) as string).replace(/[.,]+$/, "");
       if (raw === "") continue;
-      const key = readNumber(raw, { dash: false, language }).key;
+      const key = readWith(raw, false, language, verbatim).key;
       const p = findAll(RATE_PERIOD, lowered.slice(m.end))[0];
       if (p !== undefined) {
         const [cls, , ok] = unitOf(p.group(1) as string);
@@ -336,13 +420,65 @@ const SPACED_THOUSANDS = new RegExp(
   "dgu",
 );
 
-export function joinSpacedThousands(text: string): string {
+// Digits grouped by a space (plain, no-break, narrow no-break: "1 234,56") or
+// an apostrophe (Swiss "1'234.50" / "1’234.50"): 1-3 leading digits, then
+// exact three-digit groups.
+const SPACE_GROUPED = /[1-9][0-9]{0,2}(?:[ \u00a0\u202f][0-9]{3})+/gu;
+const APOSTROPHE_GROUPED = /[1-9][0-9]{0,2}(?:['\u2019][0-9]{3})+/gu;
+const GROUP_SEPARATORS = /[ \u00a0\u202f'\u2019]/gu;
+const GROUP_SEPARATOR = /^[ \u00a0\u202f'\u2019]$/u;
+const DIGIT_OR_LETTER = /^[\p{Nd}\p{L}]$/u;
+const DIGIT = /^\p{Nd}$/u;
+
+function charBefore(text: string, i: number): string {
+  const cp = text.codePointAt(i - 1) as number;
+  if (i >= 2 && cp >= 0xdc00 && cp <= 0xdfff) return String.fromCodePoint(text.codePointAt(i - 2) as number);
+  return String.fromCodePoint(cp);
+}
+
+function charAt(text: string, i: number): string {
+  return String.fromCodePoint(text.codePointAt(i) as number);
+}
+
+/** Remove the separators of each whole grouped run. A run touching another
+ *  digit, letter or number mark on either side, or followed by another
+ *  separator and a digit ("1 234 56"), stays as written: it may be several
+ *  numbers, and ambiguity is never guessed. */
+function joinGrouped(text: string, re: RegExp): string {
+  let out = "";
+  let last = 0;
+  for (const m of text.matchAll(re)) {
+    const start = m.index;
+    const end = start + m[0].length;
+    if (start > 0) {
+      const prev = charBefore(text, start);
+      if (DIGIT_OR_LETTER.test(prev) || ".,'\u2019".includes(prev)) continue;
+    }
+    if (end < text.length) {
+      const next = charAt(text, end);
+      if (DIGIT_OR_LETTER.test(next)) continue;
+      if (GROUP_SEPARATOR.test(next) && end + next.length < text.length && DIGIT.test(charAt(text, end + next.length))) {
+        continue;
+      }
+    }
+    out += text.slice(last, start) + m[0].replace(GROUP_SEPARATORS, "");
+    last = end;
+  }
+  return out + text.slice(last);
+}
+
+/** Join grouped digits before numbers are read: a money amount grouped by
+ *  spaces in every language; any space-grouped run only in a decimal-comma
+ *  language ("1 234,56", CLDR fr, de, …); apostrophe grouping in every
+ *  language — an apostrophe is a decimal mark nowhere. */
+export function joinSpacedThousands(text: string, language?: string | null): string {
   for (let i = 0; i < 4; i++) {
     const next = replaceAll(SPACED_THOUSANDS, text, "$1$2$3");
     if (next === text) break;
     text = next;
   }
-  return text;
+  if (decimalMarkOf(language) === ",") text = joinGrouped(text, SPACE_GROUPED);
+  return joinGrouped(text, APOSTROPHE_GROUPED);
 }
 
 // Dates, numeric or written, read as (day, month, year?) and compared as dates.

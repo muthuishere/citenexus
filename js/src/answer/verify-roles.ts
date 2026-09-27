@@ -9,7 +9,7 @@
 import { isStopword } from "../gate/gate.js";
 import { tokenizeV2 } from "../tokenize/tokenize-v2.js";
 import { GS, findAllStrings, goLower, goSplit, goTrim, goTrimSpace, runeLen, trimSuffix } from "./gotext.js";
-import { numbersIn } from "./numbers.js";
+import { type VerbatimNumbers, numbersIn, verbatimIn } from "./numbers.js";
 import { CONTEXT_STOP, softJoin } from "./verify-guards-model.js";
 import type { EvidenceUnit } from "./verify-answer.js";
 
@@ -99,7 +99,7 @@ function hasOwn(o: Readonly<Record<string, unknown>>, k: string): boolean {
   return Object.hasOwn(o, k);
 }
 
-export function classify(l: ActorLexicon, clause: string, language: string): RoleWord[] {
+export function classify(l: ActorLexicon, clause: string, language: string, verbatim?: VerbatimNumbers): RoleWord[] {
   const terms = new Map<string, string>();
   for (const [id, ts] of Object.entries(l.actors)) for (const t of ts) terms.set(t, id);
   const second = new Set(l.secondPersonTerms);
@@ -109,7 +109,7 @@ export function classify(l: ActorLexicon, clause: string, language: string): Rol
     let norm = goLower(goTrim(w, ROLE_TRIM));
     norm = trimSuffix(trimSuffix(norm, "'s"), "’s");
     const rw: RoleWord = { norm, actor: "", pronoun: false, slot: "", numbers: [], content: false, position: i };
-    for (const m of numbersIn(w, language)) rw.numbers.push(m.reading.key);
+    for (const m of numbersIn(w, language, verbatim)) rw.numbers.push(m.reading.key);
     const id = terms.get(rw.norm);
     if (id !== undefined) {
       rw.actor = id;
@@ -224,7 +224,7 @@ export function roleGuard(claim: string, claimLanguage: string, eu: EvidenceUnit
   if (Object.keys(lexicon.actors).length === 0 && lexicon.secondPerson === "") return "";
   const unit = roleClauses(eu.text).map((c) => classify(lexicon, c, eu.language));
   for (const c of roleClauses(claim)) {
-    const ws = classify(lexicon, c, claimLanguage);
+    const ws = classify(lexicon, c, claimLanguage, verbatimIn(eu.text, eu.language));
     const content = new Set<string>();
     for (const w of ws) if (w.content) for (const tok of tokenizeV2(w.norm)) content.add(tok);
     for (let i = 0; i < ws.length; i++) {

@@ -8,7 +8,7 @@ import { align } from "../gate/verify-v2.js";
 import { isStopword } from "../gate/gate.js";
 import { tokenizeV2 } from "../tokenize/tokenize-v2.js";
 import { Rat, cmpGo, findAllStrings, goLower, goQuote, goSplit, ratKey, replaceAll, runeLen, sortedGo } from "./gotext.js";
-import { clockTimes, moneyRates, readNumber } from "./numbers.js";
+import { type VerbatimNumbers, clockTimes, moneyRates, readWith, verbatimIn } from "./numbers.js";
 import { clauseBreak, ordinalWords } from "./verify-guards.js";
 
 // ─── polarity-swap guard ─────────────────────────────────────────────────────
@@ -110,10 +110,10 @@ const QUANTITY_LINKS: ReadonlySet<string> = new Set([
 ]);
 
 /** [value key, isNumber] of a unitScan token. */
-export function numberValue(token: string, language: string): [string, boolean] {
+export function numberValue(token: string, language: string, verbatim?: VerbatimNumbers): [string, boolean] {
   if (token === "½") return ["0.5", true];
   const c = token.charCodeAt(0);
-  if (c >= 48 && c <= 57) return [readNumber(token, { dash: false, language }).key, true];
+  if (c >= 48 && c <= 57) return [readWith(token, false, language, verbatim).key, true];
   return numberWordValue(token);
 }
 
@@ -127,9 +127,9 @@ export function qsplit(k: string): [string, string] {
 }
 
 /** The (value key, unit class) pairs in text (golang quantities). */
-export function quantities(text: string, language: string): Set<string> {
+export function quantities(text: string, language: string, verbatim?: VerbatimNumbers): Set<string> {
   [, text] = clockTimes(text); // "7.30 uur" is a time of day, not 7.3 hours
-  [, text] = moneyRates(text, language); // "€ 150 per maand" is a price, not 150 months
+  [, text] = moneyRates(text, language, verbatim); // "€ 150 per maand" is a price, not 150 months
   const tokens = findAllStrings(UNIT_SCAN, goLower(text));
   const out = new Set<string>();
   for (let i = 0; i < tokens.length; i++) {
@@ -150,22 +150,22 @@ export function quantities(text: string, language: string): Set<string> {
       if (ok && compound && cls === "year") out.add(qkey(ord, "year"));
       continue;
     }
-    let [value, isNumber] = numberValue(t, language);
+    let [value, isNumber] = numberValue(t, language, verbatim);
     if (!isNumber) continue;
     let j = i + 1;
     if (j < tokens.length) {
-      const [v, n] = numberValue(tokens[j] as string, language);
+      const [v, n] = numberValue(tokens[j] as string, language, verbatim);
       if (n && v === value) j++;
     }
     while (j + 1 < tokens.length && j - i <= 6) {
       if (!QUANTITY_LINKS.has(tokens[j] as string)) break;
       let skip = 0;
       if (RANGE_BOUND_WORDS.has(tokens[j + 1] as string) && j + 2 < tokens.length) skip = 1;
-      const [linked, n] = numberValue(tokens[j + 1 + skip] as string, language);
+      const [linked, n] = numberValue(tokens[j + 1 + skip] as string, language, verbatim);
       if (!n) break;
       j += 2 + skip;
       if (j < tokens.length) {
-        const [v, n2] = numberValue(tokens[j] as string, language);
+        const [v, n2] = numberValue(tokens[j] as string, language, verbatim);
         if (n2 && v === linked) j++; // "drie (3)" after the link
       }
     }
@@ -179,7 +179,7 @@ export function quantities(text: string, language: string): Set<string> {
       }
     }
     if (!ok && j + 1 < tokens.length) {
-      if (!numberValue(tokens[j] as string, language)[1]) {
+      if (!numberValue(tokens[j] as string, language, verbatim)[1]) {
         const c = TIME_UNITS.get(tokens[j + 1] as string);
         if (c !== undefined) {
           cls = c;
@@ -210,7 +210,10 @@ export function equivalentQuantity(q: string): [string, boolean] {
 export function unitGuard(claim: string, claimLanguage: string, passage: string, passageLanguage: string): string {
   [, claim] = clockTimes(claim); // a clock time is never a duration
   [, passage] = clockTimes(passage);
-  const [claimRates] = moneyRates(claim, claimLanguage);
+  // A number the claim copies from the passage keeps the passage's reading
+  // (ADR-0015 amendment).
+  const verbatim = verbatimIn(passage, passageLanguage);
+  const [claimRates] = moneyRates(claim, claimLanguage, verbatim);
   const [passageRates] = moneyRates(passage, passageLanguage);
   const passageSorted = sortedPairs(passageRates);
   for (const r of sortedPairs(claimRates)) {
@@ -224,7 +227,7 @@ export function unitGuard(claim: string, claimLanguage: string, passage: string,
     }
   }
   const have = quantities(passage, passageLanguage);
-  const claimed = sortedPairs(quantities(claim, claimLanguage));
+  const claimed = sortedPairs(quantities(claim, claimLanguage, verbatim));
   for (const q of claimed) {
     if (have.has(q)) continue;
     if (sameQuantityIn(q, have)) continue;

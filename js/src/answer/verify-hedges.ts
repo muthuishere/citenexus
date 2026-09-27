@@ -9,7 +9,7 @@
 import { POLARITY_MARKERS } from "../gate/verify-v2.js";
 import { tokenizeV2 } from "../tokenize/tokenize-v2.js";
 import { GS, goLower, goQuote, goSplit, matches } from "./gotext.js";
-import { numbersIn } from "./numbers.js";
+import { numbersIn, verbatimIn } from "./numbers.js";
 import { primaryLanguage } from "./verify-answer.js";
 import type { EvidenceUnit } from "./verify-answer.js";
 import { Carrier, conditionContent } from "./verify-conditions.js";
@@ -164,7 +164,7 @@ export function hedgeGuard(claim: string, claimLanguage: string, eu: EvidenceUni
   const cross =
     claimLanguage !== "" && eu.language !== "" && primaryLanguage(claimLanguage) !== primaryLanguage(eu.language);
   const c = new Carrier(new Set(claimTokens), cross, glossIdx(cfg.gloss));
-  const claimNumbers = new Set(numbersIn(claim, claimLanguage).map((m) => m.reading.key));
+  const claimNumbers = new Set(numbersIn(claim, claimLanguage, verbatimIn(eu.text, eu.language)).map((m) => m.reading.key));
   let best = "";
   let bestN = 0;
   let tie = false;

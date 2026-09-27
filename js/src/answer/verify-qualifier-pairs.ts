@@ -8,7 +8,7 @@
 // other. Without a number nothing is compared.
 
 import { findAllStrings, goLower, goQuote, goTrim } from "./gotext.js";
-import { numbersIn } from "./numbers.js";
+import { type VerbatimNumbers, numbersIn, verbatimIn } from "./numbers.js";
 import type { EvidenceUnit } from "./verify-answer.js";
 import { anyForm } from "./verify-guards-model.js";
 import { LIST_LEAD_TOKEN, ROLE_TRIM, roleClauses } from "./verify-roles.js";
@@ -47,10 +47,10 @@ export function lowerWords(clause: string): string[] {
 }
 
 /** Per word index, the ADR-0015 keys of its numbers. */
-export function numberWordKeys(clause: string, language: string): Map<number, string[]> {
+export function numberWordKeys(clause: string, language: string, verbatim?: VerbatimNumbers): Map<number, string[]> {
   const out = new Map<number, string[]>();
   findAllStrings(LIST_LEAD_TOKEN, clause).forEach((w, i) => {
-    for (const m of numbersIn(w, language)) {
+    for (const m of numbersIn(w, language, verbatim)) {
       const list = out.get(i);
       if (list === undefined) out.set(i, [m.reading.key]);
       else list.push(m.reading.key);
@@ -66,10 +66,11 @@ export function qualifierPairGuard(
   eu: EvidenceUnit,
   pairs: readonly QualifierPair[],
 ): string {
+  const verbatim = verbatimIn(eu.text, eu.language);
   const unit = roleClauses(eu.text).map((c) => ({ words: lowerWords(c), keys: numberWordKeys(c, eu.language) }));
   for (const c of roleClauses(claim)) {
     const words = lowerWords(c);
-    for (const [i, keys] of numberWordKeys(c, claimLanguage)) {
+    for (const [i, keys] of numberWordKeys(c, claimLanguage, verbatim)) {
       for (const pair of pairs) {
         const [side, form] = sideNear(words, i, pair);
         if (side < 0) continue;

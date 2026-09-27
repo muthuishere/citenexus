@@ -12,7 +12,7 @@ import { isStopword } from "../gate/gate.js";
 import { align } from "../gate/verify-v2.js";
 import { tokenizeV2 } from "../tokenize/tokenize-v2.js";
 import { GS, byteLen, cmpGo, containsAny, goQuote, goSplit, goTrim, runeLen, runes, trimPrefix } from "./gotext.js";
-import { clockTimes, numbersIn } from "./numbers.js";
+import { type VerbatimNumbers, clockTimes, numbersIn, verbatimIn } from "./numbers.js";
 import { primaryLanguage } from "./verify-answer.js";
 import type { EvidenceUnit } from "./verify-answer.js";
 import { actorTerm, hasTerm } from "./verify-conditions.js";
@@ -198,8 +198,9 @@ function bindValue(
   other: readonly string[],
 ): number {
   const claimKeys: string[][] = [];
+  const verbatim = verbatimIn(unit, unitLanguage);
   for (const c of roleClauses(claim)) {
-    for (const keys of numberWordKeys(c, claimLanguage).values()) claimKeys.push(keys);
+    for (const keys of numberWordKeys(c, claimLanguage, verbatim).values()) claimKeys.push(keys);
   }
   if (claimKeys.length === 0) return BIND_NO_NUMBER;
   let toOther = false;
@@ -285,18 +286,19 @@ function counterpartOf(o: readonly string[], p: readonly string[], sentences: re
 
 /** valueRowGuard: see the file comment. */
 export function valueRowGuard(claim: string, claimLanguage: string, eu: EvidenceUnit): string {
-  const periods = (clause: string, language: string, own: string): Set<string> => {
+  const verbatim = verbatimIn(eu.text, eu.language); // the claim's copied numbers keep the unit's reading
+  const periods = (clause: string, language: string, own: string, vb?: VerbatimNumbers): Set<string> => {
     const out = new Set<string>();
-    for (const q of quantities(clause, language)) if (qsplit(q)[0] !== own) out.add(q);
+    for (const q of quantities(clause, language, vb)) if (qsplit(q)[0] !== own) out.add(q);
     return out;
   };
   const [, unitText] = clockTimes(eu.text);
   const [, claimText] = clockTimes(claim);
   const unitClauses = goSplit(sentenceBreak, softJoin(unitText));
   for (const c of goSplit(sentenceBreak, softJoin(claimText))) {
-    for (const m of numbersIn(c, claimLanguage)) {
+    for (const m of numbersIn(c, claimLanguage, verbatim)) {
       const key = m.reading.key;
-      const mine = periods(c, claimLanguage, key);
+      const mine = periods(c, claimLanguage, key, verbatim);
       if (mine.size === 0) continue;
       let matched = false;
       let agrees = false;

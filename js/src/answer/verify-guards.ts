@@ -37,6 +37,7 @@ import {
   numbersIn,
   sameDate,
   type NumberMatch,
+  verbatimIn,
 } from "./numbers.js";
 import {
   UNIT_SCAN,
@@ -96,7 +97,11 @@ export function numberGuard(claim: string, claimLanguage: string, passage: strin
     const ord = ordinalWords.get(word);
     if (ord !== undefined) have.add("ord:" + ord);
   }
-  for (const m of numbersIn(claim, claimLanguage)) {
+  // A number the claim copies verbatim from the passage keeps the passage's
+  // reading (ADR-0015 amendment 2026-09-27); any other follows the claim's
+  // language.
+  const verbatim = verbatimIn(passage, passageLanguage);
+  for (const m of numbersIn(claim, claimLanguage, verbatim)) {
     let key = centsAsEuros(m);
     if (ORDINAL_SUFFIXES.has(m.unit) && m.attached) key = "ord:" + key;
     if (!have.has(key)) {

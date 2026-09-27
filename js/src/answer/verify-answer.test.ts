@@ -261,7 +261,10 @@ describe("verifyAnswer (golang verify_answer_test.go)", () => {
       ["The budget is €1,500.", "en", "Het budget is € 1.500.", "nl", true],
       ["De vergoeding is € 25,-.", "nl", "De vergoeding is € 25,00.", "nl", true],
       ["The fee is €25.05.", "en", "De vergoeding is € 25,50.", "nl", false],
-      ["The budget is €1.500.", "en", "Het budget is € 1.500.", "nl", false], // 1.5 vs 1500
+      // ADR-0015 amendment 2026-09-27: copied verbatim, the claim's "1.500"
+      // keeps the passage's (Dutch) reading — this was a refusal.
+      ["The budget is €1.500.", "en", "Het budget is € 1.500.", "nl", true],
+      ["The budget is €1.500.", "en", "Het budget is € 1500.", "nl", false], // not copied: 1.5 vs 1500
       ["Het budget is € 1.500.", "", "Het budget is € 1500.", "nl", false], // undeclared claim: ambiguous
     ];
     for (const [claim, claimLang, passage, passageLang, pass] of cases) {
@@ -547,9 +550,21 @@ describe("number forms in running text (golang verify_number_forms_test.go)", ()
     ["en € 0.23 = nl € 0,23", "nl", "en", nlUnit("€ 0,23"), enClaim("€ 0.23"), false],
     ["nl € 0,23 is not € 23", "nl", "nl", nlUnit("€ 0,23"), nlClaim("€ 23"), true],
     ["nl € 0,23 is not € 0,32", "nl", "nl", nlUnit("€ 0,23"), nlClaim("€ 0,32"), true],
-    ["en claim writes the dutch amount (ADR-0015)", "nl", "en", nlUnit("€ 4.000"), enClaim("€ 4.000"), true],
-    ["en claim writes the dutch amount before euro (ADR-0015)", "nl", "en", nlUnit("€ 4.000"), enClaim("4.000 euro"), true],
-    ["nl claim writes the english amount (ADR-0015)", "en", "nl", enUnit("€ 4,000"), nlClaim("€ 4,000"), true],
+    // ADR-0015 amendment 2026-09-27: a number copied verbatim from the unit
+    // keeps the unit's locale — admitted (these were refusals).
+    ["en claim copies the dutch amount verbatim", "nl", "en", nlUnit("€ 4.000"), enClaim("€ 4.000"), false],
+    ["en claim copies the dutch amount before euro", "nl", "en", nlUnit("€ 4.000"), enClaim("4.000 euro"), false],
+    ["en claim copies 4.000,00 verbatim", "nl", "en", nlUnit("€ 4.000,00"), enClaim("€ 4.000,00"), false],
+    ["en claim copies €4.000,- verbatim", "nl", "en", nlUnit("€4.000,-"), enClaim("€4.000,-"), false],
+    ["nl claim copies the english amount verbatim", "en", "nl", enUnit("€ 4,000"), nlClaim("€ 4,000"), false],
+    // A number the writer formats itself follows the claim's language.
+    ["en 4.000 not in the unit is 4", "nl", "en", nlUnit("€ 4000"), enClaim("€ 4.000"), true],
+    ["en 4.000 over a unit spelling 4.000,50", "nl", "en", nlUnit("€ 4.000,50"), enClaim("€ 4.000"), true],
+    ["en 4.000 over a unit spelling 14.000", "nl", "en", nlUnit("€ 14.000"), enClaim("€ 4.000"), true],
+    // The whole-number bound.
+    ["en € 23 over nl € 0,23", "nl", "en", nlUnit("€ 0,23"), enClaim("€ 23"), true],
+    ["en 12 over en 12.75", "en", "en", enUnit("€ 12.75"), enClaim("€ 12"), true],
+    ["en 12 over nl 0,12", "nl", "en", nlUnit("€ 0,12"), enClaim("€ 12"), true],
     ["en claim in english format over the dutch unit", "nl", "en", nlUnit("€ 4.000"), enClaim("€ 4,000"), false],
     ["nl claim in dutch format over the english unit", "en", "nl", enUnit("€ 4,000"), nlClaim("€ 4.000"), false],
     ["4.000 is not 40.000", "nl", "nl", nlUnit("€ 40.000"), nlClaim("€ 4.000"), true],
@@ -563,11 +578,21 @@ describe("number forms in running text (golang verify_number_forms_test.go)", ()
       "De huurder krijgt 4.000 parkeerplaatsen bij de bedrijfsruimte.",
       true,
     ],
+    // ADR-0015 amendment: copied verbatim outside money too, "4.000" keeps
+    // the Dutch unit's reading (4000) — admitted; this was a refusal.
     [
-      "en-declared 4.000 outside money stays ambiguous",
+      "en-declared 4.000 copied from a dutch unit outside money",
       "nl",
       "en",
       "Personeel. Het bedrijf heeft 4.000 medewerkers in dienst. Zij werken in drie vestigingen.",
+      "The company employs 4.000 staff.",
+      false,
+    ],
+    [
+      "en-declared 4.000 outside money not in the unit",
+      "nl",
+      "en",
+      "Personeel. Het bedrijf heeft 4000 medewerkers in dienst. Zij werken in drie vestigingen.",
       "The company employs 4.000 staff.",
       true,
     ],
