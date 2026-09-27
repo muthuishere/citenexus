@@ -19,6 +19,7 @@ connection is injectable for unit tests.
 from __future__ import annotations
 
 import re
+from threading import Lock
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -61,6 +62,11 @@ class PostgresVectorStore:
         self._connect = connect
         self._conn: Any = None
         self._ready = False
+        # ONE psycopg connection per leaf, and psycopg connections are not safe
+        # for concurrent use — the retrieval engine now fans the (retriever x
+        # query) calls out to threads (ADR-0013 §Cost), so the shared connection
+        # is serialised here rather than corrupted there.
+        self._lock = Lock()
 
     def _connection(self) -> Any:
         if self._conn is None:
@@ -121,19 +127,20 @@ class PostgresVectorStore:
 
     def _select(self, sql: str, params: tuple[Any, ...] | None) -> list[tuple[Any, ...]]:
         """Run a SELECT; an undefined table is an empty leaf (parity with LanceDB)."""
-        conn = self._connection()
-        try:
-            with conn.cursor() as cur:
-                cur.execute(sql, params)
-                rows: list[tuple[Any, ...]] = cur.fetchall()
-            return rows
-        except Exception as error:
-            if _is_missing_table(error):
-                rollback = getattr(conn, "rollback", None)
-                if callable(rollback):
-                    rollback()
-                return []
-            raise
+        with self._lock:  # one connection, and retrieval now fans out to threads
+            conn = self._connection()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(sql, params)
+                    rows: list[tuple[Any, ...]] = cur.fetchall()
+                return rows
+            except Exception as error:
+                if _is_missing_table(error):
+                    rollback = getattr(conn, "rollback", None)
+                    if callable(rollback):
+                        rollback()
+                    return []
+                raise
 
     def search(self, vector: Sequence[float], limit: int = 10) -> list[dict[str, Any]]:
         """Nearest rows by pgvector cosine distance (``<=>``), with ``_distance``."""

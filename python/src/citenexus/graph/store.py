@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Iterable, Mapping
 from enum import StrEnum
+from threading import Lock
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
@@ -88,6 +89,10 @@ class GraphStore:
         self._backend = backend
         self._partition = partition
         self._distiller = distiller
+        # The lazy rebuild is single-flight: the retrieval engine fans the
+        # (retriever x query) calls out to threads (ADR-0013 §Cost), so N queries
+        # reach ``ensure_current`` at once and exactly one may write the artifact.
+        self._rebuild_lock = Lock()
 
     @property
     def key(self) -> str:
@@ -113,9 +118,15 @@ class GraphStore:
 
     def ensure_current(self, store: VectorStore) -> None:
         """Rebuild the graph if it was marked dirty — called before any graph read
-        so an ``ask()`` always sees a graph consistent with all committed ingests."""
-        if self._is_dirty():
-            self.build_from_store(store)
+        so an ``ask()`` always sees a graph consistent with all committed ingests.
+
+        Single-flight: concurrent callers (one per fanned-out query) wait for the
+        one rebuild instead of racing it, so a reader never opens a half-written
+        artifact and a distiller is never called twice for the same state.
+        """
+        with self._rebuild_lock:
+            if self._is_dirty():
+                self.build_from_store(store)
 
     def build_from_store(self, store: VectorStore) -> GraphIndex:
         rows = store.scan()

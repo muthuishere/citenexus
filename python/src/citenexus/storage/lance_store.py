@@ -9,7 +9,6 @@ works over a local path (hermetic tests) and ``s3://…`` (MinIO/prod) via
 
 from __future__ import annotations
 
-import warnings
 from typing import TYPE_CHECKING, Any
 
 import lancedb
@@ -33,12 +32,11 @@ class LanceVectorStore:
         self._db = lancedb.connect(uri, storage_options=storage_options or {})
 
     def _tables(self) -> list[str]:
-        # table_names() returns a plain list of names; list_tables() returns a
-        # version-dependent paginated object. The former is clearer here.
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            names: list[str] = list(self._db.table_names())
-        return names
+        # ``list_tables()`` replaces the deprecated ``table_names()``, whose
+        # suppression mutated process-global warning state — not safe now that
+        # the engine fans the (retriever x query) calls out to threads. A leaf
+        # holds at most its own EU table, so the first page is the whole list.
+        return list(self._db.list_tables().tables)
 
     def upsert(self, rows: Sequence[dict[str, Any]]) -> None:
         """Insert or update EU rows keyed by ``eu_id`` (idempotent)."""
