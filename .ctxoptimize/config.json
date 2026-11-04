@@ -1,0 +1,24 @@
+{
+  "name": "rag-cite-nexus",
+  "modules": [
+    {
+      "path": "golang"
+    },
+    {
+      "path": "js"
+    },
+    {
+      "path": "python"
+    },
+    {
+      "path": "rust"
+    },
+    {
+      "path": "site"
+    },
+    {
+      "path": "spikes/library-stress/ports/go"
+    }
+  ],
+  "wiki": true
+}
