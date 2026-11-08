@@ -17,9 +17,10 @@ defend. The guarantee is **"no ungrounded claim,"** not "zero hallucination."
 ## Install
 
 ```bash
-pip install citenexus                                  # 0.10.1 — the Python facade
-npm install @muthuishere/citenexus                     # 0.10.1 — the deterministic core
-go get github.com/muthuishere/citenexus/golang@v0.10.1 # resolves the golang/v0.10.1 tag
+pip install citenexus                                  # 0.13.1 — the Python facade
+npm install @muthuishere/citenexus                     # 0.13.1 — the deterministic core
+go get github.com/muthuishere/citenexus/golang@v0.13.1 # resolves the golang/v0.13.1 tag
+cargo add citenexus-core                               # 0.13.1 — the Rust core
 ```
 
 > **Upgrade off 0.10.0 if you use the Go or JS `Ask`/`ask`.** 0.10.0 shipped the
